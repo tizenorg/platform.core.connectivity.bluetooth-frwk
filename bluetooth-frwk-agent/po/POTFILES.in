@@ -1,0 +1,4 @@
+# List of source files containing translatable strings.
+bluetooth-agent.c
+bluetooth-agent.h
+bluetooth-agent-cb.c

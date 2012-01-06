@@ -1,0 +1,31 @@
+# auto generated tet_scen
+all
+	"Starting Full Test Suite"
+	/bluetooth_TC/uts_bluetooth_register_callback
+	/bluetooth_TC/uts_bluetooth_check_adapter
+	/bluetooth_TC/uts_bluetooth_enable_adapter
+	/bluetooth_TC/uts_bluetooth_authorize_device
+	/bluetooth_TC/uts_bluetooth_start_discovery
+	/bluetooth_TC/uts_bluetooth_cancel_discovery
+	/bluetooth_TC/uts_bluetooth_bond_device
+	/bluetooth_TC/uts_bluetooth_cancel_bonding
+	/bluetooth_TC/uts_bluetooth_unbond_device
+	/bluetooth_TC/uts_bluetooth_search_service
+	/bluetooth_TC/uts_bluetooth_cancel_service_search
+	/bluetooth_TC/uts_bluetooth_get_bonded_device_list
+	/bluetooth_TC/uts_bluetooth_get_discoverable_mode
+	/bluetooth_TC/uts_bluetooth_get_local_address
+	/bluetooth_TC/uts_bluetooth_get_local_name
+	/bluetooth_TC/uts_bluetooth_get_remote_device
+	/bluetooth_TC/uts_bluetooth_set_discoverable_mode
+	/bluetooth_TC/uts_bluetooth_set_local_name
+	/bluetooth_TC/uts_bluetooth_is_discovering
+	/bluetooth_TC/uts_bluetooth_rfcomm_create_socket
+	/bluetooth_TC/uts_bluetooth_rfcomm_remove_socket
+	/bluetooth_TC/uts_bluetooth_rfcomm_listen
+	/bluetooth_TC/uts_bluetooth_rfcomm_connect
+	/bluetooth_TC/uts_bluetooth_rfcomm_disconnect
+	/bluetooth_TC/uts_bluetooth_rfcomm_write
+	/bluetooth_TC/uts_bluetooth_disable_adapter
+	"Completed Full Test Suite"
+# EOF

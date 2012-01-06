@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# root case
+if [ ${USER} == "root" ]
+then
+	# Set vconf values with -g/-u options
+	# 0 is root user id
+	vconftool set -t bool memory/bluetooth/allow "0" -u 0
+fi
+

@@ -1,0 +1,19 @@
+bluetooth-frwk (0.1.41-1) unstable; urgency=low
+
+  * change "com.samsung" -> "org.tizen"
+  * Git: pkgs/b/bluetooth-frwk
+  * Tag: bluetooth-frwk_0.1.41-1
+
+ -- DoHyun Pyun <dh79.pyun@samsung.com>  Thu, 22 Dec 2011 17:57:59 +0900
+
+bluetooth-frwk (0.1.41) unstable; urgency=low
+
+  * Update Version for build
+
+ -- Chanyeol Park <chanyeol.park@samsung.com>  Thu, 15 Dec 2011 12:56:57 +0900
+
+bluetooth-frwk (0.1.0) unstable; urgency=low
+
+  * Initial Release.
+
+ -- Chanyeol Park <chanyeol.park@samsung.com>  Wed, 07 Dec 2011 13:00:03 +0900
