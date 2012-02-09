@@ -154,7 +154,6 @@ BT_EXPORT_API int bluetooth_opc_push_files(bluetooth_device_address_t *remote_ad
 	GHashTable *hash;
 	GValue *value;
 	char address[BT_BD_ADDR_MAX_LEN] = { 0 };
-	GError *error = NULL;
 	char agent_path[100] = {0};
 
 	if (remote_address == NULL || file_name_array == NULL)
@@ -248,7 +247,7 @@ BT_EXPORT_API int bluetooth_opc_cancel_push(void)
 	return BLUETOOTH_ERROR_NONE;
 }
 
-BT_EXPORT_API gboolean bluetooth_opc_sessioin_is_exist(void)
+BT_EXPORT_API gboolean bluetooth_opc_session_is_exist(void)
 {
 	DBG("+");
 
@@ -548,7 +547,6 @@ static gboolean __bt_error_callback(DBusGMethodInvocation *context,
 
 static int __bt_obex_client_agent_init(char *agent_path)
 {
-	int random_num = 0;
 
 	opc_obex_agent = obex_agent_new();
 	if(NULL == opc_obex_agent)

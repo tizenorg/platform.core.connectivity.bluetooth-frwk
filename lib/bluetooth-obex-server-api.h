@@ -51,9 +51,9 @@ typedef struct {
 	DBusGProxy *obex_proxy;
 	DBusGMethodInvocation *reply_context;
 	char *filename;
+	char *transfer_path;
 	char *device_name;
-	char *type;
-	int file_size;
+ 	int file_size;
 } obex_server_info_t;
 
 typedef enum {
@@ -65,11 +65,11 @@ typedef enum {
 
 typedef struct {
 	DBusGProxy *transfer_proxy;
-	char *path;
 	char *filename;
-	char *device_name;
+	char *path;
 	char *type;
-	int transfer_id;
+	char *device_name;
+ 	int transfer_id;
 	int file_size;
 } transfer_info_t;
 

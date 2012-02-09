@@ -21,6 +21,10 @@
  *
  */
 
+#include <vconf.h>
+#include <vconf-keys.h>
+#include <syspopup_caller.h>
+
 #include "bluetooth-gap-api.h"
 
 static bluetooth_discovery_option_t discovery_option = { 0 };
@@ -176,7 +180,6 @@ static void __bluetooth_internal_change_state_req_finish_cb(DBusGProxy *proxy, D
 
 static int __bluetooth_internal_enable_adapter(void *data)
 {
-	bluetooth_event_param_t bt_event = { 0, };
 	bt_info_t *bt_internal_info = NULL;
 
 	bt_internal_info = _bluetooth_internal_get_information();
@@ -203,14 +206,6 @@ BT_EXPORT_API int bluetooth_enable_adapter(void)
 
 	DBG("+\n");
 
-	/* If the MDM set the allow value to FALSE, can't enable the adapter */
-	if (!vconf_get_bool(BT_MEMORY_KEY_RESTRICTION, &value)) {
-		if (value == 1) {
-			DBG("Not allow to enable adapter!!");
-			return BLUETOOTH_ERROR_ACCESS_DENIED;
-		}
-	}
-
 	_bluetooth_internal_session_init();
 
 	bt_internal_info = _bluetooth_internal_get_information();
@@ -236,7 +231,6 @@ BT_EXPORT_API int bluetooth_enable_adapter(void)
 
 static int __bluetooth_internal_disable_adapter(void *data)
 {
-	bluetooth_event_param_t bt_event = { 0, };
 	bt_info_t *bt_internal_info = NULL;
 
 	bt_internal_info = _bluetooth_internal_get_information();
@@ -553,12 +547,22 @@ BT_EXPORT_API int bluetooth_set_discoverable_mode(bluetooth_discoverable_mode_t 
 	case BLUETOOTH_DISCOVERABLE_MODE_TIME_LIMITED_DISCOVERABLE:
 		inq_scan = TRUE;
 		pg_scan = TRUE;
+
+		if (bt_internal_info->agent_proxy == NULL)
+			break;
+
 		break;
 	default:
 		return BLUETOOTH_ERROR_INVALID_PARAM;
 		break;
 
 	}
+
+	/* Set the discoverable timeout value in agent */
+	dbus_g_proxy_call_no_reply(bt_internal_info->agent_proxy,
+				   "SetDiscoverableTimer",
+				   G_TYPE_UINT, timeout,
+				   G_TYPE_INVALID);
 
 	g_value_set_boolean(&connectable, pg_scan);
 	g_value_set_boolean(&discoverable, inq_scan);
@@ -1065,9 +1069,7 @@ void _bluetooth_internal_bonding_created_cb(const char *bond_address, gpointer u
 	GValue *value = NULL;
 	GValue *uuid_value = NULL;
 	const gchar *name = NULL;	/*Sparrow fix */
-	gchar **array_ptr = NULL;
-	int passkey_len = 0;
-	gint rssi;
+	gint rssi = 0;
 
 	DBG("+\n");
 
@@ -1082,9 +1084,6 @@ void _bluetooth_internal_bonding_created_cb(const char *bond_address, gpointer u
 
 		value = g_hash_table_lookup(hash, "Class");
 		remote_class = value ? g_value_get_uint(value) : 0;
-
-		value = g_hash_table_lookup(hash, "PinLength");
-		passkey_len = value ? g_value_get_uint(value) : 0;
 
 		value = g_hash_table_lookup(hash, "Trusted");
 		trust = value ? g_value_get_boolean(value) : FALSE;
@@ -1139,7 +1138,6 @@ static void __bluetooth_internal_bonding_req_finish_cb(DBusGProxy *proxy, DBusGP
 	int is_headset = 0;
 	char *device_path = NULL;
 	bt_info_t *bt_internal_info = NULL;
-	bluetooth_device_info_t device_info = { { { 0 } } };
 	GError *err = NULL;
 	GHashTable *hash = NULL;
 	GValue *value = NULL;
@@ -1264,6 +1262,244 @@ static int __bluetooth_internal_bonding_req_timeout_cb(void *data)
 	DBG("-");
 
 	return 0;
+}
+
+static void __bluetooth_oob_read_local_data_cb(DBusPendingCall *call, void *user_data)
+{
+	DBusError err;
+	DBusMessage *reply = NULL;
+	unsigned char *hash = NULL;
+	unsigned char *randomizer = NULL;
+	unsigned int hash_len;
+	unsigned int randomizer_len;
+
+	bluetooth_event_param_t bt_event = {0,};
+	bt_info_t *bt_internal_info = NULL;
+	bt_oob_data_t local_oob_data = {{0},};
+
+	bt_internal_info = _bluetooth_internal_get_information();
+
+	reply = dbus_pending_call_steal_reply(call);
+
+	dbus_error_init(&err);
+	if (dbus_set_error_from_message(&err, reply)) {
+		DBG("ReadLocalData - error: %s, %s",
+			err.name, err.message);
+		dbus_error_free(&err);
+		bt_event.result = BLUETOOTH_ERROR_INTERNAL;
+		goto done;
+	}
+
+	if (dbus_message_get_args(reply, &err,
+			DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+			&hash, &hash_len,
+			DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+			&randomizer, &randomizer_len,
+			DBUS_TYPE_INVALID) == FALSE) {
+		DBG("unable to parse get_radio_states reply: %s, %s",
+			err.name, err.message);
+		dbus_error_free(&err);
+		bt_event.result = BLUETOOTH_ERROR_INVALID_DATA;
+		goto done;
+	}
+
+	if (NULL != hash && hash_len != 0) {
+		memcpy(&local_oob_data.hash, hash, hash_len);
+		local_oob_data.hash_len = hash_len;
+	}
+
+	if (NULL != randomizer && randomizer_len != 0) {
+		memcpy(&local_oob_data.randomizer, randomizer, randomizer_len);
+		local_oob_data.randomizer_len = randomizer_len;
+	}
+
+	bt_event.result = BLUETOOTH_ERROR_NONE;
+
+done:
+	bt_event.event = BLUETOOTH_EVENT_READ_LOCAL_OOB_DATA;
+	bt_event.param_data = (void *)&local_oob_data;
+	if (bt_internal_info->bt_cb_ptr) {
+		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event,
+			 bt_internal_info->user_data);
+	}
+	dbus_message_unref(reply);
+}
+
+BT_EXPORT_API int bluetooth_oob_read_local_data(void)
+{
+	DBG("+\n");
+	bt_info_t *bt_internal_info = NULL;
+	DBusMessage *msg = NULL;
+	DBusPendingCall *call;
+
+	bt_internal_info = _bluetooth_internal_get_information();
+
+	if (!bt_internal_info->sys_conn) {
+		bt_internal_info->sys_conn =
+				dbus_g_connection_get_connection(
+					bt_internal_info->conn);
+	}
+
+	msg = dbus_message_new_method_call("org.bluez",
+					bt_internal_info->adapter_path,
+					"org.bluez.OutOfBand",
+					"ReadLocalData");
+
+	if(msg == NULL)
+		return BLUETOOTH_ERROR_INTERNAL;
+
+	if (!dbus_connection_send_with_reply(bt_internal_info->sys_conn, msg,
+			&call, -1)) {
+		DBG("Error in ReadLocalData \n");
+		dbus_message_unref(msg);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	dbus_pending_call_set_notify(call, __bluetooth_oob_read_local_data_cb,
+					NULL, NULL);
+	dbus_pending_call_unref(call);
+	dbus_message_unref(msg);
+
+	DBG("-\n");
+
+	return BLUETOOTH_ERROR_NONE;
+}
+
+BT_EXPORT_API int bluetooth_oob_add_remote_data(
+			const bluetooth_device_address_t *remote_device_address,
+			bt_oob_data_t *remote_oob_data)
+{
+	DBG("+\n");
+	DBusMessage *msg = NULL;
+	DBusMessage *reply = NULL;
+	DBusError err;
+	const char *dev_addr = NULL;
+
+	bt_info_t *bt_internal_info = NULL;
+	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
+	unsigned char *remote_hash = NULL;
+	unsigned char *remote_randomizer = NULL;
+
+	if (NULL == remote_oob_data) {
+		return BLUETOOTH_ERROR_INVALID_PARAM;
+	}
+
+	bt_internal_info = _bluetooth_internal_get_information();
+
+	if (!bt_internal_info->sys_conn) {
+		bt_internal_info->sys_conn =
+				dbus_g_connection_get_connection(
+					bt_internal_info->conn);
+	}
+
+	_bluetooth_internal_addr_type_to_addr_string(address,
+		remote_device_address);
+
+	msg = dbus_message_new_method_call("org.bluez",
+			bt_internal_info->adapter_path,
+			"org.bluez.OutOfBand",
+			"AddRemoteData");
+
+	if (NULL == msg) {
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	DBG("remote hash len = [%d] and remote random len = [%d]\n",
+		remote_oob_data->hash_len, remote_oob_data->randomizer_len);
+
+	remote_hash = remote_oob_data->hash;
+	remote_randomizer = remote_oob_data->randomizer;
+
+	dev_addr = g_strdup(address);
+	DBG("dev_addr = [%s]\n", dev_addr);
+
+	dbus_message_append_args(msg,
+		DBUS_TYPE_STRING, &dev_addr,
+		DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+		&remote_hash, remote_oob_data->hash_len,
+		DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+		&remote_randomizer, remote_oob_data->randomizer_len,
+		DBUS_TYPE_INVALID);
+
+	dbus_error_init(&err);
+	reply = dbus_connection_send_with_reply_and_block(bt_internal_info->sys_conn,
+					msg, -1, &err);
+
+	dbus_message_unref(msg);
+	if (!reply) {
+		DBG("Error in AddRemoteData \n");
+		if (dbus_error_is_set(&err)) {
+			DBG("%s", err.message);
+			dbus_error_free(&err);
+			g_free((void *)dev_addr);
+			return BLUETOOTH_ERROR_INTERNAL;
+		}
+	}
+
+	g_free((void *)dev_addr);
+	dbus_message_unref(reply);
+	DBG("+\n");
+
+	return BLUETOOTH_ERROR_NONE;
+}
+
+BT_EXPORT_API int bluetooth_oob_remove_remote_data(
+			const bluetooth_device_address_t *remote_device_address)
+{
+	DBG("+\n");
+	DBusMessage *msg = NULL;
+	DBusMessage *reply = NULL;
+	DBusError err;
+
+	bt_info_t *bt_internal_info = NULL;
+	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
+
+	bt_internal_info = _bluetooth_internal_get_information();
+
+	if (!bt_internal_info->sys_conn) {
+		bt_internal_info->sys_conn =
+				dbus_g_connection_get_connection(
+					bt_internal_info->conn);
+	}
+
+	_bluetooth_internal_addr_type_to_addr_string(address, remote_device_address);
+
+	const char *dev_addr = g_strdup(address);
+	DBG("dev_addr = [%s]\n", dev_addr);
+
+	msg = dbus_message_new_method_call("org.bluez",
+			bt_internal_info->adapter_path,
+			"org.bluez.OutOfBand",
+			"RemoveRemoteData");
+
+	if (NULL == msg ) {
+		g_free((void *)dev_addr);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	dbus_message_append_args(msg, DBUS_TYPE_STRING,
+		&dev_addr, DBUS_TYPE_INVALID);
+
+	dbus_error_init(&err);
+	reply = dbus_connection_send_with_reply_and_block(bt_internal_info->sys_conn,
+					msg, -1, &err);
+
+	dbus_message_unref(msg);
+	if (!reply) {
+		DBG("Error in AddRemoteData \n");
+		if (dbus_error_is_set(&err)) {
+			DBG("%s", err.message);
+			dbus_error_free(&err);
+			g_free((void *)dev_addr);
+			return BLUETOOTH_ERROR_INTERNAL;
+		}
+	}
+
+	g_free((void *)dev_addr);
+	dbus_message_unref(reply);
+	DBG("+\n");
+
+	return BLUETOOTH_ERROR_NONE;
 }
 
 static int __bluetooth_internal_bonding_req(void)

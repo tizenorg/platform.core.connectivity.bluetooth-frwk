@@ -119,7 +119,7 @@ static gboolean obex_agent_authorize(ObexAgent *agent, const char *path, const c
 	ObexAgentPrivate *priv = OBEX_AGENT_GET_PRIVATE(agent);
 	gboolean result = FALSE;
 
-	DBG("agent %p sender %s", agent);
+	DBG("agent %p", agent);
 
 	if (priv->authorize_func) {
 		result = priv->authorize_func(context, path, bdaddress, name, type, length, time,

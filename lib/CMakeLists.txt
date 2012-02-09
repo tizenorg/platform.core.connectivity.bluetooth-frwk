@@ -1,8 +1,9 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 PROJECT(bluetooth-api C)
 
-SET(SRCS bluetooth-api-common.c marshal.c bluetooth-gap-api.c bluetooth-sdp-api.c bluetooth-rfcomm-api.c bluetooth-network-api.c bluetooth-hdp-api.c obex-agent.c bluetooth-opc-api.c bluetooth-obex-server-api.c)
-SET(HEADERS bluetooth-api.h SLP_BluetoothFW_PG.h)
+SET(SRCS bluetooth-api-common.c marshal.c bluetooth-gap-api.c bluetooth-sdp-api.c bluetooth-rfcomm-api.c bluetooth-network-api.c bluetooth-hdp-api.c obex-agent.c bluetooth-opc-api.c 
+bluetooth-obex-server-api.c bluetooth-hid-api.c)
+SET(HEADERS bluetooth-api.h bluetooth-hid-api.h)
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 SET(EXEC_PREFIX "\${prefix}")
@@ -14,7 +15,8 @@ SET(VERSION ${VERSION_MAJOR}.0.0)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 
 INCLUDE(FindPkgConfig)
-pkg_check_modules(packages REQUIRED dlog dbus-glib-1 gobject-2.0 gmodule-2.0 vconf libxml-2.0)
+pkg_check_modules(packages REQUIRED dlog dbus-glib-1 gobject-2.0 gmodule-2.0 vconf 
+libxml-2.0 mdm syspopup-caller)
 
 FOREACH(flag ${packages_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")
@@ -54,6 +56,4 @@ INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc DESTINATION lib/pkg
 FOREACH(hfile ${HEADERS})
 	INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/${hfile} DESTINATION include/bluetooth-api)
 ENDFOREACH(hfile)
-
-ADD_SUBDIRECTORY(test)
 

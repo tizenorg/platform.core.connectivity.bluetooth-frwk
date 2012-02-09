@@ -26,6 +26,12 @@
 			<arg type="u" name="phonebook_size" direction="out"/>
 		</method>
 
+		<method name="GetTotalObjectCount">
+			<annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+			<arg type="s" name="path"/>
+			<arg type="u" name="phonebook_size" direction="out"/>
+		</method>
+
 		<method name="GetPhonebookList">
 			<annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
 			<arg type="a(ssu)" name="phonebook_list" direction="out"/>

@@ -67,7 +67,7 @@ BT_EXPORT_API int bluetooth_network_activate_server(void)
 	}
 
 	/* If the adapter path is wrong, we can think the BT is not enabled. */
-	if (bluetooth_internal_get_adapter_path(conn, default_adapter_path) < 0) {
+	if (_bluetooth_internal_get_adapter_path(conn, default_adapter_path) < 0) {
 		DBG("Could not get adapter path\n");
 		dbus_g_connection_unref(conn);
 		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
@@ -120,7 +120,7 @@ BT_EXPORT_API int bluetooth_network_deactivate_server(void)
 	}
 
 	/* If the adapter path is wrong, we can think the BT is not enabled. */
-	if (bluetooth_internal_get_adapter_path(conn, default_adapter_path) < 0) {
+	if (_bluetooth_internal_get_adapter_path(conn, default_adapter_path) < 0) {
 		DBG("Could not get adapter path\n");
 		dbus_g_connection_unref(conn);
 		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
@@ -221,7 +221,6 @@ void _bluetooth_network_server_add_signal(void)
 	DBG("+\n");
 
 	bt_info_t *bt_internal_info = NULL;
-	DBusError dbus_error;
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
@@ -289,9 +288,8 @@ static void __bluetooth_network_server_connected(DBusGProxy *proxy,
 					       gpointer user_data)
 {
 	bluetooth_event_param_t bt_event = { 0, };
-	bluetooth_network_device_info_t device_info = { 0 };
+	bluetooth_network_device_info_t device_info = {{{0}}};
 	bt_info_t *bt_internal_info = NULL;
-
 	DBG("+");
 
 	if (device == NULL || address == NULL)
@@ -320,7 +318,7 @@ static void __bluetooth_network_server_disconnected(DBusGProxy *proxy,
 						  gpointer user_data)
 {
 	bluetooth_event_param_t bt_event = { 0, };
-	bluetooth_network_device_info_t device_info = { 0 };
+	bluetooth_network_device_info_t device_info = {{{0}}};
 	bt_info_t *bt_internal_info = NULL;
 
 	DBG("+");
@@ -377,7 +375,7 @@ BT_EXPORT_API int bluetooth_network_connect(const bluetooth_device_address_t *de
 	}
 
 	/* If the adapter path is wrong, we can think the BT is not enabled. */
-	if (bluetooth_internal_get_adapter_path(conn, default_adapter_path) < 0) {
+	if (_bluetooth_internal_get_adapter_path(conn, default_adapter_path) < 0) {
 		DBG("Could not get adapter path\n");
 		dbus_g_connection_unref(conn);
 		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
@@ -470,7 +468,7 @@ BT_EXPORT_API int bluetooth_network_disconnect(const bluetooth_device_address_t 
 	}
 
 	/* If the adapter path is wrong, we can think the BT is not enabled. */
-	if (bluetooth_internal_get_adapter_path(conn, default_adapter_path) < 0) {
+	if (_bluetooth_internal_get_adapter_path(conn, default_adapter_path) < 0) {
 		DBG("Could not get adapter path\n");
 		dbus_g_connection_unref(conn);
 		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
@@ -672,7 +670,6 @@ static DBusHandlerResult __bluetooth_network_event_filter(DBusConnection *sys_co
 	const char *path = dbus_message_get_path(msg);
 	DBusMessageIter item_iter, value_iter;
 	const char *property;
-	char *state;
 
 	if (dbus_message_get_type(msg) != DBUS_MESSAGE_TYPE_SIGNAL)
 		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;

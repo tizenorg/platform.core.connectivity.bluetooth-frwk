@@ -24,6 +24,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <vconf.h>
+#include <vconf-keys.h>
 
 #include "bluetooth-agent.h"
 #include "sc_core_agent.h"
@@ -55,6 +57,9 @@ struct _ScCoreAgentPrivate {
 	char pairing_addr[18];
 	char authorize_addr[18];
 
+	guint timeout_id;
+	unsigned int timeout;
+
 	SC_CORE_AGENT_FUNC_CB cb;
 };
 
@@ -83,6 +88,13 @@ static gboolean sc_core_agent_cancel(ScCoreAgent *agent, DBusGMethodInvocation *
 static gboolean sc_core_agent_release(ScCoreAgent *agent, DBusGMethodInvocation *context);
 
 static gboolean sc_core_agent_ignore_auto_pairing(ScCoreAgent *agent, const char *address,
+						DBusGMethodInvocation *context);
+
+static gboolean sc_core_agent_set_discoverable_timer(ScCoreAgent *agent,
+						const guint timeout,
+						DBusGMethodInvocation *context);
+
+static gboolean sc_core_agent_get_discoverable_timeout(ScCoreAgent *agent,
 						DBusGMethodInvocation *context);
 
 static void __sc_core_agent_name_owner_changed(DBusGProxy *object, const char *name,
@@ -652,6 +664,72 @@ static gboolean sc_core_agent_ignore_auto_pairing(ScCoreAgent *agent, const char
 	return TRUE;
 }
 
+static gboolean __sc_core_agent_timeout_handler(gpointer user_data)
+{
+	DBG("+\n");
+
+	ScCoreAgentPrivate *priv = (ScCoreAgentPrivate *)user_data;
+
+	if (priv == NULL)
+		return FALSE;
+
+	priv->timeout--;
+
+	if (priv->timeout == 0) {
+		priv->timeout_id = 0;
+		return FALSE;
+	}
+
+	DBG("-\n");
+	return TRUE;
+}
+
+static gboolean sc_core_agent_set_discoverable_timer(ScCoreAgent *agent,
+						const guint timeout,
+						DBusGMethodInvocation *context)
+{
+	DBG("+\n");
+
+	ScCoreAgentPrivate *priv = SC_CORE_AGENT_GET_PRIVATE(agent);
+
+	if (priv == NULL)
+		return FALSE;
+
+	if (priv->timeout_id) {
+		g_source_remove(priv->timeout_id);
+		priv->timeout_id = 0;
+	}
+
+	priv->timeout = timeout;
+
+	if (timeout == 0)
+		return TRUE;
+
+	priv->timeout_id = g_timeout_add_seconds(1,
+			__sc_core_agent_timeout_handler, priv);
+
+	DBG("-\n");
+
+	return TRUE;
+}
+
+static gboolean sc_core_agent_get_discoverable_timeout(ScCoreAgent *agent,
+						DBusGMethodInvocation *context)
+{
+	DBG("+\n");
+
+	ScCoreAgentPrivate *priv = SC_CORE_AGENT_GET_PRIVATE(agent);
+
+	if (priv == NULL)
+		return FALSE;
+
+	dbus_g_method_return(context, priv->timeout);
+
+	DBG("-\n");
+
+	return TRUE;
+}
+
 gboolean sc_core_agent_reply_pin_code(ScCoreAgent *agent, const guint accept, const char *pin_code,
 				      DBusGMethodInvocation *context)
 {
@@ -981,6 +1059,13 @@ static void __sc_core_agent_name_owner_changed(DBusGProxy *object, const char *n
 {
 	if (g_strcmp0(name, "org.bluez") == 0 && *new == '\0') {
 		DBG("BlueZ is terminated\n");
+
+		/* Update Bluetooth Status to notify other modules */
+		if (vconf_set_int(VCONFKEY_BT_STATUS, VCONFKEY_BT_STATUS_OFF) != 0)
+			DBG("Set vconf failed\n");
+
+		if (vconf_set_int(VCONFKEY_BT_DEVICE, VCONFKEY_BT_DEVICE_NONE) != 0)
+			DBG("Set vconf failed\n");
 	}
 }
 

@@ -231,7 +231,9 @@ static gboolean __bluetooth_internal_get_service_class_id_list_from_node(xmlNode
 
 				if (sdp_info->service_index < BLUETOOTH_MAX_SERVICES_FOR_DEVICE) {
 					DBG("sdp_info->service_index %d", sdp_info->service_index);
-					g_strlcpy(sdp_info->uuids[sdp_info->service_index], uuid_attr->children->content, BLUETOOTH_UUID_STRING_MAX);
+					g_strlcpy(sdp_info->uuids[sdp_info->service_index],
+							(const gchar *)uuid_attr->children->content,
+							BLUETOOTH_UUID_STRING_MAX);
 
 					sdp_info->service_list_array[sdp_info->service_index] =
 							strtol((char *)uuid_attr->children->content,
@@ -403,140 +405,93 @@ static void __bluetooth_internal_discover_services_cb(DBusGProxy *proxy, DBusGPr
 {
 	GError *err = NULL;
 	GHashTable *hash;
-	static bt_sdp_info_t xml_parsed_sdp_data;
+	GHashTable *property_hash;
+	GValue *value;
+	const char *dev_path = NULL;
+	static bt_sdp_info_t sdp_data;
 	bt_info_t *bt_internal_info = NULL;
 	bluetooth_event_param_t bt_event = { 0, };
 
 	bt_info_for_searching_support_service_t *bt_info_for_searching_support_service =
 	    (bt_info_for_searching_support_service_t *) user_data;
 
-	/* if service_info is NULL, it means search discover Browse group
-	   Otherwise, it means search known UUIDs.
-	 */
-
-	match_entries_t *service_info = bt_info_for_searching_support_service->search_match_ptr;
-	char *xml_record = NULL;
-
-	DBG("+\n");
-
 	dbus_g_proxy_end_call(proxy, call, &err,
 			      dbus_g_type_get_map("GHashTable", G_TYPE_UINT, G_TYPE_STRING), &hash,
 			      G_TYPE_INVALID);
 
-	_bluetooth_internal_print_bluetooth_device_address_t(&bt_info_for_searching_support_service->remote_device_addr);
-	memcpy(&xml_parsed_sdp_data.device_addr,
-	       &bt_info_for_searching_support_service->remote_device_addr,
-	       sizeof(bluetooth_device_address_t));
+	bt_internal_info = _bluetooth_internal_get_information();
 
 	if (err != NULL) {
 		DBG("Error occured in Proxy call [%s]\n", err->message);
-		xml_parsed_sdp_data.service_index = 0;
+		sdp_data.service_index = 0;
 
 		if (!strcmp("Operation canceled", err->message)) {
-			__bluetooth_internal_sdp_fail_cb(&xml_parsed_sdp_data,
+			__bluetooth_internal_sdp_fail_cb(&sdp_data,
 						       BLUETOOTH_ERROR_CANCEL_BY_USER);
 		} else if (!strcmp("In Progress", err->message)) {
-			__bluetooth_internal_sdp_fail_cb(&xml_parsed_sdp_data,
+			__bluetooth_internal_sdp_fail_cb(&sdp_data,
 						       BLUETOOTH_ERROR_IN_PROGRESS);
 		} else if (!strcmp("Host is down", err->message)) {
-			__bluetooth_internal_sdp_fail_cb(&xml_parsed_sdp_data,
+			__bluetooth_internal_sdp_fail_cb(&sdp_data,
 						       BLUETOOTH_ERROR_HOST_DOWN);
 		} else {
-			__bluetooth_internal_sdp_fail_cb(&xml_parsed_sdp_data,
+			__bluetooth_internal_sdp_fail_cb(&sdp_data,
 						       BLUETOOTH_ERROR_CONNECTION_ERROR);
 		}
+
+		bt_internal_info->is_service_req = FALSE;
 
 		g_error_free(err);
 		return;
 	}
 
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (service_info == NULL) {
-		xml_parsed_sdp_data.service_index = 0;
-		bt_info_for_searching_support_service->success_search_index = 0;
-		memcpy(&xml_parsed_sdp_data.device_addr,
-		       &bt_info_for_searching_support_service->remote_device_addr,
-		       sizeof(bluetooth_device_address_t));
-/* Read SDP XML record direclty and Call back to the upper layer. */
-
-		if (hash != NULL) {
-			GList *list = g_hash_table_get_values(hash);
-			GList *ptr = NULL;
-			for (ptr = list; ptr; ptr = ptr->next) {
-				xml_record = ptr->data;
-				__bluetooth_internal_parse_sdp_xml(xml_record,
-								 g_utf8_strlen(xml_record, -1),
-								 &xml_parsed_sdp_data);
-			}
-		}
-
-		if (bt_internal_info->bt_cb_ptr) {
-			bt_event.event = BLUETOOTH_EVENT_SERVICE_SEARCHED;
-			DBG("service_index %d\n", xml_parsed_sdp_data.service_index);
-			if (xml_parsed_sdp_data.service_index < 0) {
-				bt_event.result = BLUETOOTH_ERROR_SERVICE_SEARCH_ERROR;
-				xml_parsed_sdp_data.service_index = 0;
-			} else if (xml_parsed_sdp_data.service_index == 0) {
-					/*This is for some carkit, printer.*/
-				__bluetooth_internal_request_search_supported_services(
-					&bt_info_for_searching_support_service->remote_device_addr);
-				return;
-			} else {
-				bt_event.result = BLUETOOTH_ERROR_NONE;
-				bt_event.param_data = &xml_parsed_sdp_data;
-			}
-
-			bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-		}
+	if (bt_internal_info->is_service_req == FALSE) {
+		/* This flag is unset in __bluetooth_internal_device_property_changed function.
+		    If the UUIDs was updated, __bluetooth_internal_device_property_changed func
+		    was called first. So we don't need to send the callback event.
+		*/
+		DBG("Searched event is already sent");
 		return;
 	}
 
-	xml_parsed_sdp_data.service_index = service_info - supported_service_info;
-	DBG("service_index %d\n", xml_parsed_sdp_data.service_index);
+	bt_internal_info->is_service_req = FALSE;
 
-	DBG("Search Service[%s]\n", service_info->match_name);
-	if (hash != NULL) {
-		GList *list = g_hash_table_get_values(hash);
-		if (list != NULL && g_list_length(list) > 0) {
-			xml_record = (char *)g_list_nth_data(list, 0);
-			__bluetooth_internal_parse_sdp_xml(xml_record, g_utf8_strlen(xml_record, -1),
-							 &xml_parsed_sdp_data);
-		}
+	/* If there is no changes in device's UUIDs, device_property_changed func is not called.
+	    In this case, we use the UUIDs value in device's property. */
+
+	dev_path = dbus_g_proxy_get_path(proxy);
+
+	memcpy(&sdp_data.device_addr,
+		       &bt_info_for_searching_support_service->remote_device_addr,
+		       sizeof(bluetooth_device_address_t));
+
+	dbus_g_proxy_call(proxy, "GetProperties", NULL,
+			G_TYPE_INVALID,
+			dbus_g_type_get_map("GHashTable", G_TYPE_STRING, G_TYPE_VALUE),
+			&property_hash, G_TYPE_INVALID);
+
+	if (property_hash != NULL) {
+		value = g_hash_table_lookup(property_hash, "UUIDs");
+		_bluetooth_change_uuids_to_sdp_info(value, &sdp_data);
 	}
 
-	if (xml_record == NULL) {
-		DBG("No Record [%s]\n", service_info->match_name);
-
-	}
-
-	bt_info_for_searching_support_service->search_match_ptr++;
-	service_info = bt_info_for_searching_support_service->search_match_ptr;
-
-	DBG("Search Service[%s]\n", service_info->match_name);
-
-	if (service_info->match) {
-		__bluetooth_internal_get_remote_service_handle(proxy,
-							     bt_info_for_searching_support_service);
-	} else {
-		DBG("Search Ending\n");
-		/* Report UUID list as xml_parsed_sdp_data to the upper layer. */
-		if (bt_internal_info->bt_cb_ptr) {
-			bt_event.event = BLUETOOTH_EVENT_SERVICE_SEARCHED;
-			if (xml_parsed_sdp_data.service_index <= 0
-			    || xml_parsed_sdp_data.service_index >=
-			    BLUETOOTH_MAX_SERVICES_FOR_DEVICE) {
-				bt_event.result = BLUETOOTH_ERROR_SERVICE_SEARCH_ERROR;
-				xml_parsed_sdp_data.service_index = 0;
-			} else {
-				bt_event.result = BLUETOOTH_ERROR_NONE;
-				bt_event.param_data = &xml_parsed_sdp_data;
-			}
-
-			bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event,
-						    bt_internal_info->user_data);
-
+	if (bt_internal_info->bt_cb_ptr) {
+		bt_event.event = BLUETOOTH_EVENT_SERVICE_SEARCHED;
+		DBG("service_index %d\n", sdp_data.service_index);
+		if (sdp_data.service_index < 0) {
+			bt_event.result = BLUETOOTH_ERROR_SERVICE_SEARCH_ERROR;
+			sdp_data.service_index = 0;
+		} else if (sdp_data.service_index == 0) {
+				/*This is for some carkit, printer.*/
+			__bluetooth_internal_request_search_supported_services(
+				&bt_info_for_searching_support_service->remote_device_addr);
+			return;
+		} else {
+			bt_event.result = BLUETOOTH_ERROR_NONE;
+			bt_event.param_data = &sdp_data;
 		}
+
+		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
 	}
 
 	DBG("-\n");
@@ -627,6 +582,8 @@ BT_EXPORT_API int bluetooth_search_service(const bluetooth_device_address_t *dev
 			DBG("Could not call dbus proxy\n");
 			return BLUETOOTH_ERROR_NONE;
 		}
+
+		bt_internal_info->is_service_req = TRUE;
 
 	}
 

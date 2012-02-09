@@ -39,6 +39,7 @@
 #include <sys/stat.h>
 
 #include "bluetooth-rfcomm-api.h"
+#include <termios.h>
 
 #define BLUEZ_SERVICE_NAME "org.bluez"
 #define BLUEZ_SERIAL_CLINET_INTERFACE "org.bluez.Serial"
@@ -80,7 +81,9 @@ static int __bluetooth_rfcomm_internal_client_get_index_from_socket(int fd);
 static void __rfcomm_client_connected_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 				       gpointer user_data);
 
-static int __bluetooth_internal_set_nonblocking(int sk);
+static int __bluetooth_internal_set_non_blocking(int sk);
+
+static int __bluetooth_internal_set_non_blocking_tty(int sk);
 
 /*Get the free index channel for server */
 static int __bluetooth_rfcomm_internal_server_get_free_index(void)
@@ -290,7 +293,7 @@ static gboolean __rfcomm_server_connected_cb(GIOChannel *chan, GIOCondition cond
 	int fd = g_io_channel_unix_get_fd(chan);
 	int index = __bluetooth_rfcomm_internal_server_get_index_from_socket(fd);
 	if (index < 0) {
-		DBG("Invalid index %d", index);
+		ERR("Invalid index %d", index);
 		return BLUETOOTH_ERROR_INVALID_PARAM;
 	}
 	int server_sock, client_sock;
@@ -314,7 +317,7 @@ static gboolean __rfcomm_server_connected_cb(GIOChannel *chan, GIOCondition cond
 			     (struct sockaddr *)&client_sock_addr, (socklen_t *)&client_addr_len);
 
 	if (client_sock < 0) {
-		perror("Server Accept Error");
+		ERR("Server Accept Error");
 		return TRUE;
 
 	} else {
@@ -322,20 +325,10 @@ static gboolean __rfcomm_server_connected_cb(GIOChannel *chan, GIOCondition cond
 
 	}
 
-	long arg;
-
-	arg = fcntl(client_sock, F_GETFL);
-
-	if (arg < 0)
-		return -errno;
-
-	if (arg & O_NONBLOCK) {
-		DBG("Already blocking \n");
-		arg ^= O_NONBLOCK;
+	if(__bluetooth_internal_set_non_blocking_tty(client_sock) < 0) {
+		/* Even if setting the tty fails we will continue */
+		DBG("Warning!!Setting the tty properties failed(%d)\n", client_sock);
 	}
-
-	if (fcntl(client_sock, F_SETFL, arg) < 0)
-		return -errno;
 
 	rfcomm_server[index].client_sock_fd = client_sock;
 
@@ -366,7 +359,7 @@ static gboolean __rfcomm_server_connected_cb(GIOChannel *chan, GIOCondition cond
 	if (!reply) {
 		DBG("\nCan't Call GetInfo Proxy\n");
 		if (dbus_error_is_set(&error)) {
-			DBG("%s\n", error.message);
+			ERR("%s\n", error.message);
 			dbus_error_free(&error);
 		}
 		return -1;
@@ -375,7 +368,7 @@ static gboolean __rfcomm_server_connected_cb(GIOChannel *chan, GIOCondition cond
 	dbus_message_iter_init(reply, &reply_iter);
 
 	if (dbus_message_iter_get_arg_type(&reply_iter) != DBUS_TYPE_ARRAY) {
-		DBG("Can't get reply arguments - DBUS_TYPE_ARRAY\n");
+		ERR("Can't get reply arguments - DBUS_TYPE_ARRAY\n");
 		dbus_message_unref(reply);
 		return -1;
 	}
@@ -694,6 +687,105 @@ static int __get_rfcomm_proxy_list(char ***proxy_list, int *len)
 	return 0;
 }
 
+
+static gboolean __get_rfcomm_is_match_uuid(char *proxy, const char *uuid)
+{
+	DBusMessage *msg = NULL;
+	DBusMessage *reply = NULL;
+	DBusError error;
+	DBusMessageIter reply_iter;
+	DBusMessageIter reply_iter_entry;
+	const char *property;
+	DBusConnection *conn = NULL;
+
+	conn = dbus_bus_get(DBUS_BUS_SYSTEM, &error);
+
+	if (proxy == NULL || uuid == NULL)
+		return FALSE;
+
+	/* GetInfo Proxy Part */
+	msg = dbus_message_new_method_call(BLUEZ_SERVICE_NAME,
+					   proxy,
+					   BLUEZ_SERIAL_PROXY_INTERFACE, "GetInfo");
+
+	conn = dbus_bus_get(DBUS_BUS_SYSTEM, NULL);
+
+	if (conn == NULL)
+		return FALSE;
+
+	dbus_error_init(&error);
+
+	reply = dbus_connection_send_with_reply_and_block(conn, msg, -1, &error);
+	dbus_message_unref(msg);
+
+	if (!reply) {
+		DBG("\nCan't Call GetInfo Proxy\n");
+		if (dbus_error_is_set(&error)) {
+			ERR("%s\n", error.message);
+			dbus_error_free(&error);
+		}
+		dbus_connection_unref(conn);
+		return FALSE;
+	}
+
+	dbus_message_iter_init(reply, &reply_iter);
+
+	if (dbus_message_iter_get_arg_type(&reply_iter) != DBUS_TYPE_ARRAY) {
+		ERR("Can't get reply arguments - DBUS_TYPE_ARRAY\n");
+		dbus_message_unref(reply);
+		dbus_connection_unref(conn);
+		return FALSE;
+	}
+
+	dbus_message_iter_recurse(&reply_iter, &reply_iter_entry);
+
+	/*Parse the dict */
+	while (dbus_message_iter_get_arg_type(&reply_iter_entry) == DBUS_TYPE_DICT_ENTRY) {
+		DBusMessageIter dict_entry;
+		DBusMessageIter dict_entry_val;
+
+		dbus_message_iter_recurse(&reply_iter_entry, &dict_entry);
+
+		dbus_message_iter_get_basic(&dict_entry, &property);	/*get key value*/
+		DBG("property = %s\n", property);
+
+		if (g_strcmp0("uuid", property) == 0) {
+			const char *value;
+
+			if (!dbus_message_iter_next(&dict_entry))
+				DBG("Fail\n");
+
+			if (dbus_message_iter_get_arg_type(&dict_entry) != DBUS_TYPE_VARIANT)
+				DBG("Fail\n");
+
+			/*Getting the value of the varient*/
+			dbus_message_iter_recurse(&dict_entry, &dict_entry_val);
+
+			if (dbus_message_iter_get_arg_type(&dict_entry_val) != DBUS_TYPE_STRING)
+				DBG("Fail\n");
+
+			dbus_message_iter_get_basic(&dict_entry_val, &value);
+
+			DBG("uuid = %s", value);
+
+			if (g_strcasecmp(uuid, value) == 0) {
+				dbus_message_unref(reply);
+				dbus_connection_unref(conn);
+				return TRUE;
+			}
+
+		}
+
+		dbus_message_iter_next(&reply_iter_entry);
+	}
+
+	dbus_message_unref(reply);
+	dbus_connection_unref(conn);
+
+	return FALSE;
+}
+
+
 /*Server Part */
 /*
  * SLP 2.0 Bluetooth RFCOMM API
@@ -815,6 +907,8 @@ BT_EXPORT_API int bluetooth_rfcomm_create_socket(const char *uuid)
 	}
 	dbus_message_unref(reply);
 
+	DBG("uds_proxy = %s, %s", uds_proxy, rfcomm_server[index].uds_name);
+
 /* Make Unix Socket */
 	int sk;
 	struct sockaddr_un server_addr;
@@ -841,15 +935,19 @@ BT_EXPORT_API int bluetooth_rfcomm_create_socket(const char *uuid)
 
 	if (bind(sk, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
 		perror("\nCan't Bind Sock\n");
+		close(sk);
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
 	DBG("Return fd = %d\n", sk);
-	DBG("-\n");
 
-	ret = __bluetooth_internal_set_nonblocking(sk);
-	if (ret != 0)
-		return ret;
+	ret = __bluetooth_internal_set_non_blocking(sk);
+	DBG("-\n");
+	if (ret != 0) {
+		DBG("Cannot set the tty%d\n", sk);
+		close(sk);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
 	else
 		return sk;
 }
@@ -1089,6 +1187,12 @@ static void __rfcomm_client_connected_cb(DBusGProxy *proxy, DBusGProxyCall *call
 	}
 
 	DBG("\n/dev/rfcomm fd = %d\n", dev_node_fd);
+
+	if(__bluetooth_internal_set_non_blocking_tty(dev_node_fd) < 0) {
+		DBG("\nWarning! Unable to set the tty /dev/rfcomm fd = %d\n",
+			dev_node_fd);
+		/* Even if setting the tty fails we will continue */
+	}
 
 	rfcomm_client[index].id = index;
 	rfcomm_client[index].sock_fd = dev_node_fd;
@@ -1352,9 +1456,9 @@ BT_EXPORT_API int bluetooth_rfcomm_write(int fd, const char *buf, int length)
 	DBG("-\n");
 }
 
-static int __bluetooth_internal_set_nonblocking(int sk)
+static int __bluetooth_internal_set_non_blocking(int sk)
 {
-/* Set Nonblocking */
+	/* Set Nonblocking */
 	long arg;
 
 	arg = fcntl(sk, F_GETFL);
@@ -1370,5 +1474,31 @@ static int __bluetooth_internal_set_nonblocking(int sk)
 
 	if (fcntl(sk, F_SETFL, arg) < 0)
 		return -errno;
+
 	return 0;
 }
+
+static int __bluetooth_internal_set_non_blocking_tty(int sk)
+{
+	struct termios ti = {0,};
+	int err = 0;
+
+	err = __bluetooth_internal_set_non_blocking(sk);
+
+	if (err < 0) {
+		ERR("Error in set non blocking!\n");
+		return err;
+	}
+
+	/*Setting tty line disipline*/
+	DBG("\nsetting  raw\n");
+
+	tcflush(sk, TCIOFLUSH);
+
+	/* Switch tty to RAW mode */
+	cfmakeraw(&ti);
+	tcsetattr(sk, TCSANOW, &ti);
+
+	return 0;
+}
+

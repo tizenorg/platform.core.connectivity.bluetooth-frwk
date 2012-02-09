@@ -63,12 +63,20 @@
 #define BT_MEMORY_KEY_RESTRICTION "memory/bluetooth/restriction"
 #define BT_SETTING_DEVICE_NAME "db/setting/device_name"
 
+#define BT_SYSPOPUP_NAME "bt-syspopup"
+#define BT_SECURITY_EVENT "bt-security"
+#define BT_SECURITY_DISABLED "disabled"
+
+#define BLUEZ_NAME "org.bluez"
+#define BLUEZ_ADAPTER_NAME "org.bluez.Adapter"
+
 #define HCI_SCAN_ENABLE_NO_SCAN                                         0x00
 #define HCI_SCAN_ENABLE_INQUIRY_ONLY                                    0x01
 #define HCI_SCAN_ENABLE_PAGE_ONLY                                       0x02
 #define HCI_SCAN_ENABLE_PAGE_AND_INQUIRY                                0x03
 
 #define BT_ADDRESS_STRING_SIZE 18
+#define BT_128_UUID_LEN 36
 #define BT_ADAPTER_OBJECT_PATH_MAX 50
 
 #define RFKILL_NODE "/dev/rfkill"
@@ -165,6 +173,8 @@ typedef struct {
 	gboolean is_headset_pin_req;			/*application request bonding or not*/
 	bt_info_for_searching_support_service_t info_for_searching_support_service;  /**< Service
 								Seaching Session Infomation */
+
+	gboolean is_service_req;			/**< Request to discover device services */
 	void *user_data;
 
 } bt_info_t;
@@ -176,6 +186,8 @@ bool _bluetooth_internal_is_adapter_enabled(void);
 
 DBusGProxy *_bluetooth_internal_find_device_by_path(const char *dev_path);
 DBusGProxy *_bluetooth_internal_add_device(const char *path);
+
+void _bluetooth_change_uuids_to_sdp_info(GValue *value, bt_sdp_info_t *sdp_data);
 
 void _bluetooth_internal_print_bluetooth_device_address_t(const  bluetooth_device_address_t  *addr);
 void _bluetooth_internal_convert_addr_string_to_addr_type(bluetooth_device_address_t *addr,
@@ -191,6 +203,9 @@ int _bluetooth_internal_get_value(bt_store_key_t key);
 int _bluetooth_internal_set_value(bt_store_key_t key);
 
 int _bluetooth_get_default_adapter_name(bluetooth_device_name_t *dev_name, int size);
+
+int _bluetooth_internal_get_adapter_path(DBusGConnection *conn, char *path);
+
 
 #ifdef __cplusplus
 extern "C" {

@@ -105,7 +105,7 @@ void bluetooth_internal_convert_uuid_num_to_string(const bluetooth_service_uuid_
 	DBG("-");
 }
 
-int bluetooth_internal_get_adapter_path(DBusGConnection *conn, char *path)
+int _bluetooth_internal_get_adapter_path(DBusGConnection *conn, char *path)
 {
 	GError *err = NULL;
 	DBusGProxy *manager_proxy = NULL;
@@ -353,7 +353,7 @@ DBusGProxy *_bluetooth_internal_find_device_by_path(const char *dev_path)
 	return NULL;
 }
 
-static void __change_uuids_to_bt_sdp_info(GValue *value, bt_sdp_info_t *sdp_data)
+void _bluetooth_change_uuids_to_sdp_info(GValue *value, bt_sdp_info_t *sdp_data)
 {
 	char **uuids;
 	int i;
@@ -469,7 +469,9 @@ static void __bluetooth_internal_device_property_changed(DBusGProxy *device_prox
 
 		_bluetooth_internal_print_bluetooth_device_address_t(&sdp_data.device_addr);
 
-		__change_uuids_to_bt_sdp_info(value, &sdp_data);
+		_bluetooth_change_uuids_to_sdp_info(value, &sdp_data);
+
+		bt_internal_info->is_service_req = FALSE;
 
 		/* Report UUID list as xml_parsed_sdp_data to the upper layer. */
 		if (bt_internal_info->bt_cb_ptr) {
@@ -689,7 +691,6 @@ static void __bluetooth_internal_adapter_property_changed(DBusGProxy *adapter,
 			_bluetooth_internal_discovery_completed_cb();
 		} else {
 			bt_info.is_discovering = TRUE;
-			bt_info.is_discovery_cancel = FALSE;
 			_bluetooth_internal_discovery_started_cb();
 		}
 	} else if (g_strcmp0(property, "Discoverable") == 0) {
@@ -1124,12 +1125,6 @@ static void __bluetooth_internal_authorized_cb(gboolean authorized,
 static int __bluetooth_get_default_name(char *default_dev_name, int size)
 {
 	/* Getting Phone name starts */
-	FILE *fp = NULL;
-	char buff[BT_FILE_BUFFER_MAX+1];
-	char *name = NULL;
-	char *token = NULL;
-	char *ptr = NULL;
-	size_t sz = 0;
 	int ret = 0;
 
 	if (default_dev_name == NULL) {
@@ -1150,7 +1145,6 @@ static int __bluetooth_get_default_name(char *default_dev_name, int size)
 
 int _bluetooth_get_default_adapter_name(bluetooth_device_name_t *dev_name, int size) {
 	int ret = 0;
-	char phone_no[BT_PHONE_NUM_LEN] = { 0 };
 
 	DBG("+");
 

@@ -46,6 +46,7 @@ extern struct bt_agent_appdata *app_data;
 
 static int __bt_agent_is_auto_response(uint32_t dev_class, const gchar *address);
 static const int __bt_agent_is_hid_keyboard(uint32_t dev_class);
+static int __bt_agent_generate_passkey(char *passkey, int size);
 
 static void __bt_agent_release_memory(void)
 {
@@ -201,7 +202,7 @@ static gboolean __pincode_request(DBusGProxy *device)
 		} else if (__bt_agent_is_hid_keyboard(device_class)) {
 			char str_passkey[7] = { 0 };
 
-			bt_agent_generate_passkey(str_passkey, sizeof(str_passkey));
+			__bt_agent_generate_passkey(str_passkey, sizeof(str_passkey));
 
 			if (name)
 				_bt_agent_launch_system_popup(BT_AGENT_EVENT_KEYBOARD_PASSKEY_REQUEST,
@@ -585,7 +586,7 @@ static int __bt_agent_is_auto_response(uint32_t dev_class, const gchar *address)
 	return ret;
 }
 
-int bt_agent_generate_passkey(char *passkey, int size)
+static int __bt_agent_generate_passkey(char *passkey, int size)
 {
 	int i = 0;
 	int random_fd = 0;

@@ -50,6 +50,7 @@ extern "C" {
 
 #define BLUETOOTH_UUID_STRING_MAX 50
 
+#define BLUETOOTH_OOB_DATA_LENGTH		16
 /**
  * This is Bluetooth Connected event role
  */
@@ -221,6 +222,7 @@ typedef enum {
 	BLUETOOTH_EVENT_REMOTE_DEVICE_READ,	    /**< Bluetooth event read remote device */
 	BLUETOOTH_EVENT_DEVICE_AUTHORIZED,	    /**< Bluetooth event authorize device */
 	BLUETOOTH_EVENT_DEVICE_UNAUTHORIZED,	    /**< Bluetooth event unauthorize device */
+	BLUETOOTH_EVENT_READ_LOCAL_OOB_DATA,	    /**< Bluetooth event read local oob data */
 
 	BLUETOOTH_EVENT_SERVICE_SEARCHED = BLUETOOTH_EVENT_SDP_BASE,
 						    /**< Bluetooth event serice search base id */
@@ -278,16 +280,16 @@ typedef enum {
 	BLUETOOTH_OBEX_IR_MC_SYNC_SERVICE_UUID = ((unsigned short)0x1104),     /**<OBEX IR MC SYNC*/
 	BLUETOOTH_OBEX_OBJECT_PUSH_SERVICE_UUID = ((unsigned short)0x1105),    /**<OPP*/
 	BLUETOOTH_OBEX_FILE_TRANSFER_UUID = ((unsigned short)0x1106),		/**<FTP*/
+	BLUETOOTH_IRMC_SYNC_COMMAND_UUID = ((unsigned short)0x1107),		/**<IRMC SYNC COMMAND*/
 	BLUETOOTH_HS_PROFILE_UUID = ((unsigned short)0x1108),			/**<HS*/
 	BLUETOOTH_CTP_PROFILE_UUID = ((unsigned short)0x1109),			/**<CTP*/
 	BLUETOOTH_AUDIO_SOURCE_UUID = ((unsigned short)0x110A),			/**<AUDIO SOURCE*/
 	BLUETOOTH_AUDIO_SINK_UUID = ((unsigned short)0x110B),			/**<AUDIO SINK*/
-	BLUETOOTH_VIDEO_SOURCE_UUID = ((unsigned short)0x1303),			/**<VEDIO SOURCE*/
-	BLUETOOTH_VIDEO_SINK_UUID = ((unsigned short)0x1304),			/**<VEDIO SINK*/
 	BLUETOOTH_AV_REMOTE_CONTROL_TARGET_UUID = ((unsigned short)0x110C),  /**<AV REMOTE CONTROL
 										TARGET*/
 	BLUETOOTH_ADVANCED_AUDIO_PROFILE_UUID = ((unsigned short)0x110D),    /**<A2DP*/
 	BLUETOOTH_AV_REMOTE_CONTROL_UUID = ((unsigned short)0x110E),	/**<AV REMOTE CONTROL UUID*/
+	BLUETOOTH_AV_REMOTE_CONTROL_CONTROLLER_UUID = ((unsigned short)0x110F),	/**<AV REMOTE CONTROLLER UUID*/
 	BLUETOOTH_ICP_PROFILE_UUID = ((unsigned short)0x1110),			/**<ICP*/
 	BLUETOOTH_FAX_PROFILE_UUID = ((unsigned short)0x1111),			/**<FAX*/
 	BLUETOOTH_HEADSET_AG_SERVICE_UUID = ((unsigned short)0x1112),		/**<HS AG */
@@ -295,25 +297,46 @@ typedef enum {
 	BLUETOOTH_PAN_NAP_PROFILE_UUID = ((unsigned short)0x1116),		/**<PAN*/
 	BLUETOOTH_PAN_GN_PROFILE_UUID = ((unsigned short)0x1117),		/**<PAN*/
 	BLUETOOTH_DIRECT_PRINTING = ((unsigned short)0x1118),
+	BLUETOOTH_OBEX_BPPS_PROFILE_UUID = ((unsigned short)0x1118),		/**<OBEX BPPS*/ /* Will be removed */
 	BLUETOOTH_REFERENCE_PRINTING = ((unsigned short)0x1119),
 	BLUETOOTH_OBEX_IMAGING_UUID = ((unsigned short)0x111A),			/**<OBEX_IMAGING*/
 	BLUETOOTH_OBEX_IMAGING_RESPONDER_UUID = ((unsigned short)0x111B),	/**<OBEX_IMAGING
 										RESPONDER*/
+	BLUETOOTH_IMAGING_AUTOMATIC_ARCHIVE_UUID = ((unsigned short)0x111C),	/**<IMAGING AUTOMATIC ARCHIVE*/
+	BLUETOOTH_IMAGING_REFERENCED_OBJECTS_UUID = ((unsigned short)0x111D),	/**<IMAGING REFERENCED OBJECTS*/
 	BLUETOOTH_HF_PROFILE_UUID = ((unsigned short)0x111E),			/**<HF*/
 	BLUETOOTH_HFG_PROFILE_UUID = ((unsigned short)0x111F),			/**<HFG*/
 	BLUETOOTH_DIRECT_PRINTING_REFERENCE_OBJ_UUID = ((unsigned short)0x1120),
 									/**<DIRECT PRINTING*/
+	BLUETOOTH_REFLECTED_UI = ((unsigned short)0x1121),		/**<REFLECTED UI*/
 	BLUETOOTH_BASIC_PRINTING = ((unsigned short)0x1122),		/**<BASIC PRINTING*/
 	BLUETOOTH_PRINTING_STATUS = ((unsigned short)0x1123),		/**<PRINTING  STATUS*/
+	BLUETOOTH_OBEX_PRINTING_STATUS_UUID = ((unsigned short)0x1123),	/**<OBEX PRINTING STATUS*/ /* Will be removed */
 	BLUETOOTH_HID_PROFILE_UUID = ((unsigned short)0x1124),		/**<HID*/
-	BLUETOOTH_SIM_ACCESS_PROFILE_UUID = ((unsigned short)0x112D),	/**<SIM ACCESS PROFILE*/
-	BLUETOOTH_OBEX_PBA_PROFILE_UUID = ((unsigned short)0x112F),	/**<OBEX PBA*/
-	BLUETOOTH_OBEX_PBAP_UUID = ((unsigned short)0x1130),		/**<OBEX PBA*/
-	BLUETOOTH_OBEX_BPPS_PROFILE_UUID = ((unsigned short)0x1118),	/**<OBEX BPPS*/
-	BLUETOOTH_PNP_INFORMATION_UUID = ((unsigned short)0x1200),	/**<PNP*/
-	BLUETOOTH_OBEX_PRINTING_STATUS_UUID = ((unsigned short)0x1123),	/**<OBEX PRINTING STATUS*/
 	BLUETOOTH_HCR_PROFILE_UUID = ((unsigned short)0x1125),		/**<HCRP*/
-	BLUETOOTH_OBEX_SYNCML_TRANSFER_UUID = ((unsigned short)0x0000)	/**<OBEX_SYNC*/
+	BLUETOOTH_HCR_PRINT_UUID = ((unsigned short)0x1126),		/**<HCR PRINT*/
+	BLUETOOTH_HCR_SCAN_UUID = ((unsigned short)0x1127),		/**<HCR SCAN*/
+	BLUETOOTH_SIM_ACCESS_PROFILE_UUID = ((unsigned short)0x112D),	/**<SIM ACCESS PROFILE*/
+	BLUETOOTH_PBAP_PCE_UUID = ((unsigned short)0x112E),		/**<PBAP - PCE*/
+	BLUETOOTH_PBAP_PSE_UUID = ((unsigned short)0x112F),		/**<OBEX PBA*/
+	BLUETOOTH_OBEX_PBA_PROFILE_UUID = ((unsigned short)0x112F),	/**<OBEX PBA*/ /* Will be removed */
+	BLUETOOTH_OBEX_PBAP_UUID = ((unsigned short)0x1130),		/**<OBEX PBA*/
+	BLUETOOTH_HEADSET_HS_UUID = ((unsigned short)0x1131),		/**<HEADSET HS*/
+	BLUETOOTH_MESSAGE_ACCESS_SERVER_UUID = ((unsigned short)0x1132),/**<MESSAGE ACCESS SERVER*/
+	BLUETOOTH_MESSAGE_NOTIFICATION_SERVER_UUID = ((unsigned short)0x1133),/**<MESSAGE NOTIFICATION SERVER*/
+	BLUETOOTH_MESSAGE_ACCESS_PROFILE_UUID = ((unsigned short)0x1134),/**<MESSAGE ACCESS PROFILE*/
+	BLUETOOTH_PNP_INFORMATION_UUID = ((unsigned short)0x1200),	/**<PNP*/
+	BLUETOOTH_GENERIC_NETWORKING_UUID = ((unsigned short)0x1201),	/**<GENERIC NETWORKING*/
+	BLUETOOTH_GENERIC_FILE_TRANSFER_UUID = ((unsigned short)0x1202),/**<GENERIC FILE TRANSFER*/
+	BLUETOOTH_GENERIC_AUDIO_UUID = ((unsigned short)0x1203),	/**<GENERIC AUDIO*/
+	BLUETOOTH_GENERIC_TELEPHONY_UUID = ((unsigned short)0x1204),	/**<GENERIC TELEPHONY*/
+	BLUETOOTH_VIDEO_SOURCE_UUID = ((unsigned short)0x1303), 	/**<VEDIO SOURCE*/
+	BLUETOOTH_VIDEO_SINK_UUID = ((unsigned short)0x1304),		/**<VEDIO SINK*/
+	BLUETOOTH_VIDEO_DISTRIBUTION_UUID = ((unsigned short)0x1305),	/**<VEDIO DISTRIBUTION*/
+	BLUETOOTH_HDP_UUID = ((unsigned short)0x1400),			/**<HDP*/
+	BLUETOOTH_HDP_SOURCE_UUID = ((unsigned short)0x1401),		/**<HDP SOURCE*/
+	BLUETOOTH_HDP_SINK_UUID = ((unsigned short)0x1402),		/**<HDP SINK*/
+	BLUETOOTH_OBEX_SYNCML_TRANSFER_UUID = ((unsigned short)0x0000)	/**<OBEX_SYNC*/ /* Will be removed */
 } bluetooth_service_uuid_list_t;
 
 /**
@@ -647,13 +670,14 @@ typedef struct {
 	int size;
 }bt_opc_transfer_info_t;
 
+/* Obex Server transfer type */
+#define TRANSFER_PUT "PUT"
+#define TRANSFER_GET "GET"
 /**
  * Stucture to OPP/FTP Server authorize information
  */
 typedef struct {
 	char *filename;
-	char *device_name;
-	char *type;
 	int length;
 } bt_obex_server_authorize_into_t;
 
@@ -669,11 +693,16 @@ typedef struct {
 	int percentage;
 } bt_obex_server_transfer_info_t;
 
-/* This is for distingushing the FTP server operation type */
-#define FTS_TYPE_PUT	"x-obex/ftp-put"
-#define FTS_TYPE_GET	"x-obex/ftp-get"
-#define FTS_TYPE_DEL	"x-obex/ftp-delete"
+/**
+ * Stucture to OOB data
+ */
 
+typedef struct {
+	unsigned char hash[BLUETOOTH_OOB_DATA_LENGTH];
+	unsigned char randomizer[BLUETOOTH_OOB_DATA_LENGTH];
+	unsigned int hash_len;
+	unsigned int randomizer_len;
+} bt_oob_data_t;
 
 /**
  * Callback pointer type
@@ -2349,7 +2378,7 @@ int bluetooth_opc_push_files(bluetooth_device_address_t *remote_address,
 int bluetooth_opc_cancel_push(void);
 
 /**
- * @fn gboolean bluetooth_opc_sessioin_is_exist(void)
+ * @fn gboolean bluetooth_opc_session_is_exist(void)
  * @brief Informs whether opc session exists or not.
  *
  * This function is a synchronous call.
@@ -2363,7 +2392,7 @@ int bluetooth_opc_cancel_push(void);
  * @see    	 None
  */
 
-gboolean bluetooth_opc_sessioin_is_exist(void);
+gboolean bluetooth_opc_session_is_exist(void);
 
 
 /**
@@ -2504,6 +2533,155 @@ int bluetooth_obex_server_set_destination_path(char *dst_path);
  */
 
 int bluetooth_obex_server_set_root(char *root);
+
+/**
+ * @fn int bluetooth_obex_server_cancel_transfer(int transfer_id)
+ * @brief Cancel the transfer on server
+ *
+ * This function is a asynchronous call.
+ * If the call is success to cancel transfering then the application will receive
+ * BLUETOOTH_EVENT_TRANSFER_COMPLETED event through registered callback
+ * function with an error code BLUETOOTH_ERROR_CANCEL. In the case of failure
+ * the error code will be BLUETOOTH_ERROR_NONE
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *               BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Not enabled \n
+ *               BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST -Obex agent not registered \n
+ *               BLUETOOTH_ERROR_INTERNAL - internal error (proxy does not exist) \n
+ *               BLUETOOTH_ERROR_NOT_FOUND - The transfer is not found \n
+ *
+ * @exception None
+ * @param[in] transfer_id transfer ID
+
+ * @remark       None
+ * @see    	 None
+ */
+
+int bluetooth_obex_server_cancel_transfer(int transfer_id);
+
+
+/**
+ * @fn int bluetooth_oob_read_local_data(void)
+ * @brief Read the local Hash and Randmizer.
+ *
+ * This function is a asynchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *           BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *
+ * @exception  None
+ * @param[in]  None.
+ * @param[out]
+ *
+ * @remark       None
+ * @see    	 None
+ @code
+void bt_event_callback(int event, bluetooth_event_param_t *param)
+{
+	switch(event)
+	{
+		case BLUETOOTH_EVENT_READ_LOCAL_OOB_DATA:
+		{
+			if (param->result != BLUETOOTH_ERROR_NONE)  {
+				printf("BLUETOOTH_EVENT_READ_LOCAL_OOB_DATA -BLUETOOTH_ERROR ");
+				break;
+			}
+
+		 printf("BLUETOOTH_EVENT_READ_LOCAL_OOB_DATA - BLUETOOTH_ERROR_NONE");
+		 memcpy(&g_local_oob_data.oob_data,
+			 (bt_oob_data_t *)param->param_data,
+			 sizeof(bt_oob_data_t));
+
+		 printf("hash = [%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X"
+			 "%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X]\n",
+			 g_local_oob_data.oob_data.hash[0],
+			 g_local_oob_data.oob_data.hash[1],
+			 g_local_oob_data.oob_data.hash[2],
+			 g_local_oob_data.oob_data.hash[3],
+			 g_local_oob_data.oob_data.hash[4],
+			 g_local_oob_data.oob_data.hash[5],
+			 g_local_oob_data.oob_data.hash[6],
+			 g_local_oob_data.oob_data.hash[7],
+			 g_local_oob_data.oob_data.hash[8],
+			 g_local_oob_data.oob_data.hash[9],
+			 g_local_oob_data.oob_data.hash[10],
+			 g_local_oob_data.oob_data.hash[11],
+			 g_local_oob_data.oob_data.hash[12],
+			 g_local_oob_data.oob_data.hash[13],
+			 g_local_oob_data.oob_data.hash[14],
+			 g_local_oob_data.oob_data.hash[15]);
+
+		 printf("randomizer = [%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X"
+			 "%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X]\n",
+			 g_local_oob_data.oob_data.randomizer[0],
+			 g_local_oob_data.oob_data.randomizer[1],
+			 g_local_oob_data.oob_data.randomizer[2],
+			 g_local_oob_data.oob_data.randomizer[3],
+			 g_local_oob_data.oob_data.randomizer[4],
+			 g_local_oob_data.oob_data.randomizer[5],
+			 g_local_oob_data.oob_data.randomizer[6],
+			 g_local_oob_data.oob_data.randomizer[7],
+			 g_local_oob_data.oob_data.randomizer[8],
+			 g_local_oob_data.oob_data.randomizer[9],
+			 g_local_oob_data.oob_data.randomizer[10],
+			 g_local_oob_data.oob_data.randomizer[11],
+			 g_local_oob_data.oob_data.randomizer[12],
+			 g_local_oob_data.oob_data.randomizer[13],
+			 g_local_oob_data.oob_data.randomizer[14],
+			 g_local_oob_data.oob_data.randomizer[15]);
+		}
+	}
+}
+ @endcode
+ */
+
+int bluetooth_oob_read_local_data(void);
+
+/**
+ * @fn int bluetooth_oob_add_remote_data(
+ *			const bluetooth_device_address_t *remote_device_address,
+ *			bt_oob_data_t *oob_data)
+ * @brief Add/updated the remote device  Hash and Randmizer.
+ *
+ * This function is a synchronous call.
+ * No event for this api..
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *           BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *
+ * @exception	None
+ * @param[in] remote_device_address - Remote device address
+ *	      remote_oob_data - Ponter to Hash and Randomizer oob data structure
+ *
+ * @remark	None
+ * @see		None
+ */
+
+int bluetooth_oob_add_remote_data(
+		   const bluetooth_device_address_t *remote_device_address,
+		   bt_oob_data_t *remote_oob_data);
+
+
+/**
+ * @fn int bluetooth_oob_remove_remote_data(
+ *			const bluetooth_device_address_t *remote_device_address)
+ * @brief Delete the Hash and Randomizer w.r.t the remote device address.
+ *
+ * This function is a synchronous call.
+ * No event for this api..
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *           BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *
+ * @exception  None
+ * @param[in] remote_device_address - Remote device address
+ *
+ * @remark       None
+ * @see    	 None
+ */
+
+int bluetooth_oob_remove_remote_data(
+			const bluetooth_device_address_t *remote_device_address);
 
 /**
  * @}

@@ -25,6 +25,7 @@
 #ifndef _BT_MP_CONTROL_H_
 #define _BT_MP_CONTROL_H_
 
+#include <dbus/dbus-glib-lowlevel.h>
 #include <dbus/dbus.h>
 #include <dbus/dbus-glib.h>
 #include <glib.h>
@@ -47,6 +48,15 @@ extern "C" {
 
 #define BT_MEDIA_CONTROL_ERROR	-1
 #define BT_MEDIA_CONTROL_SUCCESS	0
+
+typedef enum {
+	EQUILIZER = 0x00,
+	REPEAT,
+	SHUFFLE,
+	SCAN,
+	STATUS,
+	POSITION
+} media_player_property_type;
 
 typedef enum {
 	EQUILIZER_OFF = 0x00,
@@ -93,7 +103,7 @@ typedef struct {
 	media_player_scan_status scan;
 	media_player_status status;
 	unsigned int position;
-}media_player_settings_t;
+} media_player_settings_t;
 
 typedef struct {
 	const char *title;
@@ -103,73 +113,11 @@ typedef struct {
 	unsigned int total_tracks;
 	unsigned int number;
 	unsigned int duration;
-}media_metadata_attributes_t;
-
-typedef struct {
-	DBusGConnection *avrcp_conn;
-	char avrcp_obj_path[MEDIA_OBJECT_PATH_LENGTH];
-} avrcp_dbus_info_t;
+} media_metadata_attributes_t;
 
 /**
- * @fn int bluetooth_media_control_init(void)
- * @brief Initializes the Media interface to media service
- *
- * This function is a asynchronous call.
- * No event for this api..
- *
- * @return   0  - Success \n
- *          -1 - On Failure\n
- *
- * @exception   None
- * @param[in]  None.
- *
- * @remark       None
- * @see    	 None
- */
-int bluetooth_media_control_init(void);
-
-/**
- * @fn int bluetooth_media_control_register_player(media_player_settings_t player_settings,
- *							media_metadata_attributes_t metadata )
- * @brief Registers the Music player with its player settings and media attributes
- *
- * This function is a asynchronous call.
- * No event for this api..
- *
- * @return   0  - Success \n
- *          -1 - On Failure\n
- *
- * @exception   None
- * @param[in]   player_settings - Music player application settings,
- *			 metadata -Meida attributes
- *
- * @remark       None
- * @see    	 None
- */
-int bluetooth_media_control_register_player(
-				media_player_settings_t player_settings,
-				media_metadata_attributes_t metadata );
-
-/**
- * @fn int bluetooth_media_control_unregister_player(void )
- * @brief Un-registers the Music player
- *
- * This function is a asynchronous call.
- * No event for this api..
- *
- * @return   0  - Success \n
- *          -1 - On Failure\n
- *
- * @exception   None
- * @param[in]   None
- *
- * @remark       None
- * @see    	 None
- */
-int bluetooth_media_control_unregister_player(void);
-
-/**
- * @fn int bluetooth_media_control_player_property_changed(media_player_settings_t player_settings)
+ * @fn int bluetooth_media_player_change_property(media_player_property_type type,
+ *				unsigned int value);
  * @brief Notifies the remote bluetooth headset with change in music player settings
  *
  * This function is a asynchronous call.
@@ -179,17 +127,19 @@ int bluetooth_media_control_unregister_player(void);
  *          -1 - On Failure\n
  *
  * @exception   None
- * @param[in]   player_settings - Music player application settings,
+ * @param[in]   type - Type of the music player property
+ *			 value - Value of the property which is changed
  *
  * @remark       None
  * @see    	 None
  */
-int bluetooth_media_control_player_property_changed(
-			media_player_settings_t player_settings);
+int bluetooth_media_player_change_property(
+			media_player_property_type type,
+			unsigned int value);
 
 
 /**
- * @fn int bluetooth_media_control_player_track_changed(media_metadata_attributes_t metadata)
+ * @fn int bluetooth_media_player_change_track(media_metadata_attributes_t metadata)
  * @briefNotifies the remote bluetooth headset with change in media attributes of the track
  *
  * This function is a asynchronous call.
@@ -204,26 +154,8 @@ int bluetooth_media_control_player_property_changed(
  * @remark       None
  * @see    	 None
  */
-int bluetooth_media_control_player_track_changed(
+int bluetooth_media_player_change_track(
 			media_metadata_attributes_t metadata);
-
-/**
- * @fn int bluetooth_media_control_deinit(void)
- * @brief deinitializes the Media interface to media service
- *
- * This function is a asynchronous call.
- * No event for this api..
- *
- * @return   0  - Success \n
- *          -1 - On Failure\n
- *
- * @exception   None
- * @param[in]  None.
- *
- * @remark       None
- * @see    	 None
- */
-int bluetooth_media_control_deinit(void);
 
 #ifdef __cplusplus
 }

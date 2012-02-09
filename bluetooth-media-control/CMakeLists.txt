@@ -1,8 +1,8 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 PROJECT(bluetooth-media-control C)
 
-SET(SRCS bluetooth-media-control-api.c)
-SET(HEADERS bluetooth-media-control-api.h)
+SET(SRCS bluetooth-media-control.c)
+SET(HEADERS bluetooth-media-control.h)
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 SET(EXEC_PREFIX "\${prefix}")
@@ -45,6 +45,3 @@ INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc DESTINATION lib/pkg
 FOREACH(hfile ${HEADERS})
 	INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/${hfile} DESTINATION include/bluetooth-media-control)
 ENDFOREACH(hfile)
-
-ADD_SUBDIRECTORY(test)
-

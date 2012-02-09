@@ -15,8 +15,6 @@ MESSAGE("Build type: ${CMAKE_BUILD_TYPE}")
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 
 INCLUDE(FindPkgConfig)
-#pkg_check_modules(pkgs REQUIRED elementary utilX appcore-efl pmapi vconf aul syspopup-caller)
-#pkg_check_modules(pkgs REQUIRED vconf aul syspopup-caller contacts-service)
 pkg_check_modules(pkgs REQUIRED contacts-service vconf)
 
 FOREACH(flag ${pkgs_CFLAGS})

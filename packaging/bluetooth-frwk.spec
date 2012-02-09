@@ -16,7 +16,6 @@ BuildRequires:  pkgconfig(vconf)
 BuildRequires:  pkgconfig(libxml-2.0)
 BuildRequires:  pkgconfig(bluez)
 BuildRequires:  pkgconfig(dbus-1)
-BuildRequires:  pkgconfig(utilX)
 BuildRequires:  pkgconfig(appcore-efl)
 BuildRequires:  pkgconfig(openobex)
 BuildRequires:  cmake
@@ -37,15 +36,6 @@ Requires:   %{name} = %{version}-%{release}
 %description devel
 This package is development files for Bluetooth framework based on BlueZ stack.
 This package contains API set for BT GAP, BT SDP, and BT RFCOMM.
-
-
-%package test
-Summary:    Bluetooth framework test application
-Group:      TO_BE/FILLED
-Requires:   %{name} = %{version}-%{release}
-
-%description test
-This package is a test application for bluetooth framework.
 
 
 %package agent
@@ -83,9 +73,6 @@ rm -rf %{buildroot}
 /usr/lib/*.so
 /usr/include/*
 /usr/lib/pkgconfig/*
-
-%files test
-/usr/bin/bluetooth-frwk-test
 
 %files agent
 /usr/bin/bluetooth-agent

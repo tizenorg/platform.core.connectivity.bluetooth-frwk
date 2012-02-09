@@ -8,7 +8,7 @@
 		<method name="GetMessageList">
 			<annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
 			<arg type="s" name="folder_name"/>
-			<arg type="a(ss)" name="msg_list" direction="out"/>
+			<arg type="a(sss)" name="msg_list" direction="out"/>
 		</method>
 		<method name="GetMessage">
 			<annotation name="org.freedesktop.DBus.GLib.Async" value=""/>

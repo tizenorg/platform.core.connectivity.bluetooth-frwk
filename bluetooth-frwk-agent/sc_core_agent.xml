@@ -51,6 +51,16 @@
       <arg type="s" name="address"/>
     </method>
 
+    <method name="SetDiscoverableTimer">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <arg type="u" name="timeout"/>
+    </method>
+
+    <method name="GetDiscoverableTimeout">
+      <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+      <arg type="u" name="timeout" direction="out"/>
+    </method>
+
     <method name="ReplyPinCode">
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <arg type="u" name="accept"/>

@@ -24,6 +24,8 @@
 #include "bluetooth-api-common.h"
 #include "bluetooth-hdp-api.h"
 
+#define HDP_BUFFER_SIZE 1024
+
 /**********************************************************************
 *		Static Functions declaration				*
 ***********************************************************************/
@@ -52,8 +54,6 @@ static void __bt_hdp_internal_watch_fd(int file_desc, const char *path);
 static gboolean __bt_hdp_internal_data_received(GIOChannel *gio,
 						GIOCondition cond,
 						gpointer data);
-
-static void __bt_hdp_internal_handle_disconnect_cb(int sk, const char *path);
 
 static int __bt_hdp_internal_destroy_application(const char *app_handle);
 
@@ -692,10 +692,9 @@ static gboolean __bt_hdp_internal_data_received(GIOChannel *gio,
 					GIOCondition cond, gpointer data)
 {
 	DBG("+\n");
-	char buff[5000] = { 0, };
+	char buff[HDP_BUFFER_SIZE] = { 0, };
 	int sk;
 	int act_read;
-	int to_read = sizeof(buff);
 	bt_hdp_data_ind_t data_ind = { 0, };
 
 	const char *path = (const char *)data;
@@ -704,16 +703,20 @@ static gboolean __bt_hdp_internal_data_received(GIOChannel *gio,
 
 	if (cond & (G_IO_NVAL | G_IO_HUP | G_IO_ERR)) {
 		DBG("GIOCondition %d.............path = %s\n", cond, path);
-		goto failed;
+		/* We should simply return from here. Proper disconnection
+		 * happens during ChannelDeleted signal.
+		 */
+		return FALSE;
 	}
 
-	act_read = recv(sk, (void *)buff, to_read, 0);
+	act_read = recv(sk, (void *)buff, sizeof(buff), 0);
+
 
 	if (act_read > 0) {
 		DBG("Received data of %d\n", act_read);
 	} else {
 		DBG("Read failed.....\n");
-		goto failed;
+		return FALSE;
 	}
 
 	data_ind.channel_id = sk;
@@ -726,52 +729,6 @@ static gboolean __bt_hdp_internal_data_received(GIOChannel *gio,
 					  BLUETOOTH_ERROR_NONE, &data_ind);
 
 	return TRUE;
-failed:
-	__bt_hdp_internal_handle_disconnect_cb(sk, path);
-
-	DBG("-\n");
-
-	return FALSE;
-}
-
-static void __bt_hdp_internal_handle_disconnect_cb(int sk, const char *path)
-{
-	DBG("+\n");
-	char address[BT_ADDRESS_STRING_SIZE] = { 0, };
-	bluetooth_device_address_t device_addr = { {0} };
-	bt_hdp_disconnected_t dis_ind = { 0, };
-
-	hdp_app_list_t *list = __bt_hdp_internal_gslist_find_using_fd(sk);
-	if (NULL == list) {
-		ERR("** Could not locate the list for fd %d****\n", sk);
-		return;
-	}
-
-	_bluetooth_internal_device_path_to_address(path, address);
-
-	_bluetooth_internal_convert_addr_string_to_addr_type(
-					&device_addr, address);
-
-	dis_ind.channel_id = sk;
-
-	dis_ind.device_address = device_addr;
-
-	__bt_hdp_internal_event_cb(BLUETOOTH_EVENT_HDP_DISCONNECTED,
-				BLUETOOTH_ERROR_NONE, &dis_ind);
-
-	if (list->fd == -1) {
-		DBG("*** Warning! FD already deleted**\n");
-	}
-
-	list->fd = -1;
-
-	g_free(list->obj_channel_path);
-
-	list->obj_channel_path = NULL;
-
-	DBG("Successfully removed  fd value in the list\n");
-
-	close(sk);
 
 	DBG("-\n");
 }
@@ -1062,7 +1019,7 @@ BT_EXPORT_API int bluetooth_hdp_connect(const char *app_handle,
 	}
 
 	/* If the adapter path is wrong, we can think the BT is not enabled. */
-	if (bluetooth_internal_get_adapter_path(conn, default_adapter_path) < 0) {
+	if (_bluetooth_internal_get_adapter_path(conn, default_adapter_path) < 0) {
 		DBG("Could not get adapter path\n");
 		dbus_g_connection_unref(conn);
 		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
@@ -1167,7 +1124,7 @@ BT_EXPORT_API int bluetooth_hdp_disconnect(unsigned int channel_id,
 	}
 
 	/* If the adapter path is wrong, we can think the BT is not enabled. */
-	if (bluetooth_internal_get_adapter_path(conn, default_adapter_path) < 0) {
+	if (_bluetooth_internal_get_adapter_path(conn, default_adapter_path) < 0) {
 		DBG("Could not get adapter path\n");
 		dbus_g_connection_unref(conn);
 		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
