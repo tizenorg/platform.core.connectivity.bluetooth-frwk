@@ -38,18 +38,10 @@
 #include <fcntl.h>
 
 /*Messaging Header Files*/
-#include "MsgTypes.h"
-#include "MapiStorage.h"
-#include "MapiControl.h"
-#include "MapiMessage.h"
 #include "MapiTransport.h"
+#include "MapiMessage.h"
 
 /*Email Header Files*/
-#include "Emf_Mapi_Init.h"
-#include "Emf_Mapi_Account.h"
-#include "Emf_Mapi_Message.h"
-#include "Emf_Mapi_Network.h"
-#include "Emf_Mapi_Mailbox.h"
 #include "Emf_Mapi_Types.h"
 
 #include <bluetooth_map_agent.h>
@@ -61,9 +53,7 @@
 		G_TYPE_STRING, G_TYPE_STRING,  G_TYPE_STRING, G_TYPE_INVALID))
 
 static MSG_HANDLE_T g_msg_handle = NULL;
-
-DBusConnection *g_session_connection = NULL;
-
+#define BT_MAP_NEW_MESSAGE "NewMessage"
 #define BT_MAP_STATUS_CB "sent status callback"
 #define BT_MAP_MSG_CB "sms message callback"
 #define BT_MAP_EMAIL_DEFAULTACCOUNT "db/email/defaultaccount"
@@ -151,21 +141,43 @@ static void bluetooth_map_agent_class_init(BluetoothMapAgentClass *klass)
 					&dbus_glib_bluetooth_map_object_info);
 }
 
+static GQuark __bt_map_agent_error_quark(void)
+{
+	static GQuark quark = 0;
+	if (!quark)
+		quark = g_quark_from_static_string("agent");
+
+	return quark;
+}
+
+static GError *__bt_map_agent_error(bt_map_agent_error_t error,
+				     const char *err_msg)
+{
+	return g_error_new(BT_MAP_AGENT_ERROR, error, err_msg);
+}
+
 static void __bluetooth_map_msg_incoming_status_cb(MSG_HANDLE_T handle,
 				msg_message_t msg, void *user_param)
 {
 	DBusMessage *message = NULL;
 	char *message_type = NULL;
+	DBusConnection *conn;
 
 	DBG("+\n");
 
-	message = dbus_message_new_signal(BT_MNS_OBJECT_PATH, BT_MNS_INTERFACE,
-					"NewMessage");
-	if (!message)
+	conn  = dbus_bus_get(DBUS_BUS_SYSTEM, NULL);
+
+	if (NULL == conn)
 		return;
 
-	switch (msg_get_message_type(msg)) {
+	message = dbus_message_new_signal(BT_MNS_OBJECT_PATH, BT_MNS_INTERFACE,
+					BT_MAP_NEW_MESSAGE);
+	if (!message) {
+		dbus_connection_unref(conn);
+		return;
+	}
 
+	switch (msg_get_message_type(msg)) {
 	case MSG_TYPE_SMS:
 		message_type =  g_strdup("SMS_GSM");
 		break;
@@ -183,8 +195,9 @@ static void __bluetooth_map_msg_incoming_status_cb(MSG_HANDLE_T handle,
 						DBUS_TYPE_INVALID);
 
 	dbus_message_set_no_reply(message, TRUE);
-	dbus_connection_send(g_session_connection, message, NULL);
+	dbus_connection_send(conn, message, NULL);
 	dbus_message_unref(message);
+	dbus_connection_unref(conn);
 	g_free(message_type);
 }
 
@@ -216,7 +229,7 @@ email:
 	email_err = email_service_begin();
 
 	if (email_err != EMF_ERROR_NONE) {
-		ERR("email_service_begin fail \n");
+		ERR("email_service_begin fail  error = %d\n", email_err);
 		email_ret = FALSE;
 	}
 
@@ -252,23 +265,23 @@ static gboolean bluetooth_map_get_folder_tree(BluetoothMapAgent *agent,
 	bool flag = FALSE;
 	int j = 0;
 	GValue *value = NULL;
-
+	GError *error = NULL;
+	bool msg_ret = TRUE;
 
 	if (__bluetooth_map_start_service() == FALSE)
-		goto done;
+		goto fail;
 
-	if (g_msg_handle == NULL)
+	if (g_msg_handle == NULL) {
+		msg_ret = FALSE;
 		goto email;
+	}
 
-	if (msg_get_folder_list(g_msg_handle, &g_folderList) != MSG_SUCCESS)
+	if (msg_get_folder_list(g_msg_handle, &g_folderList) != MSG_SUCCESS) {
+		msg_ret = FALSE;
 		goto email;
+	}
 
 	value = g_new0(GValue, 1);
-
-	 if (!value) {
-		g_ptr_array_free(array, TRUE);
-		return FALSE;
-	}
 
 	for (i = 0; i < g_folderList.nCount; i++) {
 		g_strlcpy(name, g_folderList.folderInfo[i].folderName,
@@ -284,14 +297,18 @@ static gboolean bluetooth_map_get_folder_tree(BluetoothMapAgent *agent,
 
 email:
 	vconf_err = vconf_get_int(BT_MAP_EMAIL_DEFAULTACCOUNT, &account_id);
-	if (vconf_err == -1)
-		goto done;
+	if (vconf_err == -1) {
+		if (!msg_ret)
+			goto fail;
+	}
 
 	if (EMF_ERROR_NONE != email_get_mailbox_list(account_id,
 							EMF_MAILBOX_ALL,
 							&mailbox_list,
-							&mailbox_count))
-		goto done;
+							&mailbox_count)) {
+		if (!msg_ret)
+			goto fail;
+	}
 
 	for (i = 0; i < mailbox_count; i++) {
 		flag = FALSE;
@@ -316,14 +333,23 @@ email:
 		}
 	}
 
-done:
 	if (mailbox_list != NULL)
 		 email_free_mailbox(&mailbox_list, mailbox_count);
-
 	g_free(value);
 	dbus_g_method_return(context, array);
 	g_ptr_array_free(array, TRUE);
 	return TRUE;
+
+fail:
+	if (mailbox_list != NULL)
+		 email_free_mailbox(&mailbox_list, mailbox_count);
+	g_free(value);
+	g_ptr_array_free(array, TRUE);
+	error = __bt_map_agent_error(BT_MAP_AGENT_ERROR_INTERNAL,
+				  "InternalError");
+	dbus_g_method_return_error(context, error);
+	g_error_free(error);
+	return FALSE;
 }
 
 static gboolean bluetooth_map_get_message_list(BluetoothMapAgent *agent,
@@ -334,7 +360,6 @@ static gboolean bluetooth_map_get_message_list(BluetoothMapAgent *agent,
 	MSG_FOLDER_ID_T folder_id = 0;
 	int i = 0;
 	MSG_FOLDER_LIST_S g_folderList;
-	MSG_ERROR_T err = MSG_SUCCESS;
 	MSG_SORT_RULE_S sortRule;
 	MSG_LIST_S msg_list;
 	GValue *value = NULL;
@@ -348,20 +373,18 @@ static gboolean bluetooth_map_get_message_list(BluetoothMapAgent *agent,
 	int mailbox_count = 0;
 	emf_mail_list_item_t *mail_list = NULL;
 	int mail_count = 0;
-	int err_m = 0;
 	emf_mailbox_t mailbox;
 	int total = 0;
 	int unseen = 0;
+	bool msg_ret = TRUE;
+	GError *error = NULL;
 
-	if (g_msg_handle == NULL)
+	if (g_msg_handle == NULL) {
+		msg_ret = FALSE;
 		goto email;
+	}
 
 	value = g_new0(GValue, 1);
-
-	 if (!value) {
-		g_ptr_array_free(array, TRUE);
-		return FALSE;
-	}
 
 	folder = strrchr(folder_name, '/');
 
@@ -370,8 +393,10 @@ static gboolean bluetooth_map_get_message_list(BluetoothMapAgent *agent,
 	else
 		folder++;
 
-	if (msg_get_folder_list(g_msg_handle, &g_folderList) != MSG_SUCCESS)
+	if (msg_get_folder_list(g_msg_handle, &g_folderList) != MSG_SUCCESS) {
+		msg_ret = FALSE;
 		goto email;
+	}
 
 	for (i = 0; i < g_folderList.nCount; i++)
 		if (!g_ascii_strncasecmp(folder,
@@ -379,20 +404,18 @@ static gboolean bluetooth_map_get_message_list(BluetoothMapAgent *agent,
 				strlen(folder)))
 			folder_id = g_folderList.folderInfo[i].folderId;
 
-	err = msg_get_folder_view_list(g_msg_handle, folder_id,
-				     &sortRule, &msg_list);
-	/*SMS and MMS*/
-	if (err != MSG_SUCCESS)
+	if (MSG_SUCCESS != msg_get_folder_view_list(g_msg_handle,
+					folder_id, &sortRule, &msg_list)) {
+		msg_ret = FALSE;
 		goto email;
+	}
 
 	for (i = 0; i < msg_list.nCount; i++) {
 		time_t *time = NULL;
 		struct tm local_time = {0,};
 
 		memset(value, 0, sizeof(GValue));
-
 		g_value_init(value, DBUS_STRUCT_MESSAGE_LIST);
-
 		g_value_take_boxed(value, dbus_g_type_specialized_construct(
 				DBUS_STRUCT_MESSAGE_LIST));
 
@@ -406,8 +429,9 @@ static gboolean bluetooth_map_get_message_list(BluetoothMapAgent *agent,
 			localtime_r(time, &local_time);
 
 		snprintf(msg_datetime, sizeof(msg_datetime), "%d%d%dT%d%d%d",
-				local_time.tm_year, local_time.tm_mon, local_time.tm_mday,
-				local_time.tm_hour, local_time.tm_min, local_time.tm_sec);
+				local_time.tm_year, local_time.tm_mon,
+				local_time.tm_mday, local_time.tm_hour,
+				local_time.tm_min, local_time.tm_sec);
 
 		switch (msg_get_message_type(msg_list.msgInfo[i])) {
 		case MSG_TYPE_SMS:
@@ -430,16 +454,19 @@ static gboolean bluetooth_map_get_message_list(BluetoothMapAgent *agent,
 	}
 
 email:
-	/*Email*/
 	vconf_err = vconf_get_int(BT_MAP_EMAIL_DEFAULTACCOUNT, &account_id);
-	if (vconf_err == -1)
-		goto done;
+	if (vconf_err == -1) {
+		if (!msg_ret)
+		goto fail;
+	}
 
 	if (EMF_ERROR_NONE != email_get_mailbox_list(account_id,
 						EMF_MAILBOX_ALL,
 						&mailbox_list,
-						&mailbox_count))
-		goto done;
+						&mailbox_count)) {
+		if (!msg_ret)
+		goto fail;
+	}
 
 	for (i = 0; i < mailbox_count; i++)
 		if (!g_ascii_strncasecmp(mailbox_list[i].name, folder,
@@ -448,23 +475,25 @@ email:
 	memset(&mailbox, 0x00, sizeof(emf_mailbox_t));
 	mailbox.account_id = folder_id;
 	mailbox.name = strdup(folder);
-	if (EMF_ERROR_NONE != email_count_message(&mailbox, &total, &unseen))
-		goto done;
+	if (EMF_ERROR_NONE != email_count_message(&mailbox, &total, &unseen)) {
+		if (!msg_ret)
+		goto fail;
+	}
 
 	if (mailbox.name != NULL)
 		free(mailbox.name);
 
-	err_m = email_get_mail_list_ex(folder_id, folder,
+	if (EMF_ERROR_NONE != email_get_mail_list_ex(folder_id, folder,
 				EMF_LIST_TYPE_NORMAL,
 				0, total - 1, EMF_SORT_DATETIME_HIGH,
-				&mail_list, &mail_count);
-	if (err_m != EMF_ERROR_NONE)
-		goto done;
+				&mail_list, &mail_count)) {
+		if (!msg_ret)
+		goto fail;
+	}
 
 	for (i = 0; i < mail_count; ++i) {
 		memset(value, 0, sizeof(GValue));
 		g_value_init(value, DBUS_STRUCT_MESSAGE_LIST);
-
 		g_value_take_boxed(value, dbus_g_type_specialized_construct(
 			DBUS_STRUCT_MESSAGE_LIST));
 
@@ -474,15 +503,13 @@ email:
 		g_strlcpy(msg_type,  "EMAIL", sizeof(msg_type));
 
 		/*Dummy for testing purpose*/
-		snprintf(msg_datetime, sizeof(msg_datetime), "%dT%d",
-						2011, 12);
+		snprintf(msg_datetime, sizeof(msg_datetime), "%dT%d", 2011, 12);
 		dbus_g_type_struct_set(value, 0, msg_handle,
 					1, msg_type,
 					2, msg_datetime, G_MAXUINT);
 		g_ptr_array_add(array, g_value_get_boxed(value));
 	}
 
-done:
 	if (mailbox_list != NULL)
 		 email_free_mailbox(&mailbox_list, mailbox_count);
 	if (mail_list != NULL)
@@ -491,6 +518,20 @@ done:
 	g_ptr_array_free(array, TRUE);
 	g_free(value);
 	return TRUE;
+
+fail:
+	if (mailbox_list != NULL)
+		 email_free_mailbox(&mailbox_list, mailbox_count);
+	if (mail_list != NULL)
+		g_free(mail_list);
+	g_ptr_array_free(array, TRUE);
+	g_free(value);
+	error = __bt_map_agent_error(BT_MAP_AGENT_ERROR_INTERNAL,
+				  "InternalError");
+	dbus_g_method_return_error(context, error);
+	g_error_free(error);
+	return FALSE;
+
 }
 
 static gboolean bluetooth_map_get_message(BluetoothMapAgent *agent,
@@ -510,19 +551,20 @@ static gboolean bluetooth_map_get_message(BluetoothMapAgent *agent,
 	int nread = 0;
 	char *buf = NULL;
 	long l_size = 0;
-	msg_message_t msg ;
+	msg_message_t msg;
 	MSG_ERROR_T msg_err = MSG_SUCCESS;
 	MSG_SENDINGOPT_S sendOpt = { 0 };
+	GError *error = NULL;
 
 	if (message_name != NULL) {
 		pch = strtok_r(message_name, "_", &last);
 		if (pch == NULL)
-			goto done;
+			goto fail;
 
 		message_id = atoi(pch);
 		pch = strtok_r(NULL, "_", &last);
 	} else
-		goto done;
+		goto fail;
 
 	value = g_new0(GValue, 1);
 
@@ -532,7 +574,7 @@ static gboolean bluetooth_map_get_message(BluetoothMapAgent *agent,
 
 	if (!g_ascii_strncasecmp(pch, "s", 1)) {
 		if (g_msg_handle == NULL)
-			goto done;
+			goto fail;
 
 		msg = msg_new_message();
 		msg_err = msg_get_message(g_msg_handle,
@@ -544,11 +586,12 @@ static gboolean bluetooth_map_get_message(BluetoothMapAgent *agent,
 						G_MAXUINT);
 			g_ptr_array_add(array, g_value_get_boxed(value));
 		}
+		msg_release_message(&msg);
 	} else if (!g_ascii_strncasecmp(pch, "e", 1)) {
 		vconf_err = vconf_get_int(BT_MAP_EMAIL_DEFAULTACCOUNT,
 							&account_id);
 		if (vconf_err == -1)
-			goto done;
+			goto fail;
 
 		memset(&mailbox, 0x00, sizeof(emf_mailbox_t));
 		mailbox.account_id = account_id;
@@ -566,24 +609,24 @@ static gboolean bluetooth_map_get_message(BluetoothMapAgent *agent,
 
 				buf = (char *)malloc(sizeof(char) * l_size);
 				if (NULL == buf)
-					goto done;
+					goto fail;
 
 				nread = fread(buf, 1, l_size, body_file);
 
 				if (nread != l_size)
-					goto done;
+					goto fail;
 
-				dbus_g_type_struct_set(value, 0, buf, G_MAXUINT);
-				g_ptr_array_add(array, g_value_get_boxed(value));
+				dbus_g_type_struct_set(value, 0, buf,
+							G_MAXUINT);
+				g_ptr_array_add(array,
+						g_value_get_boxed(value));
 			}
 		}
 	}
 
-done:
 	dbus_g_method_return(context, array);
 	g_free(value);
 	g_ptr_array_free(array, TRUE);
-	msg_release_message(&msg);
 	if (body_file != NULL)
 		fclose(body_file);
 	if (buf)
@@ -591,6 +634,20 @@ done:
 	if (body)
 		email_free_body_info(&body, 1);
 	return TRUE;
+fail:
+	g_free(value);
+	g_ptr_array_free(array, TRUE);
+	if (body_file != NULL)
+		fclose(body_file);
+	if (buf)
+		free(buf);
+	if (body)
+		email_free_body_info(&body, 1);
+	error = __bt_map_agent_error(BT_MAP_AGENT_ERROR_INTERNAL,
+				  "InternalError");
+	dbus_g_method_return_error(context, error);
+	g_error_free(error);
+	return FALSE;
 }
 
 static gboolean bluetooth_map_update_message(BluetoothMapAgent *agent,
@@ -600,11 +657,13 @@ static gboolean bluetooth_map_update_message(BluetoothMapAgent *agent,
 	int err = EMF_ERROR_NONE;
 
 	err = email_sync_header_for_all_account(&handle);
+
 	if (err == EMF_ERROR_NONE) {
 		DBG("Handle to stop download = %d \n", handle);
 	} else {
 		ERR("Message Update failed \n");
 	}
+
 	dbus_g_method_return(context, err);
 	return (err == EMF_ERROR_NONE) ? TRUE : FALSE;
 }
@@ -623,19 +682,21 @@ static gboolean bluetooth_map_message_status(BluetoothMapAgent *agent,
 	MSG_ERROR_T err = MSG_SUCCESS;
 	MSG_SENDINGOPT_S sendOpt = { 0 };
 	int ret = 0;
+	bool flag = FALSE;
+	GError *error = NULL;
 
 	DBG("bluetooth_map_message_status");
 
 	if (message_name != NULL) {
 		pch = strtok_r(message_name, "_", &last);
 		if (pch == NULL)
-			return FALSE;
+			goto done;
 
 		message_id = atoi(pch);
 		pch = strtok_r(NULL, "_", &last);
-	} else {
-		return FALSE;
-	}
+	} else
+		goto done;
+
 	DBG("message_id = %d, i = %d, v = %d\n", message_id, indicator, value);
 
 	if (!g_ascii_strncasecmp(pch, "s", 1)) {
@@ -647,7 +708,7 @@ static gboolean bluetooth_map_message_status(BluetoothMapAgent *agent,
 					    &sendOpt);
 			if (err != MSG_SUCCESS) {
 				msg_release_message(&msg);
-				break;
+				goto done;
 			}
 
 			if (!msg_is_read(msg)) {
@@ -674,6 +735,8 @@ static gboolean bluetooth_map_message_status(BluetoothMapAgent *agent,
 						MSG_READ_REPORT_NONE);
 				}
 			}
+			if (ret == MSG_SUCCESS)
+				flag = TRUE;
 			msg_release_message(&msg);
 			break;
 		}
@@ -682,10 +745,10 @@ static gboolean bluetooth_map_message_status(BluetoothMapAgent *agent,
 			if (msg_delete_message(g_msg_handle, message_id) ==
 						MSG_SUCCESS) {
 				DBG("Message delete success");
-				ret = TRUE;
+				flag = TRUE;
 			} else {
 				ERR("Message delete fail");
-				ret = FALSE;
+				flag = FALSE;
 			}
 			break;
 		}
@@ -705,10 +768,10 @@ static gboolean bluetooth_map_message_status(BluetoothMapAgent *agent,
 			if (email_modify_mail_flag(message_id, newflag,
 						1) < 0) {
 				ERR("email_modify_mail_flag failed \n");
-				ret = FALSE;
+				flag = FALSE;
 			} else {
 				DBG("email_modify_mail_flag success \n");
-				ret = TRUE;
+				flag = TRUE;
 			}
 			break;
 		}
@@ -721,10 +784,10 @@ static gboolean bluetooth_map_message_status(BluetoothMapAgent *agent,
 				if (email_delete_message(&mailbox, &message_id,
 							1, 1) >= 9) {
 					DBG("\n email_delete_message success");
-					ret = TRUE;
+					flag = TRUE;
 				} else {
 					ERR("\n email_delete_message failed");
-					ret = FALSE;
+					flag = FALSE;
 				}
 				email_free_mail(&mail, 1);
 			}
@@ -735,13 +798,23 @@ static gboolean bluetooth_map_message_status(BluetoothMapAgent *agent,
 			break;
 		}
 	}
-	dbus_g_method_return(context, ret);
-	return TRUE;
+
+done:
+	if (flag)
+		dbus_g_method_return(context, ret);
+	else {
+		error = __bt_map_agent_error(BT_MAP_AGENT_ERROR_INTERNAL,
+				  			"InternalError");
+		dbus_g_method_return_error(context, error);
+		g_error_free(error);
+	}
+	return flag;
 }
 
 int main(int argc, char **argv)
 {
 	BluetoothMapAgent *bluetooth_map_obj = NULL;
+	static DBusGConnection *connection = NULL;
 	DBusGProxy *bus_proxy = NULL;
 	guint result = 0;
 	GError *error = NULL;
@@ -755,7 +828,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	g_session_connection = dbus_g_bus_get(DBUS_BUS_SYSTEM, &error);
+	connection = dbus_g_bus_get(DBUS_BUS_SYSTEM, &error);
 
 	if (error != NULL) {
 		ERR("Couldn't connect to system bus[%s]\n", error->message);
@@ -763,7 +836,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	bus_proxy = dbus_g_proxy_new_for_name(g_session_connection,
+	bus_proxy = dbus_g_proxy_new_for_name(connection,
 					DBUS_SERVICE_DBUS,
 					DBUS_PATH_DBUS, DBUS_INTERFACE_DBUS);
 	if (bus_proxy == NULL) {
@@ -796,7 +869,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Registering it on the D-Bus */
-	dbus_g_connection_register_g_object(g_session_connection,
+	dbus_g_connection_register_g_object(connection,
 					BT_MAP_SERVICE_OBJECT_PATH,
 					G_OBJECT(bluetooth_map_obj));
 
@@ -808,9 +881,10 @@ int main(int argc, char **argv)
 		g_object_unref(bus_proxy);
 	if (bluetooth_map_obj)
 		g_object_unref(bluetooth_map_obj);
-	if (g_session_connection)
-		dbus_g_connection_unref(g_session_connection);
+	if (connection)
+		dbus_g_connection_unref(connection);
 
+	__bluetooth_map_stop_service();
 	return EXIT_FAILURE;
 }
 

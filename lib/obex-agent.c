@@ -34,6 +34,11 @@
 #include "marshal.h"
 
 #define BT_OBEX "BT_OBEX"
+
+#ifdef DBG
+#undef DBG
+#endif
+
 #define DBG(fmt, args...) SLOG(LOG_DEBUG, BT_OBEX, "%s():%d "fmt, __func__, __LINE__, ##args)
 
 #define OBEX_SERVICE	"org.openobex.client"

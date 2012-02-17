@@ -31,12 +31,21 @@
 
 #include <dbus/dbus-glib.h>
 
+#define BT_MAP_AGENT_ERROR (__bt_map_agent_error_quark())
+
+typedef enum {
+	BT_MAP_AGENT_ERROR_INTERNAL,
+	BT_MAP_AGENT_ERROR_CANCEL,
+} bt_map_agent_error_t;
+
 #define BT_MAP_SERVICE_OBJECT_PATH "/org/bluez/map_agent"
 #define BT_MAP_SERVICE_NAME "org.bluez.map_agent"
 #define BT_MAP_SERVICE_INTERFACE "org.bluez.MapAgent"
 
 #define BT_MAP_AGENT	"BT_MAP_AGENT"
-#define DBG(fmt, args...) SLOG(LOG_DEBUG, BT_MAP_AGENT, "%s():%d "fmt, __func__, __LINE__, ##args)
-#define ERR(fmt, args...) SLOG(LOG_ERROR, BT_MAP_AGENT, "%s():%d "fmt, __func__, __LINE__, ##args)
+#define DBG(fmt, args...) SLOG(LOG_DEBUG, BT_MAP_AGENT,\
+				"%s():%d "fmt, __func__, __LINE__, ##args)
+#define ERR(fmt, args...) SLOG(LOG_ERROR, BT_MAP_AGENT,\
+				"%s():%d "fmt, __func__, __LINE__, ##args)
 
 #endif /* __DEF_BT_AGENT_H_ */
