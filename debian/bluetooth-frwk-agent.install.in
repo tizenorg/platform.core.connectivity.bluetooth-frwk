@@ -1,5 +1,4 @@
 @PREFIX@/bin/bluetooth-agent
-@PREFIX@/share/process-info/bluetooth-agent.ini
 @PREFIX@/share/dbus-1/services/org.bluez.frwk_agent.service
 /etc/*
 @PREFIX@/bin/bluetooth-pb-agent

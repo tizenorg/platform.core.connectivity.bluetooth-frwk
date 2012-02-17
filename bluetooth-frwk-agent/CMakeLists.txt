@@ -51,32 +51,12 @@ SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed")
 ADD_EXECUTABLE(${PROJECT_NAME} ${SRCS})
 TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${pkgs_LDFLAGS})
 
-#ADD_LIBRARY(${PROJECT_NAME} SHARED ${SRCS})
-#SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES SOVERSION 0.1.0)
-
-#ADD_CUSTOM_TARGET(bluetooth-agent.edj
-#		COMMAND edje_cc -id ${CMAKE_CURRENT_SOURCE_DIR}
-#		${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-agent.edc ${CMAKE_CURRENT_BINARY_DIR}/bluetooth-agent.edj
-#		DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-agent.edc
-#)
-#ADD_DEPENDENCIES(${PROJECT_NAME} bluetooth-agent.edj)
-
 INSTALL(TARGETS ${PROJECT_NAME} DESTINATION bin)
-#INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/bluetooth-agent.edj DESTINATION share/edje)
 
-# install desktop file & icon
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
-#CONFIGURE_FILE(${PROJECT_NAME}.desktop.in ${PROJECT_NAME}.desktop)
-#INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.desktop DESTINATION share/install-info/application/)
-#INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/icon_bluetooth-agent.png DESTINATION share/icon)
 
-# install ini file
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}.ini DESTINATION share/process-info)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.bluez.frwk_agent.service DESTINATION share/dbus-1/services)
 
 # install booting script
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-agent DESTINATION /etc/rc.d/init.d)
-
-# i18n
-#ADD_SUBDIRECTORY(po)
 
