@@ -34,7 +34,7 @@
 #include "bluetooth-media-control.h"
 
 #define MEDIA_PLAYER_OBJECT_PATH	"/Samsung/Player"
-#define MEDIA_PLAYER_INTERFACE	"com.samsung.player"
+#define MEDIA_PLAYER_INTERFACE	"org.tizen.player"
 
 static int __bluetooth_media_dbus_signal_send(const char *path,
 		const char *interface, const char *method, int type, ...)
