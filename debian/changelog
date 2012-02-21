@@ -1,3 +1,11 @@
+bluetooth-frwk (0.1.48-2) unstable; urgency=low
+
+  * Change SAMSUNG -> TIZEN
+  * Git: pkgs/b/bluetooth-frwk
+  * Tag: bluetooth-frwk_0.1.48-2
+
+ -- DoHyun Pyun <dh79.pyun@samsung.com>  Tue, 21 Feb 2012 18:08:53 +0900
+
 bluetooth-frwk (0.1.48-1) unstable; urgency=low
 
   * Merge with lastest private git
