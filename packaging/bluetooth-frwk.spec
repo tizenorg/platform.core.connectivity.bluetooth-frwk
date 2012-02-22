@@ -2,8 +2,8 @@ Name:       bluetooth-frwk
 Summary:    Bluetooth framework for BlueZ This package is Bluetooth framework based on Blue
 Version:    0.1.21
 Release:    1
-Group:      TO_BE/FILLED_IN
-License:    TO BE FILLED IN
+Group:      main
+License:    Apache 2.0 License
 Source0:    %{name}-%{version}.tar.gz
 
 BuildRequires:  pkgconfig(aul)
