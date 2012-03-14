@@ -1,9 +1,9 @@
 Name:       bluetooth-frwk
 Summary:    Bluetooth framework for BlueZ This package is Bluetooth framework based on Blue
-Version:    0.1.21
+Version:    0.1.48
 Release:    1
-Group:      main
-License:    Apache 2.0 License
+Group:      TO_BE/FILLED_IN
+License:    Apache-2.0
 Source0:    %{name}-%{version}.tar.gz
 
 BuildRequires:  pkgconfig(aul)
@@ -16,8 +16,11 @@ BuildRequires:  pkgconfig(vconf)
 BuildRequires:  pkgconfig(libxml-2.0)
 BuildRequires:  pkgconfig(bluez)
 BuildRequires:  pkgconfig(dbus-1)
+BuildRequires:  pkgconfig(utilX)
 BuildRequires:  pkgconfig(appcore-efl)
 BuildRequires:  pkgconfig(openobex)
+BuildRequires:  pkgconfig(msg-service)
+BuildRequires:  pkgconfig(email-service)
 BuildRequires:  cmake
 
 Requires(post): /sbin/ldconfig
@@ -59,12 +62,20 @@ cmake . -DCMAKE_INSTALL_PREFIX=/usr
 make
 
 %install
-rm -rf %{buildroot}
 %make_install
 
-%post -p /sbin/ldconfig
+%post 
+/sbin/ldconfig
+# Set vconf values with -g/-u options
+# 0 is root user id
+vconftool set -t bool memory/bluetooth/allow "0" -u 0
 
 %postun -p /sbin/ldconfig
+
+%post agent
+
+ln -s ../init.d/bluetooth-frwk-agent /etc/rc.d/rc3.d/S80bluetooth-frwk-agent
+ln -s ../init.d/bluetooth-frwk-agent /etc/rc.d/rc5.d/S80bluetooth-frwk-agent
 
 %files
 /usr/lib/*.so.*
@@ -78,6 +89,8 @@ rm -rf %{buildroot}
 /usr/bin/bluetooth-agent
 /usr/bin/bluetooth-pb-agent
 /etc/*
-/usr/share/process-info/bluetooth-agent.ini
+#/usr/share/process-info/bluetooth-agent.ini
 /usr/share/dbus-1/services/org.bluez.frwk_agent.service
 /usr/share/dbus-1/services/org.bluez.pb_agent.service
+/usr/bin/bluetooth-map-agent
+/usr/share/dbus-1/services/org.bluez.map_agent.service
