@@ -286,7 +286,7 @@ static void obex_agent_class_init(ObexAgentClass *klass)
 
 	object_class->finalize = obex_agent_finalize;
 
-	connection = dbus_g_bus_get(DBUS_BUS_SYSTEM, &error);
+	connection = dbus_g_bus_get(DBUS_BUS_SESSION, &error);
 
 	if (error != NULL) {
 		DBG("error:%s", error->message);

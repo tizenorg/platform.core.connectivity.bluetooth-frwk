@@ -60,24 +60,6 @@ static void __bt_transfer_progress_cb(DBusGProxy *object,
 					gint transferred,
 					gpointer user_data);
 
-static void __bt_ops_internal_event_cb(int event, int result, void *param_data)
-{
-	DBG("+");
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
-	bt_event.event = event;
-	bt_event.result = result;
-	bt_event.param_data = param_data;
-
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info && bt_internal_info->bt_cb_ptr)
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event,
-					bt_internal_info->user_data);
-
-	DBG("-");
-}
-
 static GQuark __bt_obex_agent_error_quark(void)
 {
 	static GQuark quark = 0;
@@ -93,24 +75,61 @@ static GError *__bt_obex_agent_error(bt_obex_agent_error_t error,
 	return g_error_new(BT_OBEX_AGENT_ERROR, error, err_msg);
 }
 
+static void __bt_send_deinit_message(void)
+{
+	DBG("+");
+
+	DBusMessage *msg = NULL;
+	DBusGConnection *conn = NULL;
+	DBusConnection *connecton = NULL;
+
+	conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
+	if (conn == NULL) {
+		DBG("conn is NULL");
+		return;
+	}
+
+	connecton = dbus_g_connection_get_connection(conn);
+
+	msg = dbus_message_new_signal(BT_FRWK_OBJECT,
+				      BT_FRWK_INTERFACE,
+				      BT_FRWK_SIGNAL_DEINIT);
+
+	if (msg == NULL) {
+		DBG("Unable to allocate D-Bus signal");
+		return;
+	}
+
+	if (!dbus_message_append_args(msg,
+				      DBUS_TYPE_INVALID,
+				      DBUS_TYPE_INVALID)) {
+		DBG("Deinit sending failed");
+		dbus_message_unref(msg);
+		dbus_g_connection_unref(conn);
+		return;
+	}
+
+	dbus_connection_send(connecton, msg, NULL);
+	dbus_message_unref(msg);
+	dbus_g_connection_unref(conn);
+
+	DBG("-");
+
+	return;
+}
+
 BT_EXPORT_API int bluetooth_obex_server_init(char *dst_path)
 {
 	DBG("+\n");
 
-	bt_info_t *bt_internal_info = NULL;
+	int ret = BLUETOOTH_ERROR_NONE;
+	DBusGConnection *conn = NULL;
 
 	_bluetooth_internal_session_init();
 
 	if (FALSE == _bluetooth_internal_is_adapter_enabled()) {
 		DBG("Adapter not enabled");
 		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
-	}
-
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info == NULL) {
-		DBG("bt_internal_info is NULL\n");
-		return BLUETOOTH_ERROR_NO_RESOURCES;
 	}
 
 	if (g_obex_server_info.obex_server_agent) {
@@ -123,11 +142,30 @@ BT_EXPORT_API int bluetooth_obex_server_init(char *dst_path)
 		return BLUETOOTH_ERROR_INVALID_PARAM;
 	}
 
+	/* Get the session bus. This bus reff will be unref during deinit */
+	conn = dbus_g_bus_get(DBUS_BUS_SESSION, NULL);
+
+	if (conn == NULL) {
+		DBG("conn is NULL\n");
+		return BLUETOOTH_ERROR_NO_RESOURCES;
+	}
+
+	/* Send deinit signal (To deinit the native Obex server) */
+	__bt_send_deinit_message();
+
 	g_dst_path = g_strdup(dst_path);
 
+	ret = __bt_obex_agent_register(&g_obex_server_info, conn);
+
+	if (ret != BLUETOOTH_ERROR_NONE) {
+		g_free(g_dst_path);
+		dbus_g_connection_unref(conn);
+		g_dst_path = NULL;
+	}
+
 	DBG("- \n");
-	return __bt_obex_agent_register(&g_obex_server_info,
-					bt_internal_info->conn);
+
+	return ret;
 }
 
 BT_EXPORT_API int bluetooth_obex_server_deinit(void)
@@ -164,8 +202,7 @@ BT_EXPORT_API gboolean bluetooth_obex_server_is_activated(void)
 
 	DBG("+");
 
-	conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
-
+	conn = dbus_g_bus_get(DBUS_BUS_SESSION, NULL);
 	if (conn == NULL)
 		return FALSE;
 
@@ -547,7 +584,7 @@ static gboolean __bt_authorize_callback(DBusGMethodInvocation *context,
  	auth_info.filename = obex_server_info->filename;
 	auth_info.length = length;
 
-	__bt_ops_internal_event_cb(BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_AUTHORIZE,
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_AUTHORIZE,
 						BLUETOOTH_ERROR_NONE, &auth_info);
 
 	DBG("-\n");
@@ -586,7 +623,7 @@ static void __bt_transfer_progress_cb(DBusGProxy *object,
 		DBG("Transfer ID : %d    Percentage : %d \n",
 			info.transfer_id, (int)percentage_progress);
 
-		__bt_ops_internal_event_cb(BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_PROGRESS,
+		_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_PROGRESS,
 						BLUETOOTH_ERROR_NONE, &info);
 	}
 }
@@ -703,7 +740,7 @@ static void __bt_transfer_started_cb(DBusGProxy *object,
 
 	DBG("Transfer id %d\n", app_transfer_info.transfer_id);
 
-	__bt_ops_internal_event_cb(BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_STARTED,
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_STARTED,
 					BLUETOOTH_ERROR_NONE, &app_transfer_info);
  }
 
@@ -730,7 +767,7 @@ static void __bt_transfer_completed_cb(DBusGProxy *object,
 		transfer_complete_info.type = transfer_info->type;
 		transfer_complete_info.device_name = transfer_info->device_name;
 
-		__bt_ops_internal_event_cb(BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_COMPLETED,
+		_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_COMPLETED,
 						result, &transfer_complete_info);
 
 		__bt_obex_server_transfer_free(transfer_info);
@@ -830,7 +867,10 @@ static void __bt_obex_agent_unregister(obex_server_info_t *obex_server_info)
 				    G_CALLBACK(__bt_transfer_completed_cb),
 				    obex_server_info);
 
-	obex_server_info->bus = NULL;
+	if (obex_server_info->bus) {
+		dbus_g_connection_unref(obex_server_info->bus);
+		obex_server_info->bus = NULL;
+	}
 
 	g_object_unref(obex_server_info->obex_proxy);
 	obex_server_info->obex_proxy = NULL;

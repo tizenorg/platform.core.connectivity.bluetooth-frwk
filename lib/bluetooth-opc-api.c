@@ -66,30 +66,12 @@ static GError *__bt_opc_agent_error(bt_opc_agent_error_t error,
 {
 	return g_error_new(BT_OPC_AGENT_ERROR, error, err_msg);
 }
-static void __bt_opc_internal_event_cb(int event, int result, void *param_data)
-{
-	DBG("+");
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
-	bt_event.event = event;
-	bt_event.result = result;
-	bt_event.param_data = param_data;
-
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info && bt_internal_info->bt_cb_ptr)
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event,
-					bt_internal_info->user_data);
-
-	DBG("-");
-}
-
 
 BT_EXPORT_API int bluetooth_opc_init(void)
 {
 	DBG("+\n");
 
-	bt_info_t *bt_internal_info = NULL;
+	DBusGConnection *conn = NULL;
 
 	_bluetooth_internal_session_init();
 
@@ -98,26 +80,28 @@ BT_EXPORT_API int bluetooth_opc_init(void)
 		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
 	}
 
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info == NULL) {
-		DBG("bt_internal_info is NULL\n");
-		return BLUETOOTH_ERROR_NO_RESOURCES;
-	}
-
 	if (client_proxy) {
 		DBG("Already initialized");
 		return BLUETOOTH_ERROR_ACCESS_DENIED;
 	}
 
-	client_proxy =  dbus_g_proxy_new_for_name(bt_internal_info->conn,
-							"org.openobex.client", "/",
-						     	 "org.openobex.Client");
+	/* Get the session bus. */
+	conn = dbus_g_bus_get(DBUS_BUS_SESSION, NULL);
+	if (conn == NULL) {
+		DBG("conn is NULL\n");
+		return BLUETOOTH_ERROR_NO_RESOURCES;
+	}
+
+	client_proxy =  dbus_g_proxy_new_for_name(conn, OBEX_CLIENT_SERVICE,
+						"/", OBEX_CLIENT_INTERFACE);
 
 	if (NULL == client_proxy) {
 		DBG("client_proxy is null");
+		dbus_g_connection_unref(conn);
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
+
+	dbus_g_connection_unref(conn);
 
 	DBG("- \n");
 	return BLUETOOTH_ERROR_NONE;
@@ -257,8 +241,7 @@ BT_EXPORT_API gboolean bluetooth_opc_session_is_exist(void)
 	GError *error = NULL;
 	GPtrArray *gp_array = NULL;
 
-	conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
-
+	conn = dbus_g_bus_get(DBUS_BUS_SESSION, NULL);
 	if (conn == NULL)
 		return FALSE;
 
@@ -331,7 +314,7 @@ static void __bt_send_files_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 		opc_obex_agent = NULL;
 	}
 
-	__bt_opc_internal_event_cb(BLUETOOTH_EVENT_OPC_CONNECTED,
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OPC_CONNECTED,
 						result, NULL);
 	DBG("-");
 }
@@ -356,7 +339,7 @@ static gboolean __bt_progress_callback(DBusGMethodInvocation *context,
 
 	percentage_int = percentage_progress;
 
-	__bt_opc_internal_event_cb(BLUETOOTH_EVENT_OPC_TRANSFER_PROGRESS,
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OPC_TRANSFER_PROGRESS,
 						BLUETOOTH_ERROR_NONE, &percentage_int);
 
 	DBG("-");
@@ -379,7 +362,7 @@ static gboolean __bt_complete_callback(DBusGMethodInvocation *context,
 	info.filename = opc_current_transfer.name;
 	info.size = opc_current_transfer.size;
 
-	__bt_opc_internal_event_cb(BLUETOOTH_EVENT_OPC_TRANSFER_COMPLETE,
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OPC_TRANSFER_COMPLETE,
 						BLUETOOTH_ERROR_NONE, &info);
 
 	__bt_free_obexd_transfer_hierarchy(&opc_current_transfer);
@@ -428,7 +411,7 @@ static gboolean __bt_request_callback(DBusGMethodInvocation *context,
 		g_error_free(error);
 		g_object_unref(opc_obex_agent);
 		opc_obex_agent = NULL;
-		__bt_opc_internal_event_cb(BLUETOOTH_EVENT_OPC_DISCONNECTED,
+		_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OPC_DISCONNECTED,
 						BLUETOOTH_ERROR_CANCEL_BY_USER, NULL);
 		return TRUE;
 	} else {
@@ -460,7 +443,7 @@ static gboolean __bt_request_callback(DBusGMethodInvocation *context,
 		info.filename = opc_current_transfer.name;
 		info.size = opc_current_transfer.size;
 
-		__bt_opc_internal_event_cb(BLUETOOTH_EVENT_OPC_TRANSFER_STARTED,
+		_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OPC_TRANSFER_STARTED,
 						BLUETOOTH_ERROR_NONE, &info);
 	}
 
@@ -486,7 +469,7 @@ static gboolean __bt_release_callback(DBusGMethodInvocation *context,
 	/*release */
 	__bt_free_obexd_transfer_hierarchy(&opc_current_transfer);
 
-	__bt_opc_internal_event_cb(BLUETOOTH_EVENT_OPC_DISCONNECTED,
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OPC_DISCONNECTED,
 						BLUETOOTH_ERROR_NONE, NULL);
 	DBG("-");
 
@@ -527,7 +510,7 @@ static gboolean __bt_error_callback(DBusGMethodInvocation *context,
 	info.filename = opc_current_transfer.name;
 	info.size = opc_current_transfer.size;
 
-	__bt_opc_internal_event_cb(BLUETOOTH_EVENT_OPC_TRANSFER_COMPLETE,
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OPC_TRANSFER_COMPLETE,
 						result, &info);
 
 	__bt_free_obexd_transfer_hierarchy(&opc_current_transfer);
@@ -537,7 +520,7 @@ static gboolean __bt_error_callback(DBusGMethodInvocation *context,
 		g_object_unref(opc_obex_agent);
 		opc_obex_agent = NULL;
 
-		__bt_opc_internal_event_cb(BLUETOOTH_EVENT_OPC_DISCONNECTED,
+		_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OPC_DISCONNECTED,
 						result, NULL);
 	}
 

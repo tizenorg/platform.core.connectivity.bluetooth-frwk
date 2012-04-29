@@ -57,7 +57,6 @@
 	SLOG(LOG_ERROR, BT_FRWK, "%s():%d "fmt, __func__, __LINE__, ##args)
 
 #define BT_STORE_PREFIX "db/bluetooth/"
-#define BT_STORE_LOCAL_NAME_PATH BT_STORE_PREFIX"localname"
 #define BT_STORE_VISIBILITY_PATH BT_STORE_PREFIX"visibility"
 #define BT_STORE_VISIBILITY_TIME_PATH BT_STORE_PREFIX"visibility_time"
 #define BT_MEMORY_KEY_RESTRICTION "memory/bluetooth/restriction"
@@ -180,6 +179,8 @@ typedef struct {
 } bt_info_t;
 
 bt_info_t *_bluetooth_internal_get_information(void);
+void _bluetooth_internal_event_cb(int event, int result, void *param_data);
+
 void _bluetooth_internal_session_init(void);
 
 bool _bluetooth_internal_is_adapter_enabled(void);

@@ -59,4 +59,3 @@ INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.bluez.frwk_agent.service DESTINATI
 
 # install booting script
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-agent DESTINATION /etc/rc.d/init.d)
-

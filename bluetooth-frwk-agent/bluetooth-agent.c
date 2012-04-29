@@ -92,6 +92,13 @@ static void __agent_adapter_added_cb(DBusGProxy *manager_proxy, const char *adap
 	if (!aul_app_is_running("org.tizen.bluetooth"))
 		__agent_launch_bt_service(BT_AGENT_RUN_STATUS_NO_CHANGE,
 					BT_AGENT_ON_CURRENTVIEW);
+
+	/* Update Bluetooth Status to notify other modules */
+	if (vconf_set_int(VCONFKEY_BT_STATUS, VCONFKEY_BT_STATUS_ON) != 0)
+		DBG("Set vconf failed\n");
+
+	if (vconf_set_int(VCONFKEY_BT_DEVICE, VCONFKEY_BT_DEVICE_NONE) != 0)
+		DBG("Set vconf failed\n");
 }
 
 static void __agent_adapter_removed_cb(DBusGProxy *manager_proxy, const char *adapter_path,

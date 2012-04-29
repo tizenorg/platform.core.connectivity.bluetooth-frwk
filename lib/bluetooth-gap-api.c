@@ -51,7 +51,6 @@ BT_EXPORT_API int bluetooth_check_adapter(void)
 
 void _bluetooth_internal_enabled_cb(void)
 {
-	bluetooth_event_param_t bt_event = { 0, };
 	bt_info_t *bt_internal_info = NULL;
 
 	bt_internal_info = _bluetooth_internal_get_information();
@@ -73,19 +72,14 @@ void _bluetooth_internal_enabled_cb(void)
 	if (bluetooth_set_local_name(&bt_internal_info->bt_local_name) < 0)
 		ERR("init name setting failed");
 
-	bt_event.event = BLUETOOTH_EVENT_ENABLED;
-	bt_event.result = BLUETOOTH_ERROR_NONE;
-	bt_event.param_data = NULL;
-	if (bt_internal_info->bt_cb_ptr) {
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-	}
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_ENABLED,
+					  BLUETOOTH_ERROR_NONE, NULL);
 
 	return;
 }
 
 void _bluetooth_internal_disabled_cb(void)
 {
-	bluetooth_event_param_t bt_event = { 0, };
 	bt_info_t *bt_internal_info = NULL;
 
 	bt_internal_info = _bluetooth_internal_get_information();
@@ -94,40 +88,31 @@ void _bluetooth_internal_disabled_cb(void)
 		bt_internal_info->bt_change_state_timer = 0;
 	}
 
-	bt_event.event = BLUETOOTH_EVENT_DISABLED;
-	bt_event.result = BLUETOOTH_ERROR_NONE;
-	bt_event.param_data = NULL;
-	if (bt_internal_info->bt_cb_ptr) {
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-	}
-
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_DISABLED,
+					  BLUETOOTH_ERROR_NONE, NULL);
 	return;
 }
 
 static int __bluetooth_internal_change_status_timeout_cb(void *data)
 {
-	bluetooth_event_param_t bt_event = { 0, };
 	bt_info_t *bt_internal_info = NULL;
+	int event = BLUETOOTH_EVENT_NONE;
 
 	bt_internal_info = _bluetooth_internal_get_information();
 	bt_internal_info->bt_change_state_timer = 0;
 
 	if (bt_internal_info->bt_adapter_state == BLUETOOTH_ADAPTER_CHANGING_ENABLE) {
-		bt_event.event = BLUETOOTH_EVENT_ENABLED;
+		event = BLUETOOTH_EVENT_ENABLED;
 		bt_internal_info->bt_adapter_state = BLUETOOTH_ADAPTER_DISABLED;
 	} else if (bt_internal_info->bt_adapter_state == BLUETOOTH_ADAPTER_CHANGING_DISABLE) {
-		bt_event.event = BLUETOOTH_EVENT_DISABLED;
+		event = BLUETOOTH_EVENT_DISABLED;
 		bt_internal_info->bt_adapter_state = BLUETOOTH_ADAPTER_ENABLED;
 	} else {
 		ERR("Wrong adapter state [%d]", bt_internal_info->bt_adapter_state);
 		return 0;
 	}
 
-	bt_event.result = BLUETOOTH_ERROR_TIMEOUT;
-	bt_event.param_data = NULL;
-	if (bt_internal_info->bt_cb_ptr) {
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-	}
+	_bluetooth_internal_event_cb(event, BLUETOOTH_ERROR_TIMEOUT, NULL);
 
 	return 0;
 }
@@ -136,8 +121,8 @@ static void __bluetooth_internal_change_state_req_finish_cb(DBusGProxy *proxy, D
 							  gpointer user_data)
 {
 	GError *err = NULL;
-	bluetooth_event_param_t bt_event = { 0, };
 	bt_info_t *bt_internal_info = NULL;
+	int event = BLUETOOTH_EVENT_NONE;
 
 	DBG("+");
 
@@ -155,22 +140,17 @@ static void __bluetooth_internal_change_state_req_finish_cb(DBusGProxy *proxy, D
 		}
 
 		if (bt_internal_info->bt_adapter_state == BLUETOOTH_ADAPTER_CHANGING_ENABLE) {
-			bt_event.event = BLUETOOTH_EVENT_ENABLED;
+			event = BLUETOOTH_EVENT_ENABLED;
 			bt_internal_info->bt_adapter_state = BLUETOOTH_ADAPTER_DISABLED;
 		} else if (bt_internal_info->bt_adapter_state == BLUETOOTH_ADAPTER_CHANGING_DISABLE) {
-			bt_event.event = BLUETOOTH_EVENT_DISABLED;
+			event = BLUETOOTH_EVENT_DISABLED;
 			bt_internal_info->bt_adapter_state = BLUETOOTH_ADAPTER_ENABLED;
 		} else {
 			ERR("Wrong adapter state [%d]", bt_internal_info->bt_adapter_state);
 			return;
 		}
 
-		bt_event.result = BLUETOOTH_ERROR_CANCEL_BY_USER;
-		bt_event.param_data = NULL;
-		if (bt_internal_info->bt_cb_ptr) {
-			bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event,
-						    bt_internal_info->user_data);
-		}
+		_bluetooth_internal_event_cb(event, BLUETOOTH_ERROR_CANCEL_BY_USER, NULL);
 
 		return;
 	}
@@ -298,9 +278,6 @@ BT_EXPORT_API int bluetooth_get_local_address(bluetooth_device_address_t *local_
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	if (bt_internal_info == NULL)
-		return BLUETOOTH_ERROR_NO_RESOURCES;
-
 	if (bt_internal_info->adapter_proxy == NULL)
 		return BLUETOOTH_ERROR_INTERNAL;
 
@@ -340,9 +317,6 @@ BT_EXPORT_API int bluetooth_get_local_name(bluetooth_device_name_t *local_name)
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	if (bt_internal_info == NULL)
-		return BLUETOOTH_ERROR_NO_RESOURCES;
-
 	if (_bluetooth_internal_is_adapter_enabled() == FALSE) {
 		DBG("Currently not enabled");
 		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
@@ -378,7 +352,6 @@ BT_EXPORT_API int bluetooth_get_local_name(bluetooth_device_name_t *local_name)
 
 void _bluetooth_internal_adapter_name_changed_cb(void)
 {
-	bluetooth_event_param_t bt_event = { 0, };
 	bt_info_t *bt_internal_info = NULL;
 	bluetooth_device_name_t changed_name = { {0} };
 
@@ -387,12 +360,8 @@ void _bluetooth_internal_adapter_name_changed_cb(void)
 	memcpy(&changed_name, &bt_internal_info->bt_local_name, sizeof(bluetooth_device_name_t));
 	changed_name.name[BLUETOOTH_DEVICE_NAME_LENGTH_MAX] = '\0';
 
-	bt_event.event = BLUETOOTH_EVENT_LOCAL_NAME_CHANGED;
-	bt_event.result = BLUETOOTH_ERROR_NONE;
-	bt_event.param_data = &changed_name;
-	if (bt_internal_info->bt_cb_ptr) {
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-	}
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_LOCAL_NAME_CHANGED,
+				BLUETOOTH_ERROR_NONE, &changed_name);
 
 	return;
 }
@@ -422,9 +391,6 @@ BT_EXPORT_API int bluetooth_set_local_name(const bluetooth_device_name_t *local_
 	}
 
 	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info == NULL)
-		return BLUETOOTH_ERROR_NO_RESOURCES;
 
 	if (!g_utf8_validate(local_name->name, -1, (const char **)&ptr))
 		*ptr = '\0';
@@ -467,9 +433,6 @@ BT_EXPORT_API int bluetooth_get_discoverable_mode(bluetooth_discoverable_mode_t 
 	}
 
 	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info == NULL)
-		return BLUETOOTH_ERROR_NO_RESOURCES;
 
 	if (_bluetooth_internal_is_adapter_enabled() == FALSE) {
 		DBG("Currently not enabled");
@@ -520,9 +483,6 @@ BT_EXPORT_API int bluetooth_set_discoverable_mode(bluetooth_discoverable_mode_t 
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	if (bt_internal_info == NULL)
-		return BLUETOOTH_ERROR_NO_RESOURCES;
-
 	if (_bluetooth_internal_is_adapter_enabled() == FALSE) {
 		DBG("Currently not enabled");
 		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
@@ -547,10 +507,6 @@ BT_EXPORT_API int bluetooth_set_discoverable_mode(bluetooth_discoverable_mode_t 
 	case BLUETOOTH_DISCOVERABLE_MODE_TIME_LIMITED_DISCOVERABLE:
 		inq_scan = TRUE;
 		pg_scan = TRUE;
-
-		if (bt_internal_info->agent_proxy == NULL)
-			break;
-
 		break;
 	default:
 		return BLUETOOTH_ERROR_INVALID_PARAM;
@@ -558,11 +514,11 @@ BT_EXPORT_API int bluetooth_set_discoverable_mode(bluetooth_discoverable_mode_t 
 
 	}
 
-	/* Set the discoverable timeout value in agent */
-	dbus_g_proxy_call_no_reply(bt_internal_info->agent_proxy,
-				   "SetDiscoverableTimer",
-				   G_TYPE_UINT, timeout,
-				   G_TYPE_INVALID);
+	/* Set discoverable Timer in agent */
+	dbus_g_proxy_call_no_reply(bt_internal_info->agent_proxy, "SetDiscoverableTimer",
+			G_TYPE_UINT, timeout,
+			G_TYPE_INVALID,
+			G_TYPE_INVALID);
 
 	g_value_set_boolean(&connectable, pg_scan);
 	g_value_set_boolean(&discoverable, inq_scan);
@@ -608,7 +564,6 @@ BT_EXPORT_API int bluetooth_set_discoverable_mode(bluetooth_discoverable_mode_t 
 
 void _bluetooth_internal_discovery_started_cb(void)
 {
-	bluetooth_event_param_t bt_event = { 0, };
 	bt_info_t *bt_internal_info = NULL;
 
 	bt_internal_info = _bluetooth_internal_get_information();
@@ -619,20 +574,14 @@ void _bluetooth_internal_discovery_started_cb(void)
 		bt_internal_info->is_discovery_req = 1;
 	}
 
-	bt_event.event = BLUETOOTH_EVENT_DISCOVERY_STARTED;
-	bt_event.result = BLUETOOTH_ERROR_NONE;
-	bt_event.param_data = NULL;
-	if (bt_internal_info->bt_cb_ptr) {
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-	}
-
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_DISCOVERY_STARTED,
+					BLUETOOTH_ERROR_NONE, NULL);
 	return;
 }
 
 void _bluetooth_internal_remote_device_found_cb(const char *address,
 					       int rssi, unsigned int remote_class, gboolean paired)
 {
-	bluetooth_event_param_t bt_event = { 0, };
 	bt_info_t *bt_internal_info = NULL;
 	bluetooth_device_info_t dev_info = { { { 0 } } };
 
@@ -643,13 +592,8 @@ void _bluetooth_internal_remote_device_found_cb(const char *address,
 	dev_info.rssi = rssi;
 	dev_info.paired = paired;
 
-	bt_event.event = BLUETOOTH_EVENT_REMOTE_DEVICE_FOUND;
-	bt_event.result = BLUETOOTH_ERROR_NONE;
-	bt_event.param_data = &dev_info;
-	if (bt_internal_info->bt_cb_ptr && bt_internal_info->is_discovery_req) {
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-	}
-
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_REMOTE_DEVICE_FOUND,
+					BLUETOOTH_ERROR_NONE, &dev_info);
 	return;
 }
 
@@ -718,7 +662,6 @@ void _bluetooth_internal_remote_device_name_updated_cb(const char *address,
 						      const char *name, int rssi,
 						      unsigned int remote_class, gboolean paired)
 {
-	bluetooth_event_param_t bt_event = { 0, };
 	bt_info_t *bt_internal_info = NULL;
 	bluetooth_device_info_t dev_info = { { { 0 } } };
 
@@ -738,34 +681,25 @@ void _bluetooth_internal_remote_device_name_updated_cb(const char *address,
 	dev_info.rssi = rssi;
 	dev_info.paired = paired;
 
-	bt_event.event = BLUETOOTH_EVENT_REMOTE_DEVICE_NAME_UPDATED;
-	bt_event.result = BLUETOOTH_ERROR_NONE;
-	bt_event.param_data = &dev_info;
-	if (bt_internal_info->bt_cb_ptr && bt_internal_info->is_discovery_req) {
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-	}
-
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_REMOTE_DEVICE_NAME_UPDATED,
+					BLUETOOTH_ERROR_NONE, &dev_info);
 	return;
 }
 
 void _bluetooth_internal_discovery_completed_cb(void)
 {
-	bluetooth_event_param_t bt_event = { 0, };
 	bt_info_t *bt_internal_info = NULL;
+	int result = BLUETOOTH_ERROR_NONE;
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	bt_event.event = BLUETOOTH_EVENT_DISCOVERY_FINISHED;
 	if (bt_internal_info->is_discovery_cancel) {
-		bt_event.result = BLUETOOTH_ERROR_CANCEL_BY_USER;
+		result = BLUETOOTH_ERROR_CANCEL_BY_USER;
 		bt_internal_info->is_discovery_cancel = FALSE;
-	} else {
-		bt_event.result = BLUETOOTH_ERROR_NONE;
 	}
-	bt_event.param_data = NULL;
-	if (bt_internal_info->bt_cb_ptr) {
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-	}
+
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_DISCOVERY_FINISHED,
+					result, NULL);
 
 	bt_internal_info->is_discovery_req = 0;
 
@@ -774,7 +708,6 @@ void _bluetooth_internal_discovery_completed_cb(void)
 
 static int __bluetooth_internal_discovery_req_timeout_cb(void *data)
 {
-	bluetooth_event_param_t bt_event = { 0, };
 	bt_info_t *bt_internal_info = NULL;
 
 	bt_internal_info = _bluetooth_internal_get_information();
@@ -785,12 +718,8 @@ static int __bluetooth_internal_discovery_req_timeout_cb(void *data)
 	dbus_g_proxy_call_no_reply(bt_internal_info->adapter_proxy, "StopDiscovery",
 				   G_TYPE_INVALID, G_TYPE_INVALID);
 
-	bt_event.event = BLUETOOTH_EVENT_DISCOVERY_STARTED;
-	bt_event.result = BLUETOOTH_ERROR_TIMEOUT;
-	bt_event.param_data = NULL;
-	if (bt_internal_info->bt_cb_ptr) {
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-	}
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_DISCOVERY_STARTED,
+					BLUETOOTH_ERROR_TIMEOUT, NULL);
 
 	return 0;
 }
@@ -830,9 +759,6 @@ BT_EXPORT_API int bluetooth_start_discovery(unsigned short max_response,
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	if (bt_internal_info == NULL)
-		return BLUETOOTH_ERROR_NO_RESOURCES;
-
 	if (bt_internal_info->adapter_proxy == NULL)
 		return BLUETOOTH_ERROR_INTERNAL;
 
@@ -861,6 +787,8 @@ BT_EXPORT_API int bluetooth_cancel_discovery(void)
 	GError *error = NULL;
 	int ret = BLUETOOTH_ERROR_NONE;
 
+	DBG("+");
+
 	_bluetooth_internal_session_init();
 
 	if (_bluetooth_internal_is_adapter_enabled() == FALSE) {
@@ -870,11 +798,9 @@ BT_EXPORT_API int bluetooth_cancel_discovery(void)
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	if (bt_internal_info == NULL)
-		return BLUETOOTH_ERROR_NO_RESOURCES;
-
-	if (bt_internal_info->adapter_proxy == NULL)
+	if (bt_internal_info->adapter_proxy == NULL) {
 		return BLUETOOTH_ERROR_INTERNAL;
+	}
 
 	dbus_g_proxy_call(bt_internal_info->adapter_proxy, "StopDiscovery", &error,
 			  G_TYPE_INVALID, G_TYPE_INVALID);
@@ -894,6 +820,8 @@ BT_EXPORT_API int bluetooth_cancel_discovery(void)
 
 	bt_internal_info->is_discovery_cancel = TRUE;
 
+	DBG("-");
+
 	return BLUETOOTH_ERROR_NONE;
 }
 
@@ -912,9 +840,6 @@ BT_EXPORT_API int bluetooth_is_discovering(void)
 	}
 
 	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info == NULL)
-		return BLUETOOTH_ERROR_NO_RESOURCES;
 
 	if (bt_internal_info->adapter_proxy != NULL) {
 		dbus_g_proxy_call(bt_internal_info->adapter_proxy, "GetProperties", NULL,
@@ -1000,7 +925,6 @@ static void __bluetooth_internal_bonding_req_reply_cb(int error_type,
 						    const bluetooth_device_info_t *device_info,
 						    int is_headset)
 {
-	bluetooth_event_param_t bt_event = { 0, };
 	bt_info_t *bt_internal_info = NULL;
 	bluetooth_device_address_t device_address = { {0} };
 
@@ -1021,8 +945,8 @@ static void __bluetooth_internal_bonding_req_reply_cb(int error_type,
 		DBG("error_type: %d", error_type);
 
 		/* Add the codes about auto-headset pairing */
-		if (error_type == BLUETOOTH_ERROR_AUTHENTICATION_FAILED
-		    && bt_internal_info->is_headset_pin_req == FALSE) {
+		if (error_type == BLUETOOTH_ERROR_AUTHENTICATION_FAILED &&
+			bt_internal_info->is_headset_pin_req == FALSE) {
 			if (is_headset) {
 				dbus_g_proxy_call_no_reply(bt_internal_info->agent_proxy,
 							   "IgnoreAutoPairing", G_TYPE_STRING,
@@ -1049,13 +973,8 @@ static void __bluetooth_internal_bonding_req_reply_cb(int error_type,
 	bt_internal_info->is_headset_bonding = FALSE;
 	memset(bt_internal_info->bt_bonding_req_addrstr, 0x00, 18);
 
-	bt_event.event = BLUETOOTH_EVENT_BONDING_FINISHED;
-	bt_event.result = error_type;
-	bt_event.param_data = (void *)device_info;
-	if (bt_internal_info->bt_cb_ptr) {
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-	}
-
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_BONDING_FINISHED,
+					error_type, (void *)device_info);
 	DBG("-");
 }
 
@@ -1142,6 +1061,7 @@ static void __bluetooth_internal_bonding_req_finish_cb(DBusGProxy *proxy, DBusGP
 	GHashTable *hash = NULL;
 	GValue *value = NULL;
 	DBusGProxy *device_proxy = NULL;
+	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
 
 	DBG("+");
 
@@ -1250,6 +1170,21 @@ static void __bluetooth_internal_bonding_req_finish_cb(DBusGProxy *proxy, DBusGP
 
 		if (err != NULL)
 			g_error_free(err);
+	} else {
+		dbus_g_proxy_call(bt_internal_info->adapter_proxy, "FindDevice", NULL,
+				  G_TYPE_STRING, bt_internal_info->bt_bonding_req_addrstr,
+				  G_TYPE_INVALID, DBUS_TYPE_G_OBJECT_PATH, &device_path,
+				  G_TYPE_INVALID);
+		if (!device_path) {
+			DBG("device_path is NULL");
+		}
+
+		_bluetooth_internal_device_path_to_address(device_path, address);
+
+		device_proxy = _bluetooth_internal_find_device_by_path(device_path);
+
+		_bluetooth_internal_bonding_created_cb(address,
+						(gpointer)device_proxy);
 	}
 
 	DBG("-");
@@ -1264,73 +1199,18 @@ static int __bluetooth_internal_bonding_req_timeout_cb(void *data)
 	return 0;
 }
 
-static void __bluetooth_oob_read_local_data_cb(DBusPendingCall *call, void *user_data)
-{
-	DBusError err;
-	DBusMessage *reply = NULL;
-	unsigned char *hash = NULL;
-	unsigned char *randomizer = NULL;
-	unsigned int hash_len;
-	unsigned int randomizer_len;
-
-	bluetooth_event_param_t bt_event = {0,};
-	bt_info_t *bt_internal_info = NULL;
-	bt_oob_data_t local_oob_data = {{0},};
-
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	reply = dbus_pending_call_steal_reply(call);
-
-	dbus_error_init(&err);
-	if (dbus_set_error_from_message(&err, reply)) {
-		DBG("ReadLocalData - error: %s, %s",
-			err.name, err.message);
-		dbus_error_free(&err);
-		bt_event.result = BLUETOOTH_ERROR_INTERNAL;
-		goto done;
-	}
-
-	if (dbus_message_get_args(reply, &err,
-			DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-			&hash, &hash_len,
-			DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
-			&randomizer, &randomizer_len,
-			DBUS_TYPE_INVALID) == FALSE) {
-		DBG("unable to parse get_radio_states reply: %s, %s",
-			err.name, err.message);
-		dbus_error_free(&err);
-		bt_event.result = BLUETOOTH_ERROR_INVALID_DATA;
-		goto done;
-	}
-
-	if (NULL != hash && hash_len != 0) {
-		memcpy(&local_oob_data.hash, hash, hash_len);
-		local_oob_data.hash_len = hash_len;
-	}
-
-	if (NULL != randomizer && randomizer_len != 0) {
-		memcpy(&local_oob_data.randomizer, randomizer, randomizer_len);
-		local_oob_data.randomizer_len = randomizer_len;
-	}
-
-	bt_event.result = BLUETOOTH_ERROR_NONE;
-
-done:
-	bt_event.event = BLUETOOTH_EVENT_READ_LOCAL_OOB_DATA;
-	bt_event.param_data = (void *)&local_oob_data;
-	if (bt_internal_info->bt_cb_ptr) {
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event,
-			 bt_internal_info->user_data);
-	}
-	dbus_message_unref(reply);
-}
-
-BT_EXPORT_API int bluetooth_oob_read_local_data(void)
+BT_EXPORT_API int bluetooth_oob_read_local_data(bt_oob_data_t *local_oob_data)
 {
 	DBG("+\n");
-	bt_info_t *bt_internal_info = NULL;
 	DBusMessage *msg = NULL;
-	DBusPendingCall *call;
+	DBusMessage *reply = NULL;
+	DBusError err;
+	unsigned char *local_hash = NULL;
+	unsigned char *local_randomizer = NULL;
+	bt_info_t *bt_internal_info = NULL;
+
+	if (NULL == local_oob_data)
+		return BLUETOOTH_ERROR_INVALID_PARAM;
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
@@ -1348,18 +1228,39 @@ BT_EXPORT_API int bluetooth_oob_read_local_data(void)
 	if(msg == NULL)
 		return BLUETOOTH_ERROR_INTERNAL;
 
-	if (!dbus_connection_send_with_reply(bt_internal_info->sys_conn, msg,
-			&call, -1)) {
+	dbus_error_init(&err);
+	reply = dbus_connection_send_with_reply_and_block(bt_internal_info->sys_conn,
+					msg, -1, &err);
+
+	dbus_message_unref(msg);
+	if (!reply) {
 		DBG("Error in ReadLocalData \n");
-		dbus_message_unref(msg);
+		if (dbus_error_is_set(&err)) {
+			DBG("%s", err.message);
+			dbus_error_free(&err);
+		}
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	dbus_pending_call_set_notify(call, __bluetooth_oob_read_local_data_cb,
-					NULL, NULL);
-	dbus_pending_call_unref(call);
-	dbus_message_unref(msg);
+	if (!dbus_message_get_args(reply, NULL,
+			DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+			&local_hash, &local_oob_data->hash_len,
+			DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+			&local_randomizer, &local_oob_data->randomizer_len,
+			DBUS_TYPE_INVALID)) {
+		DBG("Error in reading arguments\n");
+		dbus_message_unref(reply);
+		return BLUETOOTH_ERROR_INVALID_DATA;
+	}
 
+	if (NULL != local_hash)
+		memcpy(local_oob_data->hash, local_hash, local_oob_data->hash_len);
+
+	if (NULL != local_randomizer)
+		memcpy(local_oob_data->randomizer, local_randomizer,
+					local_oob_data->randomizer_len);
+
+	dbus_message_unref(reply);
 	DBG("-\n");
 
 	return BLUETOOTH_ERROR_NONE;
@@ -1611,22 +1512,15 @@ BT_EXPORT_API int bluetooth_cancel_bonding(void)
 
 void _bluetooth_internal_bonding_removed_cb(const char *bond_address, gpointer user_data)
 {
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
 	bluetooth_device_address_t device_address = { {0} };
 
 	DBG("+ Bonding Removed from [%s]\n", bond_address);
 
 	_bluetooth_internal_convert_addr_string_to_addr_type(&device_address, bond_address);
 
-	bt_internal_info = _bluetooth_internal_get_information();
 
-	bt_event.event = BLUETOOTH_EVENT_BONDED_DEVICE_REMOVED;
-	bt_event.result = BLUETOOTH_ERROR_NONE;
-	bt_event.param_data = (void *)&device_address;
-	if (bt_internal_info->bt_cb_ptr) {
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-	}
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_BONDED_DEVICE_REMOVED,
+					BLUETOOTH_ERROR_NONE, &device_address);
 
 	DBG("-\n");
 
@@ -1637,8 +1531,6 @@ static void __bluetooth_internal_unbond_request_complete_cb(DBusGProxy *proxy, D
 							  gpointer user_data)
 {
 	GError *err = NULL;
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
 	bluetooth_device_address_t *device_address;
 
 	DBG("+\n");
@@ -1647,28 +1539,18 @@ static void __bluetooth_internal_unbond_request_complete_cb(DBusGProxy *proxy, D
 
 	device_address = (bluetooth_device_address_t *) user_data;
 
-	bt_internal_info = _bluetooth_internal_get_information();
-
 	if (err != NULL) {
 		DBG("Error occured in RemoveBonding [%s]\n", err->message);
 		g_error_free(err);
 
-		if (bt_internal_info->bt_cb_ptr) {
-			/* If control reaches here, it is always a debond request failure*/
-			bt_event.event = BLUETOOTH_EVENT_BONDED_DEVICE_REMOVED;
-			bt_event.result = BLUETOOTH_ERROR_NOT_PAIRED;
-			bt_event.param_data = (void *)device_address;
-			if (bt_internal_info->bt_cb_ptr) {
-				bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event,
-							    bt_internal_info->user_data);
-			}
-		}
+		/* If control reaches here, it is always a debond request failure*/
+		_bluetooth_internal_event_cb(BLUETOOTH_EVENT_BONDED_DEVICE_REMOVED,
+						BLUETOOTH_ERROR_NOT_PAIRED, device_address);
 	}
+
 	/*release user_data which was allocated in caller*/
-	if (device_address != NULL) {
+	if (device_address != NULL)
 		free(device_address);
-		device_address = NULL;
-	}
 
 	DBG("-\n");
 }
@@ -1871,6 +1753,7 @@ static int bluetooth_internal_get_bonded_device_list(GPtrArray **dev_list)
 {
 	DBG("+\n");
 	int ret_val = BLUETOOTH_ERROR_NONE;
+	int i;
 	bt_info_t *bt_internal_info = NULL;
 	GPtrArray *gp_array = NULL;
 	GPtrArray *result = NULL;
@@ -1883,9 +1766,6 @@ static int bluetooth_internal_get_bonded_device_list(GPtrArray **dev_list)
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	if (bt_internal_info == NULL)
-		return BLUETOOTH_ERROR_NO_RESOURCES;
-
 	if (bt_internal_info->adapter_proxy == NULL)
 		return BLUETOOTH_ERROR_INTERNAL;
 
@@ -1893,44 +1773,52 @@ static int bluetooth_internal_get_bonded_device_list(GPtrArray **dev_list)
 			  	G_TYPE_INVALID,
 				dbus_g_type_get_collection("GPtrArray", DBUS_TYPE_G_OBJECT_PATH),
 			 	&gp_array, G_TYPE_INVALID);
+	if (error != NULL)
+		goto err_listdev;
 
-	if (error == NULL) {
-		if (gp_array != NULL) {
-			int i;
-			if (gp_array->len == 0) {
-				result->len = 0;
-			} else {
-				DBG("Num of ListDevices = [%d]", gp_array->len);
-				for (i = 0; i < gp_array->len; i++) {
-					gchar *gp_path = g_ptr_array_index(gp_array, i);
-					if (gp_path != NULL) {
-						DBG("Newly list device [%s]\n", gp_path);
-						devinfo =
-						    (bluetooth_device_info_t *)
-						    malloc(sizeof(bluetooth_device_info_t));
-						memset(devinfo, 0, sizeof(bluetooth_device_info_t));
-						if (__bluetooth_internal_get_bonded_device_list_details(gp_path,
-									devinfo) == BLUETOOTH_ERROR_NONE) {		 								g_ptr_array_add(result, (gpointer) devinfo);
-						} else {
-							DBG("Can't get the paired device path \n");
-							free(devinfo);
-							break;
-						}
-					}
-				}
-			}
-			g_ptr_array_free(gp_array, TRUE);
-		} else {
-			DBG("DBus error: \n");
-			ret_val = BLUETOOTH_ERROR_INTERNAL;
-		}
-	} else {
-		DBG("ListDevices error: [%s]\n", error->message);
-		g_error_free(error);
-		ret_val = BLUETOOTH_ERROR_INTERNAL;
+	if (gp_array == NULL) {
+		DBG("DBus error: \n");
+		goto err_done;
 	}
+
+
+	if (gp_array->len == 0) {
+		result->len = 0;
+		goto success;
+	}
+
+	DBG("Num of ListDevices = [%d]", gp_array->len);
+	for (i = 0; i < gp_array->len; i++) {
+		gchar *gp_path = g_ptr_array_index(gp_array, i);
+
+		if (gp_path == NULL)
+			continue;
+
+		DBG("Newly list device [%s]\n", gp_path);
+		devinfo = (bluetooth_device_info_t *)malloc(sizeof(*devinfo));
+		memset(devinfo, 0, sizeof(*devinfo));
+		if (__bluetooth_internal_get_bonded_device_list_details(gp_path,
+					devinfo) == BLUETOOTH_ERROR_NONE) {
+			g_ptr_array_add(result, (gpointer)devinfo);
+		} else {
+			DBG("Can't get the paired device path \n");
+			free(devinfo);
+			break;
+		}
+	}
+
+success:
+	g_ptr_array_free(gp_array, TRUE);
 	DBG("-\n");
 	return ret_val;
+
+err_listdev:
+	DBG("ListDevices error: [%s]\n", error->message);
+	g_error_free(error);
+
+err_done:
+	DBG("-\n");
+	return BLUETOOTH_ERROR_INTERNAL;
 }
 
 BT_EXPORT_API int bluetooth_get_bonded_device_list(GPtrArray **dev_list)
@@ -1969,9 +1857,6 @@ BT_EXPORT_API int bluetooth_get_bonded_device(const bluetooth_device_address_t *
 	}
 
 	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info == NULL)
-		return BLUETOOTH_ERROR_NO_RESOURCES;
 
 	if (bt_internal_info->adapter_proxy == NULL)
 		return BLUETOOTH_ERROR_INTERNAL;
@@ -2059,9 +1944,6 @@ BT_EXPORT_API int bluetooth_set_alias(const bluetooth_device_address_t *device_a
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	if (bt_internal_info == NULL)
-		return BLUETOOTH_ERROR_NO_RESOURCES;
-
 	if (bt_internal_info->adapter_proxy == NULL)
 		return BLUETOOTH_ERROR_INTERNAL;
 
@@ -2113,9 +1995,6 @@ BT_EXPORT_API int bluetooth_authorize_device(const bluetooth_device_address_t *d
 	}
 
 	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info == NULL)
-		return BLUETOOTH_ERROR_NO_RESOURCES;
 
 	if (bt_internal_info->adapter_proxy == NULL)
 		return BLUETOOTH_ERROR_INTERNAL;

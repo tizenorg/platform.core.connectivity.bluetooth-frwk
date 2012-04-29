@@ -42,7 +42,7 @@
 #include <termios.h>
 
 #define BLUEZ_SERVICE_NAME "org.bluez"
-#define BLUEZ_SERIAL_CLINET_INTERFACE "org.bluez.Serial"
+#define BLUEZ_SERIAL_CLIENT_INTERFACE "org.bluez.Serial"
 
 #define BLUEZ_MANAGER_OBJ_PATH "/"
 #define BLUEZ_MANAGER_INTERFACE "org.bluez.Manager"
@@ -144,9 +144,9 @@ static int __rfcomm_internal_terminate_server(rfcomm_server_t *server_info)
 	DBG("+\n");
 	DBusMessage *msg, *reply;
 	DBusError error;
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
 	static char *default_adapter_obj_path = NULL;
+	bluetooth_rfcomm_disconnection_t disconnection_ind;
+
 	int index;
 
 	index = __bluetooth_rfcomm_internal_server_get_index_from_socket(server_info->server_sock_fd);
@@ -162,6 +162,11 @@ static int __rfcomm_internal_terminate_server(rfcomm_server_t *server_info)
 		msg = dbus_message_new_method_call(BLUEZ_SERVICE_NAME,
 						   rfcomm_server[index].uds_name,
 						   BLUEZ_SERIAL_PROXY_INTERFACE, "Disable");
+		if (msg == NULL) {
+			DBG("dbus method call is not allocated.");
+			return -1;
+		}
+
 		dbus_error_init(&error);
 		reply = dbus_connection_send_with_reply_and_block(connection, msg, -1, &error);
 
@@ -188,11 +193,16 @@ static int __rfcomm_internal_terminate_server(rfcomm_server_t *server_info)
 						   default_adapter_obj_path,
 						   BLUEZ_SERIAL_MANAGER_INTERFACE, "RemoveProxy");
 
+		g_free(default_adapter_obj_path);
+
+		if (msg == NULL) {
+			DBG("dbus method call is not allocated.");
+			return -1;
+		}
+
 		dbus_message_append_args(msg, DBUS_TYPE_STRING, &rfcomm_server[index].uds_name,
 					 DBUS_TYPE_INVALID);
 
-		dbus_error_init(&error);
-		g_free(default_adapter_obj_path);
 		reply = dbus_connection_send_with_reply_and_block(connection, msg, -1, &error);
 		dbus_message_unref(msg);
 
@@ -204,17 +214,13 @@ static int __rfcomm_internal_terminate_server(rfcomm_server_t *server_info)
 			}
 			return -1;
 		}
-		bt_internal_info = _bluetooth_internal_get_information();
-		if (bt_internal_info->bt_cb_ptr) {
-			bluetooth_rfcomm_disconnection_t disconnection_ind;
-			bt_event.event = BLUETOOTH_EVENT_RFCOMM_DISCONNECTED;
-			bt_event.result = BLUETOOTH_ERROR_NONE;
-			disconnection_ind.socket_fd = rfcomm_server[index].client_sock_fd;
-			disconnection_ind.device_addr = rfcomm_server[index].device_addr;
-			bt_event.param_data = (void *)(&disconnection_ind);
-			bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event,
-						    bt_internal_info->user_data);
-		}
+
+		disconnection_ind.socket_fd = rfcomm_server[index].client_sock_fd;
+		disconnection_ind.device_addr = rfcomm_server[index].device_addr;
+
+		_bluetooth_internal_event_cb(BLUETOOTH_EVENT_RFCOMM_DISCONNECTED,
+						BLUETOOTH_ERROR_NONE, &disconnection_ind);
+
 
 		if (rfcomm_server[index].client_sock_fd != -1) {
 			g_source_remove(rfcomm_server[index].client_event_src_id);
@@ -243,24 +249,15 @@ static int __rfcomm_internal_terminate_server(rfcomm_server_t *server_info)
 static int __rfcomm_internal_terminate_client(int index)
 {
 	DBG("+\n");
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
-	bt_internal_info = _bluetooth_internal_get_information();
+	bluetooth_rfcomm_disconnection_t disconnection_ind;
 
 	__bluetooth_rfcomm_internal_disconnect(index);
 
-	if (bt_internal_info->bt_cb_ptr) {
-		bluetooth_rfcomm_disconnection_t disconnection_ind;
+	disconnection_ind.socket_fd = rfcomm_client[index].sock_fd;
+	disconnection_ind.device_addr = rfcomm_client[index].device_addr;
 
-		bt_event.event = BLUETOOTH_EVENT_RFCOMM_DISCONNECTED;
-		bt_event.result = BLUETOOTH_ERROR_NONE;
-		disconnection_ind.socket_fd = rfcomm_client[index].sock_fd;
-		disconnection_ind.device_addr = rfcomm_client[index].device_addr;
-		bt_event.param_data = (void *)(&disconnection_ind);
-
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-
-	}
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_RFCOMM_DISCONNECTED,
+					BLUETOOTH_ERROR_NONE, &disconnection_ind);
 
 	g_source_remove(rfcomm_client[index].event_src_id);
 	rfcomm_client[index].event_src_id = -1;
@@ -282,8 +279,6 @@ static gboolean __rfcomm_server_connected_cb(GIOChannel *chan, GIOCondition cond
 	DBG("+\n");
 	DBG("rfcomm_server.server_io_channel has %d \n", cond);
 
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
 	DBusMessage *msg, *reply;
 	DBusError error;
 	DBusMessageIter reply_iter, reply_iter_entry;
@@ -342,14 +337,16 @@ static gboolean __rfcomm_server_connected_cb(GIOChannel *chan, GIOCondition cond
 			   __rfcomm_server_data_received_cb, &rfcomm_server[index]);
 
 	g_io_channel_unref(rfcomm_server[index].client_io_channel);
-	bt_internal_info = _bluetooth_internal_get_information();
-
-
 
 	/* GetInfo Proxy Part */
 	msg = dbus_message_new_method_call(BLUEZ_SERVICE_NAME,
 					   rfcomm_server[index].uds_name,
 					   BLUEZ_SERIAL_PROXY_INTERFACE, "GetInfo");
+
+	if (msg == NULL) {
+		DBG("dbus method call is not allocated.");
+		return -1;
+	}
 
 	dbus_error_init(&error);
 
@@ -464,15 +461,9 @@ static gboolean __rfcomm_server_connected_cb(GIOChannel *chan, GIOCondition cond
 	con_ind.device_role = RFCOMM_ROLE_SERVER;
 	con_ind.device_addr = rfcomm_server[index].device_addr;
 	con_ind.socket_fd = rfcomm_server[index].client_sock_fd;
-	bt_event.event = BLUETOOTH_EVENT_RFCOMM_CONNECTED;
-	bt_event.result = BLUETOOTH_ERROR_NONE;
-	bt_event.param_data = (void *)&con_ind;
 
-	if (bt_internal_info->bt_cb_ptr) {
-		DBG("\ngoing to call callback BLUETOOTH_EVENT_RFCOMM_CONNECTED \n");
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-	}
-
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_RFCOMM_CONNECTED,
+					BLUETOOTH_ERROR_NONE, &con_ind);
 	DBG("-\n");
 	return TRUE;
 }
@@ -485,8 +476,7 @@ static gboolean __rfcomm_server_data_received_cb(GIOChannel *chan, GIOCondition 
 	char buf[RFCOMM_CLIENT_BUFFER_SIZE] = { 0 };
 	unsigned int len;
 	rfcomm_server_t *rfcomm_server_info = data;
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
+	bluetooth_rfcomm_received_data_t rx_data;
 
 	if (cond & (G_IO_NVAL | G_IO_HUP | G_IO_ERR)) {
 		DBG("Unix server  disconnected (fd=%d)\n", rfcomm_server_info->client_sock_fd);
@@ -511,19 +501,13 @@ static gboolean __rfcomm_server_data_received_cb(GIOChannel *chan, GIOCondition 
 	}
 
 	DBG("%s\n", buf);
-	bt_internal_info = _bluetooth_internal_get_information();
-	if (bt_internal_info->bt_cb_ptr) {
-		bluetooth_rfcomm_received_data_t rx_data;
-		rx_data.socket_fd = rfcomm_server_info->client_sock_fd;
-		rx_data.buffer_size = len;
-		rx_data.buffer = buf;
-		bt_event.event = BLUETOOTH_EVENT_RFCOMM_DATA_RECEIVED;
-		bt_event.result = BLUETOOTH_ERROR_NONE;
-		bt_event.param_data = (void *)&rx_data;
 
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
+	rx_data.socket_fd = rfcomm_server_info->client_sock_fd;
+	rx_data.buffer_size = len;
+	rx_data.buffer = buf;
 
-	}
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_RFCOMM_DATA_RECEIVED,
+					BLUETOOTH_ERROR_NONE, &rx_data);
 
 	return TRUE;
 }
@@ -535,8 +519,8 @@ static gboolean __rfcomm_client_data_received_cb(GIOChannel *chan, GIOCondition 
 	char buf[RFCOMM_CLIENT_BUFFER_SIZE] = { 0 };
 	unsigned int len;
 	rfcomm_client_t *rfcomm_client_info = data;
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
+	bluetooth_rfcomm_received_data_t rx_data;
+
 	int index = rfcomm_client_info->id;
 	if ((index < 0) || (index >= RFCOMM_MAX_CONN)) {
 		DBG("Invalid index %d ", index);
@@ -563,20 +547,14 @@ static gboolean __rfcomm_client_data_received_cb(GIOChannel *chan, GIOCondition 
 		return FALSE;
 	}
 
-	bt_internal_info = _bluetooth_internal_get_information();
-	if (bt_internal_info->bt_cb_ptr) {
-		DBG("%s  -  clientfd = %d\n", buf, rfcomm_client_info->sock_fd);
-		bluetooth_rfcomm_received_data_t rx_data;
-		rx_data.socket_fd = rfcomm_client_info->sock_fd;
-		rx_data.buffer_size = len;
-		rx_data.buffer = buf;
-		bt_event.event = BLUETOOTH_EVENT_RFCOMM_DATA_RECEIVED;
-		bt_event.result = BLUETOOTH_ERROR_NONE;
-		bt_event.param_data = (void *)&rx_data;
+	DBG("%s  -  clientfd = %d\n", buf, rfcomm_client_info->sock_fd);
+	rx_data.socket_fd = rfcomm_client_info->sock_fd;
+	rx_data.buffer_size = len;
+	rx_data.buffer = buf;
 
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_RFCOMM_DATA_RECEIVED,
+					BLUETOOTH_ERROR_NONE, &rx_data);
 
-	}
 	return TRUE;
 }
 
@@ -602,7 +580,11 @@ static int __get_default_adapter_path(char **adapter_path)
 					   BLUEZ_MANAGER_OBJ_PATH, BLUEZ_MANAGER_INTERFACE,
 					   "DefaultAdapter");
 
-	dbus_error_init(&error);
+	if (msg == NULL) {
+		DBG("dbus method call is not allocated.");
+		return -1;
+	}
+
 	reply = dbus_connection_send_with_reply_and_block(connection, msg, -1, &error);
 
 	dbus_message_unref(msg);
@@ -650,8 +632,14 @@ static int __get_rfcomm_proxy_list(char ***proxy_list, int *len)
 					   default_adapter_obj_path, BLUEZ_SERIAL_MANAGER_INTERFACE,
 					   "ListProxies");
 
-	dbus_error_init(&error);
 	g_free(default_adapter_obj_path);
+
+	if (msg == NULL) {
+		DBG("dbus method call is not allocated.");
+		return -1;
+	}
+
+	dbus_error_init(&error);
 	reply = dbus_connection_send_with_reply_and_block(connection, msg, -1, &error);
 	dbus_message_unref(msg);
 
@@ -698,8 +686,6 @@ static gboolean __get_rfcomm_is_match_uuid(char *proxy, const char *uuid)
 	const char *property;
 	DBusConnection *conn = NULL;
 
-	conn = dbus_bus_get(DBUS_BUS_SYSTEM, &error);
-
 	if (proxy == NULL || uuid == NULL)
 		return FALSE;
 
@@ -707,6 +693,11 @@ static gboolean __get_rfcomm_is_match_uuid(char *proxy, const char *uuid)
 	msg = dbus_message_new_method_call(BLUEZ_SERVICE_NAME,
 					   proxy,
 					   BLUEZ_SERIAL_PROXY_INTERFACE, "GetInfo");
+
+	if (msg == NULL) {
+		DBG("dbus method call is not allocated.");
+		return FALSE;
+	}
 
 	conn = dbus_bus_get(DBUS_BUS_SYSTEM, NULL);
 
@@ -841,8 +832,10 @@ BT_EXPORT_API int bluetooth_rfcomm_create_socket(const char *uuid)
 
 	g_free(default_adapter_obj_path);
 
-	/*Assign index */
-	len = index;
+	if (msg == NULL) {
+		DBG("dbus method call is not allocated.");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
 
 	g_strlcpy(address_string, RFCOMM_SER_DEV_PATH, sizeof(address_string));
 	DBG("address_string1 = %s\n", address_string);
@@ -892,7 +885,11 @@ BT_EXPORT_API int bluetooth_rfcomm_create_socket(const char *uuid)
 	msg = dbus_message_new_method_call(BLUEZ_SERVICE_NAME,
 					   uds_proxy, BLUEZ_SERIAL_PROXY_INTERFACE, "Enable");
 
-	dbus_error_init(&error);
+	if (msg == NULL) {
+		DBG("dbus method call is not allocated.");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
 	reply = dbus_connection_send_with_reply_and_block(connection, msg, -1, &error);
 
 	dbus_message_unref(msg);
@@ -951,6 +948,36 @@ BT_EXPORT_API int bluetooth_rfcomm_create_socket(const char *uuid)
 	else
 		return sk;
 }
+
+BT_EXPORT_API gboolean bluetooth_rfcomm_is_server_uuid_available(const char *uuid)
+{
+	DBG("+\n");
+	char **proxy_list = NULL;
+	int i;
+	int len;
+
+	if (uuid == NULL)
+		return FALSE;
+
+	if (strlen(uuid) != BT_128_UUID_LEN)
+		return FALSE;
+
+	/*Get all proxies */
+	if (__get_rfcomm_proxy_list(&proxy_list, &len) < 0) {
+		DBG("Fail to RFCOMM List Proxy\n");
+		return TRUE;
+	}
+
+	DBG("Proxy count = %d\n", len);
+
+	for (i = 0; i < len; i++) {
+		if (__get_rfcomm_is_match_uuid(proxy_list[i], uuid) == TRUE)
+			return FALSE;
+	}
+
+	return TRUE;
+}
+
 
 /*
  * SLP 2.0 Bluetooth RFCOMM API
@@ -1017,6 +1044,7 @@ BT_EXPORT_API int bluetooth_rfcomm_remove_socket(int socket_fd, const char *uuid
 	DBusError error;
 	int index;
 	static char *default_adapter_obj_path = NULL;
+
 	index = __bluetooth_rfcomm_internal_server_get_index_from_socket(socket_fd);
 	if (index < 0) {
 		DBG("Invalid index %d", index);
@@ -1033,6 +1061,12 @@ BT_EXPORT_API int bluetooth_rfcomm_remove_socket(int socket_fd, const char *uuid
 	msg = dbus_message_new_method_call(BLUEZ_SERVICE_NAME,
 					   rfcomm_server[index].uds_name,
 					   BLUEZ_SERIAL_PROXY_INTERFACE, "Disable");
+
+	if (msg == NULL) {
+		DBG("dbus method call is not allocated.");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
 	dbus_error_init(&error);
 	reply = dbus_connection_send_with_reply_and_block(connection, msg, -1, &error);
 
@@ -1059,11 +1093,16 @@ BT_EXPORT_API int bluetooth_rfcomm_remove_socket(int socket_fd, const char *uuid
 					   default_adapter_obj_path, BLUEZ_SERIAL_MANAGER_INTERFACE,
 					   "RemoveProxy");
 
+	g_free(default_adapter_obj_path);
+
+	if (msg == NULL) {
+		DBG("dbus method call is not allocated.");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
 	dbus_message_append_args(msg, DBUS_TYPE_STRING, &rfcomm_server[index].uds_name,
 				 DBUS_TYPE_INVALID);
 
-	dbus_error_init(&error);
-	g_free(default_adapter_obj_path);
 	reply = dbus_connection_send_with_reply_and_block(connection, msg, -1, &error);
 	dbus_message_unref(msg);
 
@@ -1077,19 +1116,11 @@ BT_EXPORT_API int bluetooth_rfcomm_remove_socket(int socket_fd, const char *uuid
 	}
 
 	if (rfcomm_server[index].client_sock_fd) {
-		bluetooth_event_param_t bt_event = { 0, };
-		bt_info_t *bt_internal_info = NULL;
-		bt_internal_info = _bluetooth_internal_get_information();
-		if (bt_internal_info->bt_cb_ptr) {
-			bluetooth_rfcomm_disconnection_t disconnection_ind;
-			bt_event.event = BLUETOOTH_EVENT_RFCOMM_DISCONNECTED;
-			bt_event.result = BLUETOOTH_ERROR_NONE;
-			disconnection_ind.socket_fd = rfcomm_server[index].client_sock_fd;
-			disconnection_ind.device_addr = rfcomm_server[index].device_addr;
-			bt_event.param_data = (void *)(&disconnection_ind);
-			bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event,
-						    bt_internal_info->user_data);
-		}
+		bluetooth_rfcomm_disconnection_t disconnection_ind;
+		disconnection_ind.socket_fd = rfcomm_server[index].client_sock_fd;
+		disconnection_ind.device_addr = rfcomm_server[index].device_addr;
+		_bluetooth_internal_event_cb(BLUETOOTH_EVENT_RFCOMM_DISCONNECTED,
+						BLUETOOTH_ERROR_NONE, &disconnection_ind);
 
 		g_source_remove(rfcomm_server[index].client_event_src_id);
 		close(rfcomm_server[index].client_sock_fd);
@@ -1136,12 +1167,12 @@ static void __rfcomm_client_connected_cb(DBusGProxy *proxy, DBusGProxyCall *call
 	    remote_address->addr[1], remote_address->addr[2], remote_address->addr[3],
 	    remote_address->addr[4], remote_address->addr[5]);
 
-	DBG("+");
-
 	bt_internal_info = _bluetooth_internal_get_information();
 
 	dbus_g_proxy_end_call(proxy, call, &err,
 			      G_TYPE_STRING, &rfcomm_device_node, G_TYPE_INVALID);
+
+	g_object_unref(proxy);
 
 	if (err != NULL) {
 		DBG("Error occured in connecting port [%s]", err->message);
@@ -1155,8 +1186,6 @@ static void __rfcomm_client_connected_cb(DBusGProxy *proxy, DBusGProxyCall *call
 
 		goto done;
 	}
-
-	g_object_unref(proxy);
 
 	dev_node = g_strdup(rfcomm_device_node);
 
@@ -1283,11 +1312,11 @@ BT_EXPORT_API int bluetooth_rfcomm_connect(const bluetooth_device_address_t *rem
 
 	proxy_rfcomm_client = dbus_g_proxy_new_for_name(conn, BLUEZ_SERVICE_NAME,
 							remote_device_path,
-							BLUEZ_SERIAL_CLINET_INTERFACE);
+							BLUEZ_SERIAL_CLIENT_INTERFACE);
 	g_free(remote_device_path);
 
 	if (proxy_rfcomm_client == NULL) {
-		DBG("Failed to get the network server proxy\n");
+		DBG("Failed to get the rfcomm proxy\n");
 		return BLUETOOTH_ERROR_NOT_PAIRED;
 	}
 
@@ -1350,8 +1379,13 @@ static int __bluetooth_rfcomm_internal_disconnect(int index)
 	g_free(address_up);
 	/* Disconnect */
 	msg = dbus_message_new_method_call(BLUEZ_SERVICE_NAME,
-					   remote_device_path, BLUEZ_SERIAL_CLINET_INTERFACE,
+					   remote_device_path, BLUEZ_SERIAL_CLIENT_INTERFACE,
 					   "Disconnect");
+	if (msg == NULL) {
+		DBG("dbus method call is not allocated.");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
 	DBG("Device node name = %s\n", dev_node);
 	dbus_message_append_args(msg, DBUS_TYPE_STRING, &dev_node, DBUS_TYPE_INVALID);
 
@@ -1386,7 +1420,6 @@ static int __bluetooth_rfcomm_internal_disconnect(int index)
 
 BT_EXPORT_API int bluetooth_rfcomm_disconnect(int socket_fd)
 {
-
 	DBG("+\n");
 
 	static char *default_adapter_obj_path = NULL;
@@ -1455,6 +1488,148 @@ BT_EXPORT_API int bluetooth_rfcomm_write(int fd, const char *buf, int length)
 	return BLUETOOTH_ERROR_NONE;
 	DBG("-\n");
 }
+
+static gboolean __is_rfcomm_connected(DBusGConnection *conn, DBusGProxy *adapter,
+				const bluetooth_device_address_t *bd_addr)
+{
+	DBG("+\n");
+
+	char *object_path = NULL;
+	char addr_str[BT_ADDRESS_STRING_SIZE];
+	gboolean connected = FALSE;
+	DBusGProxy *proxy = NULL;
+	GError *error = NULL;
+	GHashTable *hash = NULL;
+	GValue *value = NULL;
+
+	if (adapter == NULL || bd_addr == NULL)
+		return FALSE;
+
+	_bluetooth_internal_addr_type_to_addr_string(addr_str, bd_addr);
+
+	dbus_g_proxy_call(adapter, "FindDevice",
+			  &error, G_TYPE_STRING, addr_str,
+			  G_TYPE_INVALID, DBUS_TYPE_G_OBJECT_PATH,
+			  &object_path, G_TYPE_INVALID);
+
+	if (error != NULL) {
+		DBG("Failed to Find device: %s\n", error->message);
+		g_error_free(error);
+		return FALSE;
+	}
+
+	if (object_path == NULL)
+		return FALSE;
+
+	proxy = dbus_g_proxy_new_for_name(conn, BLUEZ_NAME, object_path,
+						BLUEZ_SERIAL_CLIENT_INTERFACE);
+
+	if (proxy == NULL)
+		return FALSE;
+
+	dbus_g_proxy_call(proxy, "GetProperties", &error,
+				G_TYPE_INVALID,
+				dbus_g_type_get_map("GHashTable", G_TYPE_STRING, G_TYPE_VALUE),
+				&hash, G_TYPE_INVALID);
+
+	if (error != NULL) {
+		DBG("Failed to get properties: %s\n", error->message);
+		g_error_free(error);
+		g_object_unref(proxy);
+		return FALSE;
+	}
+
+	if (hash != NULL) {
+		value = g_hash_table_lookup(hash, "Connected");
+		connected = value ? g_value_get_boolean(value) : FALSE;
+	}
+
+	g_object_unref(proxy);
+
+	DBG("-\n");
+
+	return connected;
+}
+
+BT_EXPORT_API gboolean bluetooth_rfcomm_is_client_connected()
+{
+	DBG("+\n");
+
+	GError *error = NULL;
+	DBusGConnection *conn = NULL;
+	char *adapter_path = NULL;
+	GPtrArray *dev_list = NULL;
+	bluetooth_device_info_t *p = NULL;
+	gboolean connected = FALSE;
+	int ret = 0;
+	int i;
+	DBusGProxy *adapter = NULL;
+
+	conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, &error);
+
+	if (error != NULL) {
+		DBG("Unable to connect to DBus :%s \n", error->message);
+		g_error_free(error);
+		goto done;
+	}
+
+	if (__get_default_adapter_path(&adapter_path) < 0) {
+		DBG("Fail to get default hci adapter path\n");
+		goto done;
+	}
+
+	adapter = dbus_g_proxy_new_for_name(conn, BLUEZ_NAME,
+					adapter_path, BLUEZ_ADAPTER_NAME);
+
+	g_free(adapter_path);
+
+	if (adapter == NULL)
+		goto done;
+
+	dev_list = g_ptr_array_new();
+
+	ret = bluetooth_get_bonded_device_list(&dev_list);
+
+	if (ret != BLUETOOTH_ERROR_NONE) {
+		DBG("Get bonded list failed : Error cause[%d]", ret);
+		goto done;
+	}
+
+	if (dev_list == NULL || dev_list->len == 0) {
+		DBG("There is no paired device");
+		goto done;
+	}
+
+	for (i = 0; i < dev_list->len; i++) {
+		p = g_ptr_array_index(dev_list, i);
+		if (!p) {
+			DBG("device is none");
+			break;
+		}
+
+		if (__is_rfcomm_connected(conn, adapter, &p->device_address) == TRUE) {
+			free(p);
+			g_ptr_array_free(dev_list, TRUE);
+			connected = TRUE;
+			goto done;
+		}
+
+		free(p);
+	}
+
+	g_ptr_array_free(dev_list, TRUE);
+done:
+	if (adapter)
+		g_object_unref(adapter);
+
+	if (conn)
+		dbus_g_connection_unref(conn);
+
+	DBG("connected: %d", connected);
+
+	return connected;
+}
+
 
 static int __bluetooth_internal_set_non_blocking(int sk)
 {

@@ -35,6 +35,11 @@ extern "C" {
 #define OBEX_SERVER_SERVICE "org.openobex"
 #define OBEX_SERVER_MANAGER "org.openobex.Manager"
 #define BT_OBEX_SERVICE_INTERFACE "org.openobex.Agent"
+
+#define BT_FRWK_OBJECT "/org/projectx/frwk"
+#define BT_FRWK_INTERFACE "User.Bluetooth.FRWK"
+#define BT_FRWK_SIGNAL_DEINIT "deinit"
+
 #define OBEX_SERVER_AGENT_PATH "/org/bluez/obex_server_agent"
 #define BT_INVALID_PATH "/Invalid/Path"
 #define BT_OBEX_AGENT_ERROR (__bt_obex_agent_error_quark())

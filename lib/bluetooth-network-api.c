@@ -40,8 +40,6 @@ static void __bluetooth_network_server_connected(DBusGProxy *proxy, const char *
 					       const char *address, gpointer user_data);
 static void __bluetooth_network_server_disconnected(DBusGProxy *proxy, const char *device,
 						  const char *address, gpointer user_data);
-static void __bluetooth_network_connection_changed_cb(gboolean connected,
-						    const bluetooth_device_address_t *device_addr);
 static DBusHandlerResult __bluetooth_network_event_filter(DBusConnection *sys_conn,
 							DBusMessage *msg, void *data);
 
@@ -156,8 +154,7 @@ static void __bluetooth_network_activate_request_cb(DBusGProxy *proxy, DBusGProx
 						  gpointer user_data)
 {
 	GError *g_error = NULL;
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
+	int result = BLUETOOTH_ERROR_NONE;
 	DBusGConnection *conn = NULL;
 
 	conn = (DBusGConnection *) user_data;
@@ -170,26 +167,21 @@ static void __bluetooth_network_activate_request_cb(DBusGProxy *proxy, DBusGProx
 	if (g_error != NULL) {
 		DBG("Network server register Dbus Call Error: %s\n", g_error->message);
 		g_error_free(g_error);
-		bt_event.result = BLUETOOTH_ERROR_INTERNAL;
+		result = BLUETOOTH_ERROR_INTERNAL;
 	} else {
 		DBG("Network server register Dbus Call is done\n");
-		bt_event.result = BLUETOOTH_ERROR_NONE;
 	}
 
-	bt_event.event = BLUETOOTH_EVENT_NETWORK_SERVER_ACTIVATED;
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_NETWORK_SERVER_ACTIVATED,
+					result, NULL);
 
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info && bt_internal_info->bt_cb_ptr)
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
 }
 
 static void __bluetooth_network_deactivate_request_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 						    gpointer user_data)
 {
 	GError *g_error = NULL;
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
+	int result = BLUETOOTH_ERROR_NONE;
 	DBusGConnection *conn = NULL;
 
 	conn = (DBusGConnection *) user_data;
@@ -202,18 +194,14 @@ static void __bluetooth_network_deactivate_request_cb(DBusGProxy *proxy, DBusGPr
 	if (g_error != NULL) {
 		DBG("Network server unregister Dbus Call Error: %s\n", g_error->message);
 		g_error_free(g_error);
-		bt_event.result = BLUETOOTH_ERROR_INTERNAL;
+		result = BLUETOOTH_ERROR_INTERNAL;
 	} else {
 		DBG("Network server unregister Dbus Call is done\n");
-		bt_event.result = BLUETOOTH_ERROR_NONE;
 	}
 
-	bt_event.event = BLUETOOTH_EVENT_NETWORK_SERVER_DEACTIVATED;
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_NETWORK_SERVER_DEACTIVATED,
+					result, NULL);
 
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info && bt_internal_info->bt_cb_ptr)
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
 }
 
 void _bluetooth_network_server_add_signal(void)
@@ -224,7 +212,7 @@ void _bluetooth_network_server_add_signal(void)
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	if (bt_internal_info == NULL || bt_internal_info->conn == NULL)
+	if (bt_internal_info->conn == NULL)
 		return;
 
 	if (strlen(bt_internal_info->adapter_path) <= 0)
@@ -261,9 +249,6 @@ void _bluetooth_network_server_remove_signal(void)
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	if (bt_internal_info == NULL)
-		return;
-
 	if (bt_internal_info->network_server_proxy == NULL) {
 		DBG("No network proxy exist");
 		return;
@@ -287,29 +272,19 @@ static void __bluetooth_network_server_connected(DBusGProxy *proxy,
 					       const char *device, const char *address,
 					       gpointer user_data)
 {
-	bluetooth_event_param_t bt_event = { 0, };
-	bluetooth_network_device_info_t device_info = {{{0}}};
-	bt_info_t *bt_internal_info = NULL;
 	DBG("+");
-
+	bluetooth_network_device_info_t device_info = {{{0}}};
 	if (device == NULL || address == NULL)
 		return;
 
-	DBG("device[%s]", device);
-	DBG("address[%s]", address);
+	DBG("device[%s], address[%s] ", device, address);
 
 	_bluetooth_internal_convert_addr_string_to_addr_type(&device_info.device_address, address);
 
 	memcpy(device_info.interface_name, device, BLUETOOTH_INTERFACE_NAME_LENGTH);
 
-	bt_event.event = BLUETOOTH_EVENT_NETWORK_SERVER_CONNECTED;
-	bt_event.param_data = (void *)&device_info;
-
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info && bt_internal_info->bt_cb_ptr)
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_NETWORK_SERVER_CONNECTED,
+					BLUETOOTH_ERROR_NONE, &device_info);
 	DBG("-");
 }
 
@@ -317,29 +292,19 @@ static void __bluetooth_network_server_disconnected(DBusGProxy *proxy,
 						  const char *device, const char *address,
 						  gpointer user_data)
 {
-	bluetooth_event_param_t bt_event = { 0, };
-	bluetooth_network_device_info_t device_info = {{{0}}};
-	bt_info_t *bt_internal_info = NULL;
-
 	DBG("+");
-
+	bluetooth_network_device_info_t device_info = {{{0}}};
 	if (device == NULL || address == NULL)
 		return;
 
-	DBG("device[%s]", device);
-	DBG("address[%s]", address);
+	DBG("device[%s], address[%s] ", device, address);
 
 	_bluetooth_internal_convert_addr_string_to_addr_type(&device_info.device_address, address);
 
 	memcpy(device_info.interface_name, device, BLUETOOTH_INTERFACE_NAME_LENGTH);
 
-	bt_event.event = BLUETOOTH_EVENT_NETWORK_SERVER_DISCONNECTED;
-	bt_event.param_data = (void *)&device_info;
-
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info && bt_internal_info->bt_cb_ptr)
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_NETWORK_SERVER_DISCONNECTED,
+					BLUETOOTH_ERROR_NONE, &device_info);
 
 	DBG("-");
 }
@@ -520,10 +485,9 @@ static void __bluetooth_network_connect_request_cb(DBusGProxy *proxy, DBusGProxy
 						 gpointer user_data)
 {
 	GError *g_error = NULL;
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
 	char *device = NULL;
 	DBusGConnection *conn = NULL;
+	int result = BLUETOOTH_ERROR_NONE;
 
 	conn = (DBusGConnection *) user_data;
 
@@ -535,27 +499,22 @@ static void __bluetooth_network_connect_request_cb(DBusGProxy *proxy, DBusGProxy
 	if (g_error != NULL) {
 		DBG("Network Client connection  Dbus Call Error: %s\n", g_error->message);
 		g_error_free(g_error);
-		bt_event.result = BLUETOOTH_ERROR_INTERNAL;
+		result = BLUETOOTH_ERROR_INTERNAL;
 	} else {
 		DBG("Network Client connection Dbus Call is done %s\n", device);
-		bt_event.result = BLUETOOTH_ERROR_NONE;
 	}
 
-	bt_event.event = BLUETOOTH_EVENT_NETWORK_CONNECTED;
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_NETWORK_CONNECTED,
+					result, NULL);
 
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info && bt_internal_info->bt_cb_ptr)
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
 }
 
 static void __bluetooth_network_disconnect_request_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 						    gpointer user_data)
 {
 	GError *g_error = NULL;
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
 	DBusGConnection *conn = NULL;
+	int result = BLUETOOTH_ERROR_NONE;
 
 	conn = (DBusGConnection *) user_data;
 
@@ -567,18 +526,14 @@ static void __bluetooth_network_disconnect_request_cb(DBusGProxy *proxy, DBusGPr
 	if (g_error != NULL) {
 		DBG("Network Client disconnection Dbus Call Error: %s\n", g_error->message);
 		g_error_free(g_error);
-		bt_event.result = BLUETOOTH_ERROR_INTERNAL;
+		result = BLUETOOTH_ERROR_INTERNAL;
 	} else {
 		DBG("Network Client disconnection Dbus Call is done\n");
-		bt_event.result = BLUETOOTH_ERROR_NONE;
 	}
 
-	bt_event.event = BLUETOOTH_EVENT_NETWORK_DISCONNECTED;
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_NETWORK_DISCONNECTED,
+					result, NULL);
 
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info && bt_internal_info->bt_cb_ptr)
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
 }
 
 void _bluetooth_network_client_add_filter(void)
@@ -590,7 +545,7 @@ void _bluetooth_network_client_add_filter(void)
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	if (bt_internal_info == NULL || bt_internal_info->conn == NULL)
+	if (bt_internal_info->conn == NULL)
 		return;
 
 	if (bt_internal_info->sys_conn) {
@@ -643,27 +598,6 @@ void _bluetooth_network_client_remove_filter(void)
 	DBG("-\n");
 }
 
-static void __bluetooth_network_connection_changed_cb(gboolean connected,
-						    const bluetooth_device_address_t *device_addr)
-{
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
-
-	DBG("+");
-
-	bt_event.event =
-	    connected ? BLUETOOTH_EVENT_NETWORK_CONNECTED : BLUETOOTH_EVENT_NETWORK_DISCONNECTED;
-	bt_event.result = BLUETOOTH_ERROR_NONE;
-	bt_event.param_data = (void *)device_addr;
-
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info && bt_internal_info->bt_cb_ptr)
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-
-	DBG("-");
-}
-
 static DBusHandlerResult __bluetooth_network_event_filter(DBusConnection *sys_conn,
 							DBusMessage *msg, void *data)
 {
@@ -707,8 +641,9 @@ static DBusHandlerResult __bluetooth_network_event_filter(DBusConnection *sys_co
 
 		_bluetooth_internal_device_path_to_address(path, address);
 		_bluetooth_internal_convert_addr_string_to_addr_type(&device_addr, address);
-
-		__bluetooth_network_connection_changed_cb(connected, &device_addr);
+		_bluetooth_internal_event_cb(connected ? BLUETOOTH_EVENT_NETWORK_CONNECTED :
+						BLUETOOTH_EVENT_NETWORK_DISCONNECTED,
+						BLUETOOTH_ERROR_NONE, &device_addr);
 	} else if (!strcmp(property, "Interface")) {
 		const gchar *device = NULL;
 

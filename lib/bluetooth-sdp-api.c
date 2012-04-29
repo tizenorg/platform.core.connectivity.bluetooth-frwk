@@ -73,6 +73,7 @@ static void __bluetooth_internal_get_remote_device_uuids_cb(DBusGProxy *proxy, D
 
 	GHashTable *hash;
 	GValue *value = { 0 };
+	int result = BLUETOOTH_ERROR_NONE;
 	bluetooth_event_param_t bt_event = { 0, };
 	bt_info_t *bt_internal_info = NULL;
 
@@ -131,21 +132,14 @@ static void __bluetooth_internal_get_remote_device_uuids_cb(DBusGProxy *proxy, D
 	g_strfreev(array_list);
 
  done:
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info->bt_cb_ptr) {
-		bt_event.event = BLUETOOTH_EVENT_SERVICE_SEARCHED;
-		if (0 > ret) {
-			bt_event.result = BLUETOOTH_ERROR_SERVICE_SEARCH_ERROR;
-			device_uuids.service_index = 0x00;
-		} else {
-			bt_event.result = BLUETOOTH_ERROR_NONE;
-		}
-
-		bt_event.param_data = &device_uuids;
-
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
+		
+	if (0 > ret) {
+		result = BLUETOOTH_ERROR_SERVICE_SEARCH_ERROR;
+		device_uuids.service_index = 0x00;
 	}
+
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_SERVICE_SEARCHED,
+					result, &device_uuids);
 
 	DBG("-\n");
 
@@ -181,21 +175,6 @@ static void __bluetooth_internal_device_created_for_sdp_cb(DBusGProxy *proxy, DB
 	DBG("-\n");
 
 	return;
-}
-
-static void __bluetooth_internal_sdp_fail_cb(const bt_sdp_info_t *sdp_data, int error_code)
-{
-
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	bt_event.event = BLUETOOTH_EVENT_SERVICE_SEARCHED;
-	bt_event.result = error_code;
-	bt_event.param_data = (void *)sdp_data;
-	if (bt_internal_info->bt_cb_ptr) {
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
-	}
 }
 
 static int __bluetooth_internal_parse_sdp_xml(const char *buf_name, int size,
@@ -410,7 +389,7 @@ static void __bluetooth_internal_discover_services_cb(DBusGProxy *proxy, DBusGPr
 	const char *dev_path = NULL;
 	static bt_sdp_info_t sdp_data;
 	bt_info_t *bt_internal_info = NULL;
-	bluetooth_event_param_t bt_event = { 0, };
+	int result = BLUETOOTH_ERROR_NONE;
 
 	bt_info_for_searching_support_service_t *bt_info_for_searching_support_service =
 	    (bt_info_for_searching_support_service_t *) user_data;
@@ -426,17 +405,17 @@ static void __bluetooth_internal_discover_services_cb(DBusGProxy *proxy, DBusGPr
 		sdp_data.service_index = 0;
 
 		if (!strcmp("Operation canceled", err->message)) {
-			__bluetooth_internal_sdp_fail_cb(&sdp_data,
-						       BLUETOOTH_ERROR_CANCEL_BY_USER);
+			_bluetooth_internal_event_cb(BLUETOOTH_EVENT_SERVICE_SEARCHED,
+							BLUETOOTH_ERROR_CANCEL_BY_USER, &sdp_data);
 		} else if (!strcmp("In Progress", err->message)) {
-			__bluetooth_internal_sdp_fail_cb(&sdp_data,
-						       BLUETOOTH_ERROR_IN_PROGRESS);
+			_bluetooth_internal_event_cb(BLUETOOTH_EVENT_SERVICE_SEARCHED,
+							BLUETOOTH_ERROR_IN_PROGRESS, &sdp_data);
 		} else if (!strcmp("Host is down", err->message)) {
-			__bluetooth_internal_sdp_fail_cb(&sdp_data,
-						       BLUETOOTH_ERROR_HOST_DOWN);
+			_bluetooth_internal_event_cb(BLUETOOTH_EVENT_SERVICE_SEARCHED,
+							BLUETOOTH_ERROR_HOST_DOWN, &sdp_data);
 		} else {
-			__bluetooth_internal_sdp_fail_cb(&sdp_data,
-						       BLUETOOTH_ERROR_CONNECTION_ERROR);
+			_bluetooth_internal_event_cb(BLUETOOTH_EVENT_SERVICE_SEARCHED,
+							BLUETOOTH_ERROR_CONNECTION_ERROR, &sdp_data);
 		}
 
 		bt_internal_info->is_service_req = FALSE;
@@ -475,24 +454,19 @@ static void __bluetooth_internal_discover_services_cb(DBusGProxy *proxy, DBusGPr
 		_bluetooth_change_uuids_to_sdp_info(value, &sdp_data);
 	}
 
-	if (bt_internal_info->bt_cb_ptr) {
-		bt_event.event = BLUETOOTH_EVENT_SERVICE_SEARCHED;
-		DBG("service_index %d\n", sdp_data.service_index);
-		if (sdp_data.service_index < 0) {
-			bt_event.result = BLUETOOTH_ERROR_SERVICE_SEARCH_ERROR;
-			sdp_data.service_index = 0;
-		} else if (sdp_data.service_index == 0) {
-				/*This is for some carkit, printer.*/
-			__bluetooth_internal_request_search_supported_services(
-				&bt_info_for_searching_support_service->remote_device_addr);
-			return;
-		} else {
-			bt_event.result = BLUETOOTH_ERROR_NONE;
-			bt_event.param_data = &sdp_data;
-		}
 
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event, bt_internal_info->user_data);
+	DBG("service_index %d\n", sdp_data.service_index);
+	if (sdp_data.service_index < 0) {
+		result = BLUETOOTH_ERROR_SERVICE_SEARCH_ERROR;
+		sdp_data.service_index = 0;
+	} else if (sdp_data.service_index == 0) {
+		/*This is for some carkit, printer.*/
+		__bluetooth_internal_request_search_supported_services(
+			&bt_info_for_searching_support_service->remote_device_addr);
+		return;
 	}
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_SERVICE_SEARCHED,
+					result, &sdp_data);
 
 	DBG("-\n");
 
@@ -522,9 +496,6 @@ BT_EXPORT_API int bluetooth_search_service(const bluetooth_device_address_t *dev
 	}
 
 	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info == NULL)
-		return BLUETOOTH_ERROR_NO_RESOURCES;
 
 	if (bt_internal_info->adapter_proxy == NULL)
 		return BLUETOOTH_ERROR_INTERNAL;
@@ -679,9 +650,6 @@ BT_EXPORT_API int bluetooth_cancel_service_search(void)
 	}
 
 	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info == NULL)
-		return BLUETOOTH_ERROR_NO_RESOURCES;
 
 	if (bt_internal_info->adapter_proxy == NULL)
 		return BLUETOOTH_ERROR_INTERNAL;

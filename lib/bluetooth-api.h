@@ -222,7 +222,6 @@ typedef enum {
 	BLUETOOTH_EVENT_REMOTE_DEVICE_READ,	    /**< Bluetooth event read remote device */
 	BLUETOOTH_EVENT_DEVICE_AUTHORIZED,	    /**< Bluetooth event authorize device */
 	BLUETOOTH_EVENT_DEVICE_UNAUTHORIZED,	    /**< Bluetooth event unauthorize device */
-	BLUETOOTH_EVENT_READ_LOCAL_OOB_DATA,	    /**< Bluetooth event read local oob data */
 
 	BLUETOOTH_EVENT_SERVICE_SEARCHED = BLUETOOTH_EVENT_SDP_BASE,
 						    /**< Bluetooth event serice search base id */
@@ -1944,6 +1943,23 @@ int bluetooth_rfcomm_remove_socket(int socket_fd, const char *uuid);
 int bluetooth_rfcomm_listen_and_accept(int socket_fd, int max_pending_connection);
 
 /**
+ * @fn gboolean bluetooth_rfcomm_is_server_uuid_available(const char *uuid)
+ * @brief Informs whether rfcomm server uuid is available or not.
+ *
+ * This function is a synchronous call.
+ *
+ * @return   TRUE  - RFCOMM uuid is available \n
+ *              FALSE - RFCOMM uuid is not available \n
+ *
+ * @param[in]  uuid UUID string
+ *
+ * @exception   None
+ *
+ * @remark       None
+ */
+gboolean bluetooth_rfcomm_is_server_uuid_available(const char *uuid);
+
+/**
  * @fn int bluetooth_rfcomm_connect(const bluetooth_device_address_t  *remote_bt_address,
  *									const char *remote_uuid)
  * @brief Connect to the remote device rfcomm *
@@ -2086,6 +2102,21 @@ int bluetooth_rfcomm_disconnect(int socket_fd);
  @endcode
  */
 int bluetooth_rfcomm_write(int fd, const char *buf, int length);
+
+/**
+ * @fn gboolean bluetooth_rfcomm_is_client_connected(void)
+ * @brief Informs whether rfcomm client is connected.
+ *
+ * This function is a synchronous call.
+ *
+ * @return   TRUE  - RFCOMM client is connected \n
+ *              FALSE - RFCOMM client is not connected \n
+ *
+ * @exception   None
+ *
+ * @remark       None
+ */
+gboolean bluetooth_rfcomm_is_client_connected(void);
 
 /**
  * @fn int bluetooth_network_activate_server(void)
@@ -2407,11 +2438,12 @@ gboolean bluetooth_opc_session_is_exist(void);
   *             BLUETOOTH_ERROR_AGENT_ALREADY_EXIST - Obex agent already registered \n
  *
  * @exception   None
- *
+ * @param[in]  dst_path   OPS destination file path.
  * @remark       None
  * @see    	  bluetooth_obex_server_deinit
  */
 int bluetooth_obex_server_init(char *dst_path);
+
 
 /**
  * @fn int bluetooth_obex_server_deinit(void)
@@ -2425,8 +2457,7 @@ int bluetooth_obex_server_init(char *dst_path);
  *              BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST -Obex agent not registered \n
  *
  * @exception   None
- * @param[in]  dst_path   OPS destination file path.
-
+ *
  * @remark       None
  * @see    	  bluetooth_obex_server_init
  */
@@ -2561,81 +2592,24 @@ int bluetooth_obex_server_cancel_transfer(int transfer_id);
 
 
 /**
- * @fn int bluetooth_oob_read_local_data(void)
+ * @fn int bluetooth_oob_read_local_data(bt_oob_data_t *local_oob_data)
  * @brief Read the local Hash and Randmizer.
  *
- * This function is a asynchronous call.
+ * This function is a synchronous call.
  *
  * @return   BLUETOOTH_ERROR_NONE  - Success \n
  *           BLUETOOTH_ERROR_INTERNAL - Internal Error \n
  *
  * @exception  None
  * @param[in]  None.
- * @param[out]
+ * @param[out] local_oob_data - Pointer to the local OOB data
  *
  * @remark       None
  * @see    	 None
- @code
-void bt_event_callback(int event, bluetooth_event_param_t *param)
-{
-	switch(event)
-	{
-		case BLUETOOTH_EVENT_READ_LOCAL_OOB_DATA:
-		{
-			if (param->result != BLUETOOTH_ERROR_NONE)  {
-				printf("BLUETOOTH_EVENT_READ_LOCAL_OOB_DATA -BLUETOOTH_ERROR ");
-				break;
-			}
-
-		 printf("BLUETOOTH_EVENT_READ_LOCAL_OOB_DATA - BLUETOOTH_ERROR_NONE");
-		 memcpy(&g_local_oob_data.oob_data,
-			 (bt_oob_data_t *)param->param_data,
-			 sizeof(bt_oob_data_t));
-
-		 printf("hash = [%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X"
-			 "%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X]\n",
-			 g_local_oob_data.oob_data.hash[0],
-			 g_local_oob_data.oob_data.hash[1],
-			 g_local_oob_data.oob_data.hash[2],
-			 g_local_oob_data.oob_data.hash[3],
-			 g_local_oob_data.oob_data.hash[4],
-			 g_local_oob_data.oob_data.hash[5],
-			 g_local_oob_data.oob_data.hash[6],
-			 g_local_oob_data.oob_data.hash[7],
-			 g_local_oob_data.oob_data.hash[8],
-			 g_local_oob_data.oob_data.hash[9],
-			 g_local_oob_data.oob_data.hash[10],
-			 g_local_oob_data.oob_data.hash[11],
-			 g_local_oob_data.oob_data.hash[12],
-			 g_local_oob_data.oob_data.hash[13],
-			 g_local_oob_data.oob_data.hash[14],
-			 g_local_oob_data.oob_data.hash[15]);
-
-		 printf("randomizer = [%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X"
-			 "%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X]\n",
-			 g_local_oob_data.oob_data.randomizer[0],
-			 g_local_oob_data.oob_data.randomizer[1],
-			 g_local_oob_data.oob_data.randomizer[2],
-			 g_local_oob_data.oob_data.randomizer[3],
-			 g_local_oob_data.oob_data.randomizer[4],
-			 g_local_oob_data.oob_data.randomizer[5],
-			 g_local_oob_data.oob_data.randomizer[6],
-			 g_local_oob_data.oob_data.randomizer[7],
-			 g_local_oob_data.oob_data.randomizer[8],
-			 g_local_oob_data.oob_data.randomizer[9],
-			 g_local_oob_data.oob_data.randomizer[10],
-			 g_local_oob_data.oob_data.randomizer[11],
-			 g_local_oob_data.oob_data.randomizer[12],
-			 g_local_oob_data.oob_data.randomizer[13],
-			 g_local_oob_data.oob_data.randomizer[14],
-			 g_local_oob_data.oob_data.randomizer[15]);
-		}
-	}
-}
- @endcode
  */
 
-int bluetooth_oob_read_local_data(void);
+int bluetooth_oob_read_local_data(bt_oob_data_t *local_oob_data);
+
 
 /**
  * @fn int bluetooth_oob_add_remote_data(

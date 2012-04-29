@@ -29,8 +29,6 @@
 /**********************************************************************
 *		Static Functions declaration				*
 ***********************************************************************/
-static void __bt_hdp_internal_event_cb(int event, int result, void *param_data);
-
 static int __bt_hdp_internal_create_application(unsigned int data_type,
 						bool role,
 						bt_hdp_qos_type_t channel_type);
@@ -75,24 +73,6 @@ static GSList *g_app_list = NULL;
 *			Health device APIs (HDP)			*
 ***********************************************************************/
 
-static void __bt_hdp_internal_event_cb(int event, int result, void *param_data)
-{
-	DBG("+");
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
-	bt_event.event = event;
-	bt_event.result = result;
-	bt_event.param_data = param_data;
-
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info && bt_internal_info->bt_cb_ptr)
-		bt_internal_info->bt_cb_ptr(bt_event.event, &bt_event,
-					bt_internal_info->user_data);
-
-	DBG("-");
-}
-
 BT_EXPORT_API int bluetooth_hdp_activate(unsigned short data_type,
 					bt_hdp_role_type_t role,
 					bt_hdp_qos_type_t channel_type)
@@ -104,11 +84,6 @@ BT_EXPORT_API int bluetooth_hdp_activate(unsigned short data_type,
 	_bluetooth_internal_session_init();
 
 	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info == NULL) {
-		DBG("bt_internal_info is NULL\n");
-		return BLUETOOTH_ERROR_NO_RESOURCES;
-	}
 
 	if (bt_internal_info->bt_adapter_state != BLUETOOTH_ADAPTER_ENABLED) {
 		DBG("Adapter not enabled");
@@ -135,7 +110,7 @@ static gboolean  __bt_hdp_internal_create_application_cb(gpointer data)
 	bt_hdp_activate_t act_cfm;
 	act_cfm.app_handle = list->app_handle;
 
-	__bt_hdp_internal_event_cb(BLUETOOTH_EVENT_HDP_ACTIVATED,
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_HDP_ACTIVATED,
 				  BLUETOOTH_ERROR_NONE, &act_cfm);
 	DBG(" -\n");
 	return FALSE;
@@ -156,11 +131,6 @@ static int __bt_hdp_internal_create_application(unsigned int data_type,
 	int ret = BLUETOOTH_ERROR_NONE;
 
 	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info == NULL) {
-		DBG("Internal info == NULL");
-		return BLUETOOTH_ERROR_NO_RESOURCES;
-	}
 
 	msg = dbus_message_new_method_call("org.bluez", "/org/bluez",
 					  BLUEZ_HDP_MANAGER_INTERFACE,
@@ -302,8 +272,8 @@ static int __bt_hdp_internal_add_filter(void)
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	if (bt_internal_info == NULL || bt_internal_info->conn == NULL) {
-		DBG("Internel info == NULL or Conn == NULL\n");
+	if (bt_internal_info->conn == NULL) {
+		DBG("Internel Conn == NULL\n");
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
@@ -424,7 +394,7 @@ static void __bt_hdp_internal_handle_disconnect(DBusMessage *msg)
 		dis_ind.channel_id = list->fd;
 		dis_ind.device_address = device_addr;
 
-		__bt_hdp_internal_event_cb(BLUETOOTH_EVENT_HDP_DISCONNECTED,
+		_bluetooth_internal_event_cb(BLUETOOTH_EVENT_HDP_DISCONNECTED,
 					  BLUETOOTH_ERROR_NONE, &dis_ind);
 
 		close(list->fd);
@@ -499,10 +469,6 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 	int fdd = -1;
 
 	bt_internal_info = _bluetooth_internal_get_information();
-	if (bt_internal_info == NULL) {
-		DBG(" HDP:bt_internal_info NULL");
-		return BLUETOOTH_ERROR_INTERNAL;
-	}
 
 	msg = dbus_message_new_method_call("org.bluez", path,
 					  BLUEZ_HDP_CHANNEL_INTERFACE,
@@ -654,7 +620,7 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 
 	DBG("Going to give callback\n");
 
-	__bt_hdp_internal_event_cb(BLUETOOTH_EVENT_HDP_CONNECTED,
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_HDP_CONNECTED,
 				  BLUETOOTH_ERROR_NONE, &conn_ind);
 
 	dbus_message_unref(reply);
@@ -725,7 +691,7 @@ static gboolean __bt_hdp_internal_data_received(GIOChannel *gio,
 
 	data_ind.size = act_read;
 
-	__bt_hdp_internal_event_cb(BLUETOOTH_EVENT_HDP_DATA_RECEIVED,
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_HDP_DATA_RECEIVED,
 					  BLUETOOTH_ERROR_NONE, &data_ind);
 
 	return TRUE;
@@ -742,11 +708,6 @@ BT_EXPORT_API int bluetooth_hdp_deactivate(const char *app_handle)
 	_bluetooth_internal_session_init();
 
 	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info == NULL) {
-		DBG("bt_internal_info is NULL\n");
-		return BLUETOOTH_ERROR_NO_RESOURCES;
-	}
 
 	if (bt_internal_info->bt_adapter_state != BLUETOOTH_ADAPTER_ENABLED) {
 		DBG("Adapter not enabled");
@@ -821,7 +782,7 @@ static gboolean  __bt_hdp_internal_destroy_application_cb(gpointer data)
 	bt_hdp_deactivate_t deact_cfm;
 	hdp_app_list_t *list = NULL;
 	deact_cfm.app_handle = (const char *)data;
-	__bt_hdp_internal_event_cb(BLUETOOTH_EVENT_HDP_DEACTIVATED,
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_HDP_DEACTIVATED,
 					BLUETOOTH_ERROR_NONE, &deact_cfm);
 
 	list = __bt_hdp_internal_gslist_find_app_handler((void *)deact_cfm.app_handle);
@@ -855,10 +816,6 @@ static int __bt_hdp_internal_destroy_application(const char *app_handle)
 	bt_info_t *bt_internal_info = NULL;
 
 	bt_internal_info = _bluetooth_internal_get_information();
-	if (bt_internal_info == NULL) {
-		DBG("bt_internal_info is NULL\n");
-		return BLUETOOTH_ERROR_NO_RESOURCES;
-	}
 
 	msg = dbus_message_new_method_call("org.bluez", "/org/bluez",
 			BLUEZ_HDP_MANAGER_INTERFACE, "DestroyApplication");
@@ -907,7 +864,7 @@ static void __bt_hdp_internal_remove_filter(void)
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	if (bt_internal_info == NULL || bt_internal_info->conn == NULL)
+	if (bt_internal_info->conn == NULL)
 		return;
 
 	if (g_hdp_dus_conn == NULL) {
@@ -935,11 +892,6 @@ BT_EXPORT_API int bluetooth_hdp_send_data(unsigned int channel_id,
 	_bluetooth_internal_session_init();
 
 	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info == NULL) {
-		DBG("bt_internal_info is NULL\n");
-		return BLUETOOTH_ERROR_NO_RESOURCES;
-	}
 
 	if (bt_internal_info->bt_adapter_state != BLUETOOTH_ADAPTER_ENABLED) {
 		DBG("Adapter not enabled");
@@ -981,11 +933,6 @@ BT_EXPORT_API int bluetooth_hdp_connect(const char *app_handle,
 	_bluetooth_internal_session_init();
 
 	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info == NULL) {
-		DBG("bt_internal_info is NULL\n");
-		return BLUETOOTH_ERROR_NO_RESOURCES;
-	}
 
 	if (bt_internal_info->bt_adapter_state != BLUETOOTH_ADAPTER_ENABLED) {
 		DBG("Adapter not enabled");
@@ -1093,11 +1040,6 @@ BT_EXPORT_API int bluetooth_hdp_disconnect(unsigned int channel_id,
 	_bluetooth_internal_session_init();
 
 	bt_internal_info = _bluetooth_internal_get_information();
-
-	if (bt_internal_info == NULL) {
-		DBG("bt_internal_info is NULL\n");
-		return BLUETOOTH_ERROR_NO_RESOURCES;
-	}
 
 	if (bt_internal_info->bt_adapter_state != BLUETOOTH_ADAPTER_ENABLED) {
 		DBG("Adapter not enabled");

@@ -1,6 +1,6 @@
 Name:       bluetooth-frwk
-Summary:    Bluetooth framework for BlueZ This package is Bluetooth framework based on Blue
-Version:    0.1.48
+Summary:    Bluetooth framework for BlueZ and Obexd. This package is Bluetooth framework based on BlueZ and Obexd stack.
+Version: 0.1.56
 Release:    1
 Group:      TO_BE/FILLED_IN
 License:    Apache-2.0
@@ -18,7 +18,6 @@ BuildRequires:  pkgconfig(bluez)
 BuildRequires:  pkgconfig(dbus-1)
 BuildRequires:  pkgconfig(utilX)
 BuildRequires:  pkgconfig(appcore-efl)
-BuildRequires:  pkgconfig(openobex)
 BuildRequires:  pkgconfig(msg-service)
 BuildRequires:  pkgconfig(email-service)
 BuildRequires:  cmake
@@ -27,7 +26,7 @@ Requires(post): /sbin/ldconfig
 Requires(postun): /sbin/ldconfig
 
 %description
-Bluetooth framework for BlueZ This package is Bluetooth framework based on BlueZ stack.
+Bluetooth framework for BlueZ and Obexd. This package is Bluetooth framework based on BlueZ and Obexd stack.
  This package contains API set for BT GAP, BT SDP, and BT RFCOMM.
 
 

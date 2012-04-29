@@ -91,9 +91,6 @@ clean:
 	rm -f bluetooth-pb-agent/bluetooth_pb_agent_glue.h
 	rm -f bluetooth-map-agent/bluetooth_map_agent_glue.h
 	
-	rm -f bluetooth-media-control/Makefile
-	rm -f bluetooth-media-control/bluetooth-media-control.pc
-	
 	dh_clean 
 
 install: build

@@ -1,3 +1,51 @@
+bluetooth-frwk (0.1.56) unstable; urgency=low
+
+  * Upload the changes
+  * Git: pkgs/b/bluetooth-frwk
+  * Tag: bluetooth-frwk_0.1.56
+
+ -- DoHyun Pyun <dh79.pyun@samsung.com>  Thu, 19 Apr 2012 08:57:02 +0900
+
+bluetooth-frwk (0.1.55) unstable; urgency=low
+
+  * Implement the MDM handsfree mode
+  * Git: pkgs/b/bluetooth-frwk
+  * Tag: bluetooth-frwk_0.1.55
+
+ -- DoHyun Pyun <dh79.pyun@samsung.com>  Tue, 10 Apr 2012 08:36:02 +0900
+
+bluetooth-frwk (0.1.54) unstable; urgency=low
+
+  * Add the authorize API to support BADA
+  * Git: pkgs/b/bluetooth-frwk
+  * Tag: bluetooth-frwk_0.1.54
+
+ -- DoHyun Pyun <dh79.pyun@samsung.com>  Fri, 30 Mar 2012 16:43:59 +0900
+
+bluetooth-frwk (0.1.53) unstable; urgency=low
+
+  * Revert session bus (agent) to system bus
+  * Git: pkgs/b/bluetooth-frwk
+  * Tag: bluetooth-frwk_0.1.53
+
+ -- Chanyeol Park <chanyeol.park@samsung.com>  Sun, 25 Mar 2012 16:51:41 +0900
+
+bluetooth-frwk (0.1.52) unstable; urgency=low
+
+  * fixed dbus bus type to session bus
+  * Git: pkgs/b/bluetooth-frwk
+  * Tag: bluetooth-frwk_0.1.52
+
+ -- Jaekyun Lee <jkyun.lee@samsung.com>  Sat, 24 Mar 2012 16:35:23 +0900
+
+bluetooth-frwk (0.1.51) unstable; urgency=low
+
+  * Release Tizen 1.0
+  * Git: pkgs/b/bluetooth-frwk
+  * Tag: bluetooth-frwk_0.1.51
+
+ -- DoHyun Pyun <dh79.pyun@samsung.com>  Tue, 20 Mar 2012 17:23:57 +0900
+
 bluetooth-frwk (0.1.48-2) unstable; urgency=low
 
   * Change SAMSUNG -> TIZEN

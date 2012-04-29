@@ -42,7 +42,7 @@
 #include "MapiMessage.h"
 
 /*Email Header Files*/
-#include "Emf_Mapi_Types.h"
+#include "email-types.h"
 
 #include <bluetooth_map_agent.h>
 
@@ -547,7 +547,7 @@ static gboolean bluetooth_map_get_message(BluetoothMapAgent *agent,
 	int account_id = 0;
 	GPtrArray *array = g_ptr_array_new();
 	emf_mailbox_t mailbox;
-	emf_mail_body_t *body = NULL;
+	emf_mail_data_t *mail_data = NULL;
 	int nread = 0;
 	char *buf = NULL;
 	long l_size = 0;
@@ -596,11 +596,10 @@ static gboolean bluetooth_map_get_message(BluetoothMapAgent *agent,
 		memset(&mailbox, 0x00, sizeof(emf_mailbox_t));
 		mailbox.account_id = account_id;
 
-		if (EMF_ERROR_NONE == email_get_body_info(&mailbox, message_id,
-								&body)) {
-			body_file = fopen(body->plain, "r");
+		if (EMF_ERROR_NONE == email_get_mail_data(message_id, &mail_data)) {
+			body_file = fopen(mail_data->file_path_plain, "r");
 			if (body_file == NULL)
-				body_file = fopen(body->html, "rb");
+				body_file = fopen(mail_data->file_path_html, "rb");
 
 			if (body_file != NULL) {
 				fseek(body_file , 0, SEEK_END);
@@ -631,8 +630,8 @@ static gboolean bluetooth_map_get_message(BluetoothMapAgent *agent,
 		fclose(body_file);
 	if (buf)
 		free(buf);
-	if (body)
-		email_free_body_info(&body, 1);
+	if (mail_data)
+		email_free_mail_data(&mail_data, 1);
 	return TRUE;
 fail:
 	g_free(value);
@@ -641,8 +640,8 @@ fail:
 		fclose(body_file);
 	if (buf)
 		free(buf);
-	if (body)
-		email_free_body_info(&body, 1);
+	if (mail_data)
+		email_free_mail_data(&mail_data, 1);
 	error = __bt_map_agent_error(BT_MAP_AGENT_ERROR_INTERNAL,
 				  "InternalError");
 	dbus_g_method_return_error(context, error);
@@ -677,7 +676,7 @@ static gboolean bluetooth_map_message_status(BluetoothMapAgent *agent,
 	char *last = NULL;
 	int message_id = 0;
 	emf_mailbox_t mailbox;
-	emf_mail_t *mail = NULL;
+	emf_mail_data_t *mail_data = NULL;
 	msg_message_t msg;
 	MSG_ERROR_T err = MSG_SUCCESS;
 	MSG_SENDINGOPT_S sendOpt = { 0 };
@@ -777,7 +776,7 @@ static gboolean bluetooth_map_message_status(BluetoothMapAgent *agent,
 		}
 		case 1: {
 			memset(&mailbox, 0x00, sizeof(emf_mailbox_t));
-			if (email_get_mail(&mailbox, message_id, &mail) < 0) {
+			if (email_get_mail_data(message_id, &mail_data) < 0) {
 				ERR("email_get_mail failed\n");
 			} else {
 				DBG("email_get_mail success\n");
@@ -789,7 +788,7 @@ static gboolean bluetooth_map_message_status(BluetoothMapAgent *agent,
 					ERR("\n email_delete_message failed");
 					flag = FALSE;
 				}
-				email_free_mail(&mail, 1);
+				email_free_mail_data(&mail_data, 1);
 			}
 			break;
 		}
@@ -828,7 +827,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	connection = dbus_g_bus_get(DBUS_BUS_SYSTEM, &error);
+	connection = dbus_g_bus_get(DBUS_BUS_SESSION, &error);
 
 	if (error != NULL) {
 		ERR("Couldn't connect to system bus[%s]\n", error->message);
@@ -887,5 +886,3 @@ int main(int argc, char **argv)
 	__bluetooth_map_stop_service();
 	return EXIT_FAILURE;
 }
-
-

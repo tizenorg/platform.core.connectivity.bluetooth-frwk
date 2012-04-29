@@ -26,7 +26,7 @@ Description: Bluetooth framework for BlueZ
 
 Package: bluetooth-frwk-agent
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, libappcore-efl-0, libslp-utilx-0, libaul-1
+Depends: ${shlibs:Depends}, ${misc:Depends}, libappcore-efl-0, libaul-1
 Description: Bluetooth Agent for pairing and authorization
  This package is Bluetooth useraction Agent to response pairing, authorization, and mode change with BlueZ.
 
