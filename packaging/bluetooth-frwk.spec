@@ -5,6 +5,7 @@ Release:    1
 Group:      TO_BE/FILLED_IN
 License:    Apache-2.0
 Source0:    %{name}-%{version}.tar.gz
+Source1001: packaging/bluetooth-frwk.manifest 
 
 BuildRequires:  pkgconfig(aul)
 BuildRequires:  pkgconfig(contacts-service)
@@ -53,6 +54,7 @@ This package is Bluetooth useraction Agent to response pairing, authorization, a
 
 
 %build
+cp %{SOURCE1001} .
 export CFLAGS+=" -fpie"
 export LDFLAGS+=" -Wl,--rpath=/usr/lib -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs -pie"
 
@@ -77,14 +79,17 @@ ln -s ../init.d/bluetooth-frwk-agent /etc/rc.d/rc3.d/S80bluetooth-frwk-agent
 ln -s ../init.d/bluetooth-frwk-agent /etc/rc.d/rc5.d/S80bluetooth-frwk-agent
 
 %files
+%manifest bluetooth-frwk.manifest
 /usr/lib/*.so.*
 
 %files devel
+%manifest bluetooth-frwk.manifest
 /usr/lib/*.so
 /usr/include/*
 /usr/lib/pkgconfig/*
 
 %files agent
+%manifest bluetooth-frwk.manifest
 /usr/bin/bluetooth-agent
 /usr/bin/bluetooth-pb-agent
 /etc/*
