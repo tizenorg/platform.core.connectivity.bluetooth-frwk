@@ -1,0 +1,10 @@
+
+[Unit]
+Description=Start the bluetooth-agent service
+
+[Service]
+ExecStart=/usr/bin/bluetooth-agent
+
+[Install]
+WantedBy=tizen-middleware.target
+

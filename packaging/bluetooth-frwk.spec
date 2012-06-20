@@ -6,7 +6,7 @@ Group:      TO_BE/FILLED_IN
 License:    Apache-2.0
 Source0:    %{name}-%{version}.tar.gz
 Source1001: packaging/bluetooth-frwk.manifest 
-
+Source1:    bluetooth-agent.service
 BuildRequires:  pkgconfig(aul)
 BuildRequires:  pkgconfig(contacts-service)
 BuildRequires:  pkgconfig(dbus-glib-1)
@@ -65,6 +65,15 @@ make
 %install
 %make_install
 
+install -d %{buildroot}%{_libdir}/systemd/user/tizen-middleware.target.wants
+install -m 0644 %SOURCE1 %{buildroot}%{_libdir}/systemd/user/
+ln -s ../bluetooth-agent.service %{buildroot}%{_libdir}/systemd/user/tizen-middleware.target.wants/bluetooth-agent.service
+
+mkdir -p %{buildroot}/etc/rc.d/rc3.d/
+mkdir -p %{buildroot}/etc/rc.d/rc5.d/
+ln -s ../init.d/bluetooth-frwk-agent %{buildroot}/etc/rc.d/rc3.d/S80bluetooth-frwk-agent
+ln -s ../init.d/bluetooth-frwk-agent %{buildroot}/etc/rc.d/rc5.d/S80bluetooth-frwk-agent
+
 %post 
 /sbin/ldconfig
 # Set vconf values with -g/-u options
@@ -73,28 +82,26 @@ vconftool set -t bool memory/bluetooth/allow "0" -u 0
 
 %postun -p /sbin/ldconfig
 
-%post agent
-
-ln -s ../init.d/bluetooth-frwk-agent /etc/rc.d/rc3.d/S80bluetooth-frwk-agent
-ln -s ../init.d/bluetooth-frwk-agent /etc/rc.d/rc5.d/S80bluetooth-frwk-agent
-
 %files
 %manifest bluetooth-frwk.manifest
-/usr/lib/*.so.*
+%{_libdir}/*.so.*
 
 %files devel
 %manifest bluetooth-frwk.manifest
-/usr/lib/*.so
-/usr/include/*
-/usr/lib/pkgconfig/*
+%{_libdir}/*.so
+%{_includedir}/*
+%{_libdir}/pkgconfig/*
 
 %files agent
 %manifest bluetooth-frwk.manifest
-/usr/bin/bluetooth-agent
-/usr/bin/bluetooth-pb-agent
-/etc/*
-#/usr/share/process-info/bluetooth-agent.ini
-/usr/share/dbus-1/services/org.bluez.frwk_agent.service
-/usr/share/dbus-1/services/org.bluez.pb_agent.service
-/usr/bin/bluetooth-map-agent
-/usr/share/dbus-1/services/org.bluez.map_agent.service
+%{_bindir}/bluetooth-agent
+%{_bindir}/bluetooth-pb-agent
+%{_libdir}/systemd/user/bluetooth-agent.service
+%{_libdir}/systemd/user/tizen-middleware.target.wants/bluetooth-agent.service
+%{_datadir}/dbus-1/services/org.bluez.frwk_agent.service
+%{_datadir}/dbus-1/services/org.bluez.pb_agent.service
+%{_bindir}/bluetooth-map-agent
+%{_datadir}/dbus-1/services/org.bluez.map_agent.service
+/etc/rc.d/init.d/bluetooth-frwk-agent
+/etc/rc.d/rc5.d/S80bluetooth-frwk-agent
+/etc/rc.d/rc3.d/S80bluetooth-frwk-agent
