@@ -1,9 +1,8 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 PROJECT(bluetooth-api C)
 
-SET(SRCS bluetooth-api-common.c marshal.c bluetooth-gap-api.c bluetooth-sdp-api.c bluetooth-rfcomm-api.c bluetooth-network-api.c bluetooth-hdp-api.c obex-agent.c bluetooth-opc-api.c 
-bluetooth-obex-server-api.c bluetooth-hid-api.c)
-SET(HEADERS bluetooth-api.h bluetooth-hid-api.h)
+SET(SRCS bluetooth-api-common.c marshal.c bluetooth-gap-api.c bluetooth-sdp-api.c bluetooth-rfcomm-api.c bluetooth-network-api.c bluetooth-hdp-api.c obex-agent.c bluetooth-opc-api.c bluetooth-obex-server-api.c bluetooth-hid-api.c bluetooth-audio-api.c bluetooth-control-api.c bluetooth-le/bluetooth-gatt-api.c)
+SET(HEADERS bluetooth-api.h bluetooth-hid-api.h bluetooth-audio-api.h bluetooth-control-api.h)
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 SET(EXEC_PREFIX "\${prefix}")
@@ -15,7 +14,7 @@ SET(VERSION ${VERSION_MAJOR}.0.0)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 
 INCLUDE(FindPkgConfig)
-pkg_check_modules(packages REQUIRED dlog dbus-glib-1 gobject-2.0 gmodule-2.0 vconf 
+pkg_check_modules(packages REQUIRED dlog dbus-glib-1 gobject-2.0 gmodule-2.0 vconf
 libxml-2.0 syspopup-caller)
 
 FOREACH(flag ${packages_CFLAGS})
@@ -40,6 +39,7 @@ EXEC_PROGRAM("${MARSHALTOOL}" ARGS "--prefix=marshal ${CMAKE_CURRENT_SOURCE_DIR}
 
 FIND_PROGRAM(DBUS_BINDING_TOOL NAMES dbus-binding-tool)
 EXEC_PROGRAM("${DBUS_BINDING_TOOL}" ARGS "--prefix=obex_agent ${CMAKE_CURRENT_SOURCE_DIR}/obex-agent.xml --mode=glib-server --output=${CMAKE_CURRENT_SOURCE_DIR}/obex-agent-glue.h")
+EXEC_PROGRAM("${DBUS_BINDING_TOOL}" ARGS "--prefix=bluetooth_gatt ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-le/bluetooth-gatt.xml --mode=glib-server --output=${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-le/bluetooth-gatt-glue.h")
 
 #SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed")
 
@@ -56,4 +56,3 @@ INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc DESTINATION lib/pkg
 FOREACH(hfile ${HEADERS})
 	INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/${hfile} DESTINATION include/bluetooth-api)
 ENDFOREACH(hfile)
-

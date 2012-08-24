@@ -30,6 +30,7 @@
 #include <malloc.h>
 #include <errno.h>
 #include <sys/types.h>
+#include <libintl.h>
 
 #include <dbus/dbus-glib-lowlevel.h>
 #include <dbus/dbus-glib.h>
@@ -56,18 +57,19 @@
 #define AST(fmt, args...) \
 	SLOG(LOG_ERROR, BT_FRWK, "%s():%d "fmt, __func__, __LINE__, ##args)
 
-#define BT_STORE_PREFIX "db/bluetooth/"
-#define BT_STORE_VISIBILITY_PATH BT_STORE_PREFIX"visibility"
-#define BT_STORE_VISIBILITY_TIME_PATH BT_STORE_PREFIX"visibility_time"
-#define BT_MEMORY_KEY_RESTRICTION "memory/bluetooth/restriction"
 #define BT_SETTING_DEVICE_NAME "db/setting/device_name"
+#define BT_MEMORY_OBEX_NO_AGENT "memory/private/libbluetooth-frwk-0/obex_no_agent"
+#define BT_MEMORY_RFCOMM_UUID "memory/private/libbluetooth-frwk-0/uuid"
+#define BT_FILE_VISIBLE_TIME "file/private/libug-setting-bluetooth-efl/visibility_time"
 
-#define BT_SYSPOPUP_NAME "bt-syspopup"
-#define BT_SECURITY_EVENT "bt-security"
-#define BT_SECURITY_DISABLED "disabled"
+#define BLUEZ_SERVICE_NAME "org.bluez"
+#define BLUEZ_MANAGER_OBJ_PATH "/"
+#define BLUEZ_MANAGER_INTERFACE "org.bluez.Manager"
 
-#define BLUEZ_NAME "org.bluez"
-#define BLUEZ_ADAPTER_NAME "org.bluez.Adapter"
+#define BLUEZ_ADAPTER_INTERFACE "org.bluez.Adapter"
+#define BLUEZ_DEVICE_INTERFACE "org.bluez.Device"
+
+#define BT_AGENT_INTERFACE "User.Bluetooth.agent"
 
 #define HCI_SCAN_ENABLE_NO_SCAN                                         0x00
 #define HCI_SCAN_ENABLE_INQUIRY_ONLY                                    0x01
@@ -82,10 +84,21 @@
 
 #define BLUETOOTH_UUID_POSTFIX "0000-1000-8000-00805f9b34fb"
 
+#define BT_COMMON_PKG "ug-setting-bluetooth-efl"
+
+#define BT_STR_DISABLED_RESTRICTS \
+	dgettext(BT_COMMON_PKG, "IDS_BT_BODY_SECURITY_POLICY_RESTRICTS_USE_OF_BLUETOOTH_CONNECTION")
+
+#define BT_STR_HANDS_FREE_RESTRICTS \
+	dgettext(BT_COMMON_PKG, "IDS_BT_BODY_SECURITY_POLICY_RESTRICTS_USE_OF_BLUETOOTH_CONNECTION_TO_HANDS_FREE_FEATURES_ONLY")
+
 #define RFKILL_EVENT_SIZE 8
 
 #define BT_PHONE_NUM_LEN 50
 #define BT_FILE_BUFFER_MAX 256
+
+#define SLEEP_TIME 50000 /* 50 ms */
+#define BLOCK_MAX_TIMEOUT 2000000 /* 2 seconds */
 
 typedef enum {
 	BT_STORE_BOOLEAN,
@@ -110,6 +123,13 @@ typedef enum {
         RFKILL_TYPE_FM,
         NUM_RFKILL_TYPES,
 } rfkill_type;
+
+typedef enum {
+	BT_ACCEPT,
+	BT_REJECT,
+	BT_CANCEL,
+	BT_TIMEOUT,
+} bt_accept_type_t;
 
 typedef struct {
 	unsigned int idx;
@@ -149,7 +169,9 @@ typedef struct {
 	DBusGProxy *adapter_proxy;		/**< bluez adapter ipc proxy */
 	DBusGProxy *agent_proxy;		/**< Agent ipc proxy */
 	DBusGProxy *network_server_proxy;
+	DBusGProxy *rfcomm_proxy;
 	char adapter_path[BT_ADAPTER_OBJECT_PATH_MAX];	/*bluez adapter path*/
+	char *connecting_uuid;
 	GList *device_proxy_list;			/**< bluez device ipc proxy list */
 
 	bluetooth_adapter_state_t bt_adapter_state;	/*Current bluetooth state*/
@@ -200,13 +222,11 @@ void _bluetooth_internal_divide_device_class(bluetooth_device_class_t *device_cl
 void _bluetooth_internal_device_path_to_address(const char *device_path,
 					       char *device_address);
 
-int _bluetooth_internal_get_value(bt_store_key_t key);
-int _bluetooth_internal_set_value(bt_store_key_t key);
-
 int _bluetooth_get_default_adapter_name(bluetooth_device_name_t *dev_name, int size);
 
 int _bluetooth_internal_get_adapter_path(DBusGConnection *conn, char *path);
 
+DBusGProxy *_bluetooth_internal_get_adapter_proxy(DBusGConnection *conn);
 
 #ifdef __cplusplus
 extern "C" {

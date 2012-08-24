@@ -37,15 +37,36 @@
 
 #define BT_AGENT_PADDING_SIZE 4096
 #define BT_MAX_SERVICES_FOR_DEVICE	20     /**< This specifies maximum number of services a
+
 						device can support */
 #define BT_MAX_EVENT_STR_LENGTH	50
 #define BT_AGENT_ADDR_SIZE	18
+#define BT_TEMINATING_WAIT_TIME 200
+
+/* Define Error type */
+#define BT_AGENT_FAIL -1
+#define BT_AGENT_ERROR_NONE 0
+
+#define BT_FILE_VISIBLE_TIME "file/private/libug-setting-bluetooth-efl/visibility_time"
+
+/* Need to covert to design ID */
+#define BT_STR_HANDS_FREE_RESTRICTS \
+	"Security policy restricts use of Bluletooth connection to hands-free features only"
+
+typedef enum {
+	BT_DEACTIVATING = 0x00,	/* BT Deactivating */
+	BT_DEACTIVATED = 0x01,	/* BT Deactivated */
+	BT_ACTIVATING = 0x02,	/* BT Activating */
+	BT_ACTIVATED = 0x03,	/* BT Activated */
+} bt_status_t;
 
 struct bt_agent_appdata {
-	void *g_connection;
+	DBusGConnection *g_connection;
+	DBusGProxy *manager_proxy;
 	int ignore_auto_pairing;
 	char bonding_addr[BT_AGENT_ADDR_SIZE + 1];	/*bluetooth device address which currently
 							bonding is requested to */
+	bt_status_t bt_status;
 };
 
 typedef enum {
@@ -68,7 +89,9 @@ typedef enum {
 	BT_AGENT_EVENT_APP_CONFIRM_REQUEST = 0x0040,
 	BT_AGENT_EVENT_FILE_RECIEVED = 0x0080,
 	BT_AGENT_EVENT_KEYBOARD_PASSKEY_REQUEST = 0x0100,
-	BT_AGENT_EVENT_TERMINATE = 0x0200,
+	BT_AGENT_EVENT_SECURITY = 0x0200,
+	BT_AGENT_EVENT_TERMINATE = 0x0400,
+	BT_AGENT_EVENT_EXCHANGE_REQUEST = 0x0800,
 } bt_agent_event_type_t;
 
 typedef enum {
@@ -99,5 +122,11 @@ typedef struct {
 int _bt_agent_launch_system_popup(bt_agent_event_type_t event_type, const char *device_name,
 				 char *passkey, const char *filename);
 void _bt_agent_register(DBusGProxy *adapter_proxy);
+
+bt_status_t _bt_agent_bt_status_get();
+
+void _bt_agent_bt_status_set(bt_status_t status);
+
+int _bt_agent_destroy();
 
 #endif				/* __DEF_BT_AGENT_H_ */

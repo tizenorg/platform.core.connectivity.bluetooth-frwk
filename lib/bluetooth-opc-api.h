@@ -47,6 +47,7 @@ struct obexd_transfer_hierarchy {
 	char *name;
 	char *file_name;
 	gint64 size;
+	gchar *address;
 };
 
 

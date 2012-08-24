@@ -122,7 +122,11 @@ int _bluetooth_internal_get_adapter_path(DBusGConnection *conn, char *path)
 
 	DBG("+\n");
 
-	manager_proxy = dbus_g_proxy_new_for_name(conn, "org.bluez", "/", "org.bluez.Manager");
+	if (conn == NULL)
+		return BLUETOOTH_ERROR_INTERNAL;
+
+	manager_proxy = dbus_g_proxy_new_for_name(conn, BLUEZ_SERVICE_NAME,
+				BLUEZ_MANAGER_OBJ_PATH, BLUEZ_MANAGER_INTERFACE);
 
 	if (manager_proxy == NULL) {
 		DBG("Could not create a dbus proxy\n");
@@ -153,6 +157,54 @@ int _bluetooth_internal_get_adapter_path(DBusGConnection *conn, char *path)
 
 	return BLUETOOTH_ERROR_NONE;
 }
+
+DBusGProxy *_bluetooth_internal_get_adapter_proxy(DBusGConnection *conn)
+{
+	GError *err = NULL;
+	DBusGProxy *manager_proxy = NULL;
+	DBusGProxy *adapter_proxy = NULL;
+	char *adapter_path = NULL;
+
+	DBG("+\n");
+
+	if (conn == NULL)
+		return NULL;
+
+	manager_proxy = dbus_g_proxy_new_for_name(conn, BLUEZ_SERVICE_NAME,
+				BLUEZ_MANAGER_OBJ_PATH, BLUEZ_MANAGER_INTERFACE);
+
+	if (manager_proxy == NULL) {
+		DBG("Could not create a dbus proxy\n");
+		return NULL;
+	}
+
+	if (!dbus_g_proxy_call(manager_proxy, "DefaultAdapter", &err,
+			       G_TYPE_INVALID, DBUS_TYPE_G_OBJECT_PATH, &adapter_path,
+				G_TYPE_INVALID)) {
+		if (err != NULL) {
+			DBG("Getting DefaultAdapter failed: [%s]\n", err->message);
+			g_error_free(err);
+		}
+		g_object_unref(manager_proxy);
+		return NULL;
+	}
+
+	if (adapter_path == NULL || strlen(adapter_path) >= BT_ADAPTER_OBJECT_PATH_MAX) {
+		DBG("Adapter path is inproper\n");
+		g_object_unref(manager_proxy);
+		return NULL;
+	}
+
+	adapter_proxy = dbus_g_proxy_new_for_name(conn,
+					BLUEZ_SERVICE_NAME,
+					adapter_path,
+					BLUEZ_ADAPTER_INTERFACE);
+
+	g_object_unref(manager_proxy);
+
+	return adapter_proxy;
+}
+
 
 void _bluetooth_internal_convert_addr_string_to_addr_type(bluetooth_device_address_t *addr,
 									const char *address)
@@ -201,36 +253,6 @@ void _bluetooth_internal_divide_device_class(bluetooth_device_class_t *device_cl
 		device_class->service_class |=
 					BLUETOOTH_DEVICE_SERVICE_CLASS_LIMITED_DISCOVERABLE_MODE;
 	}
-}
-
-static int __bluetooth_internal_store_set_value(const char *key, bt_store_type_t store_type,
-						void *value)
-{
-	int ret = 0;
-	int int_vlaue = 0;
-
-	if (value == NULL) {
-		return -1;
-	}
-
-	switch (store_type) {
-	case BT_STORE_BOOLEAN:
-		int_vlaue = *((gboolean *) value);
-		ret = vconf_set_bool(key, int_vlaue);
-		break;
-	case BT_STORE_INT:
-		int_vlaue = *((int *)value);
-		ret = vconf_set_int(key, int_vlaue);
-		break;
-	case BT_STORE_STRING:
-		ret = vconf_set_str(key, (char *)value);
-		break;
-	default:
-		DBG("Unknown Store Type");
-		return -1;
-	}
-
-	return ret;
 }
 
 static int __bluetooth_internal_store_get_value(const char *key,
@@ -494,8 +516,8 @@ DBusGProxy *_bluetooth_internal_add_device(const char *path)
 {
 	DBusGProxy *device_proxy = NULL;
 
-	device_proxy = dbus_g_proxy_new_for_name(bt_info.conn, "org.bluez",
-						path, "org.bluez.Device");
+	device_proxy = dbus_g_proxy_new_for_name(bt_info.conn, BLUEZ_SERVICE_NAME,
+						path, BLUEZ_DEVICE_INTERFACE);
 	if (device_proxy) {
 		bt_info.device_proxy_list = g_list_append(bt_info.device_proxy_list,
 								device_proxy);
@@ -632,7 +654,6 @@ static void __bluetooth_internal_adapter_property_changed(DBusGProxy *adapter,
 							GValue *value,
 							gpointer user_data)
 {
-	int ret = 0;
 	DBG("+ property[%s]", property);
 
 	if (g_strcmp0(property, "Name") == 0) {
@@ -735,8 +756,9 @@ static void __bluetooth_internal_remote_device_found(DBusGProxy *adapter,
 									paired);
 		} else {
 			_bluetooth_internal_remote_device_found_cb(address,
+								rssi,
 								remote_class,
-								rssi, paired);
+								paired);
 		}
 	}
 
@@ -899,8 +921,8 @@ int bluetooth_internal_set_adapter_path(const char *adapter_path)
 	g_strlcpy(bt_info.adapter_path, adapter_path, BT_ADAPTER_OBJECT_PATH_MAX);
 
 	bt_info.adapter_proxy =
-	    dbus_g_proxy_new_for_name(bt_info.conn, "org.bluez", bt_info.adapter_path,
-					"org.bluez.Adapter");
+	    dbus_g_proxy_new_for_name(bt_info.conn, BLUEZ_SERVICE_NAME, bt_info.adapter_path,
+					BLUEZ_ADAPTER_INTERFACE);
 	if (!bt_info.adapter_proxy) {
 		AST("Could not create a dbus proxy");
 		return BLUETOOTH_ERROR_INTERNAL;
@@ -981,7 +1003,7 @@ static void __bluetooth_internal_name_owner_changed(DBusGProxy *dbus_proxy, cons
 
 	DBG("Name str = %s", name);
 
-	if (g_strcmp0(name, "org.bluez") == 0 && *new == '\0') {
+	if (g_strcmp0(name, BLUEZ_SERVICE_NAME) == 0 && *new == '\0') {
 		DBG("BlueZ is terminated");
 		bt_info.bt_adapter_state = BLUETOOTH_ADAPTER_DISABLED;
 
@@ -1006,6 +1028,11 @@ static void __bluetooth_internal_mode_changed_cb(DBusGProxy *object, const char 
 	int result = BLUETOOTH_ERROR_NONE;
 	void *param_data = NULL;
 	int scanEnable = 0;
+
+	if (changed_mode == NULL) {
+		ERR("changed_mode is NULL");
+		return;
+	}
 
 	DBG("Mode changed [%s]\n", changed_mode);
 
@@ -1076,7 +1103,6 @@ void _bluetooth_internal_session_init(void)
 {
 	GError *err = NULL;
 	const char *adapter_path = NULL;
-	int ret = 0;
 
 	DBG("+\n");
 	if (bt_info.application_pid == 0) {
@@ -1106,8 +1132,8 @@ void _bluetooth_internal_session_init(void)
 							NULL, NULL);
 		}
 
-		bt_info.manager_proxy = dbus_g_proxy_new_for_name(bt_info.conn, "org.bluez", "/",
-									"org.bluez.Manager");
+		bt_info.manager_proxy = dbus_g_proxy_new_for_name(bt_info.conn, BLUEZ_SERVICE_NAME,
+							BLUEZ_MANAGER_OBJ_PATH, BLUEZ_MANAGER_INTERFACE);
 		if (!bt_info.manager_proxy) {
 			AST("Could not create a dbus proxy");
 			return;
@@ -1265,24 +1291,6 @@ BT_EXPORT_API int bluetooth_is_supported(void)
 
 	return is_supported;
 }
-
-BT_EXPORT_API int bluetooth_allow_service(gboolean allow)
-{
-	DBG("+\n");
-
-	/* Vconf value 1: Restrict to use BT service
-	    Vconf value 0: Allow to use BT service */
-	if (vconf_set_bool(BT_MEMORY_KEY_RESTRICTION, !allow))
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
-
-	if (allow == FALSE)
-		bluetooth_disable_adapter();
-
-	DBG("-\n");
-
-	return BLUETOOTH_ERROR_NONE;
-}
-
 
 BT_EXPORT_API int bluetooth_register_callback(bluetooth_cb_func_ptr callback_ptr, void *user_data)
 {

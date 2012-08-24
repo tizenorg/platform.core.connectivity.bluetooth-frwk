@@ -2,7 +2,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 PROJECT(bluetooth-agent C)
 
 SET(SRCS bluetooth-agent.c bluetooth-agent-cb.c marshal.c sc_core_agent.c)
-SET(APP_VENDOR samsung)
+SET(APP_VENDOR tizen)
 SET(APP_NAME bluetooth-agent)
 SET(APP_DIR /usr/bin)
 SET(APP_LOCALEDIR /usr/share/locale)
@@ -15,7 +15,8 @@ MESSAGE("Build type: ${CMAKE_BUILD_TYPE}")
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 
 INCLUDE(FindPkgConfig)
-pkg_check_modules(pkgs REQUIRED vconf aul syspopup-caller contacts-service dbus-glib-1 msg-service email-service)
+pkg_check_modules(pkgs REQUIRED vconf aul syspopup-caller contacts-service dbus-glib-1 msg-service
+email-service)
 
 FOREACH(flag ${pkgs_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")

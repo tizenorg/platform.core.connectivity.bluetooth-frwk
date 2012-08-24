@@ -40,11 +40,13 @@ typedef struct {
 	gboolean is_listen;	/*server listen*/
 	char *uds_name;	/*proxy name*/
 	char *file_name;	/*device name*/
+	char *uuid;	/*uuid*/
 
 	int client_sock_fd;
 	bluetooth_device_address_t device_addr;
 	GIOChannel *client_io_channel;
 	guint client_event_src_id;
+	DBusGConnection *sys_conn;
 } rfcomm_server_t;
 static rfcomm_server_t rfcomm_server[RFCOMM_MAX_CONN];
 

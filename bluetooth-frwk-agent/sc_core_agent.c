@@ -58,7 +58,7 @@ struct _ScCoreAgentPrivate {
 	char authorize_addr[18];
 
 	guint timeout_id;
-	unsigned int timeout;
+	int timeout;
 
 	SC_CORE_AGENT_FUNC_CB cb;
 };
@@ -91,7 +91,7 @@ static gboolean sc_core_agent_ignore_auto_pairing(ScCoreAgent *agent, const char
 						DBusGMethodInvocation *context);
 
 static gboolean sc_core_agent_set_discoverable_timer(ScCoreAgent *agent,
-						const guint timeout,
+						const gint timeout,
 						DBusGMethodInvocation *context);
 
 static gboolean sc_core_agent_get_discoverable_timeout(ScCoreAgent *agent,
@@ -100,10 +100,6 @@ static gboolean sc_core_agent_get_discoverable_timeout(ScCoreAgent *agent,
 static void __sc_core_agent_name_owner_changed(DBusGProxy *object, const char *name,
 						const char *prev, const char *new,
 						gpointer user_data);
-
-static void __sc_core_agent_mode_change(int changed_mode);
-
-static gboolean __sc_cre_core_agent_readd(gpointer data);
 
 #include "sc_core_agent_glue.h"
 
@@ -139,20 +135,11 @@ static void sc_core_agent_init(ScCoreAgent *agent)
 static void sc_core_agent_finalize(GObject *agent)
 {
 	ScCoreAgentPrivate *priv = SC_CORE_AGENT_GET_PRIVATE(agent);
-	SC_CORE_AGENT_FUNC_CB *cb_ptr = NULL;
 
 	DBG("Free agent %p\n", agent);
 
 	g_free(priv->path);
 	g_free(priv->busname);
-
-	cb_ptr = (SC_CORE_AGENT_FUNC_CB *) malloc(sizeof(SC_CORE_AGENT_FUNC_CB));
-	if (cb_ptr) {
-		memcpy(cb_ptr, &priv->cb, sizeof(SC_CORE_AGENT_FUNC_CB));
-		g_idle_add(__sc_cre_core_agent_readd, (void *)cb_ptr);
-	} else {
-		DBG("Error copy callback pointer\n");
-	}
 
 	G_OBJECT_CLASS(sc_core_agent_parent_class)->finalize(agent);
 }
@@ -518,7 +505,7 @@ static gboolean sc_core_agent_confirm_mode(ScCoreAgent *agent, const char *mode,
 
 	if (need_asking && dbus_g_proxy_call(priv->dbus_proxy, "GetConnectionUnixProcessID", NULL,
 					     G_TYPE_STRING,
-					     "org.tizen.SplusA.bluetooth.BluetoothService",
+					     "com.samsung.SplusA.bluetooth.BluetoothService",
 					     G_TYPE_INVALID, G_TYPE_UINT, &inhouse_pid,
 					     G_TYPE_INVALID)) {
 		if (inhouse_pid > 0 && (sender_pid > 0 ||
@@ -623,12 +610,6 @@ static gboolean sc_core_agent_release(ScCoreAgent *agent, DBusGMethodInvocation 
 	memset(priv->pairing_addr, 0x00, sizeof(priv->pairing_addr));
 	memset(priv->authorize_addr, 0x00, sizeof(priv->authorize_addr));
 
-	/* Check blocking this part */
-	g_signal_handlers_disconnect_by_func(priv->dbus_proxy,
-					     G_CALLBACK(__sc_core_agent_name_owner_changed), NULL);
-	g_object_unref(agent);
-	gap_agent = NULL;
-
 	g_free(sender);
 	return TRUE;
 }
@@ -675,8 +656,13 @@ static gboolean __sc_core_agent_timeout_handler(gpointer user_data)
 
 	priv->timeout--;
 
-	if (priv->timeout == 0) {
+	if (priv->timeout <= 0) {
+		g_source_remove(priv->timeout_id);
 		priv->timeout_id = 0;
+
+		if (vconf_set_int(BT_FILE_VISIBLE_TIME, 0) != 0)
+			DBG("Set vconf failed\n");
+
 		return FALSE;
 	}
 
@@ -685,7 +671,7 @@ static gboolean __sc_core_agent_timeout_handler(gpointer user_data)
 }
 
 static gboolean sc_core_agent_set_discoverable_timer(ScCoreAgent *agent,
-						const guint timeout,
+						const gint timeout,
 						DBusGMethodInvocation *context)
 {
 	DBG("+\n");
@@ -702,7 +688,10 @@ static gboolean sc_core_agent_set_discoverable_timer(ScCoreAgent *agent,
 
 	priv->timeout = timeout;
 
-	if (timeout == 0)
+	if (vconf_set_int(BT_FILE_VISIBLE_TIME, timeout) != 0)
+		DBG("Set vconf failed\n");
+
+	if (timeout <= 0)
 		return TRUE;
 
 	priv->timeout_id = g_timeout_add_seconds(1,
@@ -848,6 +837,8 @@ gboolean sc_core_agent_reply_confirmation(ScCoreAgent *agent, const guint accept
 gboolean sc_core_agent_reply_authorize(ScCoreAgent *agent, const guint accept,
 				       DBusGMethodInvocation *context)
 {
+	gboolean ret = TRUE;
+
 	DBG("+\n");
 
 	ScCoreAgentPrivate *priv = SC_CORE_AGENT_GET_PRIVATE(agent);
@@ -872,6 +863,19 @@ gboolean sc_core_agent_reply_authorize(ScCoreAgent *agent, const guint accept,
 			dbus_g_method_return_error(priv->reply_context, error);
 			g_error_free(error);
 		}
+
+		if (context)
+			dbus_g_method_return(context);
+	} else {
+		GError *error = sc_core_agent_error(SC_CORE_AGENT_ERROR_REJECT,
+							"No context");
+		DBG("No context");
+
+		if (context)
+			dbus_g_method_return_error(context, error);
+
+		g_error_free(error);
+		ret = FALSE;
 	}
 
 	priv->exec_type = SC_CORE_AGENT_EXEC_NO_OPERATION;
@@ -880,7 +884,7 @@ gboolean sc_core_agent_reply_authorize(ScCoreAgent *agent, const guint accept,
 
 	DBG("-\n");
 
-	return TRUE;
+	return ret;
 }
 
 gboolean sc_core_agent_reply_adapter_enable(ScCoreAgent *agent, const guint changed_mode,
@@ -891,7 +895,7 @@ gboolean sc_core_agent_reply_adapter_enable(ScCoreAgent *agent, const guint chan
 	ScCoreAgentPrivate *priv = SC_CORE_AGENT_GET_PRIVATE(agent);
 
 	if (accept == SC_CORE_AGENT_ACCEPT) {
-		__sc_core_agent_mode_change(changed_mode);
+		_sc_core_agent_mode_change(changed_mode);
 		dbus_g_method_return(priv->reply_context);
 	} else {
 		GError *error = NULL;
@@ -915,17 +919,26 @@ gboolean sc_core_agent_reply_adapter_enable(ScCoreAgent *agent, const guint chan
 	return TRUE;
 }
 
-static void __sc_core_agent_mode_change(int changed_mode)
+void _sc_core_agent_mode_change(int changed_mode)
 {
 	int ret = 0;
+	bt_status_t bt_up_status;
 
 	switch (changed_mode) {
 	case BT_AGENT_CHANGED_MODE_ENABLE:
 		/* Run BT intiate script */
+		bt_up_status = _bt_agent_bt_status_get();
+		if (bt_up_status == BT_ACTIVATING || bt_up_status == BT_ACTIVATED) {
+			DBG("BT is activating or already activated.\n");
+			break;
+		}
+
+		_bt_agent_bt_status_set(BT_ACTIVATING);
+
 		if ((ret = system("/usr/etc/bluetooth/bt-stack-up.sh &")) < 0) {
 			DBG("running script failed");
 			ret = system("/usr/etc/bluetooth/bt-dev-end.sh &");
-
+			_bt_agent_bt_status_set(BT_DEACTIVATED);
 			sc_core_agent_reply_adapter_enable(_sc_core_agent_get_proxy(), changed_mode,
 							   SC_CORE_AGENT_REJECT, NULL);
 			return;
@@ -934,9 +947,17 @@ static void __sc_core_agent_mode_change(int changed_mode)
 
 	case BT_AGENT_CHANGED_MODE_DISABLE:
 		/* Run BT terminate script */
+		bt_up_status = _bt_agent_bt_status_get();
+		if (bt_up_status == BT_DEACTIVATING || bt_up_status == BT_DEACTIVATED) {
+			DBG("BT is deactivating or already deactivated.\n");
+			break;
+		}
+
+		_bt_agent_bt_status_set(BT_DEACTIVATING);
+
 		if ((ret = system("/usr/etc/bluetooth/bt-stack-down.sh &")) < 0) {
 			DBG("running script failed");
-
+			_bt_agent_bt_status_set(BT_ACTIVATED);
 			sc_core_agent_reply_adapter_enable(_sc_core_agent_get_proxy(), changed_mode,
 							   SC_CORE_AGENT_REJECT, NULL);
 			return;
@@ -951,43 +972,16 @@ static void __sc_core_agent_mode_change(int changed_mode)
 	}
 }
 
-static gboolean __sc_core_agent_register_on_adapter(ScCoreAgent *agent, DBusGProxy *adapter,
-						  SC_CORE_AGENT_FUNC_CB *func_cb)
+static gboolean __sc_core_agent_register_on_adapter(ScCoreAgent *agent, DBusGProxy *adapter)
 {
 	ScCoreAgentPrivate *priv = SC_CORE_AGENT_GET_PRIVATE(agent);
 	DBusGProxy *proxy;
-	GObject *object;
 	GError *error = NULL;
 
 	DBG("agent %p\n", agent);
 
-	if (priv->adapter != NULL)
+	if (adapter == NULL)
 		return FALSE;
-
-	/* DBUS method call install */
-	if (priv->path == NULL) {
-		priv->path = g_strdup_printf("/org/bluez/agent/frwk_agent");
-
-		DBG("%s \n", priv->path);
-
-		object = dbus_g_connection_lookup_g_object(connection, priv->path);
-		if (object != NULL)
-			g_object_unref(object);
-
-		dbus_g_connection_register_g_object(connection, priv->path, G_OBJECT(agent));
-	}
-
-	if (func_cb) {
-		priv->cb.pincode_func = func_cb->pincode_func;
-		priv->cb.display_func = func_cb->display_func;
-		priv->cb.passkey_func = func_cb->passkey_func;
-		priv->cb.confirm_func = func_cb->confirm_func;
-		priv->cb.authorize_func = func_cb->authorize_func;
-		priv->cb.pairing_cancel_func = func_cb->pairing_cancel_func;
-		priv->cb.authorization_cancel_func = func_cb->authorization_cancel_func;
-		priv->cb.confirm_mode_func = func_cb->confirm_mode_func;
-		priv->cb.ignore_auto_pairing_func = func_cb->ignore_auto_pairing_func;
-	}
 
 	priv->exec_type = SC_CORE_AGENT_EXEC_NO_OPERATION;
 	memset(priv->pairing_addr, 0x00, sizeof(priv->pairing_addr));
@@ -995,33 +989,29 @@ static gboolean __sc_core_agent_register_on_adapter(ScCoreAgent *agent, DBusGPro
 	priv->reply_context = NULL;
 
 	/* Adapter agent register */
-	if (adapter) {
-		priv->adapter = g_object_ref(adapter);
+	priv->adapter = g_object_ref(adapter);
 
-		proxy = dbus_g_proxy_new_for_name_owner(connection,
-							dbus_g_proxy_get_bus_name(priv->adapter),
-							dbus_g_proxy_get_path(priv->adapter),
-							dbus_g_proxy_get_interface(priv->adapter),
-							NULL);
+	proxy = dbus_g_proxy_new_for_name_owner(connection,
+						dbus_g_proxy_get_bus_name(priv->adapter),
+						dbus_g_proxy_get_path(priv->adapter),
+						dbus_g_proxy_get_interface(priv->adapter),
+						NULL);
 
-		if (priv->busname)
-			g_free(priv->busname);
+	g_free(priv->busname);
 
-		if (proxy != NULL) {
-			priv->busname = g_strdup(dbus_g_proxy_get_bus_name(proxy));
-			g_object_unref(proxy);
-		} else
-			priv->busname = g_strdup(dbus_g_proxy_get_bus_name(adapter));
+	if (proxy != NULL) {
+		priv->busname = g_strdup(dbus_g_proxy_get_bus_name(proxy));
+		g_object_unref(proxy);
+	} else
+		priv->busname = g_strdup(dbus_g_proxy_get_bus_name(adapter));
 
-		dbus_g_proxy_call(priv->adapter, "RegisterAgent", &error,
-				  DBUS_TYPE_G_OBJECT_PATH, priv->path,
-				  G_TYPE_STRING, "DisplayYesNo", G_TYPE_INVALID, G_TYPE_INVALID);
-
-		if (error != NULL) {
-			DBG("Agent registration failed: %s\n", error->message);
-			g_error_free(error);
-			return FALSE;
-		}
+	dbus_g_proxy_call(priv->adapter, "RegisterAgent", &error,
+			  DBUS_TYPE_G_OBJECT_PATH, priv->path,
+			  G_TYPE_STRING, "DisplayYesNo", G_TYPE_INVALID, G_TYPE_INVALID);
+	if (error != NULL) {
+		DBG("Agent registration failed: %s\n", error->message);
+		g_error_free(error);
+		return FALSE;
 	}
 
 	return TRUE;
@@ -1039,7 +1029,6 @@ static gboolean __sc_core_agent_unregister(ScCoreAgent *agent)
 
 	dbus_g_proxy_call(priv->adapter, "UnregisterAgent", &error,
 			  DBUS_TYPE_G_OBJECT_PATH, priv->path, G_TYPE_INVALID, G_TYPE_INVALID);
-
 	if (error != NULL) {
 		g_printerr("Agent unregistration failed: %s\n", error->message);
 		g_error_free(error);
@@ -1048,10 +1037,18 @@ static gboolean __sc_core_agent_unregister(ScCoreAgent *agent)
 	g_object_unref(priv->adapter);
 	priv->adapter = NULL;
 
-	g_free(priv->path);
-	priv->path = NULL;
-
 	return TRUE;
+}
+
+static gboolean __sc_core_agent_destroy_cb(gpointer user_data)
+{
+	if (_bt_agent_bt_status_get() != BT_ACTIVATING) {
+		/* Destroy the agent */
+		_bt_agent_destroy();
+	} else
+		DBG("Now activating!!!");
+
+	return FALSE;
 }
 
 static void __sc_core_agent_name_owner_changed(DBusGProxy *object, const char *name,
@@ -1066,15 +1063,25 @@ static void __sc_core_agent_name_owner_changed(DBusGProxy *object, const char *n
 
 		if (vconf_set_int(VCONFKEY_BT_DEVICE, VCONFKEY_BT_DEVICE_NONE) != 0)
 			DBG("Set vconf failed\n");
+
+		__sc_core_agent_unregister(gap_agent);
+		_bt_agent_bt_status_set(BT_DEACTIVATED);
+
+		/* Wait some miliseconds,
+		    because it is possible that anyone try to BT on.
+		    So we need to yield the calling turn to dbus method */
+		g_timeout_add(BT_TEMINATING_WAIT_TIME,
+			      (GSourceFunc)__sc_core_agent_destroy_cb, NULL);
 	}
 }
 
-static void __sc_core_setup_dbus(ScCoreAgent *agent)
+static void __sc_core_setup_dbus(ScCoreAgent *agent, SC_CORE_AGENT_FUNC_CB *func_cb)
 {
 	guint result;
 	GError *error = NULL;
 	gchar *agent_name = NULL;
 	ScCoreAgentPrivate *priv = SC_CORE_AGENT_GET_PRIVATE(agent);
+	GObject *object;
 
 	agent_name = g_strdup_printf("org.bluez.frwk_agent");
 
@@ -1102,6 +1109,16 @@ static void __sc_core_setup_dbus(ScCoreAgent *agent)
 
 	g_free(agent_name);
 
+	priv->path = g_strdup_printf("/org/bluez/agent/frwk_agent");
+
+	object = dbus_g_connection_lookup_g_object(connection, priv->path);
+	if (object != NULL)
+		g_object_unref(object);
+
+	dbus_g_connection_register_g_object(connection, priv->path, G_OBJECT(agent));
+
+	memcpy(&priv->cb, func_cb, sizeof(SC_CORE_AGENT_FUNC_CB));
+
 	dbus_g_proxy_add_signal(priv->dbus_proxy, "NameOwnerChanged",
 				G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_INVALID);
 
@@ -1113,34 +1130,28 @@ static void __sc_core_reset_dbus(ScCoreAgent *agent)
 {
 	ScCoreAgentPrivate *priv = SC_CORE_AGENT_GET_PRIVATE(agent);
 
+	dbus_g_proxy_disconnect_signal(priv->dbus_proxy, "NameOwnerChanged",
+					G_CALLBACK(__sc_core_agent_name_owner_changed),
+					NULL);
+
 	g_object_unref(priv->dbus_proxy);
 	priv->dbus_proxy = NULL;
-	priv->adapter = NULL;
+
+	g_free(priv->path);
+	priv->path = NULL;
 }
 
 int _sc_core_agent_add(DBusGProxy *adapter_proxy, SC_CORE_AGENT_FUNC_CB *func_cb)
 {
 	if (gap_agent == NULL) {
 		gap_agent = sc_core_agent_new();
-		__sc_core_setup_dbus(gap_agent);
+		__sc_core_setup_dbus(gap_agent, func_cb);
 	}
 
-	if (__sc_core_agent_register_on_adapter(gap_agent, adapter_proxy, func_cb))
+	if (__sc_core_agent_register_on_adapter(gap_agent, adapter_proxy))
 		return 0;
 
 	return -1;
-}
-
-static gboolean __sc_cre_core_agent_readd(gpointer data)
-{
-	SC_CORE_AGENT_FUNC_CB *cb_ptr = (SC_CORE_AGENT_FUNC_CB *) data;
-
-	_sc_core_agent_add(NULL, cb_ptr);
-
-	if (cb_ptr) {
-		free(cb_ptr);
-	}
-	return 0;
 }
 
 void _sc_core_agent_remove(void)

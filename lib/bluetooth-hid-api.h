@@ -42,14 +42,6 @@ extern "C" {
 #define HID_ERROR_NOT_ENABLED		((int)HID_ERROR_BASE - 0x05)
 #define HID_ERROR_CONNECTION_FAILED	((int)HID_ERROR_BASE - 0x06)
 
-/**
- * Bluetooth event type
- */
-typedef enum {
-	BLUETOOTH_HID_CONNECTED,
-	BLUETOOTH_HID_DISCONNECTED
-} hid_event_t;
-
 typedef struct {
 	int event;
 	int result;

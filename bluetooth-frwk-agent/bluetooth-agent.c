@@ -25,33 +25,37 @@
 #include <vconf.h>
 #include <vconf-keys.h>
 #include <aul.h>
+#include <stdlib.h>
 
 #include "bluetooth-agent.h"
+#include "sc_core_agent.h"
+
 
 struct bt_agent_appdata *app_data = NULL;
+static GMainLoop *main_loop = NULL;
 
-/* status - 0 : No operation, 1 : Activate , 2 : Deactivate, 3 : Search Test*/
-/* run_type - No window change, 1 : Top window, 2 : Background*/
-static void __agent_launch_bt_service(int status, int run_type)
+static void __bt_agent_release_service(void);
+static void __bt_agent_terminate(void);
+
+bt_status_t _bt_agent_bt_status_get()
 {
-	bundle *kb;
-	char status_val[5] = { 0, };
-	char run_type_val[5] = { 0, };
+	return app_data->bt_status;
+}
 
-	snprintf(status_val, sizeof(status_val), "%d", status);
-	snprintf(run_type_val, sizeof(run_type_val), "%d", run_type);
+void _bt_agent_bt_status_set(bt_status_t status)
+{
+	app_data->bt_status = status;
+}
 
-	DBG("status: %s, run_type: %s", status_val, run_type_val);
+int _bt_agent_destroy()
+{
+	DBG("_bt_agent_destroy");
 
-	kb = bundle_create();
+	__bt_agent_release_service();
 
-	bundle_add(kb, "launch-type", "setstate");
-	bundle_add(kb, "status", status_val);
-	bundle_add(kb, "run-type", run_type_val);
+	__bt_agent_terminate();
 
-	aul_launch_app("org.tizen.bluetooth", kb);
-
-	bundle_free(kb);
+	return BT_AGENT_ERROR_NONE;
 }
 
 static int __agent_check_bt_service(void *data)
@@ -63,15 +67,19 @@ static int __agent_check_bt_service(void *data)
 
 	if (bt_status != VCONFKEY_BT_STATUS_OFF) {
 		DBG("Previous session was enabled.");
+		/* Enable the BT */
+		_sc_core_agent_mode_change(BT_AGENT_CHANGED_MODE_ENABLE);
+	} else {
+		DBG("State: %d", _bt_agent_bt_status_get());
 
-		/*check BT service*/
-		if (!aul_app_is_running("org.tizen.bluetooth")) {
-			__agent_launch_bt_service(BT_AGENT_RUN_STATUS_ACTIVATE,
-						BT_AGENT_ON_BACKGROUND);
+		if (_bt_agent_bt_status_get() != BT_ACTIVATING) {
+			/* Destroy the agent */
+			_sc_core_agent_remove();
+			_bt_agent_destroy();
 		}
 	}
 
-	return 0;
+	return BT_AGENT_ERROR_NONE;
 }
 
 static void __agent_adapter_added_cb(DBusGProxy *manager_proxy, const char *adapter_path,
@@ -85,13 +93,10 @@ static void __agent_adapter_added_cb(DBusGProxy *manager_proxy, const char *adap
 
 	adapter_proxy = dbus_g_proxy_new_for_name(connection, "org.bluez", adapter_path,
 						"org.bluez.Adapter");
-	if (adapter_proxy)
+	if (adapter_proxy) {
 		_bt_agent_register(adapter_proxy);
-
-	/*check BT service*/
-	if (!aul_app_is_running("org.tizen.bluetooth"))
-		__agent_launch_bt_service(BT_AGENT_RUN_STATUS_NO_CHANGE,
-					BT_AGENT_ON_CURRENTVIEW);
+		g_object_unref(adapter_proxy);
+	}
 
 	/* Update Bluetooth Status to notify other modules */
 	if (vconf_set_int(VCONFKEY_BT_STATUS, VCONFKEY_BT_STATUS_ON) != 0)
@@ -99,6 +104,8 @@ static void __agent_adapter_added_cb(DBusGProxy *manager_proxy, const char *adap
 
 	if (vconf_set_int(VCONFKEY_BT_DEVICE, VCONFKEY_BT_DEVICE_NONE) != 0)
 		DBG("Set vconf failed\n");
+
+	_bt_agent_bt_status_set(BT_ACTIVATED);
 }
 
 static void __agent_adapter_removed_cb(DBusGProxy *manager_proxy, const char *adapter_path,
@@ -118,40 +125,37 @@ static void __bt_agent_flight_mode_cb(keynode_t *node, void *data)
 
 		DBG("value=%d\n", flight_mode);
 
-		if (flight_mode == TRUE && aul_app_is_running("org.tizen.bluetooth")) {
+		if (flight_mode == TRUE) {
 			DBG("Deactivate Bluetooth Service\n");
-			__agent_launch_bt_service(BT_AGENT_RUN_STATUS_DEACTIVATE,
-						BT_AGENT_ON_CURRENTVIEW);
+			_sc_core_agent_mode_change(BT_AGENT_CHANGED_MODE_DISABLE);
 		}
 	}
 }
-
-static int __agent_init(void *data)
+static gboolean __agent_init(gpointer data)
 {
-	struct bt_agent_appdata *ad = (struct bt_agent_appdata *)data;
-	static DBusGConnection *connection = NULL;
-	static DBusGProxy *manager_proxy = NULL;
+	struct bt_agent_appdata *ad = data;
+	DBusGConnection *connection = NULL;
+	DBusGProxy *manager_proxy = NULL;
 	DBusGProxy *adapter_proxy = NULL;
 	GError *error = NULL;
 	const char *adapter_path = NULL;
 
-	if (connection == NULL)
-		connection = dbus_g_bus_get(DBUS_BUS_SYSTEM, &error);
+	_bt_agent_bt_status_set(BT_DEACTIVATED);
+
+	connection = dbus_g_bus_get(DBUS_BUS_SYSTEM, &error);
 	if (error != NULL) {
 		ERR("ERROR: Can't get on system bus [%s]", error->message);
 		g_error_free(error);
-		return 1;
+		return TRUE;
 	}
 
-	ad->g_connection = (void *)connection;
+	ad->g_connection = connection;
 
-	if (manager_proxy == NULL)
-		manager_proxy = dbus_g_proxy_new_for_name(connection, "org.bluez", "/",
+	manager_proxy = dbus_g_proxy_new_for_name(connection, "org.bluez", "/",
 									"org.bluez.Manager");
-
 	if (manager_proxy == NULL) {
 		ERR("ERROR: Can't make dbus proxy");
-		return 1;
+		return TRUE;
 	}
 
 	if (!dbus_g_proxy_call(manager_proxy, "DefaultAdapter", &error,
@@ -164,26 +168,63 @@ static int __agent_init(void *data)
 
 		_bt_agent_register(NULL);
 
-		dbus_g_proxy_add_signal(manager_proxy, "AdapterAdded",
-					DBUS_TYPE_G_OBJECT_PATH, G_TYPE_INVALID);
-		dbus_g_proxy_connect_signal(manager_proxy, "AdapterAdded",
-					    G_CALLBACK(__agent_adapter_added_cb), ad, NULL);
 	} else {
 		DBG("DefaultAdapter [%s]", adapter_path);
 		adapter_proxy = dbus_g_proxy_new_for_name(connection, "org.bluez", adapter_path,
 								"org.bluez.Adapter");
-		if (adapter_proxy)
+		if (adapter_proxy) {
+			_bt_agent_bt_status_set(BT_ACTIVATED);
 			_bt_agent_register(adapter_proxy);
+			g_object_unref(adapter_proxy);
+		}
 	}
+
+	dbus_g_proxy_add_signal(manager_proxy, "AdapterAdded",
+				DBUS_TYPE_G_OBJECT_PATH, G_TYPE_INVALID);
+	dbus_g_proxy_connect_signal(manager_proxy, "AdapterAdded",
+				    G_CALLBACK(__agent_adapter_added_cb), ad, NULL);
 
 	dbus_g_proxy_add_signal(manager_proxy, "AdapterRemoved",
 				DBUS_TYPE_G_OBJECT_PATH, G_TYPE_INVALID);
 	dbus_g_proxy_connect_signal(manager_proxy, "AdapterRemoved",
-				    G_CALLBACK(__agent_adapter_removed_cb), NULL, NULL);
+				    G_CALLBACK(__agent_adapter_removed_cb), ad, NULL);
 
-	g_idle_add((GSourceFunc) __agent_check_bt_service, NULL);
+	ad->manager_proxy = manager_proxy;
 
-	return 0;
+	vconf_notify_key_changed(VCONFKEY_SETAPPL_FLIGHT_MODE_BOOL, __bt_agent_flight_mode_cb, ad);
+
+	g_idle_add((GSourceFunc) __agent_check_bt_service, ad);
+
+	return FALSE;
+}
+
+static void __bt_agent_terminate(void)
+{
+	if (main_loop != NULL)
+		g_main_loop_quit(main_loop);
+	else
+		exit(0);
+}
+
+static void __bt_agent_release_service(void)
+{
+	struct bt_agent_appdata *ad = app_data;
+
+	if (ad->manager_proxy) {
+		dbus_g_proxy_disconnect_signal(ad->manager_proxy, "AdapterAdded",
+						G_CALLBACK(__agent_adapter_added_cb),
+						NULL);
+
+		dbus_g_proxy_disconnect_signal(ad->manager_proxy, "AdapterRemoved",
+						G_CALLBACK(__agent_adapter_removed_cb),
+						NULL);
+
+		g_object_unref(ad->manager_proxy);
+		ad->manager_proxy = NULL;
+	}
+
+	vconf_ignore_key_changed(VCONFKEY_SETAPPL_FLIGHT_MODE_BOOL,
+				__bt_agent_flight_mode_cb);
 }
 
 static int __bt_agent_create(void *data)
@@ -192,14 +233,10 @@ static int __bt_agent_create(void *data)
 
 	DBG("__bt_agent_create() start.\n");
 
-	g_idle_add((GSourceFunc) __agent_init, ad);
+	__agent_init(ad);
 
-	vconf_notify_key_changed(VCONFKEY_SETAPPL_FLIGHT_MODE_BOOL, __bt_agent_flight_mode_cb, ad);
-
-	return 0;
+	return BT_AGENT_ERROR_NONE;
 }
-
-GMainLoop *main_loop = NULL;
 
 int main(int argc, char *argv[])
 {
@@ -214,9 +251,8 @@ int main(int argc, char *argv[])
 
 	g_main_loop_run(main_loop);
 
-	if (main_loop != NULL) {
+	if (main_loop != NULL)
 		g_main_loop_unref(main_loop);
-	}
 
 	return 0;
 }

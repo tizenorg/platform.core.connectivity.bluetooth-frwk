@@ -53,7 +53,7 @@
 
     <method name="SetDiscoverableTimer">
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-      <arg type="u" name="timeout"/>
+      <arg type="i" name="timeout"/>
     </method>
 
     <method name="GetDiscoverableTimeout">

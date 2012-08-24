@@ -4,7 +4,7 @@
 #export DH_VERBOSE=1
 
 CFLAGS ?= -Wall -g
-LDFLAGS ?= 
+LDFLAGS ?=
 PREFIX ?= /usr
 DATADIR ?= /opt
 
@@ -78,7 +78,7 @@ clean:
 	rm -f bluetooth-map-agent/Makefile
 	rm -f bluetooth-frwk-agent/po/Makefile
 	rm -f lib/test/Makefile
-	
+
 	rm -f lib/*.pc
 	rm -f lib/marshal.c
 	rm -f lib/marshal.h
@@ -86,17 +86,25 @@ clean:
 
 	rm -f bluetooth-frwk-agent/marshal.c
 	rm -f bluetooth-frwk-agent/marshal.h
+	rm -f bluetooth-telephony/marshal.c
+	rm -f bluetooth-telephony/marshal.h
+
 	rm -f bluetooth-frwk-agent/sc_core_agent_glue.h
 	rm -f bluetooth-frwk-agent/bluetooth_obex_agent_glue.h
 	rm -f bluetooth-pb-agent/bluetooth_pb_agent_glue.h
 	rm -f bluetooth-map-agent/bluetooth_map_agent_glue.h
-	
-	dh_clean 
+	rm -f bluetooth-telephony/bluetooth-telephony-glue.h
+
+	rm -f bluetooth-media-control/Makefile
+	rm -f bluetooth-media-control/bluetooth-media-control.pc
+	rm -f bluetooth-media-control/test/Makefile
+
+	dh_clean
 
 install: build
 	dh_testdir
 	dh_testroot
-	dh_clean -k 
+	dh_clean -k
 	dh_installdirs
 
 	# Add here commands to install the package into debian/wavplayer.
@@ -116,12 +124,12 @@ binary-indep: build install
 binary-arch: build install
 	dh_testdir
 	dh_testroot
-	dh_installchangelogs 
+	dh_installchangelogs
 	dh_installdocs
 	dh_installexamples
 	dh_install --sourcedir=debian/tmp
 #	dh_installmenu
-#	dh_installdebconf	
+#	dh_installdebconf
 #	dh_installlogrotate
 #	dh_installemacsen
 #	dh_installpam

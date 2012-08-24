@@ -1,8 +1,8 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 PROJECT(bluetooth-pb-agent C)
 
-SET(SRCS bluetooth_pb_agent.c)
-SET(APP_VENDOR samsung)
+SET(SRCS bluetooth_pb_agent.c bluetooth_pb_vcard.c)
+SET(APP_VENDOR tizen)
 SET(APP_NAME bluetooth-pb-agent)
 SET(APP_DIR /usr/bin)
 SET(APP_LOCALEDIR /usr/share/locale)

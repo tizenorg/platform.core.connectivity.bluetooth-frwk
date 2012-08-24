@@ -316,8 +316,8 @@ BT_EXPORT_API int bluetooth_hid_connect(hid_device_address_t *device_address)
 		return HID_ERROR_NOT_ENABLED;
 	}
 
-	adapter_proxy = dbus_g_proxy_new_for_name(bt_hid_info.conn, BLUEZ_NAME,
-					adapter_path, BLUEZ_ADAPTER_NAME);
+	adapter_proxy = dbus_g_proxy_new_for_name(bt_hid_info.conn, BLUEZ_SERVICE_NAME,
+					adapter_path, BLUEZ_ADAPTER_INTERFACE);
 
 	if (adapter_proxy == NULL) {
 		DBG("dbus_g_proxy_new_for_name() failed\n");
@@ -339,7 +339,7 @@ BT_EXPORT_API int bluetooth_hid_connect(hid_device_address_t *device_address)
 		return HID_ERROR_NOT_PAIRED;
 	}
 
-	hid_proxy = dbus_g_proxy_new_for_name(bt_hid_info.conn, BLUEZ_NAME,
+	hid_proxy = dbus_g_proxy_new_for_name(bt_hid_info.conn, BLUEZ_SERVICE_NAME,
 				      hid_dev_path, BLUEZ_INPUT_NAME);
 
 	if (hid_proxy == NULL) {
@@ -393,8 +393,8 @@ BT_EXPORT_API int bluetooth_hid_disconnect(hid_device_address_t *device_address)
 		return HID_ERROR_NOT_ENABLED;
 	}
 
-	adapter_proxy = dbus_g_proxy_new_for_name(bt_hid_info.conn, BLUEZ_NAME,
-					adapter_path, BLUEZ_ADAPTER_NAME);
+	adapter_proxy = dbus_g_proxy_new_for_name(bt_hid_info.conn, BLUEZ_SERVICE_NAME,
+					adapter_path, BLUEZ_ADAPTER_INTERFACE);
 
 	if (adapter_proxy == NULL) {
 		DBG("dbus_g_proxy_new_for_name() failed\n");
@@ -416,7 +416,7 @@ BT_EXPORT_API int bluetooth_hid_disconnect(hid_device_address_t *device_address)
 		return HID_ERROR_NOT_PAIRED;
 	}
 
-	hid_proxy = dbus_g_proxy_new_for_name(bt_hid_info.conn, BLUEZ_NAME,
+	hid_proxy = dbus_g_proxy_new_for_name(bt_hid_info.conn, BLUEZ_SERVICE_NAME,
 				      hid_dev_path, BLUEZ_INPUT_NAME);
 
 	if (hid_proxy == NULL) {

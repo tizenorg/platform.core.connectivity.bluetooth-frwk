@@ -6,6 +6,7 @@
  * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
  *		 Girishashok Joshi <girish.joshi@samsung.com>
  *		 Chanyeol Park <chanyeol.park@samsung.com>
+ *		 Jaekyun Lee <jkyun.leek@samsung.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,53 +26,26 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 #include <glib.h>
 #include <dbus/dbus-glib.h>
-#include <time.h>
 #include <contacts-svc.h>
-
-#include "vconf.h"
-#include "vconf-keys.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
 #include "bluetooth_pb_agent.h"
+#include "bluetooth_pb_vcard.h"
 
-#define CALL_LOG_VCARD  "BEGIN:VCARD\r\n" \
-					"VERSION:2.1\r\n" \
-					"N:%s;%s\r\n" \
-					"TEL:%s\r\n" \
-					"X-IRMC-CALL-DATETIME;%s:%s\r\n" \
-					"END:VCARD\r\n"
-
-#define PBAP_OWNER_VCARD  "BEGIN:VCARD\r\n" \
-					"VERSION:2.1\r\n" \
-					"TEL:%s\r\n" \
-					"END:VCARD\r\n"
-
-#define PBAP_EMPTY_VCARD  "BEGIN:VCARD\r\n" \
-					"VERSION:2.1\r\n" \
-					"END:VCARD\r\n"
-
-#define VCARD_NO_NAME  "Noname"
-#define MAX_CONTACT_NAME_LEN  256
-#define MAX_CONTACT_NUM_LEN  20
-#define PBAP_OWNER_VCARD_MAX_LEN  255
-#define VCARD_MAX_LEN	3000
-
-#define DBUS_STRUCT_STRING_STRING_UINT (dbus_g_type_get_struct("GValueArray", G_TYPE_STRING, \
-							G_TYPE_STRING, G_TYPE_UINT, G_TYPE_INVALID))
-
-enum PhoneBookObject {
+typedef enum {
 	TELECOM_NONE = 0,
 	TELECOM_PB,
 	TELECOM_ICH,
 	TELECOM_OCH,
 	TELECOM_MCH,
-	TELECOM_CCH,
-};
+	TELECOM_CCH
+} PhoneBookType;
 
 typedef struct {
 	GObject parent;
@@ -79,7 +53,15 @@ typedef struct {
 
 typedef struct {
 	GObjectClass parent;
+
+	void (*clear) (BluetoothPbAgent *agent);
 } BluetoothPbAgentClass;
+
+
+enum {
+	CLEAR,
+	LAST_SIGNAL
+};
 
 GType bluetooth_pb_agent_get_type(void);
 
@@ -91,10 +73,10 @@ GType bluetooth_pb_agent_get_type(void);
 #define BLUETOOTH_PB_AGENT_CLASS(klass) \
 	(G_TYPE_CHECK_CLASS_CAST((klass), \
 	BLUETOOTH_PB_TYPE_AGENT , BluetoothPbAgentClass))
-#define BLUETOOTH_PB_IS_AGENT(object) \
+#define BLUETOOTH_IS_PB_AGENT(object) \
 	(G_TYPE_CHECK_INSTANCE_TYPE((object), \
 	BLUETOOTH_PB_TYPE_AGENT))
-#define BLUETOOTH_PB_IS_AGENT_CLASS(klass) \
+#define BLUETOOTH_IS_PB_AGENT_CLASS(klass) \
 	(G_TYPE_CHECK_CLASS_TYPE((klass), \
 	BLUETOOTH_PB_TYPE_AGENT))
 #define BLUETOOTH_PB_AGENT_GET_CLASS(obj) \
@@ -103,55 +85,197 @@ GType bluetooth_pb_agent_get_type(void);
 
 G_DEFINE_TYPE(BluetoothPbAgent, bluetooth_pb_agent, G_TYPE_OBJECT)
 
-GMainLoop *mainloop = NULL;
+#define DBUS_STRUCT_STRING_STRING_UINT (dbus_g_type_get_struct("GValueArray", G_TYPE_STRING, \
+							G_TYPE_STRING, G_TYPE_UINT, G_TYPE_INVALID))
 
+static guint signals[LAST_SIGNAL] = { 0 };
+
+static GMainLoop *mainloop = NULL;
+
+static GHashTable *contact_list_hash = NULL;
+
+static PhoneBookType g_current_pb_type = TELECOM_NONE;
+
+static void bluetooth_pb_agent_finalize(GObject *obj);
+
+static void bluetooth_pb_agent_clear(BluetoothPbAgent *agent);
+
+/* Dbus messages */
 static gboolean bluetooth_pb_get_phonebook(BluetoothPbAgent *agent,
-					gushort max_list,
-					gushort offset,
+					const char *name,
+					guint64 filter,
+					guint8 format,
+					guint16 max_list_count,
+					guint16 list_start_offset,
 					DBusGMethodInvocation *context);
-
-static gboolean bluetooth_pb_get_calls(BluetoothPbAgent *agent,
-				gushort max_list,
-				gushort offset,
-				gchar *call_type,
-				DBusGMethodInvocation *context);
 
 static gboolean bluetooth_pb_get_phonebook_size(BluetoothPbAgent *agent,
 						const char *name,
 						DBusGMethodInvocation *context);
 
+static gboolean bluetooth_pb_get_phonebook_list(BluetoothPbAgent *agent,
+						const char *name,
+						DBusGMethodInvocation *context);
+
+static gboolean bluetooth_pb_get_phonebook_entry(BluetoothPbAgent *agent,
+						const gchar *folder,
+						const gchar *id,
+						guint64 filter,
+						guint8 format,
+						DBusGMethodInvocation *context);
+
+static gboolean bluetooth_pb_get_phonebook_size_at(BluetoothPbAgent *agent,
+					const gchar *command,
+					DBusGMethodInvocation *context);
+
+static gboolean bluetooth_pb_get_phonebook_entries_at(BluetoothPbAgent *agent,
+					const gchar *command,
+					gint32 start_index,
+					gint32 end_index,
+					DBusGMethodInvocation *context);
+
+static gboolean bluetooth_pb_get_phonebook_entries_find_at(BluetoothPbAgent *agent,
+							const gchar *command,
+							const gchar *find_text,
+							DBusGMethodInvocation *context);
+
 static gboolean bluetooth_pb_get_total_object_count(BluetoothPbAgent *agent,
 						gchar *path,
 						DBusGMethodInvocation *context);
 
-static gboolean bluetooth_pb_get_phonebook_list(BluetoothPbAgent *agent,
-						DBusGMethodInvocation *context);
-
-static gboolean bluetooth_pb_get_calls_list(BluetoothPbAgent *agent,
-					gchar *call_type,
-					    DBusGMethodInvocation *context);
-
-static gboolean bluetooth_pb_get_phonebook_entry(BluetoothPbAgent *agent,
-						gchar *id,
-						 DBusGMethodInvocation *context);
-
-static gboolean bluetooth_pb_get_calls_entry(BluetoothPbAgent *agent,
-					gchar *id,
-					     DBusGMethodInvocation *context);
-
 static gboolean bluetooth_pb_add_contact (BluetoothPbAgent *agent,
 					const char *filename,
-					 GError **error);
+					GError **error);
+
+static void __bluetooth_pb_dbus_return_error(DBusGMethodInvocation *context,
+					gint code,
+					const gchar *message);
+
+static PhoneBookType __bluetooth_pb_get_pb_type(const char *name);
+
+static PhoneBookType __bluetooth_pb_get_storage_pb_type(const char *name);
+
+static unsigned int __bluetooth_pb_get_contact_size(void);
+
+static unsigned int __bluetooth_pb_get_incoming_call_size(void);
+
+static unsigned int __bluetooth_pb_get_outgoing_call_size(void);
+
+static unsigned int __bluetooth_pb_get_missed_call_size(void);
+
+static unsigned int __bluetooth_pb_get_combined_call_size(void);
 
 
-static unsigned int __bluetooth_pb_get_call_size(const enum PhoneBookObject pb_oject);
+static GPtrArray *__bluetooth_pb_get_contact_vcards(BluetoothPbAgent *agent,
+						guint64 filter,
+						guint8 format,
+						guint16 max_list_count,
+						guint16 list_start_offset);
+
+static GPtrArray *__bluetooth_pb_get_incoming_call_vcards(BluetoothPbAgent *agent,
+							guint64 filter,
+							guint8 format,
+							guint16 max_list_count,
+							guint16 list_start_offset);
+
+static GPtrArray *__bluetooth_pb_get_outgoing_call_vcards(BluetoothPbAgent *agent,
+							guint64 filter,
+							guint8 format,
+							guint16 max_list_count,
+							guint16 list_start_offset);
+
+static GPtrArray *__bluetooth_pb_get_missed_call_vcards(BluetoothPbAgent *agent,
+							guint64 filter,
+							guint8 format,
+							guint16 max_list_count,
+							guint16 list_start_offset);
+
+static GPtrArray *__bluetooth_pb_get_combined_call_vcards(BluetoothPbAgent *agent,
+							guint64 filter,
+							guint8 format,
+							guint16 max_list_count,
+							guint16 list_start_offset);
+
+static void __bluetooth_pb_create_contact_index(PhoneBookType pb_type);
+
+static void __bluetooth_pb_create_call_index(PhoneBookType pb_type);
+
+static void __bluetooth_pb_get_contact_list(PhoneBookType pb_type,
+					GPtrArray *ptr_array,
+					gint start_index,
+					gint end_index,
+					gboolean formatted_name);
+
+static void __bluetooth_pb_get_call_list(PhoneBookType pb_type,
+					GPtrArray *ptr_array,
+					gint start_index,
+					gint end_index,
+					gboolean formatted_name);
+
+static void __bluetooth_pb_get_contact_list_by_name(PhoneBookType pb_type,
+						GPtrArray *ptr_array,
+						const gchar *find_text,
+						gboolean formatted_name,
+						gboolean owner);
+
+static void __bluetooth_pb_get_call_list_by_name(PhoneBookType pb_type,
+						GPtrArray *ptr_array,
+						const gchar *find_text,
+						gboolean formatted_name);
+
+static int __bluetooth_get_calllog_type(int call_type);
+
+static unsigned int __get_call_log_count(unsigned int call_log_type);
+
+
+static void __bluetooth_pb_list_hash_reset(void);
+
+static gboolean __bluetooth_pb_list_hash_insert(gint handle,
+						gint id);
+
+static gint __bluetooth_pb_list_hash_lookup_id(gint handle);
+
+static guint __bluetooth_pb_list_hash_size(void);
+
+
+static void __bluetooth_pb_list_ptr_array_add(GPtrArray *ptr_array,
+						const gchar *name,
+						const gchar *number,
+						gint handle);
+
+static void __bluetooth_pb_list_ptr_array_free(gpointer data);
+
+static void __bluetooth_pb_agent_signal_handler(int signum);
+
+static void __bluetooth_pb_contact_changed(void *user_data);
+
+static void __bluetooth_pb_call_changed(void *user_data);
+
 
 #include "bluetooth_pb_agent_glue.h"
 
 static void bluetooth_pb_agent_init(BluetoothPbAgent *obj)
 {
-	DBG("+\n");
-	g_assert(obj != NULL);
+}
+
+static void bluetooth_pb_agent_class_init(BluetoothPbAgentClass *klass)
+{
+	GObjectClass *object_class = (GObjectClass *) klass;
+
+	klass->clear = bluetooth_pb_agent_clear;
+
+	object_class->finalize = bluetooth_pb_agent_finalize;
+
+	signals[CLEAR] = g_signal_new("clear",
+			G_TYPE_FROM_CLASS(klass),
+			G_SIGNAL_RUN_LAST,
+			G_STRUCT_OFFSET(BluetoothPbAgentClass, clear),
+			NULL, NULL,
+			g_cclosure_marshal_VOID__VOID,
+			G_TYPE_NONE, 0);
+
+	dbus_g_object_type_install_info(BLUETOOTH_PB_TYPE_AGENT,
+					&dbus_glib_bluetooth_pb_object_info);
 }
 
 static void bluetooth_pb_agent_finalize(GObject *obj)
@@ -161,61 +285,118 @@ static void bluetooth_pb_agent_finalize(GObject *obj)
 	G_OBJECT_CLASS(bluetooth_pb_agent_parent_class)->finalize(obj);
 }
 
-static void bluetooth_pb_agent_class_init(BluetoothPbAgentClass *klass)
+static void bluetooth_pb_agent_clear(BluetoothPbAgent *agent)
 {
-	GObjectClass *object_class = (GObjectClass *) klass;
+	DBG("+\n");
 
-	g_assert(klass != NULL);
+	if (contact_list_hash) {
+		g_hash_table_destroy(contact_list_hash);
+		contact_list_hash = NULL;
+	}
 
-	object_class->finalize = bluetooth_pb_agent_finalize;
+	g_current_pb_type = TELECOM_NONE;
+}
 
-	dbus_g_object_type_install_info(BLUETOOTH_PB_TYPE_AGENT,
-					&dbus_glib_bluetooth_pb_object_info);
+static gboolean bluetooth_pb_get_phonebook(BluetoothPbAgent *agent,
+					const char *name,
+					guint64 filter,
+					guint8 format,
+					guint16 max_list_count,
+					guint16 list_start_offset,
+					DBusGMethodInvocation *context)
+{
+	PhoneBookType pb_type = TELECOM_NONE;
+	GPtrArray *vcards = NULL;
+	gchar **vcards_str = NULL;
+
+	gint new_missed_calls = 0;
+
+	DBG("\n");
+
+	pb_type = __bluetooth_pb_get_pb_type(name);
+
+	switch (pb_type) {
+	case TELECOM_PB:
+		vcards = __bluetooth_pb_get_contact_vcards(agent,
+				filter, format,
+				max_list_count, list_start_offset);
+		break;
+	case TELECOM_ICH:
+		vcards = __bluetooth_pb_get_incoming_call_vcards(agent,
+				filter, format,
+				max_list_count, list_start_offset);
+		break;
+	case TELECOM_OCH:
+		vcards = __bluetooth_pb_get_outgoing_call_vcards(agent,
+				filter, format,
+				max_list_count, list_start_offset);
+		break;
+	case TELECOM_MCH:
+		vcards = __bluetooth_pb_get_missed_call_vcards(agent,
+				filter, format,
+				max_list_count, list_start_offset);
+		break;
+	case TELECOM_CCH:
+		vcards = __bluetooth_pb_get_combined_call_vcards(agent,
+				filter, format,
+				max_list_count, list_start_offset);
+		break;
+	default: {
+		__bluetooth_pb_dbus_return_error(context,
+					G_FILE_ERROR_INVAL,
+					"unsupported name defined");
+		return FALSE;
+	}
+
+	}
+
+	if (vcards)
+		vcards_str = (gchar **) g_ptr_array_free(vcards, FALSE);
+
+	/* TODO : new_missed_calls need to implement */
+	dbus_g_method_return(context, vcards_str, new_missed_calls);
+
+	g_strfreev(vcards_str);
+
+	return TRUE;
 }
 
 static gboolean bluetooth_pb_get_phonebook_size(BluetoothPbAgent *agent,
 						const char *name,
 						DBusGMethodInvocation *context)
 {
+	PhoneBookType pb_type = TELECOM_NONE;
 	unsigned int phonebook_size = 0;
 
-	DBG("%s() %d\n", __FUNCTION__, __LINE__);
+	DBG("\n");
 
-	if (name == NULL) {
-		GError *error = NULL;
-		GQuark quark;
+	pb_type = __bluetooth_pb_get_pb_type(name);
 
-		quark = g_type_qname(bluetooth_pb_agent_get_type());
-		error = g_error_new(quark, -1, "No name defined");
-
-		DBG("no name defined\n");
-
-		dbus_g_method_return_error(context, error);
-
-		g_error_free(error);
-
+	switch (pb_type) {
+	case TELECOM_PB:
+		phonebook_size = __bluetooth_pb_get_contact_size();
+		break;
+	case TELECOM_ICH:
+		phonebook_size = __bluetooth_pb_get_incoming_call_size();
+		break;
+	case TELECOM_OCH:
+		phonebook_size = __bluetooth_pb_get_outgoing_call_size();
+		break;
+	case TELECOM_MCH:
+		phonebook_size = __bluetooth_pb_get_missed_call_size();
+		break;
+	case TELECOM_CCH:
+		phonebook_size = __bluetooth_pb_get_combined_call_size();
+		break;
+	default: {
+		__bluetooth_pb_dbus_return_error(context,
+					G_FILE_ERROR_INVAL,
+					"unsupported name defined");
 		return FALSE;
 	}
 
-	if (g_strcmp0(name, "/telecom/pb.vcf") == 0) {
-		contacts_svc_connect();
-
-		phonebook_size = contacts_svc_count(CTS_GET_ALL_CONTACT);
-		DBG("Number of contacts is %d\n", phonebook_size);
-
-		contacts_svc_disconnect();
-
-		/* add count for owner (0.vcf) */
-		phonebook_size++;
-	} else if (g_strcmp0(name, "/telecom/ich.vcf") == 0) {
-		phonebook_size = __bluetooth_pb_get_call_size(TELECOM_ICH);
-	} else if (g_strcmp0(name, "/telecom/och.vcf") == 0) {
-		phonebook_size = __bluetooth_pb_get_call_size(TELECOM_OCH);
-	} else if (g_strcmp0(name, "/telecom/mch.vcf") == 0) {
-		phonebook_size = __bluetooth_pb_get_call_size(TELECOM_MCH);
-	} else if (g_strcmp0(name, "/telecom/cch.vcf") == 0) {
-		phonebook_size = __bluetooth_pb_get_call_size(TELECOM_CCH);
 	}
+
 
 	dbus_g_method_return(context, phonebook_size);
 
@@ -223,57 +404,224 @@ static gboolean bluetooth_pb_get_phonebook_size(BluetoothPbAgent *agent,
 }
 
 
-static int __bluetooth_get_calllog_type(int call_type)
+static gboolean bluetooth_pb_get_phonebook_list(BluetoothPbAgent *agent,
+						const char *name,
+						DBusGMethodInvocation *context)
 {
-	int val = CTS_PLOG_TYPE_NONE;
-	switch (call_type) {
-	case CTS_PLOG_TYPE_VOICE_INCOMMING:
-	case CTS_PLOG_TYPE_VIDEO_INCOMMING:
-		val = CTS_PLOG_TYPE_VOICE_INCOMMING;
-		break;
+	PhoneBookType pb_type = TELECOM_NONE;
 
-	case CTS_PLOG_TYPE_VOICE_OUTGOING:
-	case CTS_PLOG_TYPE_VIDEO_OUTGOING:
-		val = CTS_PLOG_TYPE_VOICE_OUTGOING;
-		break;
+	GPtrArray *ptr_array;
 
-	case CTS_PLOG_TYPE_VOICE_INCOMMING_UNSEEN:
-	case CTS_PLOG_TYPE_VOICE_INCOMMING_SEEN:
-	case CTS_PLOG_TYPE_VIDEO_INCOMMING_UNSEEN:
-	case CTS_PLOG_TYPE_VIDEO_INCOMMING_SEEN:
-		val = CTS_PLOG_TYPE_VOICE_INCOMMING_UNSEEN;
-		break;
+	DBG("\n");
 
-	default:
-		break;
+	pb_type = __bluetooth_pb_get_pb_type(name);
+
+	if (pb_type == TELECOM_NONE) {
+		__bluetooth_pb_dbus_return_error(context,
+					G_FILE_ERROR_INVAL,
+					"unsupported name defined");
+		return FALSE;
 	}
 
-	return val;
+	ptr_array = g_ptr_array_new_with_free_func(__bluetooth_pb_list_ptr_array_free);
+
+	if (pb_type == TELECOM_PB)
+		__bluetooth_pb_get_contact_list(pb_type, ptr_array, 0, G_MAXINT, FALSE);
+	else
+		__bluetooth_pb_get_call_list(pb_type, ptr_array, 0, G_MAXINT, FALSE);
+
+	dbus_g_method_return(context, ptr_array);
+
+	if (ptr_array)
+		g_ptr_array_free(ptr_array, TRUE);
+
+	return TRUE;
 }
 
-static unsigned int __get_call_log_count(unsigned int call_log_type)
+
+static gboolean bluetooth_pb_get_phonebook_entry(BluetoothPbAgent *agent,
+						const gchar *folder,
+						const gchar *id,
+						guint64 filter,
+						guint8 format,
+						DBusGMethodInvocation *context)
 {
-	CTSiter *iter = NULL;
-	unsigned int count = 0;
+	PhoneBookType pb_type = TELECOM_NONE;
 
-	contacts_svc_get_list(CTS_LIST_GROUPING_PLOG, &iter);
-	while (CTS_SUCCESS == contacts_svc_iter_next(iter)) {
-		CTSvalue *plog = NULL;
+	gint handle = 0;
+	gint cid = -1;
+	gchar *str = NULL;
 
-		plog = contacts_svc_iter_get_info(iter);
-		if (plog) {
-			int type = contacts_svc_value_get_int(plog, CTS_LIST_PLOG_LOG_TYPE_INT);
-			DBG("type: %d\n", type);
-			int log_type = __bluetooth_get_calllog_type(type);
+	DBG("\n");
 
-			if ((call_log_type == 0xFF || call_log_type == log_type) &&
-								(log_type != CTS_PLOG_TYPE_NONE)) {
-				count++;
-			}
-		}
+	if (!g_str_has_suffix(id, ".vcf")) {
+		__bluetooth_pb_dbus_return_error(context,
+					G_FILE_ERROR_INVAL,
+					"invalid vcf file");
+		return FALSE;
 	}
-	return count;
+
+	handle = (gint)g_ascii_strtoll(id, NULL, 10);
+	cid = __bluetooth_pb_list_hash_lookup_id(handle);
+
+	DBG("id %s handle%d, cid %d\n", id, handle, cid );
+
+	pb_type = __bluetooth_pb_get_pb_type(folder);
+	switch (pb_type) {
+	case TELECOM_PB:
+		__bluetooth_pb_create_contact_index(pb_type);
+		str = _bluetooth_pb_vcard_contact(cid, filter, format);
+		break;
+	case TELECOM_ICH:
+		__bluetooth_pb_create_call_index(pb_type);
+		str = _bluetooth_pb_vcard_call(cid, filter, format, "RECEIVED");
+		break;
+	case TELECOM_OCH:
+		__bluetooth_pb_create_call_index(pb_type);
+		str = _bluetooth_pb_vcard_call(cid, filter, format, "DIALED");
+		break;
+	case TELECOM_MCH:
+		__bluetooth_pb_create_call_index(pb_type);
+		str = _bluetooth_pb_vcard_call(cid, filter, format, "MISSED");
+		break;
+	case TELECOM_CCH: {
+		char *attr = NULL;
+
+		if (_bluetooth_pb_is_incoming_call(cid))
+			attr = "RECEIVED";
+		else if (_bluetooth_pb_is_outgoing_call(cid))
+			attr = "DIALED";
+		else if (_bluetooth_pb_is_missed_call(cid))
+			attr = "MISSED";
+
+		__bluetooth_pb_create_call_index(pb_type);
+		str = _bluetooth_pb_vcard_call(cid, filter, format, attr);
+
+		break;
+	}
+	default: {
+		__bluetooth_pb_dbus_return_error(context,
+					G_FILE_ERROR_INVAL,
+					"unsupported name defined");
+		return FALSE;
+	}
+
+	}
+
+	dbus_g_method_return(context, str);
+	g_free(str);
+
+	return TRUE;
 }
+
+static gboolean bluetooth_pb_get_phonebook_size_at(BluetoothPbAgent *agent,
+					const gchar *command,
+					DBusGMethodInvocation *context)
+{
+	PhoneBookType pb_type = TELECOM_NONE;
+	unsigned int phonebook_size = 0;
+
+	DBG("\n");
+
+	pb_type = __bluetooth_pb_get_storage_pb_type(command);
+
+	switch (pb_type) {
+	case TELECOM_PB:
+		phonebook_size = __bluetooth_pb_get_contact_size();
+		break;
+	case TELECOM_ICH:
+		phonebook_size = __bluetooth_pb_get_incoming_call_size();
+		break;
+	case TELECOM_OCH:
+		phonebook_size = __bluetooth_pb_get_outgoing_call_size();
+		break;
+	case TELECOM_MCH:
+		phonebook_size = __bluetooth_pb_get_missed_call_size();
+		break;
+	default: {
+		__bluetooth_pb_dbus_return_error(context,
+					G_FILE_ERROR_INVAL,
+					"unsupported name defined");
+		return FALSE;
+	}
+
+	}
+
+	dbus_g_method_return(context, phonebook_size);
+
+	return TRUE;
+}
+
+static gboolean bluetooth_pb_get_phonebook_entries_at(BluetoothPbAgent *agent,
+					const gchar *command,
+					gint start_index,
+					gint end_index,
+					DBusGMethodInvocation *context)
+{
+	PhoneBookType pb_type = TELECOM_NONE;
+
+	GPtrArray *ptr_array = NULL;
+
+	DBG("command %s, start_index %d, end_index %d %s %d\n",
+			command, start_index, end_index, __FILE__, __LINE__);
+
+	pb_type = __bluetooth_pb_get_storage_pb_type(command);
+
+	if (pb_type == TELECOM_NONE || pb_type == TELECOM_CCH) {
+		__bluetooth_pb_dbus_return_error(context,
+					G_FILE_ERROR_INVAL,
+					"unsupported name defined");
+		return FALSE;
+	}
+
+	ptr_array = g_ptr_array_new_with_free_func(__bluetooth_pb_list_ptr_array_free);
+
+	if (pb_type == TELECOM_PB)
+		__bluetooth_pb_get_contact_list(pb_type, ptr_array, start_index, end_index, TRUE);
+	else
+		__bluetooth_pb_get_call_list(pb_type, ptr_array, start_index, end_index, TRUE);
+
+	dbus_g_method_return(context, ptr_array);
+
+	if (ptr_array)
+		g_ptr_array_free(ptr_array, TRUE);
+
+	return TRUE;
+}
+
+static gboolean bluetooth_pb_get_phonebook_entries_find_at(BluetoothPbAgent *agent,
+							const gchar *command,
+							const gchar *find_text,
+							DBusGMethodInvocation *context)
+{
+	PhoneBookType pb_type = TELECOM_NONE;
+
+	GPtrArray *ptr_array = NULL;
+
+	pb_type = __bluetooth_pb_get_storage_pb_type(command);
+
+	if (pb_type == TELECOM_NONE || pb_type == TELECOM_CCH) {
+		__bluetooth_pb_dbus_return_error(context,
+					G_FILE_ERROR_INVAL,
+					"unsupported name defined");
+		return FALSE;
+	}
+
+	ptr_array = g_ptr_array_new_with_free_func(__bluetooth_pb_list_ptr_array_free);
+
+	if (pb_type == TELECOM_PB)
+		__bluetooth_pb_get_contact_list_by_name(pb_type, ptr_array, find_text, TRUE, FALSE);
+	else
+		__bluetooth_pb_get_call_list_by_name(pb_type, ptr_array, find_text, TRUE);
+
+	dbus_g_method_return(context, ptr_array);
+
+	if (ptr_array)
+		g_ptr_array_free(ptr_array, TRUE);
+
+	return TRUE;
+}
+
 static gboolean bluetooth_pb_get_total_object_count(BluetoothPbAgent *agent,
 					gchar *path, DBusGMethodInvocation *context)
 {
@@ -302,562 +650,6 @@ static gboolean bluetooth_pb_get_total_object_count(BluetoothPbAgent *agent,
 	return TRUE;
 }
 
-static void __get_vcard_from_contact(int id, int *vcard_total_len, char **vcard)
-{
-	int ret;
-	int vcard_len;
-	char *vcard_stream;
-	CTSstruct *contact = NULL;
-
-	contacts_svc_get_contact(id, &contact);
-
-	ret = contacts_svc_get_vcard_from_contact(contact, &vcard_stream);
-	if (CTS_SUCCESS == ret) {
-		vcard_len = strlen(vcard_stream);
-		*vcard_total_len += vcard_len;
-		DBG("len:%d total:%d\n", vcard_len, *vcard_total_len);
-		*vcard = strdup(vcard_stream);
-		free(vcard_stream);
-	}
-
-	contacts_svc_struct_free(contact);
-}
-
-static gboolean bluetooth_pb_get_phonebook(BluetoothPbAgent *agent,
-					gushort max_list, gushort offset,
-					DBusGMethodInvocation *context)
-{
-	int i = 0;
-	int nr_contact = 0;
-	int vcard_total_len = 0;
-
-	CTSiter *iter = NULL;
-	static int *contact_id = NULL;
-	static int index = 0;
-	int last_part = 0;
-
-	char **vcard;
-
-	DBG("max_list:%d offset:%d\n", max_list, offset);
-
-	contacts_svc_connect();
-
-	nr_contact = contacts_svc_count(CTS_GET_ALL_CONTACT);
-	DBG("Number of contacts is %d\n", nr_contact);
-
-	vcard = g_new0(char *, nr_contact + 1);
-
-	/* first request */
-	if (!contact_id) {
-		contact_id = (int *)malloc(nr_contact * sizeof(int));
-		if (!contact_id) {
-			DBG("malloc error\n");
-			contacts_svc_disconnect();
-			g_strfreev(vcard);
-
-			return FALSE;
-		}
-
-                contacts_svc_get_list(CTS_LIST_ALL_CONTACT, &iter);
-
-                while (CTS_SUCCESS == contacts_svc_iter_next(iter)) {
-			CTSvalue *row_info = NULL;
-			int id;
-
-			row_info = contacts_svc_iter_get_info(iter);
-			id = contacts_svc_value_get_int(row_info,
-							CTS_LIST_CONTACT_ID_INT);
-			contact_id[i] = id;
-
-			if (vcard_total_len < VCARD_MAX_LEN) {
-				__get_vcard_from_contact(id, &vcard_total_len,
-								&vcard[i]);
-				DBG("vcard:%s\n", vcard[i]);
-                                index++;
-
-				if (index >= max_list) {
-					DBG("Over max list%d\n", max_list);
-					break;
-				}
-			}
-
-                        contacts_svc_value_free(row_info);
-			i++;
-		}
-		if( NULL != iter ) {
-			contacts_svc_iter_remove(iter);
-		}
-        } else { /* subsequent request */
-                while (vcard_total_len < VCARD_MAX_LEN) {
-			__get_vcard_from_contact(contact_id[index],
-						&vcard_total_len, &vcard[i]);
-			DBG("vcard:%s\n", vcard[i]);
-
-                        index++;
-			i++;
-
-			if (index >= nr_contact || index >= max_list) {
-				DBG("Complete\n");
-				break;
-			}
-                }
-        }
-	contacts_svc_disconnect();
-
-	if (index >= nr_contact || index >= max_list) {
-		free(contact_id);
-		contact_id = NULL;
-		index = 0;
-		last_part = 1;
-	}
-
-	dbus_g_method_return(context, last_part, vcard);
-
-	g_strfreev(vcard);
-
-        return TRUE;
-}
-
-static gboolean bluetooth_pb_get_calls(BluetoothPbAgent *agent, gushort max_list, gushort offset,
-				       gchar *call_type, DBusGMethodInvocation *context)
-{
-	int call_log_type;
-	int i = 0;
-	char **vcard;
-	char vcard_buffer[256] = {0,};
-	CTSiter *iter = NULL;
-
-	DBG("%s() %d\n", __FUNCTION__, __LINE__);
-	contacts_svc_connect();
-
-	if (strncmp(call_type, "incoming", 8) == 0)
-		call_log_type = CTS_PLOG_TYPE_VOICE_INCOMMING;
-	else if (strncmp(call_type, "outgoing", 8) == 0)
-		call_log_type = CTS_PLOG_TYPE_VOICE_OUTGOING;
-	else if (strncmp(call_type, "missed", 6) == 0)
-		call_log_type = CTS_PLOG_TYPE_VOICE_INCOMMING_UNSEEN;
-	else
-		call_log_type = 0xFF;
-
-	vcard = g_new0(char *, max_list + 1);
-
-	contacts_svc_get_list(CTS_LIST_GROUPING_PLOG, &iter);
-
-	while (CTS_SUCCESS == contacts_svc_iter_next(iter)) {
-		CTSvalue *plog = NULL;
-
-		plog = contacts_svc_iter_get_info(iter);
-		if (plog) {
-			struct tm timeinfo;
-			char log_time_stamp[32] = {0,};
-			char calllog_type[10] = {0,};
-			int type = contacts_svc_value_get_int(plog, CTS_LIST_PLOG_LOG_TYPE_INT);
-			DBG("type: %d\n", type);
-			int log_type = __bluetooth_get_calllog_type(type);
-
-			const char *number = contacts_svc_value_get_str(plog,
-									CTS_LIST_PLOG_NUMBER_STR);
-			const char *first_name = contacts_svc_value_get_str(plog,
-									CTS_LIST_PLOG_FIRST_NAME_STR);
-			const char *last_name = contacts_svc_value_get_str(plog,
-									CTS_LIST_PLOG_LAST_NAME_STR);
-
-			time_t time = contacts_svc_value_get_int(plog, CTS_LIST_PLOG_LOG_TIME_INT);
-
-			if (!number) {
-				contacts_svc_value_free(plog);
-				continue;
-			}
-			if (!first_name)
-				first_name = "";
-			if (!last_name)
-				last_name = "";
-
-			localtime_r(&time, &timeinfo);
-
-			strftime(log_time_stamp, sizeof(log_time_stamp),
-						"%Y%m%dT%H%M%S", &timeinfo);
-
-			if (log_type == CTS_PLOG_TYPE_VOICE_INCOMMING)
-				strncpy(calllog_type, "RECEIVED", strlen("RECEIVED"));
-			 else if (log_type == CTS_PLOG_TYPE_VOICE_OUTGOING)
-				strncpy(calllog_type, "DIALED", strlen("DIALED"));
-			else if (log_type == CTS_PLOG_TYPE_VOICE_INCOMMING_UNSEEN)
-				strncpy(calllog_type, "MISSED", strlen("MISSED"));
-			 else {
-				DBG("no log type found \n");
-			}
-
-			if ((call_log_type == 0xFF || call_log_type == log_type) &&
-								(log_type != CTS_PLOG_TYPE_NONE)) {
-
-				snprintf(vcard_buffer, sizeof(vcard_buffer), CALL_LOG_VCARD,
-							 last_name, first_name, number, calllog_type, log_time_stamp);
-
-				vcard[i] = strdup((char *)vcard_buffer);
-				DBG("%s() %d [%d] %s\n", __FUNCTION__, __LINE__, i, vcard[i]);
-				i++;
-			}
-
-			contacts_svc_value_free(plog);
-
-			if (i >= max_list) {
-				DBG("Over max list count %d\n", max_list);
-				break;
-			}
-		}
-	}
-
-	if( NULL != iter ) {
-		contacts_svc_iter_remove(iter);
-	}
-	contacts_svc_disconnect();
-
-	DBG("%s() %d\n", __FUNCTION__, __LINE__);
-
-	dbus_g_method_return(context, vcard);
-
-	g_strfreev(vcard);
-
-	return TRUE;
-}
-
-static gboolean bluetooth_pb_get_phonebook_list(BluetoothPbAgent *agent,
-						DBusGMethodInvocation *context)
-{
-	unsigned int nr_contact = 0;
-	guint ret = 0;
-	CTSiter *iter = NULL;
-	GPtrArray *array = g_ptr_array_new();
-	char *subscriber_number = NULL;
-
-	DBG("%s() %d\n", __FUNCTION__, __LINE__);
-
-	GValue owner_value = {0, };
-
-	/* owner's vcard 0.vcf */
-	g_value_init(&owner_value, DBUS_STRUCT_STRING_STRING_UINT);
-	g_value_take_boxed(&owner_value,
-		dbus_g_type_specialized_construct(DBUS_STRUCT_STRING_STRING_UINT));
-
-	subscriber_number = vconf_get_str(VCONFKEY_TELEPHONY_SUBSCRIBER_NUMBER);
-	if (NULL == subscriber_number) {
-		DBG("vconf_get_int failed for VCONFKEY_TELEPHONY_SUBSCRIBER_NUMBER \n");
-
-		dbus_g_type_struct_set(&owner_value, 0, " ", 1, " ", 2, 0, G_MAXUINT);
-	} else {
-		dbus_g_type_struct_set(&owner_value, 0, subscriber_number, 1,
-					subscriber_number, 2, 0, G_MAXUINT);
-	}
-
-	g_ptr_array_add(array, g_value_get_boxed(&owner_value));
-
-	if (subscriber_number)
-		free(subscriber_number);
-
-	contacts_svc_connect();
-
-	nr_contact = contacts_svc_count(CTS_GET_ALL_CONTACT);
-	DBG("Number of contacts is %d\n", nr_contact);
-
-	contacts_svc_get_list(CTS_LIST_ALL_CONTACT, &iter);
-
-	while (CTS_SUCCESS == contacts_svc_iter_next(iter)) {
-		int index_num;
-		char name[MAX_CONTACT_NAME_LEN + 2] = { 0 };
-		const char *first = NULL;
-		const char *last = NULL;
-		const char *default_num = NULL;
-
-		CTSvalue *row_info = NULL;
-		CTSvalue *number = NULL;
-		GValue value = {0, };
-
-		row_info = contacts_svc_iter_get_info(iter);
-
-		if (!row_info) {
-			DBG("contacts_svc_iter_get_info failed \n");
-			break;
-		}
-
-		first = contacts_svc_value_get_str(row_info, CTS_LIST_CONTACT_FIRST_STR);
-		last = contacts_svc_value_get_str(row_info, CTS_LIST_CONTACT_LAST_STR);
-
-		if (first && last) {
-			g_strlcpy(name, last, sizeof(name) / 2);
-			g_strlcat(name, ";", sizeof(name));
-			g_strlcat(name, first, sizeof(name));
-		} else if (first) {
-			g_strlcpy(name, first, sizeof(name));
-		} else if (last)  {
-			g_strlcpy(name, last, sizeof(name));
-		} else {
-			g_strlcpy(name, VCARD_NO_NAME, sizeof(name));
-		}
-
-		index_num = contacts_svc_value_get_int(row_info, CTS_LIST_CONTACT_ID_INT);
-
-		ret = contacts_svc_get_contact_value(CTS_GET_DEFAULT_NUMBER_VALUE, index_num,
-							&number);
-
-		if (CTS_SUCCESS != ret) {
-			DBG("contacts_svc_get_contact_value() Failed(%d)\n", ret);
-		} else {
-			default_num = contacts_svc_value_get_str(number, CTS_NUM_VAL_NUMBER_STR);
-			DBG("The default Number is %s\n", default_num);
-		}
-
-		g_value_init(&value, DBUS_STRUCT_STRING_STRING_UINT);
-		g_value_take_boxed(&value,
-			dbus_g_type_specialized_construct(DBUS_STRUCT_STRING_STRING_UINT));
-		dbus_g_type_struct_set(&value, 0, name, 1, default_num, 2, index_num, G_MAXUINT);
-		g_ptr_array_add(array, g_value_get_boxed(&value));
-
-		if (number)
-			contacts_svc_value_free(number);
-
-		if (row_info)
-			contacts_svc_value_free(row_info);
-
-	}
-
-	if( NULL != iter ) {
-		contacts_svc_iter_remove(iter);
-	}
-
-	contacts_svc_disconnect();
-
-	DBG("%s() %d\n", __FUNCTION__, __LINE__);
-
-	dbus_g_method_return(context, array);
-
-	g_ptr_array_foreach(array, (GFunc)g_value_array_free, NULL);
-	g_ptr_array_free(array, TRUE);
-
-	return TRUE;
-}
-
-static gboolean bluetooth_pb_get_calls_list(BluetoothPbAgent *agent, gchar *call_type,
-					    DBusGMethodInvocation *context)
-{
-	int call_log_type;
-	char name[256] = {0,};
-	GPtrArray *array = g_ptr_array_new();
-
-	CTSiter *iter = NULL;
-
-	DBG("%s() %d call_type:%s\n", __FUNCTION__, __LINE__, call_type);
-
-	if (strncmp(call_type, "incoming", 8) == 0)
-		call_log_type = CTS_PLOG_TYPE_VOICE_INCOMMING;
-	else if (strncmp(call_type, "outgoing", 8) == 0)
-		call_log_type = CTS_PLOG_TYPE_VOICE_OUTGOING;
-	else if (strncmp(call_type, "missed", 6) == 0)
-		call_log_type = CTS_PLOG_TYPE_VOICE_INCOMMING_UNSEEN;
-	else
-		call_log_type = 0xFF;
-
-	contacts_svc_connect();
-
-	contacts_svc_get_list(CTS_LIST_GROUPING_PLOG, &iter);
-
-	while (CTS_SUCCESS == contacts_svc_iter_next(iter)) {
-		CTSvalue *plog = NULL;
-
-		plog = contacts_svc_iter_get_info(iter);
-		if (plog) {
-			int index = contacts_svc_value_get_int(plog, CTS_LIST_PLOG_ID_INT);
-			int type = contacts_svc_value_get_int(plog, CTS_LIST_PLOG_LOG_TYPE_INT);
-			int log_type = __bluetooth_get_calllog_type(type);
-			const char *number = contacts_svc_value_get_str(plog,
-									CTS_LIST_PLOG_NUMBER_STR);
-			const char *first_name = contacts_svc_value_get_str(plog,
-								CTS_LIST_PLOG_FIRST_NAME_STR);
-			const char *last_name = contacts_svc_value_get_str(plog,
-								CTS_LIST_PLOG_LAST_NAME_STR);
-
-			if (!number) {
-				DBG("number is NULL\n");
-				contacts_svc_value_free(plog);
-				continue;
-			}
-			DBG("number: %s\n", number);
-
-			if (first_name && last_name)
-				snprintf(name, sizeof(name), "%s;%s;", last_name, first_name);
-			else if (first_name)
-				snprintf(name, sizeof(name), ";%s", first_name);
-			else if (last_name)
-				snprintf(name, sizeof(name), "%s;", last_name);
-			else
-				strncpy(name, number, sizeof(name) - 1);
-
-			if ((call_log_type == 0xFF || call_log_type == log_type) &&
-					(log_type != CTS_PLOG_TYPE_NONE)) {
-
-				GValue value = {0, };
-				g_value_init(&value, DBUS_STRUCT_STRING_STRING_UINT);
-				g_value_take_boxed(&value,
-					dbus_g_type_specialized_construct(DBUS_STRUCT_STRING_STRING_UINT));
-				dbus_g_type_struct_set(&value, 0, name, 1, number, 2, (guint) index,
-						       G_MAXUINT);
-				g_ptr_array_add(array, g_value_get_boxed(&value));
-			}
-
-			contacts_svc_value_free(plog);
-		}
-	}
-
-	if( NULL != iter ) {
-		contacts_svc_iter_remove(iter);
-	}
-
-	contacts_svc_disconnect();
-
-	DBG("%s() %d\n", __FUNCTION__, __LINE__);
-
-	dbus_g_method_return(context, array);
-
-	g_ptr_array_foreach(array, (GFunc)g_value_array_free, NULL);
-	g_ptr_array_free(array, TRUE);
-
-	return TRUE;
-}
-
-static gboolean bluetooth_pb_get_phonebook_entry(BluetoothPbAgent *agent, gchar *id,
-						 DBusGMethodInvocation *context)
-{
-
-	int ret = -1;
-	int index;
-	CTSstruct *contact = NULL;
-	char *phonebook_entry = NULL;
-
-	DBG("%s() %d\n", __FUNCTION__, __LINE__);
-
-	if (sscanf(id, "%d.vcf", &index) != 1) {
-		DBG("Failed to get index\n");
-		return FALSE;
-	}
-
-	if (index != 0) {
-		contacts_svc_connect();
-
-		DBG("Get %dth phonebook entry\n", index);
-		ret = contacts_svc_get_contact(index, &contact);
-		if (CTS_SUCCESS == ret) {
-			ret = contacts_svc_get_vcard_from_contact(contact, &phonebook_entry);
-			if (CTS_SUCCESS == ret) {
-				DBG("[%s]\n", phonebook_entry);
-
-				dbus_g_method_return(context, phonebook_entry);
-			}
-			contacts_svc_struct_free(contact);
-		}
-		contacts_svc_disconnect();
-	}
-
-	if (index == 0 || ret != CTS_SUCCESS) {
-		DBG("Get owner vcard\n");
-		char *subscriber_number = NULL;
-
-		subscriber_number = vconf_get_str(VCONFKEY_TELEPHONY_SUBSCRIBER_NUMBER);
-		if (NULL == subscriber_number) {
-			DBG("vconf_get_int failed for VCONFKEY_TELEPHONY_SUBSCRIBER_NUMBER \n");
-
-			phonebook_entry = strdup(PBAP_EMPTY_VCARD);
-			dbus_g_method_return(context, phonebook_entry);
-		} else {
-			char vcard_buffer[PBAP_OWNER_VCARD_MAX_LEN + 1] = {0,};
-
-			if (strlen(subscriber_number) > MAX_CONTACT_NUM_LEN) {
-				char temp[MAX_CONTACT_NUM_LEN + 1] = {0,};
-				strncpy(temp, subscriber_number, MAX_CONTACT_NUM_LEN);
-				snprintf(vcard_buffer, sizeof(vcard_buffer), PBAP_OWNER_VCARD,
-						temp);
-			} else {
-				snprintf(vcard_buffer, sizeof(vcard_buffer), PBAP_OWNER_VCARD,
-							subscriber_number);
-				DBG(" Owner vcard \n %s  \n", vcard_buffer);
-			}
-
-			dbus_g_method_return(context, vcard_buffer);
-
-			free(subscriber_number);
-		}
-	}
-
-	if (phonebook_entry)
-		free(phonebook_entry);
-
-	return TRUE;
-}
-
-static gboolean bluetooth_pb_get_calls_entry(BluetoothPbAgent *agent, gchar *id,
-					     DBusGMethodInvocation *context)
-{
-	int calls_index;
-	char *calls_entry;
-	char vcard_buffer[256];
-	CTSiter *iter = NULL;
-
-	DBG("%s() %d\n", __FUNCTION__, __LINE__);
-	contacts_svc_connect();
-
-	if (sscanf(id, "%d.vcf", &calls_index) != 1) {
-		DBG("Failed to get index\n");
-		return FALSE;
-	}
-
-	contacts_svc_get_list(CTS_LIST_GROUPING_PLOG, &iter);
-
-	while (CTS_SUCCESS == contacts_svc_iter_next(iter)) {
-		CTSvalue *plog = NULL;
-
-		plog = contacts_svc_iter_get_info(iter);
-		if (plog) {
-			int index = contacts_svc_value_get_int(plog, CTS_LIST_PLOG_ID_INT);
-			const char *number = contacts_svc_value_get_str(plog,
-									CTS_LIST_PLOG_NUMBER_STR);
-			const char *first_name = contacts_svc_value_get_str(plog,
-								CTS_LIST_PLOG_FIRST_NAME_STR);
-			const char *last_name = contacts_svc_value_get_str(plog,
-								CTS_LIST_PLOG_LAST_NAME_STR);
-			const char *display_name = contacts_svc_value_get_str(plog,
-								CTS_LIST_PLOG_DISPLAY_NAME_STR);
-
-			if (!number)
-				number = "";
-			if (!first_name)
-				first_name = "";
-			if (!last_name)
-				last_name = "";
-			if (display_name) {
-				DBG("display_name: %s\n", display_name);
-			}
-
-			if (calls_index == index) {
-				snprintf(vcard_buffer, sizeof(vcard_buffer), CALL_LOG_VCARD,
-					 last_name, first_name, number);
-				calls_entry = vcard_buffer;
-			}
-
-			contacts_svc_value_free(plog);
-		}
-	}
-
-	if( NULL != iter ) {
-		contacts_svc_iter_remove(iter);
-	}
-
-	contacts_svc_disconnect();
-
-	DBG("%s() %d\n", __FUNCTION__, __LINE__);
-
-	dbus_g_method_return(context, calls_entry);
-
-	return TRUE;
-}
 
 static int __bluetooth_pb_agent_read_file(const char *file_path, char **stream)
 {
@@ -983,91 +775,990 @@ static gboolean bluetooth_pb_add_contact(BluetoothPbAgent *agent, const char *fi
 	return TRUE;
 }
 
+static void __bluetooth_pb_dbus_return_error(DBusGMethodInvocation *context,
+					gint code,
+					const gchar *message)
+{
+	GQuark quark;
+	GError *error = NULL;
 
-static unsigned int __bluetooth_pb_get_call_size(const enum PhoneBookObject pb_object)
+	quark = g_type_qname(bluetooth_pb_agent_get_type());
+	error = g_error_new_literal(quark, code, message);
+
+	dbus_g_method_return_error(context, error);
+	g_error_free(error);
+}
+
+static PhoneBookType __bluetooth_pb_get_pb_type(const char *name)
+{
+	gchar *suffix = ".vcf";
+	gint len;
+
+	if (name == NULL)
+		return TELECOM_NONE;
+
+	len = strlen(name);
+
+	if (g_str_has_suffix(name, suffix))
+		len -= strlen(suffix);
+
+	if (len < 0)
+		return TELECOM_NONE;
+
+	if (strncmp(name, "/telecom/pb", len) == 0)
+		return TELECOM_PB;
+
+	if (strncmp(name, "/telecom/ich", len) == 0)
+		return TELECOM_ICH;
+
+	if (strncmp(name, "/telecom/och", len) == 0)
+		return TELECOM_OCH;
+
+	if (strncmp(name, "/telecom/mch", len) == 0)
+		return TELECOM_MCH;
+
+	if (strncmp(name, "/telecom/cch", len) == 0)
+		return TELECOM_CCH;
+
+	return TELECOM_NONE;
+}
+
+static PhoneBookType __bluetooth_pb_get_storage_pb_type(const char *name)
+{
+	if (name == NULL)
+		return TELECOM_NONE;
+
+	if (g_strcmp0(name, "\"ME\"") == 0 )
+		return TELECOM_PB;
+
+	if (g_strcmp0(name, "\"RC\"") == 0)
+		return TELECOM_ICH;
+
+	if (g_strcmp0(name, "\"DC\"") == 0)
+		return TELECOM_OCH;
+
+	if (g_strcmp0(name, "\"MC\"") == 0)
+		return TELECOM_MCH;
+
+	return TELECOM_NONE;
+}
+
+static unsigned int __bluetooth_pb_get_contact_size(void)
+{
+	unsigned int phonebook_size = 0;
+
+	phonebook_size = contacts_svc_count(CTS_GET_ALL_CONTACT);
+	DBG("Number of contacts is %d\n", phonebook_size);
+
+	/* add count for owner (0.vcf) */
+	phonebook_size++;
+
+	return phonebook_size;
+}
+
+static unsigned int __bluetooth_pb_get_incoming_call_size(void)
 {
 	CTSiter *iter = NULL;
+
 	unsigned int call_size = 0;
-
-	int err = 0;
-
-	err = contacts_svc_connect();
-	if (err != CTS_SUCCESS) {
-		DBG("contacts_svc_connect fucntion call [error] = %d \n", err);
-		return call_size;
-	}
 
 	contacts_svc_get_list(CTS_LIST_ALL_PLOG, &iter);
 
-	while (CTS_SUCCESS == contacts_svc_iter_next(iter)) {
-
+	while (contacts_svc_iter_next(iter) == CTS_SUCCESS) {
 		CTSvalue *value = NULL;
-		int type = 0;
+		gint phonelog_id = 0;
 
 		value = contacts_svc_iter_get_info(iter);
 		if (value == NULL)
 			continue;
 
-		type = contacts_svc_value_get_int(value, CTS_LIST_PLOG_LOG_TYPE_INT);
+		phonelog_id = contacts_svc_value_get_int(value, CTS_LIST_PLOG_ID_INT);
 
-		DBG("type : %d\n", type);
+		if (_bluetooth_pb_is_incoming_call(phonelog_id))
+			call_size++;
 
-		switch (pb_object) {
-		case TELECOM_ICH:
-			if (CTS_PLOG_TYPE_VOICE_INCOMMING == type ||
-				CTS_PLOG_TYPE_VIDEO_INCOMMING == type) {
-				call_size++;
-			}
-			break;
-		case TELECOM_OCH:
-			if (CTS_PLOG_TYPE_VOICE_OUTGOING == type ||
-				CTS_PLOG_TYPE_VIDEO_OUTGOING == type) {
-				call_size++;
-			}
-			break;
-		case TELECOM_MCH:
-			if (CTS_PLOG_TYPE_VOICE_INCOMMING_UNSEEN == type ||
-				CTS_PLOG_TYPE_VOICE_INCOMMING_SEEN == type ||
-				CTS_PLOG_TYPE_VIDEO_INCOMMING_UNSEEN == type ||
-				CTS_PLOG_TYPE_VIDEO_INCOMMING_SEEN) {
-				call_size++;
-			}
-			break;
-		case TELECOM_CCH:
-			if (CTS_PLOG_TYPE_VOICE_INCOMMING == type ||
-				CTS_PLOG_TYPE_VIDEO_INCOMMING == type ||
-				CTS_PLOG_TYPE_VOICE_OUTGOING == type ||
-				CTS_PLOG_TYPE_VIDEO_OUTGOING == type ||
-				CTS_PLOG_TYPE_VOICE_INCOMMING_UNSEEN == type ||
-				CTS_PLOG_TYPE_VOICE_INCOMMING_SEEN == type ||
-				CTS_PLOG_TYPE_VIDEO_INCOMMING_UNSEEN == type ||
-				CTS_PLOG_TYPE_VIDEO_INCOMMING_SEEN) {
-				call_size++;
-			}
-			break;
-		default:
-			break;
-		}
+		contacts_svc_value_free(value);
 	}
 
 	if (iter)
 		contacts_svc_iter_remove(iter);
 
-	err = contacts_svc_disconnect();
-	if (err != CTS_SUCCESS)
-		DBG("contacts_svc_disconnect fucntion call [error] = %d \n", err);
+	return call_size;
+}
+
+static unsigned int __bluetooth_pb_get_outgoing_call_size(void)
+{
+	CTSiter *iter = NULL;
+
+	unsigned int call_size = 0;
+
+	contacts_svc_get_list(CTS_LIST_ALL_PLOG, &iter);
+
+	while (contacts_svc_iter_next(iter) == CTS_SUCCESS) {
+		CTSvalue *value = NULL;
+		gint phonelog_id = 0;
+
+		value = contacts_svc_iter_get_info(iter);
+		if (value == NULL)
+			continue;
+
+		phonelog_id = contacts_svc_value_get_int(value, CTS_LIST_PLOG_ID_INT);
+
+		if (_bluetooth_pb_is_outgoing_call(phonelog_id))
+			call_size++;
+
+		contacts_svc_value_free(value);
+	}
+
+	if (iter)
+		contacts_svc_iter_remove(iter);
 
 	return call_size;
 }
 
+static unsigned int __bluetooth_pb_get_missed_call_size(void)
+{
+	CTSiter *iter = NULL;
+
+	unsigned int call_size = 0;
+
+	contacts_svc_get_list(CTS_LIST_ALL_MISSED_CALL, &iter);
+
+	while (contacts_svc_iter_next(iter) == CTS_SUCCESS) {
+		call_size++;
+	}
+
+	if (iter)
+		contacts_svc_iter_remove(iter);
+
+	return call_size;
+}
+
+static unsigned int __bluetooth_pb_get_combined_call_size(void)
+{
+	CTSiter *iter = NULL;
+
+	unsigned int call_size = 0;
+
+	contacts_svc_get_list(CTS_LIST_ALL_PLOG, &iter);
+
+	while (contacts_svc_iter_next(iter) == CTS_SUCCESS) {
+		CTSvalue *value = NULL;
+		gint phonelog_id = 0;
+
+		value = contacts_svc_iter_get_info(iter);
+		if (value == NULL)
+			continue;
+
+		phonelog_id = contacts_svc_value_get_int(value, CTS_LIST_PLOG_ID_INT);
+
+		if (_bluetooth_pb_is_incoming_call(phonelog_id) ||
+					_bluetooth_pb_is_outgoing_call(phonelog_id) ||
+					_bluetooth_pb_is_missed_call(phonelog_id))
+			call_size++;
+
+		contacts_svc_value_free(value);
+	}
+
+	if (iter)
+		contacts_svc_iter_remove(iter);
+
+	return call_size;
+}
+
+static GPtrArray *__bluetooth_pb_get_contact_vcards(BluetoothPbAgent *agent,
+						guint64 filter,
+						guint8 format,
+						guint16 max_list_count,
+						guint16 list_start_offset)
+{
+	GPtrArray *vcards = NULL;
+
+	gint i = 1;
+	gboolean unrestricted = FALSE;
+
+	CTSiter *iter = NULL;
+
+	vcards = g_ptr_array_new();
+
+	if (max_list_count == 65535)
+		unrestricted = TRUE;
+
+	/* for owner */
+	if (list_start_offset == 0) {
+		gchar *vcard = NULL;
+		vcard = _bluetooth_pb_vcard_contact(0, filter, format);
+
+		g_ptr_array_add(vcards, vcard);
+	}
+
+	contacts_svc_get_list(CTS_LIST_ALL_CONTACT, &iter);
+	while ((contacts_svc_iter_next(iter) == CTS_SUCCESS) &&
+			(unrestricted || (i < list_start_offset + max_list_count))) {
+		CTSvalue *value = NULL;
+		gchar *vcard = NULL;
+		gint id = 0;
+
+		value = contacts_svc_iter_get_info(iter);
+		if (value == NULL)
+			continue;
+
+		id = contacts_svc_value_get_int(value, CTS_LIST_CONTACT_ID_INT);
+		vcard = _bluetooth_pb_vcard_contact(id, filter, format);
+
+		contacts_svc_value_free(value);
+
+		if (vcard == NULL)
+			continue;
+
+		if ( i >= list_start_offset)
+			g_ptr_array_add(vcards, vcard);
+
+		i++;
+	}
+
+	g_ptr_array_add(vcards, NULL);
+
+	if (iter)
+		contacts_svc_iter_remove(iter);
+
+	return vcards;
+}
+
+static GPtrArray *__bluetooth_pb_get_incoming_call_vcards(BluetoothPbAgent *agent,
+							guint64 filter,
+							guint8 format,
+							guint16 max_list_count,
+							guint16 list_start_offset)
+{
+	GPtrArray *vcards = NULL;
+
+	gint i = 1;
+	guint16 offset = list_start_offset;
+
+	gboolean unrestricted = FALSE;
+
+	CTSiter *iter = NULL;
+
+	vcards = g_ptr_array_new();
+	contacts_svc_get_list(CTS_LIST_ALL_PLOG, &iter);
+
+	if (max_list_count == 65535)
+		unrestricted = TRUE;
+
+	if (offset == 0)
+		offset = 1;
+
+	DBG("i %d offset %d max_list_count %d\n", i, offset, max_list_count);
+
+	while ((contacts_svc_iter_next(iter) == CTS_SUCCESS) &&
+			(unrestricted || (i < offset + max_list_count))) {
+		CTSvalue *value = NULL;
+		gint phonelog_id = 0;
+		gchar *vcard = NULL;
+
+		value = contacts_svc_iter_get_info(iter);
+		if (value == NULL)
+			continue;
+
+		phonelog_id = contacts_svc_value_get_int(value, CTS_LIST_PLOG_ID_INT);
+
+		if (_bluetooth_pb_is_incoming_call(phonelog_id)) {
+			vcard = _bluetooth_pb_vcard_call(phonelog_id, filter, format,
+					"RECEIVED");
+
+			if (vcard == NULL)
+				continue;
+
+			if ( i >= offset)
+				g_ptr_array_add(vcards, vcard);
+			i++;
+		}
+
+		contacts_svc_value_free(value);
+	}
+
+	g_ptr_array_add(vcards, NULL);
+
+	if (iter)
+		contacts_svc_iter_remove(iter);
+
+	return vcards;
+}
+
+static GPtrArray *__bluetooth_pb_get_outgoing_call_vcards(BluetoothPbAgent *agent,
+							guint64 filter,
+							guint8 format,
+							guint16 max_list_count,
+							guint16 list_start_offset)
+{
+	GPtrArray *vcards = NULL;
+
+	gint i = 1;
+	guint16 offset = list_start_offset;
+
+	gboolean unrestricted = FALSE;
+
+	CTSiter *iter = NULL;
+
+	vcards = g_ptr_array_new();
+	contacts_svc_get_list(CTS_LIST_ALL_PLOG, &iter);
+
+	if (max_list_count == 65535)
+		unrestricted = TRUE;
+
+	if (offset == 0)
+		offset = 1;
+
+	while ((contacts_svc_iter_next(iter) == CTS_SUCCESS) &&
+			(unrestricted || (i < offset + max_list_count))) {
+		CTSvalue *value = NULL;
+		gint phonelog_id = 0;
+		gchar *vcard = NULL;
+
+		value = contacts_svc_iter_get_info(iter);
+		if (value == NULL)
+			continue;
+
+		phonelog_id = contacts_svc_value_get_int(value, CTS_LIST_PLOG_ID_INT);
+
+		if (_bluetooth_pb_is_outgoing_call(phonelog_id)) {
+			vcard = _bluetooth_pb_vcard_call(phonelog_id, filter, format,
+					"DIALED");
+
+			if (vcard == NULL)
+				continue;
+
+			if (i >= offset)
+				g_ptr_array_add(vcards, vcard);
+			i++;
+		}
+
+		contacts_svc_value_free(value);
+	}
+
+	g_ptr_array_add(vcards, NULL);
+
+	if (iter)
+		contacts_svc_iter_remove(iter);
+
+	return vcards;
+}
+
+static GPtrArray *__bluetooth_pb_get_missed_call_vcards(BluetoothPbAgent *agent,
+							guint64 filter,
+							guint8 format,
+							guint16 max_list_count,
+							guint16 list_start_offset)
+{
+	GPtrArray *vcards = NULL;
+
+	gint i = 1;
+	guint16 offset = list_start_offset;
+
+	gboolean unrestricted = FALSE;
+
+	CTSiter *iter = NULL;
+
+	vcards = g_ptr_array_new();
+	contacts_svc_get_list(CTS_LIST_ALL_MISSED_CALL, &iter);
+
+	if (max_list_count == 65535)
+		unrestricted = TRUE;
+
+	if (offset == 0)
+		offset = 1;
+
+	while ((contacts_svc_iter_next(iter) == CTS_SUCCESS) &&
+			(unrestricted || (i < offset + max_list_count))) {
+		CTSvalue *value = NULL;
+		gint phonelog_id = 0;
+		gchar *vcard = NULL;
+
+		value = contacts_svc_iter_get_info(iter);
+		if (value == NULL)
+			continue;
+
+		phonelog_id = contacts_svc_value_get_int(value, CTS_LIST_PLOG_ID_INT);
+
+		if (_bluetooth_pb_is_missed_call(phonelog_id)) {
+			vcard = _bluetooth_pb_vcard_call(phonelog_id, filter, format,
+					"MISSED");
+
+			if (vcard == NULL)
+				continue;
+
+			if (i >= offset)
+				g_ptr_array_add(vcards, vcard);
+			i++;
+		}
+
+		contacts_svc_value_free(value);
+	}
+
+	g_ptr_array_add(vcards, NULL);
+
+	if (iter)
+		contacts_svc_iter_remove(iter);
+
+	return vcards;
+}
+
+static GPtrArray *__bluetooth_pb_get_combined_call_vcards(BluetoothPbAgent *agent,
+							guint64 filter,
+							guint8 format,
+							guint16 max_list_count,
+							guint16 list_start_offset)
+{
+	GPtrArray *vcards = NULL;
+
+	gint i = 1;
+	guint16 offset = list_start_offset;
+
+	gboolean unrestricted = FALSE;
+
+	CTSiter *iter = NULL;
+
+	vcards = g_ptr_array_new();
+	contacts_svc_get_list(CTS_LIST_ALL_PLOG, &iter);
+
+	if (max_list_count == 65535)
+		unrestricted = TRUE;
+
+	if (offset == 0)
+		offset = 1;
+
+	while ((contacts_svc_iter_next(iter) == CTS_SUCCESS) &&
+			(unrestricted || (i < offset + max_list_count))) {
+		CTSvalue *value = NULL;
+		gint phonelog_id = 0;
+		gchar *vcard = NULL;
+
+		gchar *attr = NULL;
+
+		value = contacts_svc_iter_get_info(iter);
+		if(value == NULL)
+			continue;
+
+		phonelog_id = contacts_svc_value_get_int(value, CTS_LIST_PLOG_ID_INT);
+
+		if (_bluetooth_pb_is_incoming_call(phonelog_id))
+			attr = "RECEIVED";
+		else if (_bluetooth_pb_is_outgoing_call(phonelog_id))
+			attr = "DIALED";
+		else if (_bluetooth_pb_is_missed_call(phonelog_id))
+			attr = "MISSED";
+
+		vcard = _bluetooth_pb_vcard_call(phonelog_id, filter, format,
+				attr);
+
+		if (vcard == NULL)
+			continue;
+
+		if (i >= offset)
+			g_ptr_array_add(vcards, vcard);
+		i++;
+
+		contacts_svc_value_free(value);
+	}
+
+	g_ptr_array_add(vcards, NULL);
+
+	if (iter)
+		contacts_svc_iter_remove(iter);
+
+	return vcards;
+}
+
+static void __bluetooth_pb_create_contact_index(PhoneBookType pb_type)
+{
+	CTSiter *iter = NULL;
+	gint i = 1;
+
+
+	if (g_current_pb_type == pb_type)
+		return;
+
+	/* create cache */
+	g_current_pb_type = pb_type;
+	__bluetooth_pb_list_hash_reset();
+
+	contacts_svc_get_list(CTS_LIST_ALL_CONTACT, &iter);
+
+	while (contacts_svc_iter_next(iter) == CTS_SUCCESS) {
+		CTSvalue *value = NULL;
+		gint contact_id = 0;
+
+		value = contacts_svc_iter_get_info(iter);
+		if (value == NULL)
+			continue;
+
+		contact_id = contacts_svc_value_get_int(value, CTS_LIST_CONTACT_ID_INT);
+		__bluetooth_pb_list_hash_insert(i, contact_id);
+
+
+		i++;
+	}
+}
+
+static void __bluetooth_pb_create_call_index(PhoneBookType pb_type)
+{
+	CTSiter *iter = NULL;
+	gint i = 1;
+
+	if (g_current_pb_type == pb_type)
+		return;
+
+	/* create cache */
+	g_current_pb_type = pb_type;
+	__bluetooth_pb_list_hash_reset();
+
+	contacts_svc_get_list(CTS_LIST_ALL_PLOG, &iter);
+
+	while(contacts_svc_iter_next(iter) == CTS_SUCCESS) {
+		CTSvalue *value = NULL;
+		gint phonelog_id = 0;
+
+		value = contacts_svc_iter_get_info(iter);
+		if(value == NULL)
+			continue;
+
+		phonelog_id = contacts_svc_value_get_int(value, CTS_LIST_PLOG_ID_INT);
+
+		switch (pb_type) {
+		case TELECOM_ICH: {
+			if(_bluetooth_pb_is_incoming_call(phonelog_id)) {
+				__bluetooth_pb_list_hash_insert(i, phonelog_id);
+				i++;
+			}
+		}
+			break;
+		case TELECOM_OCH: {
+			if(_bluetooth_pb_is_outgoing_call(phonelog_id)) {
+				__bluetooth_pb_list_hash_insert(i, phonelog_id);
+				i++;
+			}
+		}
+			break;
+		case TELECOM_MCH: {
+			if(_bluetooth_pb_is_missed_call(phonelog_id)) {
+				__bluetooth_pb_list_hash_insert(i, phonelog_id);
+				i++;
+			}
+		}
+			break;
+		case TELECOM_CCH: {
+			if(_bluetooth_pb_is_incoming_call(phonelog_id) ||
+					_bluetooth_pb_is_outgoing_call(phonelog_id) ||
+					_bluetooth_pb_is_missed_call(phonelog_id)) {
+				__bluetooth_pb_list_hash_insert(i, phonelog_id);
+				i++;
+			}
+		}
+			break;
+		default :
+			return;
+		}
+
+		contacts_svc_value_free(value);
+	}
+}
+
+
+static void __bluetooth_pb_get_contact_list(PhoneBookType pb_type,
+					GPtrArray *ptr_array,
+					gint start_index,
+					gint end_index,
+					gboolean formatted_name)
+{
+	gint i;
+	guint hash_size;
+
+	if (ptr_array == NULL)
+		return;
+
+	__bluetooth_pb_create_contact_index(pb_type);
+
+	if (end_index < 0 || end_index < start_index)
+		end_index = start_index;
+
+	if (start_index <= 0) {
+		/* owner */
+		gchar *name = NULL;
+		gchar *number = NULL;
+
+		if (formatted_name)
+			name = _bluetooth_pb_name_owner();
+		else
+			name = _bluetooth_pb_fn_owner();
+
+		number = _bluetooth_pb_number_owner();
+
+		__bluetooth_pb_list_ptr_array_add(ptr_array, name, number, 0);
+
+		g_free(name);
+		g_free(number);
+
+		start_index = 1;
+	}
+
+	hash_size = __bluetooth_pb_list_hash_size();
+	if (hash_size < end_index)
+		end_index = hash_size;
+
+	for (i = start_index; i <= end_index; i++) {
+		gint contact_id;
+
+		gchar *name = NULL;
+		gchar *number = NULL;
+
+		contact_id = __bluetooth_pb_list_hash_lookup_id(i);
+
+		if (formatted_name)
+			name = _bluetooth_pb_fn_from_contact_id(contact_id);
+		else
+			name = _bluetooth_pb_name_from_contact_id(contact_id);
+
+		number = _bluetooth_pb_number_from_contact_id(contact_id);
+
+		__bluetooth_pb_list_ptr_array_add(ptr_array, name, number, i);
+
+		g_free(name);
+		g_free(number);
+	}
+}
+
+static void __bluetooth_pb_get_call_list(PhoneBookType pb_type,
+					GPtrArray *ptr_array,
+					gint start_index,
+					gint end_index,
+					gboolean formatted_name)
+{
+	gint i;
+	guint hash_size;
+
+	if (ptr_array == NULL)
+		return;
+
+	__bluetooth_pb_create_call_index(pb_type);
+
+	if (end_index < 0 || end_index < start_index)
+		end_index = start_index;
+
+	if (start_index <= 0)
+		start_index = 1;
+
+	hash_size = __bluetooth_pb_list_hash_size();
+	if (hash_size < end_index)
+		end_index = hash_size;
+
+	DBG("start_index: %d end_index %d\n", start_index, end_index);
+
+	for (i = start_index; i <= end_index; i++) {
+		gint phonelog_id;
+
+		gchar *name = NULL;
+		gchar *number = NULL;
+
+		phonelog_id = __bluetooth_pb_list_hash_lookup_id(i);
+
+		if (formatted_name)
+			name = _bluetooth_pb_fn_from_phonelog_id(phonelog_id);
+		else
+			name = _bluetooth_pb_name_from_phonelog_id(phonelog_id);
+
+		number = _bluetooth_pb_number_from_phonelog_id(phonelog_id);
+
+		__bluetooth_pb_list_ptr_array_add(ptr_array, name, number, i);
+
+		g_free(name);
+		g_free(number);
+	}
+}
+
+static void __bluetooth_pb_get_contact_list_by_name(PhoneBookType pb_type,
+						GPtrArray *ptr_array,
+						const gchar *find_text,
+						gboolean formatted_name,
+						gboolean owner)
+{
+	DBG("%s %d\n", __FILE__, __LINE__);
+	guint i;
+	guint hash_size;
+
+	if (ptr_array == NULL)
+		return;
+
+	__bluetooth_pb_create_contact_index(pb_type);
+
+	if (owner) {
+		/* owner */
+		gchar *name;
+
+		if (formatted_name)
+			name = _bluetooth_pb_name_owner();
+		else
+			name = _bluetooth_pb_fn_owner();
+
+		if (g_str_has_prefix(name, find_text)) {
+			gchar *number;
+
+			number = _bluetooth_pb_number_owner();
+
+			__bluetooth_pb_list_ptr_array_add(ptr_array, name, number, 0);
+
+			g_free(number);
+		}
+
+		g_free(name);
+	}
+
+	hash_size = __bluetooth_pb_list_hash_size();
+
+	for (i = 1; i <= hash_size; i++) {
+		gint contact_id;
+		gchar *name;
+
+		contact_id = __bluetooth_pb_list_hash_lookup_id(i);
+
+		if (formatted_name)
+			name = _bluetooth_pb_fn_from_contact_id(contact_id);
+		else
+			name = _bluetooth_pb_name_from_contact_id(contact_id);
+
+		if(g_str_has_prefix(name , find_text)) {
+			gchar *number;
+
+			number = _bluetooth_pb_number_from_contact_id(contact_id);
+
+			__bluetooth_pb_list_ptr_array_add(ptr_array, name, number, i);
+
+			g_free(number);
+		}
+
+		g_free(name);
+	}
+}
+
+static void __bluetooth_pb_get_call_list_by_name(PhoneBookType pb_type,
+						GPtrArray *ptr_array,
+						const gchar *find_text,
+						gboolean formatted_name)
+{
+	guint i;
+	guint hash_size;
+
+	if (ptr_array == NULL)
+		return;
+
+	__bluetooth_pb_create_call_index(pb_type);
+
+	hash_size = __bluetooth_pb_list_hash_size();
+
+	for (i = 1; i <= hash_size; i++) {
+		gint phonelog_id;
+		gchar *name;
+
+		phonelog_id = __bluetooth_pb_list_hash_lookup_id(i);
+
+		if (formatted_name)
+			name = _bluetooth_pb_fn_from_phonelog_id(phonelog_id);
+		else
+			name = _bluetooth_pb_name_from_phonelog_id(phonelog_id);
+
+		if(g_str_has_prefix(name , find_text)) {
+			gchar *number;
+
+			number = _bluetooth_pb_number_from_phonelog_id(phonelog_id);
+
+			__bluetooth_pb_list_ptr_array_add(ptr_array, name, number, i);
+
+			g_free(number);
+		}
+
+		g_free(name);
+	}
+}
+
+static int __bluetooth_get_calllog_type(int call_type)
+{
+	int val = CTS_PLOG_TYPE_NONE;
+
+	switch (call_type) {
+	case CTS_PLOG_TYPE_VOICE_INCOMMING:
+	case CTS_PLOG_TYPE_VIDEO_INCOMMING:
+		val = CTS_PLOG_TYPE_VOICE_INCOMMING;
+		break;
+
+	case CTS_PLOG_TYPE_VOICE_OUTGOING:
+	case CTS_PLOG_TYPE_VIDEO_OUTGOING:
+		val = CTS_PLOG_TYPE_VOICE_OUTGOING;
+		break;
+
+	case CTS_PLOG_TYPE_VOICE_INCOMMING_UNSEEN:
+	case CTS_PLOG_TYPE_VOICE_INCOMMING_SEEN:
+	case CTS_PLOG_TYPE_VIDEO_INCOMMING_UNSEEN:
+	case CTS_PLOG_TYPE_VIDEO_INCOMMING_SEEN:
+		val = CTS_PLOG_TYPE_VOICE_INCOMMING_UNSEEN;
+		break;
+
+	default:
+		break;
+	}
+
+	return val;
+}
+
+static unsigned int __get_call_log_count(unsigned int call_log_type)
+{
+	CTSiter *iter = NULL;
+	unsigned int count = 0;
+
+	contacts_svc_get_list(CTS_LIST_GROUPING_PLOG, &iter);
+	while (CTS_SUCCESS == contacts_svc_iter_next(iter)) {
+		CTSvalue *plog = NULL;
+
+		plog = contacts_svc_iter_get_info(iter);
+		if(plog == NULL)
+			continue;
+
+		int type = contacts_svc_value_get_int(plog, CTS_LIST_PLOG_LOG_TYPE_INT);
+		DBG("type: %d\n", type);
+		int log_type = __bluetooth_get_calllog_type(type);
+
+		if ((call_log_type == 0xFF || call_log_type == log_type) &&
+				(log_type != CTS_PLOG_TYPE_NONE)) {
+			count++;
+		}
+	}
+	return count;
+}
+
+static void __bluetooth_pb_list_hash_reset(void)
+{
+	if (contact_list_hash)
+		g_hash_table_destroy(contact_list_hash);
+
+	contact_list_hash = g_hash_table_new(g_direct_hash, g_direct_equal);
+}
+
+static gboolean __bluetooth_pb_list_hash_insert(gint handle,
+						gint id)
+{
+	if (contact_list_hash == NULL)
+		return FALSE;
+
+	g_hash_table_insert(contact_list_hash,
+			GINT_TO_POINTER(handle), GINT_TO_POINTER(id));
+
+	return TRUE;
+}
+
+static gint __bluetooth_pb_list_hash_lookup_id(gint handle)
+{
+	gint id;
+	if (contact_list_hash == NULL)
+		return 0;
+
+	id = GPOINTER_TO_INT(g_hash_table_lookup(contact_list_hash,
+				GINT_TO_POINTER(handle)));
+
+	return id;
+}
+
+static guint __bluetooth_pb_list_hash_size (void)
+{
+	if (contact_list_hash == NULL)
+		return 0;
+
+	return g_hash_table_size(contact_list_hash);
+}
+
+static void __bluetooth_pb_list_ptr_array_add(GPtrArray *ptr_array,
+						const gchar *name,
+						const gchar *number,
+						gint handle)
+{
+	GValue value = { 0, };
+
+	g_value_init(&value, DBUS_STRUCT_STRING_STRING_UINT);
+	g_value_take_boxed(&value,
+			dbus_g_type_specialized_construct(DBUS_STRUCT_STRING_STRING_UINT));
+
+	dbus_g_type_struct_set(&value,
+				0, g_strdup(name),
+				1, g_strdup(number),
+				2, handle,
+				G_MAXUINT);
+
+	g_ptr_array_add(ptr_array, g_value_get_boxed(&value));
+}
+
+static void __bluetooth_pb_list_ptr_array_free(gpointer data)
+{
+	GValue value = { 0, };
+
+	gchar *name = NULL;
+	gchar *number = NULL;
+
+	if(data == NULL)
+		return;
+
+	g_value_init(&value, DBUS_STRUCT_STRING_STRING_UINT);
+	g_value_set_boxed(&value, data);
+
+	dbus_g_type_struct_get(&value,
+			0, &name,
+			1, &number,
+			G_MAXUINT);
+
+	g_free(name);
+	g_free(number);
+}
+
+static void __bluetooth_pb_agent_signal_handler(int signum)
+{
+	if (mainloop)
+		g_main_loop_quit(mainloop);
+	else
+		exit(0);
+}
+
+static void __bluetooth_pb_contact_changed(void *user_data)
+{
+	BluetoothPbAgent *agent;
+
+	g_return_if_fail(BLUETOOTH_IS_PB_AGENT(user_data));
+	agent = BLUETOOTH_PB_AGENT(user_data);
+
+	g_signal_emit(agent, signals[CLEAR], 0);
+}
+
+static void __bluetooth_pb_call_changed(void *user_data)
+{
+	BluetoothPbAgent *agent;
+
+	g_return_if_fail(BLUETOOTH_IS_PB_AGENT(user_data));
+	agent = BLUETOOTH_PB_AGENT(user_data);
+
+	g_signal_emit(agent, signals[CLEAR], 0);
+}
 
 int main(int argc, char **argv)
 {
 	BluetoothPbAgent *bluetooth_pb_obj = NULL;
+
 	DBusGConnection *bus = NULL;
 	DBusGProxy *bus_proxy = NULL;
+
 	guint result = 0;
+
+	gint ret = EXIT_SUCCESS;
+	struct sigaction sa;
+
 	GError *error = NULL;
+
+	cts_error status;
 
 	g_type_init();
 
@@ -1077,7 +1768,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	bus = dbus_g_bus_get(DBUS_BUS_SESSION, &error);
+	bus = dbus_g_bus_get(DBUS_BUS_SYSTEM, &error);
 	if (error != NULL) {
 		DBG("Couldn't connect to system bus[%s]\n", error->message);
 		g_error_free(error);
@@ -1088,6 +1779,7 @@ int main(int argc, char **argv)
 					DBUS_PATH_DBUS, DBUS_INTERFACE_DBUS);
 	if (bus_proxy == NULL) {
 		DBG("Failed to get a proxy for D-Bus\n");
+		ret = EXIT_FAILURE;
 		goto failure;
 	}
 
@@ -1098,11 +1790,13 @@ int main(int argc, char **argv)
 			DBG("RequestName RPC failed[%s]\n", error->message);
 			g_error_free(error);
 		}
+		ret = EXIT_FAILURE;
 		goto failure;
 	}
 	DBG("result : %d %d\n", result, DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER);
 	if (result != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
 		DBG("Failed to get the primary well-known name.\n");
+		ret = EXIT_FAILURE;
 		goto failure;
 	}
 
@@ -1112,6 +1806,7 @@ int main(int argc, char **argv)
 	bluetooth_pb_obj = g_object_new(BLUETOOTH_PB_TYPE_AGENT, NULL);
 	if (bluetooth_pb_obj == NULL) {
 		DBG("Failed to create one BluetoothPbAgent instance.\n");
+		ret = EXIT_FAILURE;
 		goto failure;
 	}
 
@@ -1119,10 +1814,42 @@ int main(int argc, char **argv)
 	dbus_g_connection_register_g_object(bus, BT_PB_SERVICE_OBJECT_PATH,
 						G_OBJECT(bluetooth_pb_obj));
 
+	/* connect contact */
+	status = (cts_error)contacts_svc_connect();
+	if (status != CTS_SUCCESS) {
+		DBG("Can not connect contacts server\n");
+		ret = EXIT_FAILURE;
+		goto failure;
+	}
+
+	contacts_svc_subscribe_change(CTS_SUBSCRIBE_CONTACT_CHANGE,
+				__bluetooth_pb_contact_changed,
+				bluetooth_pb_obj);
+	contacts_svc_subscribe_change(CTS_SUBSCRIBE_PLOG_CHANGE,
+				__bluetooth_pb_call_changed,
+				bluetooth_pb_obj);
+
+	/* set signal */
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = __bluetooth_pb_agent_signal_handler;
+	sigaction(SIGTERM, &sa, NULL);
+	sigaction(SIGINT, &sa, NULL);
+
 	g_main_loop_run(mainloop);
 
  failure:
 	DBG("Terminate the bluetooth-pb-agent\n");
+
+	/* disconnect contact */
+	contacts_svc_unsubscribe_change(CTS_SUBSCRIBE_CONTACT_CHANGE,
+				__bluetooth_pb_contact_changed);
+	contacts_svc_unsubscribe_change(CTS_SUBSCRIBE_PLOG_CHANGE,
+				__bluetooth_pb_call_changed);
+
+	contacts_svc_disconnect();
+
+	g_signal_emit(bluetooth_pb_obj, signals[CLEAR], 0);
+
 	if (bluetooth_pb_obj)
 		g_object_unref(bluetooth_pb_obj);
 
@@ -1132,5 +1859,5 @@ int main(int argc, char **argv)
 	if (bus)
 		dbus_g_connection_unref(bus);
 
-	return EXIT_FAILURE;
+	return ret;
 }

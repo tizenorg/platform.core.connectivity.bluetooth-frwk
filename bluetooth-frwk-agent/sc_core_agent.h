@@ -86,6 +86,9 @@ struct _ScCoreAgentClass {
 
 int _sc_core_agent_add(DBusGProxy *adapter_proxy, SC_CORE_AGENT_FUNC_CB *func_cb);
 void _sc_core_agent_remove(void);
+
+void _sc_core_agent_mode_change(int changed_mode);
+
 ScCoreAgent *_sc_core_agent_get_proxy(void);
 
 gboolean sc_core_agent_reply_pin_code(ScCoreAgent *agent, const guint accept, const char *pin_code,

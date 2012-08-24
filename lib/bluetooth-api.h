@@ -198,6 +198,13 @@ typedef enum {
 								/**< Base ID for OPC events */
 #define BLUETOOTH_EVENT_OBEX_SERVER_BASE ((int)(BLUETOOTH_EVENT_OPC_BASE + 0x0020))
 								/**< Base ID for Obex Server events */
+#define BLUETOOTH_EVENT_GATT_BASE ((int)(BLUETOOTH_EVENT_OBEX_SERVER_BASE + 0x0020))
+								/**< Base ID for GATT events */
+
+#define BLUETOOTH_EVENT_AUDIO_BASE ((int)(BLUETOOTH_EVENT_GATT_BASE + 0x0020))
+								/**< Base ID for Audio events */
+#define BLUETOOTH_EVENT_HID_BASE ((int)(BLUETOOTH_EVENT_AUDIO_BASE + 0x0020))
+								/**< Base ID for Audio events */
 /**
  * Bluetooth event type
  */
@@ -231,6 +238,8 @@ typedef enum {
 	BLUETOOTH_EVENT_RFCOMM_CONNECTED,		/**< Rfcomm server incomming connection */
 	BLUETOOTH_EVENT_RFCOMM_DISCONNECTED,		/**< Rfcomm server/client disconnect */
 
+	BLUETOOTH_EVENT_RFCOMM_AUTHORIZE,
+
 	BLUETOOTH_EVENT_DEVICE_CONNECTED,	    /**< Bluetooth event device connected */
 	BLUETOOTH_EVENT_DEVICE_DISCONNECTED,	    /**< Bluetooth event device disconnected */
 
@@ -244,10 +253,8 @@ typedef enum {
 	BLUETOOTH_EVENT_NETWORK_CONNECTED,		/**< Network connected event in client*/
 	BLUETOOTH_EVENT_NETWORK_DISCONNECTED,		/**< Network disconnected evnet in client*/
 
-	BLUETOOTH_EVENT_HDP_ACTIVATED
-			= BLUETOOTH_EVENT_HDP_BASE, /**<HDP Activation for Source and Sync>*/
-	BLUETOOTH_EVENT_HDP_DEACTIVATED,	   /**<HDP DeActivation for Source and Sync>*/
-	BLUETOOTH_EVENT_HDP_CONNECTED,		   /**<HDP Connect>*/
+	BLUETOOTH_EVENT_HDP_CONNECTED
+			= BLUETOOTH_EVENT_HDP_BASE,		   /**<HDP Connect>*/
 	BLUETOOTH_EVENT_HDP_DISCONNECTED,	   /**<HDP Disconnect>*/
 	BLUETOOTH_EVENT_HDP_DATA_RECEIVED,	   /**<HDP Data Indication>*/
 
@@ -263,8 +270,23 @@ typedef enum {
 	BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_STARTED,	/* Obex Server transfer started event*/
 	BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_PROGRESS,/* Obex Server transfer progress event*/
 	BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_COMPLETED,/* Obex Server transfer complete event*/
+	BLUETOOTH_EVENT_OBEX_SERVER_CONNECTION_AUTHORIZE,
 
-	BLUETOOTH_EVENT_MAX,				/**< Bluetooth event Max value */
+	BLUETOOTH_EVENT_GATT_SVC_CHAR_DISCOVERED = BLUETOOTH_EVENT_GATT_BASE,
+				/**<Discovered GATT service characteristics event*/
+	BLUETOOTH_EVENT_GATT_CHAR_VAL_CHANGED,
+				/**<Remote GATT charateristic value changed event*/
+	BLUETOOTH_EVENT_AG_CONNECTED = BLUETOOTH_EVENT_AUDIO_BASE, /**<AG service connected event*/
+	BLUETOOTH_EVENT_AG_DISCONNECTED, /**<AG service disconnected event*/
+	BLUETOOTH_EVENT_AG_SPEAKER_GAIN, /**<Speaker gain request event*/
+	BLUETOOTH_EVENT_AG_MIC_GAIN, /**<Mic gain request event*/
+	BLUETOOTH_EVENT_AG_AUDIO_CONNECTED, /**<AV & AG service connected event*/
+	BLUETOOTH_EVENT_AG_AUDIO_DISCONNECTED,  /**<AV & AG service disconnected event*/
+	BLUETOOTH_EVENT_AV_CONNECTED, /**<AV service connected event*/
+	BLUETOOTH_EVENT_AV_DISCONNECTED, /**<AV service disconnected event*/
+	BLUETOOTH_HID_CONNECTED= BLUETOOTH_EVENT_HID_BASE, /**<HID Connected event*/
+	BLUETOOTH_HID_DISCONNECTED, /**<HID Disconnected event*/
+	BLUETOOTH_EVENT_MAX, /**< Bluetooth event Max value */
 } bluetooth_event_type_t;
 
  /**
@@ -276,18 +298,18 @@ typedef enum {
 	BLUETOOTH_SPP_PROFILE_UUID = ((unsigned short)0x1101),			/**<SPP*/
 	BLUETOOTH_LAP_PROFILE_UUID = ((unsigned short)0x1102),			/**<LAP*/
 	BLUETOOTH_DUN_PROFILE_UUID = ((unsigned short)0x1103),			/**<DUN*/
-	BLUETOOTH_OBEX_IR_MC_SYNC_SERVICE_UUID = ((unsigned short)0x1104),     /**<OBEX IR MC SYNC*/
-	BLUETOOTH_OBEX_OBJECT_PUSH_SERVICE_UUID = ((unsigned short)0x1105),    /**<OPP*/
+	BLUETOOTH_OBEX_IR_MC_SYNC_SERVICE_UUID = ((unsigned short)0x1104),	/**<OBEX IR MC SYNC*/
+	BLUETOOTH_OBEX_OBJECT_PUSH_SERVICE_UUID = ((unsigned short)0x1105),	/**<OPP*/
 	BLUETOOTH_OBEX_FILE_TRANSFER_UUID = ((unsigned short)0x1106),		/**<FTP*/
 	BLUETOOTH_IRMC_SYNC_COMMAND_UUID = ((unsigned short)0x1107),		/**<IRMC SYNC COMMAND*/
 	BLUETOOTH_HS_PROFILE_UUID = ((unsigned short)0x1108),			/**<HS*/
 	BLUETOOTH_CTP_PROFILE_UUID = ((unsigned short)0x1109),			/**<CTP*/
 	BLUETOOTH_AUDIO_SOURCE_UUID = ((unsigned short)0x110A),			/**<AUDIO SOURCE*/
 	BLUETOOTH_AUDIO_SINK_UUID = ((unsigned short)0x110B),			/**<AUDIO SINK*/
-	BLUETOOTH_AV_REMOTE_CONTROL_TARGET_UUID = ((unsigned short)0x110C),  /**<AV REMOTE CONTROL
+	BLUETOOTH_AV_REMOTE_CONTROL_TARGET_UUID = ((unsigned short)0x110C),	/**<AV REMOTE CONTROL
 										TARGET*/
-	BLUETOOTH_ADVANCED_AUDIO_PROFILE_UUID = ((unsigned short)0x110D),    /**<A2DP*/
-	BLUETOOTH_AV_REMOTE_CONTROL_UUID = ((unsigned short)0x110E),	/**<AV REMOTE CONTROL UUID*/
+	BLUETOOTH_ADVANCED_AUDIO_PROFILE_UUID = ((unsigned short)0x110D),	/**<A2DP*/
+	BLUETOOTH_AV_REMOTE_CONTROL_UUID = ((unsigned short)0x110E),		/**<AV REMOTE CONTROL UUID*/
 	BLUETOOTH_AV_REMOTE_CONTROL_CONTROLLER_UUID = ((unsigned short)0x110F),	/**<AV REMOTE CONTROLLER UUID*/
 	BLUETOOTH_ICP_PROFILE_UUID = ((unsigned short)0x1110),			/**<ICP*/
 	BLUETOOTH_FAX_PROFILE_UUID = ((unsigned short)0x1111),			/**<FAX*/
@@ -591,6 +613,7 @@ typedef struct {
 	int device_role;/** < Device role - RFCOMM_ROLE_SERVER or RFCOMM_ROLE_CLIENT */
 	bluetooth_device_address_t device_addr;
 					      /**< device address */
+	char *uuid;
 } bluetooth_rfcomm_connection_t;
 
 /**
@@ -599,9 +622,18 @@ typedef struct {
 typedef struct {
 	int socket_fd;
 		/**< the socket fd */
+	int device_role;/** < Device role - RFCOMM_ROLE_SERVER or RFCOMM_ROLE_CLIENT */
 	bluetooth_device_address_t device_addr;
 					      /**< device address */
+	char *uuid;
 } bluetooth_rfcomm_disconnection_t;
+
+typedef struct {
+	int socket_fd;
+		/**< the socket fd */
+	bluetooth_device_address_t device_addr;
+					      /**< device address */
+} bluetooth_rfcomm_connection_request_t;
 
 /**
  * HDP QOS types
@@ -620,19 +652,6 @@ typedef enum {
 	HDP_ROLE_SINK
 }bt_hdp_role_type_t;
 
-/**
- * Stucture to HDP activated
- */
-typedef struct {
-	const char *app_handle;	/**< the application handle */
-} bt_hdp_activate_t;
-
-/**
- * Stucture to HDP deactivate
- */
-typedef struct {
-	const char *app_handle;	/**< the application handle */
-} bt_hdp_deactivate_t;
 
 /**
  * Stucture to HDP connected
@@ -667,6 +686,7 @@ typedef struct {
 typedef struct {
 	char *filename;
 	int size;
+	int percentage;
 }bt_opc_transfer_info_t;
 
 /* Obex Server transfer type */
@@ -702,6 +722,68 @@ typedef struct {
 	unsigned int hash_len;
 	unsigned int randomizer_len;
 } bt_oob_data_t;
+
+/**
+ * Structure to GATT attribute handle data
+ */
+
+typedef struct {
+	int count;
+	char **handle;
+} bt_gatt_handle_info_t;
+
+/**
+ * Structure to GATT Remote service data
+ */
+
+typedef struct {
+	char *uuid;
+	bt_gatt_handle_info_t handle_info;
+} bt_gatt_service_property_t;
+
+/**
+ * Structure to GATT Remote characteristic data
+ */
+
+typedef struct {
+	char *service_handle;
+	bt_gatt_handle_info_t handle_info;
+} bt_gatt_discovered_char_t;
+
+/**
+ * Structure to format of GATT Characteristic Value
+ */
+
+typedef struct {
+	unsigned char format;
+	unsigned char exponent;
+	unsigned short unit;
+	unsigned char name_space;
+	unsigned short description;
+} bt_gatt_char_format_t;
+
+/**
+ * Structure to GATT Characteristic property
+ */
+
+typedef struct {
+	char *uuid;
+	char *name;
+	char *description;
+	bt_gatt_char_format_t format;
+	unsigned char *val;
+	unsigned int val_len;
+	char *representation;
+} bt_gatt_char_property_t;
+
+/**
+ * Structure to GATT Characteristic value
+ */
+
+typedef struct {
+	char *char_handle;
+	guint8 *char_value;
+} bt_gatt_char_value_t;
 
 /**
  * Callback pointer type
@@ -840,7 +922,6 @@ int bluetooth_unregister_callback(void);
  *
  * @return      BLUETOOTH_ERROR_NONE - Success\n
  *		BLUETOOTH_ERROR_DEVICE_ALREADY_ENABLED - Adapter already enabled\n
- *		BLUETOOTH_ERROR_ACCESS_DENIED - Enabling adapter is not allowed by MDM policy\n
  *		BLUETOOTH_ERROR_IN_PROGRESS - Adapter is activating or deactivating\n
  * @exception   BLUETOOTH_ERROR_INTERNAL - Dbus proxy call is fail
  * @remark      None
@@ -931,7 +1012,6 @@ int bluetooth_disable_adapter(void);
  *
  * This API checks whether the bluetooth is supported or not.
  * This API only run by root permission.
- * This API was made for the MDM service.
  *
  * This function is a synchronous call.
  *
@@ -946,31 +1026,6 @@ ret = bluetooth_is_supported();
 @endcode
  */
 int bluetooth_is_supported(void);
-
-/**
- * @fn int bluetooth_allow_service(gboolean allow)
- * @brief Allow to start the bluetooth service
- *
- * This API is to allow the bluetooth service.
- * If allow value is FALSE, disable the adapter. and user can't enable the adapter
- * before allow value is to be TRUE or reboot.
- * If user reboot the phone, this allow value will be TRUE. (If no one set the allow value again)
- * This API only run by root permission.
- * This API was made for the MDM service.
- *
- * This function is a synchronous call.
- *
- * @param[in]  allow the mode to allow BT service
- * @return	BLUETOOTH_ERROR_NONE - success to change the value\n
- *		BLUETOOTH_ERROR_ACCESS_DENIED - access denied because of the permission \n
- * @remark      None
-@code
-
-int ret = 0;
-ret = bluetooth_is_supported();
-@endcode
- */
-int bluetooth_allow_service(gboolean allow);
 
 
 /**
@@ -1077,12 +1132,41 @@ int bluetooth_get_local_name(bluetooth_device_name_t *local_name);
  *
  * @remark      None
 
+@code
 bluetooth_device_name_t local_name={0,}
 int ret = 0;
 ret = bluetooth_set_local_name (&local_name);
 @endcode
  */
 int bluetooth_set_local_name(const bluetooth_device_name_t *local_name);
+
+
+/**
+ * @fn int bluetooth_is_service_used(const char *service_uuid, gboolean *used)
+ * @brief Check if the uuid is used or not
+ *
+ * This function is used to check if the uuid is used or not.
+ *
+ * This function is a synchronous call.
+ *
+ * @param[in]   service_uuid   service uuid (UUID 128 bit as string)
+ * @param[out] used  if the uuid is used or not
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM - Bluetooth name parameter is incorrect \n
+ *		BLUETOOTH_ERROR_INTERNAL - The dbus method call is fail \n
+ *
+ * @remark      None
+ *
+@code
+gboolean used = FALSE;
+const char *uuid ="00001101-0000-1000-8000-00805F9B34FB";
+ret = bluetooth_is_service_used(uuid, &used);
+@endcode
+ */
+int bluetooth_is_service_used(const char *service_uuid, gboolean *used);
+
 
 /**
  * @fn int bluetooth_get_discoverable_mode(bluetooth_discoverable_mode_t *discoverable_mode_ptr)
@@ -1864,7 +1948,6 @@ int bluetooth_rfcomm_create_socket(const char *uuid);
  *               BLUETOOTH_ERROR_NOT_FOUND - Cannot find the proxy\n
  *               BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter \n
  * @param[in]  int socket_fd
- * @param[in]   UUID (128 bits)
  *
  * @remark      None
  * @see       bluetooth_rfcomm_create_socket, bluetooth_rfcomm_listen_and_accept
@@ -1890,10 +1973,40 @@ int bluetooth_rfcomm_create_socket(const char *uuid);
  fd  = bluetooth_rfcomm_create_socket(rfcomm_test_uuid);
  ret = bluetooth_rfcomm_listen_and_accept(fd, 1);
  ....
- ret = bluetooth_rfcomm_remove_socket(fd, rfcomm_test_uuid);
+ ret = bluetooth_rfcomm_remove_socket(fd);
  @endcode
  */
-int bluetooth_rfcomm_remove_socket(int socket_fd, const char *uuid);
+int bluetooth_rfcomm_remove_socket(int socket_fd);
+
+
+/**
+ * @fn int bluetooth_rfcomm_server_disconnect(int socket_fd)
+ * @brief Disconnect rfcomm connection
+ *
+ *
+ * Disconnect a specific(device node fd)  RFCOMM connection. This is a Synchronous call and there
+ * is no cabbback events for this API. We have to provice the valid client fd to disconnect from the
+ * remote server.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *              BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter \n
+ *              BLUETOOTH_ERROR_NOT_CONNECTED - Not connected \n
+ * @param[in]  char remote bt_address
+ *
+ * @remark      None
+ *
+ @code
+
+  ret = bluetooth_rfcomm_server_disconnect(g_ret_fd);
+  if (ret < 0)
+	printf("Disconnection failed");
+  else
+  printf("Disconnection Success");
+
+ @endcode
+ */
+int bluetooth_rfcomm_server_disconnect(int socket_fd);
+
 
 /**
  * @fn int bluetooth_rfcomm_listen_and_accept(int socket_fd,int max_pending_connection)
@@ -1941,6 +2054,91 @@ int bluetooth_rfcomm_remove_socket(int socket_fd, const char *uuid);
  @endcode
  */
 int bluetooth_rfcomm_listen_and_accept(int socket_fd, int max_pending_connection);
+
+/**
+ * @fn int bluetooth_rfcomm_listen(int socket_fd,int max_pending_connection)
+ * @brief Rfcomm socket listen
+ *
+ *
+ * This API make rfcomm socket listen and accept with socket. We will call this API immediatly
+ * after the bluetooth_rfcomm_create_socket API.
+ * This API listen for the incomming connection and once it receives a connection, it will give
+ * BLUETOOTH_EVENT_RFCOMM_AUTHORIZE
+ * event to the application. This is an Asynchronous API call.
+ *
+ *
+ * @return  BLUETOOTH_ERROR_NONE - Success \n
+ *              BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter \n
+ *              BLUETOOTH_ERROR_CONNECTION_ERROR - Listen failed \n
+
+ * @param[in]  int socket_fd
+ * @param[in]  max pending connection.
+ *
+ * @remark      None
+ * @see       bluetooth_rfcomm_create_socket
+ *
+  @code
+  void bt_event_callback(int event, bluetooth_event_param_t* param)
+ {
+	switch(event)
+	{
+		case BLUETOOTH_EVENT_RFCOMM_AUTHORIZE:
+		{
+			char *name = (char *)param->param_data;
+
+			printf("\nConnected from %s",  name);
+
+			bluetooth_rfcomm_accept_connection();
+		}
+	}
+ }
+
+ ...
+
+ int ret = 0;
+ fd  = bluetooth_rfcomm_create_socket(rfcomm_test_uuid);
+ ret = bluetooth_rfcomm_listen(fd, 1);
+
+ @endcode
+ */
+int bluetooth_rfcomm_listen(int socket_fd, int max_pending_connection);
+
+/**
+ * @fn int bluetooth_rfcomm_accept_connection()
+ * @brief Accepts the authorization request indicated by the event
+  * BLUETOOTH_EVENT_RFCOMM_AUTHORIZE.
+ *
+ * This function is a synchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *              BLUETOOTH_ERROR_INTERNAL - Internal error \n
+ *
+ * @param[in]  the socket fd of the server
+ * @param[out]  the socket fd of the client
+ *
+ * @exception   None
+ * @remark       None
+ * @see    	  bluetooth_rfcomm_reject_connection
+ */
+int bluetooth_rfcomm_accept_connection(int server_fd, int *client_fd);
+
+/**
+ * @fn int bluetooth_rfcomm_reject_connection()
+ * @brief Rejects the authorization request indicated by the event
+  * BLUETOOTH_EVENT_RFCOMM_AUTHORIZE.
+ *
+ * This function is a synchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *              BLUETOOTH_ERROR_INTERNAL - Internal error \n
+ *
+ * @param[in]  the socket fd of the server
+ *
+ * @exception   None
+ * @remark       None
+ * @see    	  bluetooth_rfcomm_accept_connection
+ */
+int bluetooth_rfcomm_reject_connection(int server_fd);
 
 /**
  * @fn gboolean bluetooth_rfcomm_is_server_uuid_available(const char *uuid)
@@ -2208,11 +2406,11 @@ int bluetooth_network_disconnect(const bluetooth_device_address_t *device_addres
 /**
  * @fn int bluetooth_hdp_activate(unsigned short  data_type,
  *					bt_hdp_role_type_t role,
- *					bt_hdp_qos_type_t channel_type)
+ *					bt_hdp_qos_type_t channel_type,
+ *					char **app_handle)
  * @brief Activate the HDP service for a particular data type
  *
- * This function is a asynchronous call.
- * The HDP activate is responded by BLUETOOTH_EVENT_HDP_ACTIVATED event.
+ * This function is a synchronous call.
  *
  * @return   BLUETOOTH_ERROR_NONE  - Success \n
  *              BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter \n
@@ -2226,18 +2424,19 @@ int bluetooth_network_disconnect(const bluetooth_device_address_t *device_addres
  *				HDP_QOS_RELIABLE/HDP_QOS_STREAMING/HDP_QOS_ANY.
  *				For role = HDP_ROLE_SINK, the channel_type
  *				should be HDP_QOS_ANY.
+ * @param[out]  app_handle    The application handler against corresponding service
  * @remark       None
  * @see    	   bluetooth_hdp_deactivate
  */
 int bluetooth_hdp_activate(unsigned short  data_type,
 				bt_hdp_role_type_t role,
-				bt_hdp_qos_type_t channel_type);
+				bt_hdp_qos_type_t channel_type,
+				char **app_handle);
 /**
  * @fn int bluetooth_hdp_deactivate(const char *app_handle)
  * @brief Deactivate the HDP service for a particular service using the handler
  *
- * This function is a asynchronous call.
- * The HDP activate is responded by BLUETOOTH_EVENT_HDP_DEACTIVATED event.
+ * This function is a synchronous call.
  *
  * @return   BLUETOOTH_ERROR_NONE  - Success \n
  *              BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter \n
@@ -2333,6 +2532,7 @@ int bluetooth_hdp_disconnect(unsigned int channel_id,
  * No event corresponding to this api
  *
  * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *              BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Device is not enabled \n
  *              BLUETOOTH_ERROR_INTERNAL - Internal Error \n
  *              BLUETOOTH_ERROR_NO_RESOURCES - Not resource available \n
   *             BLUETOOTH_ERROR_ACCESS_DENIED -Memory allocation failed \n
@@ -2352,8 +2552,8 @@ int bluetooth_opc_init(void);
  * No event corresponding to this api
  *
  * @return   BLUETOOTH_ERROR_NONE  - Success \n
- *              BLUETOOTH_ERROR_NO_RESOURCES - Not resource available \n
-  *             BLUETOOTH_ERROR_ACCESS_DENIED -Memory allocation failed \n
+ *              BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Device is not enabled \n
+ *              BLUETOOTH_ERROR_ACCESS_DENIED -Memory allocation failed \n
  *
  * @exception   None
  *
@@ -2364,18 +2564,19 @@ int bluetooth_opc_init(void);
  int bluetooth_opc_deinit(void);
 
 /**
- * @fn int bluetooth_opc_push_files(bluetooth_device_address_t *device_address,
-					unsigned char **file_name_array)
+ * @fn int bluetooth_opc_push_files(bluetooth_device_address_t *remote_address,
+					char **file_name_array)
  * @brief Send multiple files to a remote device.
  *
  * This function is a asynchronous call.
  * This api  is responded by BLUETOOTH_EVENT_OPC_CONNECTED event.
  *
  * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *              BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Device is not enabled \n
  *              BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter \n
  *              BLUETOOTH_ERROR_INTERNAL - Internal Error \n
  *              BLUETOOTH_ERROR_NO_RESOURCES - Not resource available \n
-  *             BLUETOOTH_ERROR_IN_PROGRESS -Already one push in progress \n
+ *              BLUETOOTH_ERROR_IN_PROGRESS -Already one push in progress \n
  *
  * @exception   None
  * @param[in]  device_address   The remote device Bd address.
@@ -2397,8 +2598,8 @@ int bluetooth_opc_push_files(bluetooth_device_address_t *remote_address,
  * BLUETOOTH_EVENT_OPC_TRANSFER_COMPLETED event.
  *
  * @return   BLUETOOTH_ERROR_NONE  - Success \n
- *              BLUETOOTH_ERROR_NO_RESOURCES - Not resource available \n
-  *             BLUETOOTH_ERROR_ACCESS_DENIED - No push in progress \n
+ *              BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Device is not enabled \n
+ *              BLUETOOTH_ERROR_ACCESS_DENIED - No push in progress \n
  *
  * @exception   None
  *
@@ -2427,22 +2628,24 @@ gboolean bluetooth_opc_session_is_exist(void);
 
 
 /**
- * @fn int bluetooth_obex_server_init(char *dst_path)
+ * @fn int bluetooth_obex_server_init(const char *dst_path)
  * @brief Initialize OPP and FTP server.
  *
  * This function is a synchronous call.
  * No event corresponding to this api
  *
  * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *              BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Device is not enabled \n
  *              BLUETOOTH_ERROR_NO_RESOURCES - Not resource available \n
-  *             BLUETOOTH_ERROR_AGENT_ALREADY_EXIST - Obex agent already registered \n
+ *              BLUETOOTH_ERROR_AGENT_ALREADY_EXIST - Obex agent already registered \n
+ *              BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter \n
  *
  * @exception   None
  * @param[in]  dst_path   OPS destination file path.
  * @remark       None
  * @see    	  bluetooth_obex_server_deinit
  */
-int bluetooth_obex_server_init(char *dst_path);
+int bluetooth_obex_server_init(const char *dst_path);
 
 
 /**
@@ -2453,7 +2656,7 @@ int bluetooth_obex_server_init(char *dst_path);
  * No event corresponding to this api
  *
  * @return   BLUETOOTH_ERROR_NONE  - Success \n
- *              BLUETOOTH_ERROR_NO_RESOURCES - Not resource available \n
+ *              BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Device is not enabled \n
  *              BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST -Obex agent not registered \n
  *
  * @exception   None
@@ -2461,7 +2664,6 @@ int bluetooth_obex_server_init(char *dst_path);
  * @remark       None
  * @see    	  bluetooth_obex_server_init
  */
-
 int bluetooth_obex_server_deinit(void);
 
 
@@ -2483,7 +2685,84 @@ gboolean bluetooth_obex_server_is_activated(void);
 
 
 /**
- * @fn int bluetooth_obex_server_accept_authorize(char *filename)
+ * @fn int bluetooth_obex_server_init_without_agent(const char *dst_path)
+ * @brief Initialize OPP and FTP server without the conneciton authorization of the agent
+ *
+ * This function is a synchronous call.
+ * No event corresponding to this api
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *              BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Device is not enabled \n
+ *              BLUETOOTH_ERROR_NO_RESOURCES - Not resource available \n
+ *              BLUETOOTH_ERROR_AGENT_ALREADY_EXIST - Obex agent already registered \n
+ *              BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter \n
+ *
+ *
+ * @exception   None
+ * @param[in]  dst_path   OPS destination file path.
+ * @remark       None
+ * @see    	  bluetooth_obex_server_deinit_without_agent
+ */
+int bluetooth_obex_server_init_without_agent(const char *dst_path);
+
+
+/**
+ * @fn int bluetooth_obex_server_deinit_without_agent(void)
+ * @brief Deinitialize OPP and FTP server without the conneciton authorization of the agent
+ *
+ * This function is a synchronous call.
+ * No event corresponding to this api
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *              BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Device is not enabled \n
+ *              BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST -Obex agent not registered \n
+ *
+ * @exception   None
+ *
+ * @remark       None
+ * @see    	  bluetooth_obex_server_init_without_agent
+ */
+int bluetooth_obex_server_deinit_without_agent(void);
+
+
+/**
+ * @fn int bluetooth_obex_server_accept_connection(void)
+ * @brief Accepts the authorization request indicated by the event
+  * BLUETOOTH_EVENT_OBEX_SERVER_CONNECTION_AUTHORIZE.
+ *
+ * This function is a synchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *              BLUETOOTH_ERROR_NO_RESOURCES - Not resource available \n
+ *              BLUETOOTH_ERROR_INTERNAL - Internal error \n
+ *
+ * @exception   None
+ * @remark       None
+ * @see    	  bluetooth_obex_server_reject_authorize
+ */
+int bluetooth_obex_server_accept_connection(void);
+
+
+/**
+ * @fn int bluetooth_obex_server_reject_connection(void)
+ * @brief Rejects the authorization request indicated by the event
+  * BLUETOOTH_EVENT_OBEX_SERVER_CONNECTION_AUTHORIZE.
+ *
+ * This function is a synchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *              BLUETOOTH_ERROR_NO_RESOURCES - Not resource available \n
+ *              BLUETOOTH_ERROR_INTERNAL - Internal error \n
+ *
+ * @exception   None
+ * @remark       None
+ * @see    	  bluetooth_obex_server_reject_authorize
+ */
+int bluetooth_obex_server_reject_connection(void);
+
+
+/**
+ * @fn int bluetooth_obex_server_accept_authorize(const char *filename)
  * @brief Accepts the authorization request indicated by the event
   * BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_AUTHORIZE.
  *
@@ -2491,7 +2770,8 @@ gboolean bluetooth_obex_server_is_activated(void);
  * This api will be responded with the event BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_STARTED.
  *
  * @return   BLUETOOTH_ERROR_NONE  - Success \n
- *              BLUETOOTH_ERROR_NO_RESOURCES - Not resource available \n
+ *              BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Device is not enabled \n
+ *              BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter \n
  *              BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST -Obex agent not registered \n
  *
  * @exception   None
@@ -2501,7 +2781,7 @@ gboolean bluetooth_obex_server_is_activated(void);
  * @see    	  bluetooth_obex_server_reject_authorize
  */
 
-int bluetooth_obex_server_accept_authorize(char *filename);
+int bluetooth_obex_server_accept_authorize(const char *filename);
 
 /**
  * @fn int bluetooth_obex_server_reject_authorize(void)
@@ -2512,7 +2792,7 @@ int bluetooth_obex_server_accept_authorize(char *filename);
  * No event for this api..
  *
  * @return   BLUETOOTH_ERROR_NONE  - Success \n
- *              BLUETOOTH_ERROR_NO_RESOURCES - Not resource available \n
+ *              BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Device is not enabled \n
  *              BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST -Obex agent not registered \n
  *
  * @exception   None
@@ -2524,7 +2804,7 @@ int bluetooth_obex_server_accept_authorize(char *filename);
 int bluetooth_obex_server_reject_authorize(void);
 
 /**
- * @fn int bluetooth_obex_server_set_destination_path(char *dst_path)
+ * @fn int bluetooth_obex_server_set_destination_path(const char *dst_path)
  * @brief Set the OPS destination file path..
  *
  * This function is a asynchronous call.
@@ -2533,7 +2813,7 @@ int bluetooth_obex_server_reject_authorize(void);
  * @return   BLUETOOTH_ERROR_NONE  - Success \n
  *              BLUETOOTH_ERROR_NO_RESOURCES - Not resource available \n
  *              BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST -Obex agent not registered \n
- *		 BLUETOOTH_ERROR_INVALID_PARAM - Invalid Param \n
+ *              BLUETOOTH_ERROR_INVALID_PARAM - Invalid Param \n
  *
  * @exception   None
  * @param[in]  dst_path   OPS destination file path.
@@ -2542,19 +2822,21 @@ int bluetooth_obex_server_reject_authorize(void);
  * @see    	 None
  */
 
-int bluetooth_obex_server_set_destination_path(char *dst_path);
+int bluetooth_obex_server_set_destination_path(const char *dst_path);
 
 /**
- * @fn int bluetooth_obex_server_set_root(char *root)
+ * @fn int bluetooth_obex_server_set_root(const char *root)
  * @brief Set the FTS root folder..
  *
  * This function is a asynchronous call.
  * No event for this api..
  *
  * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *              BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Device is not enabled \n
  *              BLUETOOTH_ERROR_NO_RESOURCES - Not resource available \n
- *              BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST -Obex agent not registered \n
- *		 BLUETOOTH_ERROR_INVALID_PARAM - Invalid Param \n
+ *              BLUETOOTH_ERROR_ACCESS_DENIED - Operation not allowed \n
+ *              BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter \n
+ *              BLUETOOTH_ERROR_INTERNAL - Internal Error \n
  *
  * @exception  None
  * @param[in]   root   FTS root folder.
@@ -2563,14 +2845,14 @@ int bluetooth_obex_server_set_destination_path(char *dst_path);
  * @see    	 None
  */
 
-int bluetooth_obex_server_set_root(char *root);
+int bluetooth_obex_server_set_root(const char *root);
 
 /**
  * @fn int bluetooth_obex_server_cancel_transfer(int transfer_id)
  * @brief Cancel the transfer on server
  *
- * This function is a asynchronous call.
- * If the call is success to cancel transfering then the application will receive
+ * This function is an asynchronous call.
+ * If the function call that cancels transfer is successful, the application would recieve
  * BLUETOOTH_EVENT_TRANSFER_COMPLETED event through registered callback
  * function with an error code BLUETOOTH_ERROR_CANCEL. In the case of failure
  * the error code will be BLUETOOTH_ERROR_NONE
@@ -2587,8 +2869,31 @@ int bluetooth_obex_server_set_root(char *root);
  * @remark       None
  * @see    	 None
  */
-
 int bluetooth_obex_server_cancel_transfer(int transfer_id);
+
+
+/**
+ * @fn int bluetooth_obex_server_cancel_all_transfers(void)
+ * @brief Cancel the transfer on server
+ *
+ * This function is an asynchronous call.
+ * If the function call that cancels transfer is successful, the application would recieve
+ * BLUETOOTH_EVENT_TRANSFER_COMPLETED event through registered callback
+ * function with an error code BLUETOOTH_ERROR_CANCEL. In the case of failure
+ * the error code will be BLUETOOTH_ERROR_NONE
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *               BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Not enabled \n
+ *               BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST -Obex agent not registered \n
+ *               BLUETOOTH_ERROR_INTERNAL - internal error (proxy does not exist) \n
+ *               BLUETOOTH_ERROR_NOT_FOUND - The transfer is not found \n
+ *
+ * @exception None
+ *
+ * @remark       None
+ * @see    	 None
+ */
+int bluetooth_obex_server_cancel_all_transfers(void);
 
 
 /**
@@ -2656,6 +2961,222 @@ int bluetooth_oob_add_remote_data(
 
 int bluetooth_oob_remove_remote_data(
 			const bluetooth_device_address_t *remote_device_address);
+
+/**
+ * @fn int bluetooth_gatt_get_primary_services(const bluetooth_device_address_t *address,
+ *						bt_gatt_handle_info_t *prim_svc);
+ *
+ * @brief Gets the GATT based primary services handle supported by remote device
+ *
+ * This function is a synchronous call.
+ * The output parameter needs to be freed by calling bluetooth_gatt_free_primary_services()
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+ *
+ * @exception	 None
+ * @param[in]	 address - Remote device address
+ * @param[out] prim_svc - Structure containing remote service count and handle list.
+ *
+ * @remark	None
+ * @see		bluetooth_gatt_free_primary_services()
+ */
+int bluetooth_gatt_get_primary_services(const bluetooth_device_address_t *address,
+						bt_gatt_handle_info_t *prim_svc);
+
+/**
+ * @fn int bluetooth_gatt_discover_service_characteristics(const char *service_handle)
+ *
+ * @brief Discovers the characteristics of GATT based service of remote device
+ *
+ * This function is an asynchronous call.
+ * This API is responded with BLUETOOTH_EVENT_GATT_SVC_CHAR_DISCOVERED
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+ *
+ * @exception	None
+ * @param[in]	service_handle - Handle for remote service.
+ *
+ * @remark	None
+ * @see		None
+ */
+int bluetooth_gatt_discover_service_characteristics(const char *service_handle);
+
+/**
+ * @fn int bluetooth_gatt_get_service_property(const char *service_handle,
+ *						bt_gatt_service_property_t *service);
+ *
+ * @brief Gets the properties of GATT based service of remote device
+ *
+ * This function is a synchronous call.
+ * The output parameter needs to be freed by calling bluetooth_gatt_free_primary_services()
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+ *
+ * @exception	None
+ * @param[in]	service_handle - Handle for remote service.
+ * @param[out]	service - Structure containing remote service property.
+ *
+ * @remark	None
+ * @see		bluetooth_gatt_free_service_property()
+ */
+int bluetooth_gatt_get_service_property(const char *service_handle,
+						bt_gatt_service_property_t *service);
+
+/**
+ * @fn int bluetooth_gatt_watch_characteristics(const char *service_handle)
+ *
+ * @brief Register to GATT based service to receive value change notification/indication.
+ *
+ * This function is a synchronous call.
+ * No event for this api.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+ *
+ * @exception	None
+ * @param[in]	service_handle - Handle for remote service.
+ *
+ * @remark	None
+ * @see    	None
+ */
+int bluetooth_gatt_watch_characteristics(const char *service_handle);
+
+/**
+ * @fn int bluetooth_gatt_unwatch_characteristics(const char *service_handle)
+ *
+ * @brief Unregister GATT based service to receive value change notification/indication.
+ *
+ * This function is a synchronous call.
+ * No event for this api.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+ *
+ * @exception	None
+ * @param[in]	service_handle - Handle for remote service.
+ *
+ * @remark	None
+ * @see		None
+ */
+int bluetooth_gatt_unwatch_characteristics(const char *service_handle);
+
+/**
+ * @fn int bluetooth_gatt_get_characteristics_property(const char *char_handle,
+ *						bt_gatt_char_property_t *characteristic);
+ *
+ * @brief Provides characteristic value along with properties.
+ *
+ * This function is a synchronous call.
+ * The output parameter needs to be freed by calling bluetooth_gatt_free_char_property()
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+ *
+ * @exception	None
+ * @param[in]	char_handle - Handle for Characteristic property.
+ * @param[out] characteristic - Structure containing remote characteristic property.
+ *
+ * @remark	None
+ * @see		bluetooth_gatt_free_char_property()
+ */
+int bluetooth_gatt_get_characteristics_property(const char *char_handle,
+						bt_gatt_char_property_t *characteristic);
+
+/**
+ * @fn int bluetooth_gatt_set_characteristics_value(const char *char_handle,
+ *						const guint8 *value, int length)
+ *
+ * @brief Set characteristic value.
+ *
+ * This function is a synchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+ *
+ * @exception	None
+ * @param[in]	char_handle - Handle for Characteristic property.
+ * @param[in]	value - New value to set for characteristic property.
+ * @param[in]	length - Length of the value to be set.
+ *
+ * @remark	None
+ * @see		None
+ */
+int bluetooth_gatt_set_characteristics_value(const char *char_handle,
+						const guint8 *value, int length);
+
+/**
+ * @fn int bluetooth_gatt_free_primary_services(bt_gatt_handle_info_t *prim_svc);
+ *
+ * @brief Releases the memory allocated by bluetooth_gatt_get_primary_services()
+ *
+ * This function is a synchronous call.
+ * The input parameter is obtained by calling bluetooth_gatt_get_primary_services()
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *
+ * @exception	None
+ * @param[in]	prim_svc - GATT handle info structure
+ *
+ * @remark	None
+ * @see		bluetooth_gatt_get_primary_services()
+ */
+int bluetooth_gatt_free_primary_services(bt_gatt_handle_info_t *prim_svc);
+
+/**
+ * @fn int bluetooth_gatt_free_service_property(bt_gatt_service_property_t *svc_pty);
+ *
+ * @brief  Releases the memory allocated by bluetooth_gatt_get_service_property()
+ *
+ * This function is a synchronous call.
+ * The input parameter is obtained by calling bluetooth_gatt_get_service_property()
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *
+ * @exception	None
+ * @param[in]	svc_pty - GATT service property structure.
+ *
+ * @remark	None
+ * @see		bluetooth_gatt_get_service_property()
+ */
+int bluetooth_gatt_free_service_property(bt_gatt_service_property_t *svc_pty);
+
+/**
+ * @fn int bluetooth_gatt_free_char_property(bt_gatt_char_property_t *char_pty);
+ *
+ * @brief Provides characteristic value along with properties.
+ *
+ * This function is a synchronous call.
+ * The input parameter is obtained by calling bluetooth_gatt_get_characteristics_property()
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *
+ * @exception	None
+ * @param[in]	char_pty - GATT characteristics property structure.
+ *
+ * @remark	None
+ * @see		bluetooth_gatt_get_characteristics_property()
+ */
+ int bluetooth_gatt_free_char_property(bt_gatt_char_property_t *char_pty);
 
 /**
  * @}

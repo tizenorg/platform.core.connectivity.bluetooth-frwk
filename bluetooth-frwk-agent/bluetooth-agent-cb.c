@@ -27,6 +27,7 @@
 #include <malloc.h>
 #include <stacktrim.h>
 #include <syspopup_caller.h>
+#include <vconf.h>
 
 #include "bluetooth-agent.h"
 #include "sc_core_agent.h"
@@ -38,6 +39,17 @@ extern struct bt_agent_appdata *app_data;
 
 #define HFP_AUDIO_GATEWAY_UUID "0000111f-0000-1000-8000-00805f9b34fb"
 #define A2DP_UUID "0000110D-0000-1000-8000-00805F9B34FB"
+#define OPP_UUID "00001105-0000-1000-8000-00805f9b34fb"
+#define FTP_UUID "00001106-0000-1000-8000-00805f9b34fb"
+#define SPP_UUID "00001101-0000-1000-8000-00805f9b34fb"
+
+#define BT_MEMORY_OBEX_NO_AGENT "memory/private/libbluetooth-frwk-0/obex_no_agent"
+#define BT_MEMORY_RFCOMM_UUID "memory/private/libbluetooth-frwk-0/uuid"
+
+#define BT_AGENT_OBJECT "/org/projectx/bt_agent"
+#define BT_AGENT_INTERFACE "User.Bluetooth.agent"
+#define BT_AGENT_SIGNAL_AUTHORIZE "Authorize"
+#define BT_AGENT_SIGNAL_OBEX_AUTHORIZE "ObexAuthorize"
 
 #define BT_PIN_MAX_LENGTH 16
 #define BT_PASSKEY_MAX_LENGTH 6
@@ -87,14 +99,13 @@ static gboolean __bt_agent_system_popup_timer_cb(gpointer user_data)
 	}
 	ret = syspopup_launch("bt-syspopup", b);
 
-	if (0 > ret) {
+	if (0 > ret)
 		DBG("Sorry Can not launch popup\n");
-		return TRUE;
-	} else {
+	else
 		DBG("Hurray Popup launched \n");
-		bundle_free(b);
-		return FALSE;
-	}
+
+	bundle_free(b);
+	return FALSE;
 }
 
 int _bt_agent_launch_system_popup(bt_agent_event_type_t event_type, const char *device_name,
@@ -149,8 +160,11 @@ int _bt_agent_launch_system_popup(bt_agent_event_type_t event_type, const char *
 		strncpy(event_str, "terminate", BT_MAX_EVENT_STR_LENGTH);
 		break;
 
-	default:
+	case BT_AGENT_EVENT_EXCHANGE_REQUEST:
+		strncpy(event_str, "exchange-request", BT_MAX_EVENT_STR_LENGTH);
+		break;
 
+	default:
 		break;
 
 	}
@@ -175,7 +189,8 @@ static gboolean __pincode_request(DBusGProxy *device)
 	uint32_t device_class;
 	GHashTable *hash = NULL;
 	GValue *value;
-	const gchar *address, *name;
+	const gchar *address = NULL;
+	const gchar *name = NULL;
 	GError *error = NULL;
 
 	DBG("+\n");
@@ -203,6 +218,9 @@ static gboolean __pincode_request(DBusGProxy *device)
 			char str_passkey[7] = { 0 };
 
 			__bt_agent_generate_passkey(str_passkey, sizeof(str_passkey));
+
+			sc_core_agent_reply_pin_code(_sc_core_agent_get_proxy(),
+						     SC_CORE_AGENT_ACCEPT, str_passkey, NULL);
 
 			if (name)
 				_bt_agent_launch_system_popup(BT_AGENT_EVENT_KEYBOARD_PASSKEY_REQUEST,
@@ -243,9 +261,11 @@ static gboolean __pincode_request(DBusGProxy *device)
 
 static gboolean __passkey_request(DBusGProxy *device)
 {
+	uint32_t device_class;
 	GHashTable *hash = NULL;
 	GValue *value;
-	const gchar *address, *name;
+	const gchar *address = NULL;
+	const gchar *name = NULL;
 	GError *error = NULL;
 
 	DBG("+\n");
@@ -256,6 +276,9 @@ static gboolean __passkey_request(DBusGProxy *device)
 				&hash, G_TYPE_INVALID);
 
 	if (hash != NULL) {
+		value = g_hash_table_lookup(hash, "Class");
+		device_class = value ? g_value_get_uint(value) : 0;
+
 		value = g_hash_table_lookup(hash, "Address");
 		address = value ? g_value_get_string(value) : NULL;
 
@@ -323,9 +346,11 @@ static gboolean __display_request(DBusGProxy *device, guint passkey, guint enter
 
 static gboolean __confirm_request(DBusGProxy *device, guint passkey)
 {
+	uint32_t device_class;
 	GHashTable *hash = NULL;
 	GValue *value;
-	const gchar *address, *name;
+	const gchar *address = NULL;
+	const gchar *name = NULL;
 	GError *error = NULL;
 	char str_passkey[7] = { 0 };
 
@@ -339,6 +364,9 @@ static gboolean __confirm_request(DBusGProxy *device, guint passkey)
 				&hash, G_TYPE_INVALID);
 
 	if (hash != NULL) {
+		value = g_hash_table_lookup(hash, "Class");
+		device_class = value ? g_value_get_uint(value) : 0;
+
 		value = g_hash_table_lookup(hash, "Address");
 		address = value ? g_value_get_string(value) : NULL;
 
@@ -382,13 +410,59 @@ static gboolean __pairing_cancel_request(const char *address)
 	return TRUE;
 }
 
+static void __bt_send_autorize_message(char *address, char *name, char *signal)
+{
+	DBG("+");
+
+	DBusMessage *msg = NULL;
+	DBusGConnection *conn = NULL;
+	DBusConnection *connecton = NULL;
+
+	conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
+	if (conn == NULL) {
+		DBG("conn is NULL\n");
+		return;
+	}
+
+	connecton = dbus_g_connection_get_connection(conn);
+
+	msg = dbus_message_new_signal(BT_AGENT_OBJECT,
+				      BT_AGENT_INTERFACE,
+				      signal);
+
+	DBG("address: %s, name: %s", address, name);
+
+	if (!dbus_message_append_args(msg,
+				DBUS_TYPE_STRING, &address,
+				DBUS_TYPE_STRING, &name,
+				DBUS_TYPE_INVALID)) {
+		DBG("Authorize sending failed\n");
+		dbus_message_unref(msg);
+		dbus_g_connection_unref(conn);
+		return;
+	}
+
+	dbus_connection_send(connecton, msg, NULL);
+	dbus_message_unref(msg);
+	dbus_g_connection_unref(conn);
+
+	DBG("-");
+
+	return;
+}
+
 static gboolean __authorize_request(DBusGProxy *device, const char *uuid)
 {
 	GHashTable *hash = NULL;
-	GValue *value;
-	const gchar *address, *name;
+	GValue *value = NULL;
+	const gchar *address = NULL;
+	const gchar *name = NULL;
 	gboolean trust = FALSE;
+	gboolean paired = FALSE;
 	GError *error = NULL;
+	char *rfcomm_uuid = NULL;
+	int val = 0;
+	int request_type = BT_AGENT_EVENT_AUTHORIZE_REQUEST;
 
 	DBG("+\n");
 
@@ -414,21 +488,57 @@ static gboolean __authorize_request(DBusGProxy *device, const char *uuid)
 		value = g_hash_table_lookup(hash, "Trusted");
 		trust = value ? g_value_get_boolean(value) : 0;
 
+		value = g_hash_table_lookup(hash, "Paired");
+		paired = value ? g_value_get_boolean(value) : 0;
+
+		if (paired == FALSE) {
+			DBG("No paired device");
+			sc_core_agent_reply_authorize(_sc_core_agent_get_proxy(),
+						      SC_CORE_AGENT_REJECT, NULL);
+			return TRUE;
+		}
+
 		DBG("Authorization request for device [%s] Service:[%s]\n", address, uuid);
+
+		vconf_get_int(BT_MEMORY_OBEX_NO_AGENT, (void *)&val);
+
+		if (val == 1 && !strcasecmp(uuid, OPP_UUID)) {
+			/* Send dbus signal to FRWK */
+			__bt_send_autorize_message((char *)address,
+					(char *)name,
+					BT_AGENT_SIGNAL_OBEX_AUTHORIZE);
+
+			return TRUE;
+		}
+
+		rfcomm_uuid = vconf_get_str(BT_MEMORY_RFCOMM_UUID);
+
+		if (rfcomm_uuid && !strcasecmp(uuid, rfcomm_uuid)) {
+			DBG("rfcomm_uuid: %s, uuid: %s", rfcomm_uuid, uuid);
+			/* Send dbus signal to FRWK */
+			__bt_send_autorize_message((char *)address,
+					(char *)name,
+					BT_AGENT_SIGNAL_AUTHORIZE);
+			return TRUE;
+		}
+
+		if (!strcasecmp(uuid, OPP_UUID))
+			request_type = BT_AGENT_EVENT_EXCHANGE_REQUEST;
 
 		if (trust) {
 			DBG("Trusted device, so authorize\n");
 			sc_core_agent_reply_authorize(_sc_core_agent_get_proxy(),
 						      SC_CORE_AGENT_ACCEPT, NULL);
-		} else if (name != NULL)
-			_bt_agent_launch_system_popup(BT_AGENT_EVENT_AUTHORIZE_REQUEST,
+		} else if (name != NULL) {
+			_bt_agent_launch_system_popup(request_type,
 						     (const char *)name, NULL, NULL);
-		else if (address != NULL)
-			_bt_agent_launch_system_popup(BT_AGENT_EVENT_AUTHORIZE_REQUEST,
+		} else if (address != NULL) {
+			_bt_agent_launch_system_popup(request_type,
 						     (const char *)address, NULL, NULL);
-		else
+		} else {
 			sc_core_agent_reply_authorize(_sc_core_agent_get_proxy(),
 						      SC_CORE_AGENT_REJECT, NULL);
+		}
 	} else {
 		DBG("error in GetBasicProperties [%s]\n", error->message);
 		g_error_free(error);
@@ -512,13 +622,11 @@ void _bt_agent_register(DBusGProxy *adapter_proxy)
 	func_cb.ignore_auto_pairing_func = __ignore_auto_pairing_request;
 
 	if (_sc_core_agent_add(adapter_proxy, &func_cb) < 0) {
-		if (adapter_proxy == NULL) {
-			return;
-		}
-		ERR("Agent register failed, Agent finish.\n");
+		ERR("Agent not registered");
+		return;
 	}
 
-	DBG("Agent registered.\n");
+	DBG("Agent registered");
 }
 
 static const int __bt_agent_is_hid_keyboard(uint32_t dev_class)
@@ -589,6 +697,7 @@ static int __bt_agent_is_auto_response(uint32_t dev_class, const gchar *address)
 static int __bt_agent_generate_passkey(char *passkey, int size)
 {
 	int i = 0;
+	ssize_t len;
 	int random_fd = 0;
 	unsigned int value = 0;
 
@@ -604,7 +713,7 @@ static int __bt_agent_generate_passkey(char *passkey, int size)
 		return -1;
 
 	for (i = 0; i < size - 1; i++) {
-		read(random_fd, &value, sizeof(value));
+		len = read(random_fd, &value, sizeof(value));
 		passkey[i] = '0' + (value % 10);
 	}
 

@@ -32,6 +32,28 @@ static bluetooth_discovery_option_t discovery_option = { 0 };
 static int __bluetooth_internal_bonding_req(void);
 static void __bluetooth_internal_get_service_list(GValue *value, bluetooth_device_info_t *dev);
 
+static int __bt_launch_terminate_popup(void)
+{
+	int ret = 0;
+	bundle *b = NULL;
+
+	b = bundle_create();
+
+	if (b == NULL)
+		return BLUETOOTH_ERROR_INTERNAL;
+
+	bundle_add(b, "event-type", "terminate");
+
+	ret = syspopup_launch("bt-syspopup", b);
+
+	if (ret < 0)
+		DBG("Popup launch failed: %d\n", ret);
+
+	bundle_free(b);
+
+	return ret;
+}
+
 BT_EXPORT_API int bluetooth_check_adapter(void)
 {
 	int adapter_state = BLUETOOTH_ADAPTER_DISABLED;
@@ -182,7 +204,6 @@ static int __bluetooth_internal_enable_adapter(void *data)
 BT_EXPORT_API int bluetooth_enable_adapter(void)
 {
 	bt_info_t *bt_internal_info = NULL;
-	int value;
 
 	DBG("+\n");
 
@@ -418,11 +439,74 @@ BT_EXPORT_API int bluetooth_set_local_name(const bluetooth_device_name_t *local_
 	return ret;
 }
 
+BT_EXPORT_API int bluetooth_is_service_used(const char *service_uuid,
+						gboolean *used)
+{
+	bt_info_t *bt_internal_info = NULL;
+	char **uuids = NULL;
+	int i = 0;
+	GHashTable *hash = NULL;
+	GValue *value = NULL;
+
+	if (service_uuid == NULL) {
+		ERR("wrong parameter");
+		return BLUETOOTH_ERROR_INVALID_PARAM;
+	}
+
+	if (used == NULL) {
+		ERR("wrong parameter");
+		return BLUETOOTH_ERROR_INVALID_PARAM;
+	}
+
+	bt_internal_info = _bluetooth_internal_get_information();
+
+	if (_bluetooth_internal_is_adapter_enabled() == FALSE) {
+		DBG("Currently not enabled");
+		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
+	}
+
+	if (bt_internal_info->adapter_proxy == NULL) {
+		DBG("adapter_proxy is NULL");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	dbus_g_proxy_call(bt_internal_info->adapter_proxy, "GetProperties", NULL,
+			  G_TYPE_INVALID,
+			  dbus_g_type_get_map("GHashTable", G_TYPE_STRING, G_TYPE_VALUE),
+			  &hash, G_TYPE_INVALID);
+
+	if (hash == NULL) {
+		DBG("hash is NULL");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	value = g_hash_table_lookup(hash, "UUIDs");
+	uuids = g_value_get_boxed(value);
+
+	if (uuids == NULL) {
+		*used = FALSE;
+		return BLUETOOTH_ERROR_NONE;
+	}
+
+	for (i = 0; uuids[i] != NULL; i++) {
+		DBG("UUIDs %s ", uuids[i]);
+		if (strcasecmp(uuids[i], service_uuid) == 0) {
+			*used = TRUE;
+			return BLUETOOTH_ERROR_NONE;
+		}
+	}
+
+	*used = FALSE;
+
+	return BLUETOOTH_ERROR_NONE;
+}
+
 BT_EXPORT_API int bluetooth_get_discoverable_mode(bluetooth_discoverable_mode_t *
 						  discoverable_mode_ptr)
 {
 	DBG("+");
 	bt_info_t *bt_internal_info = NULL;
+	int timeout = 0;
 	GHashTable *hash = NULL;
 	GValue *value = NULL;
 	GValue *timeout_value = NULL;
@@ -436,7 +520,18 @@ BT_EXPORT_API int bluetooth_get_discoverable_mode(bluetooth_discoverable_mode_t 
 
 	if (_bluetooth_internal_is_adapter_enabled() == FALSE) {
 		DBG("Currently not enabled");
-		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
+		if (vconf_get_int(BT_FILE_VISIBLE_TIME, &timeout) != 0) {
+			DBG("Fail to get the timeout value");
+			return BLUETOOTH_ERROR_INTERNAL;
+		}
+
+		if (timeout == -1) {
+			*discoverable_mode_ptr = BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE;
+		} else {
+			*discoverable_mode_ptr = BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE;
+		}
+
+		return BLUETOOTH_ERROR_NONE;
 	}
 
 	if (bt_internal_info->adapter_proxy != NULL) {
@@ -514,12 +609,6 @@ BT_EXPORT_API int bluetooth_set_discoverable_mode(bluetooth_discoverable_mode_t 
 
 	}
 
-	/* Set discoverable Timer in agent */
-	dbus_g_proxy_call_no_reply(bt_internal_info->agent_proxy, "SetDiscoverableTimer",
-			G_TYPE_UINT, timeout,
-			G_TYPE_INVALID,
-			G_TYPE_INVALID);
-
 	g_value_set_boolean(&connectable, pg_scan);
 	g_value_set_boolean(&discoverable, inq_scan);
 	g_value_set_uint(&val_timeout, timeout);
@@ -531,7 +620,7 @@ BT_EXPORT_API int bluetooth_set_discoverable_mode(bluetooth_discoverable_mode_t 
 	if (error != NULL) {
 		DBG("Powered set err:[%s]", error->message);
 		g_error_free(error);
-		ret = BLUETOOTH_ERROR_INTERNAL;
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
 	dbus_g_proxy_call(bt_internal_info->adapter_proxy, "SetProperty", &error,
@@ -541,7 +630,7 @@ BT_EXPORT_API int bluetooth_set_discoverable_mode(bluetooth_discoverable_mode_t 
 	if (error != NULL) {
 		DBG("Discoverable set err:[%s]", error->message);
 		g_error_free(error);
-		ret = BLUETOOTH_ERROR_INTERNAL;
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
 	dbus_g_proxy_call(bt_internal_info->adapter_proxy, "SetProperty", &error,
@@ -551,8 +640,17 @@ BT_EXPORT_API int bluetooth_set_discoverable_mode(bluetooth_discoverable_mode_t 
 	if (error != NULL) {
 		DBG("Timeout set err:[%s]", error->message);
 		g_error_free(error);
-		ret = BLUETOOTH_ERROR_INTERNAL;
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
+
+	/* Set discoverable Timer in agent */
+	if (discoverable_mode == BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE)
+		timeout = -1;
+
+	dbus_g_proxy_call_no_reply(bt_internal_info->agent_proxy, "SetDiscoverableTimer",
+			G_TYPE_INT, timeout,
+			G_TYPE_INVALID,
+			G_TYPE_INVALID);
 
 	g_value_unset(&val_timeout);
 	g_value_unset(&connectable);
@@ -617,36 +715,36 @@ static bool __bluetooth_match_discovery_option(bluetooth_device_class_t device_c
 
 	/* Check the major class */
 	switch (device_class.major_class) {
-		case BLUETOOTH_DEVICE_MAJOR_CLASS_COMPUTER:
-			major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_COMPUTER;
-			break;
-		case BLUETOOTH_DEVICE_MAJOR_CLASS_PHONE:
-			major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_PHONE;
-			break;
-		case BLUETOOTH_DEVICE_MAJOR_CLASS_LAN_ACCESS_POINT:
-			major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_LAN_ACCESS_POINT;
-			break;
-		case BLUETOOTH_DEVICE_MAJOR_CLASS_AUDIO:
-			major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_AUDIO;
-			break;
-		case BLUETOOTH_DEVICE_MAJOR_CLASS_PERIPHERAL:
-			major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_PERIPHERAL;
-			break;
-		case BLUETOOTH_DEVICE_MAJOR_CLASS_IMAGING:
-			major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_IMAGING;
-			break;
-		case BLUETOOTH_DEVICE_MAJOR_CLASS_WEARABLE:
-			major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_WEARABLE;
-			break;
-		case BLUETOOTH_DEVICE_MAJOR_CLASS_TOY:
-			major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_TOY;
-			break;
-		case BLUETOOTH_DEVICE_MAJOR_CLASS_HEALTH:
-			major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_HEALTH;
-			break;
-		default:
-			major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_MISC;
-			break;
+	case BLUETOOTH_DEVICE_MAJOR_CLASS_COMPUTER:
+		major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_COMPUTER;
+		break;
+	case BLUETOOTH_DEVICE_MAJOR_CLASS_PHONE:
+		major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_PHONE;
+		break;
+	case BLUETOOTH_DEVICE_MAJOR_CLASS_LAN_ACCESS_POINT:
+		major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_LAN_ACCESS_POINT;
+		break;
+	case BLUETOOTH_DEVICE_MAJOR_CLASS_AUDIO:
+		major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_AUDIO;
+		break;
+	case BLUETOOTH_DEVICE_MAJOR_CLASS_PERIPHERAL:
+		major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_PERIPHERAL;
+		break;
+	case BLUETOOTH_DEVICE_MAJOR_CLASS_IMAGING:
+		major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_IMAGING;
+		break;
+	case BLUETOOTH_DEVICE_MAJOR_CLASS_WEARABLE:
+		major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_WEARABLE;
+		break;
+	case BLUETOOTH_DEVICE_MAJOR_CLASS_TOY:
+		major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_TOY;
+		break;
+	case BLUETOOTH_DEVICE_MAJOR_CLASS_HEALTH:
+		major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_HEALTH;
+		break;
+	default:
+		major_mask = BLUETOOTH_DEVICE_MAJOR_MASK_MISC;
+		break;
 	}
 
 	DBG("major_mask: %x", major_mask);
@@ -671,6 +769,9 @@ void _bluetooth_internal_remote_device_name_updated_cb(const char *address,
 
 	if (__bluetooth_match_discovery_option(dev_info.device_class,
 				discovery_option.classOfDeviceMask) == FALSE)
+		return;
+
+	if (name == NULL || address == NULL)
 		return;
 
 	_bluetooth_internal_convert_addr_string_to_addr_type(&dev_info.device_address, address);
@@ -731,6 +832,7 @@ BT_EXPORT_API int bluetooth_start_discovery(unsigned short max_response,
 	DBG("+");
 
 	bt_info_t *bt_internal_info = NULL;
+	DBusGProxy *adapter_proxy;
 
 	_bluetooth_internal_session_init();
 
@@ -759,14 +861,19 @@ BT_EXPORT_API int bluetooth_start_discovery(unsigned short max_response,
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	if (bt_internal_info->adapter_proxy == NULL)
+	adapter_proxy = _bluetooth_internal_get_adapter_proxy(bt_internal_info->conn);
+
+	if (adapter_proxy == NULL)
 		return BLUETOOTH_ERROR_INTERNAL;
 
-	if (!dbus_g_proxy_call(bt_internal_info->adapter_proxy, "StartDiscovery", NULL,
+	if (!dbus_g_proxy_call(adapter_proxy, "StartDiscovery", NULL,
 			       G_TYPE_INVALID, G_TYPE_INVALID)) {
 		DBG("Discover start failed");
+		g_object_unref(adapter_proxy);
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
+
+	g_object_unref(adapter_proxy);
 
 	if (bt_internal_info->bt_discovery_req_timer != 0) {
 		g_source_remove(bt_internal_info->bt_discovery_req_timer);
@@ -786,6 +893,7 @@ BT_EXPORT_API int bluetooth_cancel_discovery(void)
 	bt_info_t *bt_internal_info = NULL;
 	GError *error = NULL;
 	int ret = BLUETOOTH_ERROR_NONE;
+	DBusGProxy *adapter_proxy;
 
 	DBG("+");
 
@@ -798,12 +906,15 @@ BT_EXPORT_API int bluetooth_cancel_discovery(void)
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	if (bt_internal_info->adapter_proxy == NULL) {
-		return BLUETOOTH_ERROR_INTERNAL;
-	}
+	adapter_proxy = _bluetooth_internal_get_adapter_proxy(bt_internal_info->conn);
 
-	dbus_g_proxy_call(bt_internal_info->adapter_proxy, "StopDiscovery", &error,
+	if (adapter_proxy == NULL)
+		return BLUETOOTH_ERROR_INTERNAL;
+
+	dbus_g_proxy_call(adapter_proxy, "StopDiscovery", &error,
 			  G_TYPE_INVALID, G_TYPE_INVALID);
+
+	g_object_unref(adapter_proxy);
 
 	if (error) {
 		DBG("error in StopDiscovery [%s]\n", error->message);
@@ -831,6 +942,7 @@ BT_EXPORT_API int bluetooth_is_discovering(void)
 	GHashTable *hash = NULL;
 	GValue *value = NULL;
 	int is_discovering = 0;
+	DBusGProxy *adapter_proxy;
 
 	_bluetooth_internal_session_init();
 
@@ -841,18 +953,23 @@ BT_EXPORT_API int bluetooth_is_discovering(void)
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	if (bt_internal_info->adapter_proxy != NULL) {
-		dbus_g_proxy_call(bt_internal_info->adapter_proxy, "GetProperties", NULL,
-				  G_TYPE_INVALID,
-				  dbus_g_type_get_map("GHashTable", G_TYPE_STRING, G_TYPE_VALUE),
-				  &hash, G_TYPE_INVALID);
+	adapter_proxy = _bluetooth_internal_get_adapter_proxy(bt_internal_info->conn);
 
-		if (hash != NULL) {
-			value = g_hash_table_lookup(hash, "Discovering");
+	if (adapter_proxy == NULL)
+		return is_discovering;
 
-			if (value)
-				is_discovering = g_value_get_boolean(value);
-		}
+	dbus_g_proxy_call(adapter_proxy, "GetProperties", NULL,
+			  G_TYPE_INVALID,
+			  dbus_g_type_get_map("GHashTable", G_TYPE_STRING, G_TYPE_VALUE),
+			  &hash, G_TYPE_INVALID);
+
+	g_object_unref(adapter_proxy);
+
+	if (hash != NULL) {
+		value = g_hash_table_lookup(hash, "Discovering");
+
+		if (value)
+			is_discovering = (g_value_get_boolean(value) == FALSE) ? 0 : 1;
 	}
 
 	return is_discovering;
@@ -960,7 +1077,8 @@ static void __bluetooth_internal_bonding_req_reply_cb(int error_type,
 				bt_internal_info->is_headset_pin_req = TRUE;
 				bt_internal_info->is_bonding_req = FALSE;
 				bt_internal_info->is_headset_bonding = FALSE;
-				memset(bt_internal_info->bt_bonding_req_addrstr, 0x00, 18);
+				memset(bt_internal_info->bt_bonding_req_addrstr,
+						0x00, BT_ADDRESS_STRING_SIZE);
 
 				bluetooth_bond_device(&device_address);
 				return;
@@ -971,7 +1089,7 @@ static void __bluetooth_internal_bonding_req_reply_cb(int error_type,
 	bt_internal_info->is_headset_pin_req = FALSE;
 	bt_internal_info->is_bonding_req = FALSE;
 	bt_internal_info->is_headset_bonding = FALSE;
-	memset(bt_internal_info->bt_bonding_req_addrstr, 0x00, 18);
+	memset(bt_internal_info->bt_bonding_req_addrstr, 0x00, BT_ADDRESS_STRING_SIZE);
 
 	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_BONDING_FINISHED,
 					error_type, (void *)device_info);
@@ -983,7 +1101,7 @@ void _bluetooth_internal_bonding_created_cb(const char *bond_address, gpointer u
 	int remote_class = 0;
 	gboolean trust = FALSE;
 
-	DBusGProxy *device_proxy = (DBusGProxy *) user_data;
+	DBusGProxy *device_proxy = (DBusGProxy *)user_data;
 	GHashTable *hash = NULL;
 	GValue *value = NULL;
 	GValue *uuid_value = NULL;
@@ -1187,6 +1305,9 @@ static void __bluetooth_internal_bonding_req_finish_cb(DBusGProxy *proxy, DBusGP
 						(gpointer)device_proxy);
 	}
 
+	/* Terminate the BT system popup (In the keyboard case) */
+	__bt_launch_terminate_popup();
+
 	DBG("-");
 }
 
@@ -1220,12 +1341,12 @@ BT_EXPORT_API int bluetooth_oob_read_local_data(bt_oob_data_t *local_oob_data)
 					bt_internal_info->conn);
 	}
 
-	msg = dbus_message_new_method_call("org.bluez",
+	msg = dbus_message_new_method_call(BLUEZ_SERVICE_NAME,
 					bt_internal_info->adapter_path,
 					"org.bluez.OutOfBand",
 					"ReadLocalData");
 
-	if(msg == NULL)
+	if (msg == NULL)
 		return BLUETOOTH_ERROR_INTERNAL;
 
 	dbus_error_init(&err);
@@ -1296,7 +1417,7 @@ BT_EXPORT_API int bluetooth_oob_add_remote_data(
 	_bluetooth_internal_addr_type_to_addr_string(address,
 		remote_device_address);
 
-	msg = dbus_message_new_method_call("org.bluez",
+	msg = dbus_message_new_method_call(BLUEZ_SERVICE_NAME,
 			bt_internal_info->adapter_path,
 			"org.bluez.OutOfBand",
 			"AddRemoteData");
@@ -1368,7 +1489,7 @@ BT_EXPORT_API int bluetooth_oob_remove_remote_data(
 	const char *dev_addr = g_strdup(address);
 	DBG("dev_addr = [%s]\n", dev_addr);
 
-	msg = dbus_message_new_method_call("org.bluez",
+	msg = dbus_message_new_method_call(BLUEZ_SERVICE_NAME,
 			bt_internal_info->adapter_path,
 			"org.bluez.OutOfBand",
 			"RemoveRemoteData");
@@ -1537,7 +1658,7 @@ static void __bluetooth_internal_unbond_request_complete_cb(DBusGProxy *proxy, D
 
 	dbus_g_proxy_end_call(proxy, call, &err, G_TYPE_INVALID);
 
-	device_address = (bluetooth_device_address_t *) user_data;
+	device_address = (bluetooth_device_address_t *)user_data;
 
 	if (err != NULL) {
 		DBG("Error occured in RemoveBonding [%s]\n", err->message);
@@ -1583,9 +1704,9 @@ BT_EXPORT_API int bluetooth_unbond_device(const bluetooth_device_address_t *devi
 
 	_bluetooth_internal_addr_type_to_addr_string(address, device_address);
 
-	/*allocate user data so that it can be retrieved in callback */
+	/* allocate user data so that it can be retrieved in callback */
 	bluetooth_address =
-	    (bluetooth_device_address_t *) malloc(sizeof(bluetooth_device_address_t));
+	    (bluetooth_device_address_t *)malloc(sizeof(bluetooth_device_address_t));
 	if (bluetooth_address == NULL) {
 		DBG("Out of memory");
 		return BLUETOOTH_ERROR_INTERNAL;
@@ -1600,7 +1721,7 @@ BT_EXPORT_API int bluetooth_unbond_device(const bluetooth_device_address_t *devi
 	if (device_path != NULL) {
 		if (!dbus_g_proxy_begin_call(bt_internal_info->adapter_proxy, "RemoveDevice",
 			(DBusGProxyCallNotify) __bluetooth_internal_unbond_request_complete_cb,
-			(gpointer) bluetooth_address, NULL, DBUS_TYPE_G_OBJECT_PATH, device_path,
+			(gpointer)bluetooth_address, NULL, DBUS_TYPE_G_OBJECT_PATH, device_path,
 			G_TYPE_INVALID)) {
 			DBG("RemoveBonding begin failed\n");
 			return BLUETOOTH_ERROR_INTERNAL;
@@ -1730,8 +1851,9 @@ static int __bluetooth_internal_get_bonded_device_list_details(gchar *device_pat
 
 		_bluetooth_internal_convert_addr_string_to_addr_type(&dev->device_address,
 								    address);
-		strncpy(dev->device_name.name, name, strlen(name));
-		dev->device_name.name[strlen(name)] = '\0';
+		g_strlcpy(dev->device_name.name, name,
+				BLUETOOTH_DEVICE_NAME_LENGTH_MAX+1);
+
 		dev->rssi = rssi;
 		dev->trust = trust;
 		dev->paired = paired;

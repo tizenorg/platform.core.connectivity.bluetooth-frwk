@@ -74,8 +74,6 @@ static void __bluetooth_internal_get_remote_device_uuids_cb(DBusGProxy *proxy, D
 	GHashTable *hash;
 	GValue *value = { 0 };
 	int result = BLUETOOTH_ERROR_NONE;
-	bluetooth_event_param_t bt_event = { 0, };
-	bt_info_t *bt_internal_info = NULL;
 
 	DBG("+\n");
 
@@ -132,7 +130,7 @@ static void __bluetooth_internal_get_remote_device_uuids_cb(DBusGProxy *proxy, D
 	g_strfreev(array_list);
 
  done:
-		
+
 	if (0 > ret) {
 		result = BLUETOOTH_ERROR_SERVICE_SEARCH_ERROR;
 		device_uuids.service_index = 0x00;
@@ -175,208 +173,6 @@ static void __bluetooth_internal_device_created_for_sdp_cb(DBusGProxy *proxy, DB
 	DBG("-\n");
 
 	return;
-}
-
-static int __bluetooth_internal_parse_sdp_xml(const char *buf_name, int size,
-						bt_sdp_info_t *xml_parsed_sdp);
-
-static gboolean __bluetooth_internal_get_service_rec_handle_from_node(xmlNodePtr xml_node,
-								unsigned int *record_handle);
-static gboolean __bluetooth_internal_get_service_class_id_list_from_node(xmlNodePtr xml_node,
-								       bt_sdp_info_t *sdp_info);
-
-static gboolean __bluetooth_internal_get_service_class_id_list_from_node(xmlNodePtr xml_node,
-									bt_sdp_info_t *sdp_info)
-{
-	xmlNodePtr local_node;
-	xmlAttr *uuid_attr;
-	xmlNodePtr uuid_node;
-
-	if (xml_node == NULL || sdp_info == NULL)
-		return FALSE;
-
-	local_node = xml_node->next;
-
-	while (local_node) {
-		if (!strcmp((char *)local_node->name, "sequence")) {
-			DBG("\t\t %s\n", local_node->name);
-			uuid_node = local_node->xmlChildrenNode;
-			uuid_node = uuid_node->next;
-
-			if (uuid_node) {
-				uuid_attr = uuid_node->properties;
-				DBG("\t\t\t%s, %s\n", uuid_node->name,
-				    uuid_attr->children->content);
-
-				if (sdp_info->service_index < BLUETOOTH_MAX_SERVICES_FOR_DEVICE) {
-					DBG("sdp_info->service_index %d", sdp_info->service_index);
-					g_strlcpy(sdp_info->uuids[sdp_info->service_index],
-							(const gchar *)uuid_attr->children->content,
-							BLUETOOTH_UUID_STRING_MAX);
-
-					sdp_info->service_list_array[sdp_info->service_index] =
-							strtol((char *)uuid_attr->children->content,
-											 NULL, 0);
-					sdp_info->service_index++;
-				} else {
-					DBG("service index(%d) is more than"
-							"BLUETOOTH_MAX_SERVICES_FOR_DEVICE",
-									sdp_info->service_index);
-				}
-
-			}
-		}
-		local_node = local_node->next;
-	}
-	return TRUE;
-}
-
-static gboolean __bluetooth_internal_get_service_rec_handle_from_node(xmlNodePtr xml_node,
-								unsigned int *record_handle) {
-	xmlNodePtr local_node;
-	xmlAttr *local_attr;
-
-	if (xml_node == NULL || record_handle == NULL)
-		return FALSE;
-
-	local_node = xml_node->next;
-
-	if (local_node) {
-		if (!strcmp((char *)local_node->name, "uint32")) {
-			local_attr = local_node->properties;
-			DBG("\t\t%s, %s\n", local_node->name, local_attr->children->content);
-			*record_handle = strtol((char *)local_attr->children->content, NULL, 0);
-		}
-	}
-	return TRUE;
-}
-
-static int __bluetooth_internal_parse_xml_parse_record(xmlNodePtr cur,
-						     bt_sdp_info_t *xml_parsed_sdp_data)
-{
-	xmlNodePtr icur;
-
-	icur = cur;
-	icur = icur->xmlChildrenNode;
-	xmlAttr *attr = NULL;
-
-	unsigned int attribute_value = 0;
-	unsigned int record_handle = 0;
-
-	while (icur) {
-		attr = icur->properties;
-
-		if (strcmp((char *)icur->name, "attribute")) {
-			icur = icur->next;
-			continue;
-		}
-
-		DBG("%s\n", icur->name);
-		while (attr) {
-			if (strcmp((char *)attr->name, "id")) {
-				attr = attr->next;
-				continue;
-			}
-			DBG("\t%s, %s\n", attr->name, attr->children->content);
-			attribute_value = strtol((char *)attr->children->content, NULL, 0);
-
-			switch (attribute_value) {
-			case SERVICE_RECORD_HANDLE:
-				DBG("\tSERVICE_RECORD_HANDLE:\n");
-				__bluetooth_internal_get_service_rec_handle_from_node
-				    (icur->xmlChildrenNode, &record_handle);
-				DBG("\tRecord Handle 0x%04x \n", record_handle);
-				break;
-
-			case SERVICE_CLASS_ID_LIST:
-				DBG("\tSERVICE_CLASS_ID_LIST:\n");
-				__bluetooth_internal_get_service_class_id_list_from_node
-				    (icur->xmlChildrenNode, xml_parsed_sdp_data);
-				break;
-
-			case PROTOCOL_DESCRIPOTR_LIST:
-				break;
-
-			case BLUETOOTH_PROFILE_DESCRIPTOR_LIST:
-				break;
-
-			default:
-				break;
-
-			}
-			attr = attr->next;
-		}
-		icur = icur->next;
-	}
-	return TRUE;
-}
-
-static int __bluetooth_internal_parse_sdp_xml(const char *buf_name, int size,
-					    bt_sdp_info_t *xml_parsed_sdp)
-{
-	xmlDocPtr doc;
-	xmlNodePtr first;
-	xmlNodePtr base;
-	xmlInitParser();
-
-	char *check = NULL;
-
-	DBG("+\n");
-
-	/*Below check is done for proper parsing of BPP service UUID, in case of BPP '&' gets
-	appended to text value parameter of service list, when '&' containing data  is passed
-	to function "xmlParseMemory()" parse error occurs. so '&' is replaced with blank space ' '*/
-	if (buf_name != NULL) {
-		check = strchr(buf_name, '&');
-		if (check != NULL) {
-			*check = ' ';
-		}
-	}
-
-	if (size != 0) {
-		doc = xmlParseMemory(buf_name, size);
-	} else
-		return -1;
-
-	if (doc == NULL) {
-		DBG("Document not parsed successfully.\n");
-		return -1;
-	}
-
-	DBG("Document parsed successfully.\n");
-
-	first = xmlDocGetRootElement(doc);
-
-	if (first == NULL) {
-		DBG("Root element = NULL \n");
-		xmlFreeDoc(doc);
-		return -1;
-	}
-
-	base = first;
-	if (base == NULL) {
-		DBG("empty document\n");
-		xmlFreeDoc(doc);
-
-		xmlCleanupParser();
-		return -1;
-	} else {
-		DBG("Root - %s\n", first->name);
-	}
-	while (base != NULL) {
-		DBG(" Main While %s\n", base->name);
-
-		__bluetooth_internal_parse_xml_parse_record(base, xml_parsed_sdp);
-		base = base->next;
-
-	}
-
-	xmlFreeDoc(doc);
-
-	xmlCleanupParser();
-	DBG("-\n");
-
-	return 0;
 }
 
 static void __bluetooth_internal_discover_services_cb(DBusGProxy *proxy, DBusGProxyCall *call,
@@ -460,7 +256,7 @@ static void __bluetooth_internal_discover_services_cb(DBusGProxy *proxy, DBusGPr
 		result = BLUETOOTH_ERROR_SERVICE_SEARCH_ERROR;
 		sdp_data.service_index = 0;
 	} else if (sdp_data.service_index == 0) {
-		/*This is for some carkit, printer.*/
+			/*This is for some carkit, printer.*/
 		__bluetooth_internal_request_search_supported_services(
 			&bt_info_for_searching_support_service->remote_device_addr);
 		return;

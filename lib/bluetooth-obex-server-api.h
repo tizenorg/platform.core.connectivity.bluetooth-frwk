@@ -32,6 +32,8 @@ extern "C" {
 
 #define FILE_PATH_LEN (4096 + 10)
 
+#define BT_VCONF_OPP_SERVER_INIT "memory/private/bluetooth-share/opp_server_init"
+
 #define OBEX_SERVER_SERVICE "org.openobex"
 #define OBEX_SERVER_MANAGER "org.openobex.Manager"
 #define BT_OBEX_SERVICE_INTERFACE "org.openobex.Agent"
@@ -52,13 +54,14 @@ typedef enum {
 
 typedef struct {
 	DBusGConnection *bus;
+	DBusGConnection *system_bus;
 	void *obex_server_agent;
 	DBusGProxy *obex_proxy;
 	DBusGMethodInvocation *reply_context;
 	char *filename;
 	char *transfer_path;
 	char *device_name;
- 	int file_size;
+	int file_size;
 } obex_server_info_t;
 
 typedef enum {

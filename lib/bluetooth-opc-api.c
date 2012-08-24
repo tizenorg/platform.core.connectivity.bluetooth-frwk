@@ -21,17 +21,17 @@
  *
  */
 
-#include "bluetooth-api-common.h"
-#include "bluetooth-opc-api.h"
-
-#include "obex-agent.h"
-#include <sys/time.h>
 #include <dbus/dbus-glib.h>
 #include <unistd.h>
 #include <fcntl.h>
 
+#include "bluetooth-api-common.h"
+#include "bluetooth-opc-api.h"
+#include "obex-agent.h"
+
 static ObexAgent *opc_obex_agent = NULL;
 static DBusGProxy *client_proxy = NULL;
+static DBusGProxyCall *call_proxy = NULL;
 static DBusGProxy *current_transfer = NULL;
 
 static gboolean cancel_sending_files = FALSE;
@@ -140,9 +140,10 @@ BT_EXPORT_API int bluetooth_opc_push_files(bluetooth_device_address_t *remote_ad
 	char address[BT_BD_ADDR_MAX_LEN] = { 0 };
 	char agent_path[100] = {0};
 
-	if (remote_address == NULL || file_name_array == NULL)
+	if ((NULL == remote_address) || (NULL == file_name_array)) {
+		DBG("Invalid Param\n");
 		return BLUETOOTH_ERROR_INVALID_PARAM;
-
+	}
 	_bluetooth_internal_session_init();
 
 	if (FALSE == _bluetooth_internal_is_adapter_enabled()) {
@@ -160,11 +161,6 @@ BT_EXPORT_API int bluetooth_opc_push_files(bluetooth_device_address_t *remote_ad
 		return BLUETOOTH_ERROR_IN_PROGRESS;
 	}
 
-	if ((NULL == remote_address) || (NULL == file_name_array)) {
-		DBG("Invalid Param\n");
-		return BLUETOOTH_ERROR_INVALID_PARAM;
-	}
-
 	snprintf(agent_path, sizeof(agent_path), OBEX_CLIENT_AGENT_PATH,
 				getpid(), g_counter++);
 
@@ -174,7 +170,7 @@ BT_EXPORT_API int bluetooth_opc_push_files(bluetooth_device_address_t *remote_ad
 	}
 
 	hash = g_hash_table_new_full(g_str_hash, g_str_equal,
-				     g_free, (GDestroyNotify) __bt_value_free);
+				     NULL, (GDestroyNotify)__bt_value_free);
 
 	_bluetooth_internal_print_bluetooth_device_address_t(remote_address);
 
@@ -187,22 +183,50 @@ BT_EXPORT_API int bluetooth_opc_push_files(bluetooth_device_address_t *remote_ad
 
 	cancel_sending_files = FALSE;
 
-	if (!dbus_g_proxy_begin_call(client_proxy, "SendFiles",
+	call_proxy = dbus_g_proxy_begin_call(client_proxy, "SendFiles",
 				__bt_send_files_cb, NULL, NULL,
 				dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
 						    G_TYPE_VALUE), hash,
 				G_TYPE_STRV, file_name_array,
 				DBUS_TYPE_G_OBJECT_PATH, agent_path,
-				G_TYPE_INVALID)) {
-				DBG("SendFiles failed \n");
-				g_object_unref(opc_obex_agent);
-				opc_obex_agent = NULL;
-				return BLUETOOTH_ERROR_INTERNAL;
+				G_TYPE_INVALID);
+	if (call_proxy == NULL) {
+			DBG("SendFiles failed \n");
+			g_object_unref(opc_obex_agent);
+			opc_obex_agent = NULL;
+			g_hash_table_destroy(hash);
+			return BLUETOOTH_ERROR_INTERNAL;
 	}
+
+	g_free(opc_current_transfer.address);
+	opc_current_transfer.address = g_strdup(address);
+
+	g_hash_table_destroy(hash);
 
 	DBG("- \n");
 	return BLUETOOTH_ERROR_NONE;
 
+}
+
+static gboolean cancel_connect_cb(gpointer data)
+{
+	bluetooth_device_address_t device_addr = { {0} };
+	DBG("+");
+
+	_bluetooth_internal_convert_addr_string_to_addr_type(&device_addr,
+						opc_current_transfer.address);
+
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OPC_CONNECTED,
+				BLUETOOTH_ERROR_CANCEL_BY_USER, &device_addr);
+
+	g_object_unref(opc_obex_agent);
+	opc_obex_agent = NULL;
+
+	g_free(opc_current_transfer.address);
+	opc_current_transfer.address = NULL;
+
+	DBG("-");
+	return FALSE;
 }
 
 BT_EXPORT_API int bluetooth_opc_cancel_push(void)
@@ -223,9 +247,17 @@ BT_EXPORT_API int bluetooth_opc_cancel_push(void)
 
 	cancel_sending_files = TRUE;
 
-	if (current_transfer)
-		dbus_g_proxy_call_no_reply(current_transfer, "Cancel", G_TYPE_INVALID,
-				   G_TYPE_INVALID);
+	if (current_transfer) {
+		dbus_g_proxy_call_no_reply(current_transfer, "Cancel",
+					G_TYPE_INVALID, G_TYPE_INVALID);
+	} else {
+		if (call_proxy) {
+			dbus_g_proxy_cancel_call(client_proxy, call_proxy);
+			call_proxy = NULL;
+
+			g_idle_add(cancel_connect_cb, NULL);
+		}
+	}
 
 	DBG("-");
 	return BLUETOOTH_ERROR_NONE;
@@ -292,30 +324,35 @@ static void __bt_send_files_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 				void *user_data)
 {
 	GError *error = NULL;
+	bluetooth_device_address_t device_addr = { {0} };
 	int result = BLUETOOTH_ERROR_NONE;
 
 	DBG("+");
 
+	_bluetooth_internal_convert_addr_string_to_addr_type(&device_addr,
+						opc_current_transfer.address);
+
 	if (dbus_g_proxy_end_call(proxy, call, &error,
-				G_TYPE_INVALID) == FALSE) {
+					G_TYPE_INVALID) == FALSE) {
 
 		DBG("%s", error->message);
 
 		g_error_free(error);
 
+		g_object_unref(opc_obex_agent);
+		opc_obex_agent = NULL;
+
+		g_free(opc_current_transfer.address);
+		opc_current_transfer.address = NULL;
+
 		result = BLUETOOTH_ERROR_SERVICE_NOT_FOUND;
 	}
 
-	if (TRUE == cancel_sending_files)
-		result = BLUETOOTH_ERROR_CANCEL_BY_USER;
-
-	if (result != BLUETOOTH_ERROR_NONE) {
-		g_object_unref(opc_obex_agent);
-		opc_obex_agent = NULL;
-	}
-
 	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OPC_CONNECTED,
-						result, NULL);
+			result, &device_addr);
+
+	call_proxy = NULL;
+
 	DBG("-");
 }
 
@@ -325,7 +362,7 @@ static gboolean __bt_progress_callback(DBusGMethodInvocation *context,
 					gpointer user_data)
 {
 	gdouble percentage_progress = 0;
-	int percentage_int = 0;
+	bt_opc_transfer_info_t info;
 
 	DBG("+");
 	DBG("transferred:[%ld] \n", transferred);
@@ -337,10 +374,12 @@ static gboolean __bt_progress_callback(DBusGMethodInvocation *context,
 	else
 		percentage_progress = 0;
 
-	percentage_int = percentage_progress;
+	info.filename = opc_current_transfer.name;
+	info.size = opc_current_transfer.size;
+	info.percentage = percentage_progress;
 
 	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OPC_TRANSFER_PROGRESS,
-						BLUETOOTH_ERROR_NONE, &percentage_int);
+						BLUETOOTH_ERROR_NONE, &info);
 
 	DBG("-");
 
@@ -396,6 +435,7 @@ static gboolean __bt_request_callback(DBusGMethodInvocation *context,
 {
 	g_assert(current_transfer == NULL);
 	bt_opc_transfer_info_t info;
+	bluetooth_device_address_t device_addr = { {0} };
 	GHashTable *hash = NULL;
 	GError *error;
 
@@ -409,10 +449,19 @@ static gboolean __bt_request_callback(DBusGMethodInvocation *context,
 		error = __bt_opc_agent_error(BT_OBEX_AGENT_ERROR_CANCEL, "CancelledByUser");
 		dbus_g_method_return_error(context, error);
 		g_error_free(error);
+
+		_bluetooth_internal_convert_addr_string_to_addr_type(&device_addr,
+							opc_current_transfer.address);
+
 		g_object_unref(opc_obex_agent);
 		opc_obex_agent = NULL;
+
+		g_free(opc_current_transfer.address);
+		opc_current_transfer.address = NULL;
+
 		_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OPC_DISCONNECTED,
-						BLUETOOTH_ERROR_CANCEL_BY_USER, NULL);
+						BLUETOOTH_ERROR_CANCEL_BY_USER, &device_addr);
+
 		return TRUE;
 	} else {
 		dbus_g_method_return(context, "");
@@ -456,6 +505,8 @@ static gboolean __bt_release_callback(DBusGMethodInvocation *context,
 {
 	DBG("+");
 
+	bluetooth_device_address_t device_addr = { {0} };
+
 	dbus_g_method_return(context);
 
 	if (current_transfer) {
@@ -463,14 +514,23 @@ static gboolean __bt_release_callback(DBusGMethodInvocation *context,
 		current_transfer = NULL;
 	}
 
-	g_object_unref(opc_obex_agent);
+	_bluetooth_internal_convert_addr_string_to_addr_type(&device_addr,
+						opc_current_transfer.address);
+
+	/*
+		here opc_obex_agent is just assigned to NULL, since it is being freed at
+		obex_agent_release()
+	*/
 	opc_obex_agent = NULL;
+
+	g_free(opc_current_transfer.address);
+	opc_current_transfer.address = NULL;
 
 	/*release */
 	__bt_free_obexd_transfer_hierarchy(&opc_current_transfer);
 
 	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OPC_DISCONNECTED,
-						BLUETOOTH_ERROR_NONE, NULL);
+						BLUETOOTH_ERROR_NONE, &device_addr);
 	DBG("-");
 
 	return TRUE;
@@ -483,6 +543,7 @@ static gboolean __bt_error_callback(DBusGMethodInvocation *context,
 {
 	int result = BLUETOOTH_ERROR_NONE;
 	bt_opc_transfer_info_t info;
+	bluetooth_device_address_t device_addr = { {0} };
 	DBG("+ \n");
 
 	DBG("message:[%s] \n", message);
@@ -517,11 +578,18 @@ static gboolean __bt_error_callback(DBusGMethodInvocation *context,
 
 	if (TRUE == cancel_sending_files)  {
 		/* User cancelled or Remote device is switched off / memory full*/
+
+		_bluetooth_internal_convert_addr_string_to_addr_type(&device_addr,
+							opc_current_transfer.address);
+
 		g_object_unref(opc_obex_agent);
 		opc_obex_agent = NULL;
 
+		g_free(opc_current_transfer.address);
+		opc_current_transfer.address = NULL;
+
 		_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OPC_DISCONNECTED,
-						result, NULL);
+						result, &device_addr);
 	}
 
 	DBG("- \n");

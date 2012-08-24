@@ -36,9 +36,13 @@ extern "C" {
 #define BLUEZ_HDP_CHANNEL_INTERFACE  "org.bluez.HealthChannel"
 
 typedef struct {
-	void *app_handle;
-	void *obj_channel_path;
+	char *obj_channel_path;
 	int fd;
+} hdp_obj_info_t;
+
+typedef struct {
+	void *app_handle;
+	GSList *obj_info;
 } hdp_app_list_t;
 
 

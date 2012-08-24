@@ -28,10 +28,6 @@
 *                                      Static Functions declaration    *
 ***********************************************************************/
 
-static void __bluetooth_network_activate_request_cb(DBusGProxy *proxy, DBusGProxyCall *call,
-						  gpointer user_data);
-static void __bluetooth_network_deactivate_request_cb(DBusGProxy *proxy, DBusGProxyCall *call,
-						    gpointer user_data);
 static void __bluetooth_network_connect_request_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 						 gpointer user_data);
 static void __bluetooth_network_disconnect_request_cb(DBusGProxy *proxy, DBusGProxyCall *call,
@@ -54,6 +50,7 @@ BT_EXPORT_API int bluetooth_network_activate_server(void)
 	GError *err = NULL;
 	DBusGConnection *conn = NULL;
 	DBusGProxy *proxy_net_server = NULL;
+	int ret = BLUETOOTH_ERROR_NONE;
 	char default_adapter_path[BT_ADAPTER_OBJECT_PATH_MAX + 1] = { 0 };
 
 	conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, &err);
@@ -65,14 +62,15 @@ BT_EXPORT_API int bluetooth_network_activate_server(void)
 	}
 
 	/* If the adapter path is wrong, we can think the BT is not enabled. */
-	if (_bluetooth_internal_get_adapter_path(conn, default_adapter_path) < 0) {
+	if (_bluetooth_internal_get_adapter_path(conn,
+					default_adapter_path) < 0) {
 		DBG("Could not get adapter path\n");
 		dbus_g_connection_unref(conn);
 		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
 	}
 
-	proxy_net_server = dbus_g_proxy_new_for_name(conn, "org.bluez",
-						     default_adapter_path, BLUEZ_NET_SERVER_PATH);
+	proxy_net_server = dbus_g_proxy_new_for_name(conn, BLUEZ_SERVICE_NAME,
+			     default_adapter_path, BLUEZ_NET_SERVER_PATH);
 
 	if (proxy_net_server == NULL) {
 		DBG("Failed to get the network server proxy\n");
@@ -80,24 +78,21 @@ BT_EXPORT_API int bluetooth_network_activate_server(void)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	if (!dbus_g_proxy_begin_call(proxy_net_server, "Register",
-			(DBusGProxyCallNotify) __bluetooth_network_activate_request_cb,
-			conn,/*user data*/
-			NULL, /*destroy*/
-			G_TYPE_STRING,
-			NAP_UUID_NAME,/*first_arg_type*/
-			G_TYPE_STRING,
-			NET_BRIDGE_INTERFACE,/*second_arg_type*/
+	if (!dbus_g_proxy_call(proxy_net_server, "Register", &err,
+			G_TYPE_STRING, NAP_UUID_NAME, /*first_arg */
+			G_TYPE_STRING, NET_BRIDGE_INTERFACE,/*second_arg */
 			G_TYPE_INVALID)) {
-		DBG("Network server register Dbus Call Error");
-		g_object_unref(proxy_net_server);
-		dbus_g_connection_unref(conn);
-		return BLUETOOTH_ERROR_INTERNAL;
+		DBG("Network server register Error: %s\n", err->message);
+		g_error_free(err);
+		ret = BLUETOOTH_ERROR_INTERNAL;
 	}
+
+	g_object_unref(proxy_net_server);
+	dbus_g_connection_unref(conn);
 
 	DBG("-\n");
 
-	return BLUETOOTH_ERROR_NONE;
+	return ret;
 }
 
 BT_EXPORT_API int bluetooth_network_deactivate_server(void)
@@ -107,6 +102,7 @@ BT_EXPORT_API int bluetooth_network_deactivate_server(void)
 	GError *err = NULL;
 	DBusGConnection *conn = NULL;
 	DBusGProxy *proxy_net_server = NULL;
+	int ret = BLUETOOTH_ERROR_NONE;
 	char default_adapter_path[BT_ADAPTER_OBJECT_PATH_MAX + 1] = { 0 };
 
 	conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, &err);
@@ -118,14 +114,15 @@ BT_EXPORT_API int bluetooth_network_deactivate_server(void)
 	}
 
 	/* If the adapter path is wrong, we can think the BT is not enabled. */
-	if (_bluetooth_internal_get_adapter_path(conn, default_adapter_path) < 0) {
+	if (_bluetooth_internal_get_adapter_path(conn,
+					default_adapter_path) < 0) {
 		DBG("Could not get adapter path\n");
 		dbus_g_connection_unref(conn);
 		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
 	}
 
-	proxy_net_server = dbus_g_proxy_new_for_name(conn, "org.bluez",
-						     default_adapter_path, BLUEZ_NET_SERVER_PATH);
+	proxy_net_server = dbus_g_proxy_new_for_name(conn, BLUEZ_SERVICE_NAME,
+			     default_adapter_path, BLUEZ_NET_SERVER_PATH);
 
 	if (proxy_net_server == NULL) {
 		DBG("Failed to get the network server proxy\n");
@@ -133,75 +130,20 @@ BT_EXPORT_API int bluetooth_network_deactivate_server(void)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	if (!dbus_g_proxy_begin_call(proxy_net_server, "Unregister",
-				(DBusGProxyCallNotify) __bluetooth_network_deactivate_request_cb,
-				conn,	/*user_data*/
-				NULL,	/*destroy*/
-				G_TYPE_STRING, NAP_UUID_NAME,	/*first_arg_type*/
-				G_TYPE_INVALID)) {
-		DBG("Network server deregister Dbus Call Error");
-		g_object_unref(proxy_net_server);
-		dbus_g_connection_unref(conn);
-		return BLUETOOTH_ERROR_INTERNAL;
+	if (!dbus_g_proxy_call(proxy_net_server, "Unregister", &err,
+			G_TYPE_STRING, NAP_UUID_NAME, /*first_arg */
+			G_TYPE_INVALID)) {
+		DBG("Network server unregister Error: %s\n", err->message);
+		g_error_free(err);
+		ret = BLUETOOTH_ERROR_INTERNAL;
 	}
+
+	g_object_unref(proxy_net_server);
+	dbus_g_connection_unref(conn);
 
 	DBG("-\n");
 
-	return BLUETOOTH_ERROR_NONE;
-}
-
-static void __bluetooth_network_activate_request_cb(DBusGProxy *proxy, DBusGProxyCall *call,
-						  gpointer user_data)
-{
-	GError *g_error = NULL;
-	int result = BLUETOOTH_ERROR_NONE;
-	DBusGConnection *conn = NULL;
-
-	conn = (DBusGConnection *) user_data;
-
-	dbus_g_proxy_end_call(proxy, call, &g_error, G_TYPE_INVALID);
-
-	g_object_unref(proxy);
-	dbus_g_connection_unref(conn);
-
-	if (g_error != NULL) {
-		DBG("Network server register Dbus Call Error: %s\n", g_error->message);
-		g_error_free(g_error);
-		result = BLUETOOTH_ERROR_INTERNAL;
-	} else {
-		DBG("Network server register Dbus Call is done\n");
-	}
-
-	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_NETWORK_SERVER_ACTIVATED,
-					result, NULL);
-
-}
-
-static void __bluetooth_network_deactivate_request_cb(DBusGProxy *proxy, DBusGProxyCall *call,
-						    gpointer user_data)
-{
-	GError *g_error = NULL;
-	int result = BLUETOOTH_ERROR_NONE;
-	DBusGConnection *conn = NULL;
-
-	conn = (DBusGConnection *) user_data;
-
-	dbus_g_proxy_end_call(proxy, call, &g_error, G_TYPE_INVALID);
-
-	g_object_unref(proxy);
-	dbus_g_connection_unref(conn);
-
-	if (g_error != NULL) {
-		DBG("Network server unregister Dbus Call Error: %s\n", g_error->message);
-		g_error_free(g_error);
-		result = BLUETOOTH_ERROR_INTERNAL;
-	} else {
-		DBG("Network server unregister Dbus Call is done\n");
-	}
-
-	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_NETWORK_SERVER_DEACTIVATED,
-					result, NULL);
-
+	return ret;
 }
 
 void _bluetooth_network_server_add_signal(void)
@@ -225,7 +167,7 @@ void _bluetooth_network_server_add_signal(void)
 
 	/* Add the network server signal */
 	bt_internal_info->network_server_proxy =
-	    dbus_g_proxy_new_for_name(bt_internal_info->conn, "org.bluez",
+	    dbus_g_proxy_new_for_name(bt_internal_info->conn, BLUEZ_SERVICE_NAME,
 				      bt_internal_info->adapter_path, BLUEZ_NET_SERVER_PATH);
 
 	dbus_g_proxy_add_signal(bt_internal_info->network_server_proxy, "PeerConnected",
@@ -360,7 +302,7 @@ BT_EXPORT_API int bluetooth_network_connect(const bluetooth_device_address_t *de
 	g_strdelimit(path, ":", '_');
 	DBG("path  %s\n", path);
 
-	proxy_net_client = dbus_g_proxy_new_for_name(conn, "org.bluez",
+	proxy_net_client = dbus_g_proxy_new_for_name(conn, BLUEZ_SERVICE_NAME,
 						     path, BLUEZ_NET_CLIENT_PATH);
 
 	if (proxy_net_client == NULL) {
@@ -451,7 +393,7 @@ BT_EXPORT_API int bluetooth_network_disconnect(const bluetooth_device_address_t 
 	g_strdelimit(path, ":", '_');
 	DBG("path  %s\n", path);
 
-	proxy_net_client = dbus_g_proxy_new_for_name(conn, "org.bluez",
+	proxy_net_client = dbus_g_proxy_new_for_name(conn, BLUEZ_SERVICE_NAME,
 						     path, BLUEZ_NET_CLIENT_PATH);
 
 	if (proxy_net_client == NULL) {

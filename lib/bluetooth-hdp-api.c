@@ -31,7 +31,8 @@
 ***********************************************************************/
 static int __bt_hdp_internal_create_application(unsigned int data_type,
 						bool role,
-						bt_hdp_qos_type_t channel_type);
+						bt_hdp_qos_type_t channel_type,
+						char **app_handle);
 
 static DBusHandlerResult __bt_hdp_internal_event_filter(DBusConnection *sys_conn,
 							DBusMessage *msg,
@@ -59,10 +60,9 @@ static void __bt_hdp_internal_remove_filter(void);
 
 static hdp_app_list_t *__bt_hdp_internal_gslist_find_app_handler(void *app_handle);
 
-static hdp_app_list_t *__bt_hdp_internal_gslist_find_using_fd(int fd);
+static hdp_obj_info_t *__bt_hdp_internal_gslist_obj_find_using_fd(int fd);
 
-static hdp_app_list_t *__bt_hdp_internal_gslist_find_using_obj_channel(
-						const char *obj_channel_path);
+static hdp_obj_info_t *__bt_hdp_internal_gslist_obj_find_using_path(const char *obj_channel_path);
 
 /*Global Variables*/
 static DBusConnection *g_hdp_dus_conn;
@@ -75,7 +75,8 @@ static GSList *g_app_list = NULL;
 
 BT_EXPORT_API int bluetooth_hdp_activate(unsigned short data_type,
 					bt_hdp_role_type_t role,
-					bt_hdp_qos_type_t channel_type)
+					bt_hdp_qos_type_t channel_type,
+					char **app_handle)
 {
 	DBG("+\n");
 	int result = BLUETOOTH_ERROR_NONE;
@@ -97,27 +98,24 @@ BT_EXPORT_API int bluetooth_hdp_activate(unsigned short data_type,
 	}
 
 	result = __bt_hdp_internal_create_application(data_type, role,
-						channel_type);
+						channel_type, app_handle);
 
-	return BLUETOOTH_ERROR_NONE;
+	return result;
 }
 
-
-static gboolean  __bt_hdp_internal_create_application_cb(gpointer data)
+static void __bt_hdp_obj_info_free(hdp_obj_info_t *info)
 {
-	DBG(" +\n");
-	hdp_app_list_t *list = (hdp_app_list_t *)data;
-	bt_hdp_activate_t act_cfm;
-	act_cfm.app_handle = list->app_handle;
-
-	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_HDP_ACTIVATED,
-				  BLUETOOTH_ERROR_NONE, &act_cfm);
-	DBG(" -\n");
-	return FALSE;
+	if (info) {
+		close(info->fd);
+		g_free(info->obj_channel_path);
+		g_free(info);
+	}
 }
+
 static int __bt_hdp_internal_create_application(unsigned int data_type,
 					bool role,
-					bt_hdp_qos_type_t channel_type)
+					bt_hdp_qos_type_t channel_type,
+					char **app_handle)
 {
 	DBG(" +\n");
 	DBusMessage *msg, *reply;
@@ -132,7 +130,7 @@ static int __bt_hdp_internal_create_application(unsigned int data_type,
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	msg = dbus_message_new_method_call("org.bluez", "/org/bluez",
+	msg = dbus_message_new_method_call(BLUEZ_SERVICE_NAME, "/org/bluez",
 					  BLUEZ_HDP_MANAGER_INTERFACE,
 					  "CreateApplication");
 
@@ -244,22 +242,11 @@ static int __bt_hdp_internal_create_application(unsigned int data_type,
 		return ret;
 	}
 
-	hdp_app_list_t *list = malloc(sizeof(hdp_app_list_t));
-	if (NULL == list) {
-		DBG("Malloc list failed");
-		return BLUETOOTH_ERROR_MEMORY_ALLOCATION;
-	}
-
+	hdp_app_list_t *list = g_new0(hdp_app_list_t, 1);
 	list->app_handle = (void *)g_strdup(app_path);
-
-	list->obj_channel_path = NULL;
-
-	list->fd = -1;
+	*app_handle = list->app_handle;
 
 	g_app_list = g_slist_append(g_app_list, list);
-
-
-	g_idle_add(__bt_hdp_internal_create_application_cb, (gpointer)list);
 
 	return BLUETOOTH_ERROR_NONE;
 }
@@ -363,6 +350,7 @@ static void __bt_hdp_internal_handle_disconnect(DBusMessage *msg)
 	char address[BT_ADDRESS_STRING_SIZE] = { 0, };
 	bluetooth_device_address_t device_addr = { {0} };
 	bt_hdp_disconnected_t dis_ind;
+	hdp_obj_info_t *info;
 
 	DBG("Path = %s\n", path);
 
@@ -374,38 +362,27 @@ static void __bt_hdp_internal_handle_disconnect(DBusMessage *msg)
 
 	DBG("Channel Deleted, Path = %s\n", obj_channel_path);
 
+	info = __bt_hdp_internal_gslist_obj_find_using_path(obj_channel_path);
+	if (!info) {
+		DBG("No obj info for ob_channel_path [%s]\n", obj_channel_path);
+		return;
+	}
+
 	/*Since bluetoothd is not sending the ChannelDeleted signal */
 	_bluetooth_internal_device_path_to_address(path, address);
 
 	_bluetooth_internal_convert_addr_string_to_addr_type(&device_addr,
 							address);
 
-	hdp_app_list_t *list = __bt_hdp_internal_gslist_find_using_obj_channel(
-					obj_channel_path);
-	if (NULL == list) {
-		DBG("** Could not locate the list for ob_channel_path %s****\n",
-			obj_channel_path);
-	} else {
+	dis_ind.channel_id = info->fd;
+	dis_ind.device_address = device_addr;
 
-		if (list->fd == -1) {
-			DBG("******* Warning! FD already deleted******\n");
-		}
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_HDP_DISCONNECTED,
+					BLUETOOTH_ERROR_NONE, &dis_ind);
 
-		dis_ind.channel_id = list->fd;
-		dis_ind.device_address = device_addr;
+	DBG(" Removed connection from list\n");
 
-		_bluetooth_internal_event_cb(BLUETOOTH_EVENT_HDP_DISCONNECTED,
-					  BLUETOOTH_ERROR_NONE, &dis_ind);
-
-		close(list->fd);
-		list->fd = -1;
-		g_free(list->obj_channel_path);
-		list->obj_channel_path = NULL;
-
-		DBG(" Removed  fd and obj_channel_path from the list\n");
-	}
-
-	DBG("-*************\n\n");
+	__bt_hdp_obj_info_free(info);
 
 }
 
@@ -466,11 +443,11 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 	bt_info_t *bt_internal_info = NULL;
 	bt_hdp_connected_t conn_ind;
 	DBusError err;
-	int fdd = -1;
+	int fd;
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	msg = dbus_message_new_method_call("org.bluez", path,
+	msg = dbus_message_new_method_call(BLUEZ_SERVICE_NAME, path,
 					  BLUEZ_HDP_CHANNEL_INTERFACE,
 					  "Acquire");
 	if (!msg) {
@@ -497,7 +474,7 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	if (!dbus_message_get_args(reply, &err, DBUS_TYPE_UNIX_FD, &fdd,
+	if (!dbus_message_get_args(reply, &err, DBUS_TYPE_UNIX_FD, &fd,
 				DBUS_TYPE_INVALID)) {
 		DBG(" HDP:dbus Can't get reply arguments");
 
@@ -510,9 +487,9 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 
 	dbus_message_unref(reply);
 
-	DBG("File Descriptor = %d, Dev_path = %s \n", fdd, path);
+	DBG("File Descriptor = %d, Dev_path = %s \n", fd, path);
 
-	msg = dbus_message_new_method_call("org.bluez", path,
+	msg = dbus_message_new_method_call(BLUEZ_SERVICE_NAME, path,
 			BLUEZ_HDP_CHANNEL_INTERFACE, "GetProperties");
 	if (!msg) {
 		DBG(" HDP:dbus Can't allocate new method call");
@@ -600,9 +577,12 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 		goto error;
 	}
 
-	list->obj_channel_path = g_strdup(path);
+	hdp_obj_info_t *info = g_new0(hdp_obj_info_t, 1);
+	info->fd = fd;
+	info->obj_channel_path = g_strdup(path);
+	list->obj_info = g_slist_append(list->obj_info, info);
 
-	__bt_hdp_internal_watch_fd(fdd, list->obj_channel_path);
+	__bt_hdp_internal_watch_fd(fd, info->obj_channel_path);
 
 	_bluetooth_internal_device_path_to_address(path, address);
 
@@ -611,7 +591,7 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 
 	conn_ind.app_handle = app_handle;
 
-	conn_ind.channel_id = fdd;
+	conn_ind.channel_id = fd;
 
 	conn_ind.device_address = device_addr;
 
@@ -621,15 +601,9 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 	DBG("Going to give callback\n");
 
 	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_HDP_CONNECTED,
-				  BLUETOOTH_ERROR_NONE, &conn_ind);
+					BLUETOOTH_ERROR_NONE, &conn_ind);
 
 	dbus_message_unref(reply);
-
-	if (list->fd != -1) {
-		DBG("Warning! FD already updated(%d).Duplication!\n", list->fd);
-	}
-
-	list->fd = fdd;
 
 	DBG("Updated fd in the list*\n");
 	DBG("-\n");
@@ -654,6 +628,38 @@ static void __bt_hdp_internal_watch_fd(int file_desc, const char *path)
 	DBG("-\n");
 }
 
+
+static void __bt_hdp_internal_handle_disconnect_cb(int sk, const char *path)
+{
+	DBG("******** Socket Error  ******\n\n");
+	char address[BT_ADDRESS_STRING_SIZE] = { 0, };
+	bluetooth_device_address_t device_addr = { {0} };
+	bt_hdp_disconnected_t dis_ind;
+	hdp_obj_info_t *info;
+
+	info = __bt_hdp_internal_gslist_obj_find_using_path(path);
+	if (!info) {
+		DBG("No obj info for ob_channel_path [%s]\n", path);
+		return;
+	}
+
+	/*Since bluetoothd is not sending the ChannelDeleted signal */
+	_bluetooth_internal_device_path_to_address(path, address);
+
+	_bluetooth_internal_convert_addr_string_to_addr_type(&device_addr,
+							address);
+
+	dis_ind.channel_id = sk;
+	dis_ind.device_address = device_addr;
+
+	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_HDP_DISCONNECTED,
+					BLUETOOTH_ERROR_NONE, &dis_ind);
+
+	DBG(" Removed connection from list\n");
+
+	__bt_hdp_obj_info_free(info);
+}
+
 static gboolean __bt_hdp_internal_data_received(GIOChannel *gio,
 					GIOCondition cond, gpointer data)
 {
@@ -669,9 +675,7 @@ static gboolean __bt_hdp_internal_data_received(GIOChannel *gio,
 
 	if (cond & (G_IO_NVAL | G_IO_HUP | G_IO_ERR)) {
 		DBG("GIOCondition %d.............path = %s\n", cond, path);
-		/* We should simply return from here. Proper disconnection
-		 * happens during ChannelDeleted signal.
-		 */
+		 __bt_hdp_internal_handle_disconnect_cb(sk, path);
 		return FALSE;
 	}
 
@@ -692,7 +696,7 @@ static gboolean __bt_hdp_internal_data_received(GIOChannel *gio,
 	data_ind.size = act_read;
 
 	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_HDP_DATA_RECEIVED,
-					  BLUETOOTH_ERROR_NONE, &data_ind);
+					BLUETOOTH_ERROR_NONE, &data_ind);
 
 	return TRUE;
 
@@ -743,34 +747,51 @@ static hdp_app_list_t *__bt_hdp_internal_gslist_find_app_handler(void *app_handl
 	return NULL;
 }
 
-static hdp_app_list_t *__bt_hdp_internal_gslist_find_using_fd(int fd)
+static hdp_obj_info_t *__bt_hdp_internal_gslist_obj_find_using_fd(int fd)
 {
 	GSList *l;
+	GSList *iter;
 
 	DBG("List length = %d\n", g_slist_length(g_app_list));
 
 	for (l = g_app_list; l != NULL; l = l->next) {
 		hdp_app_list_t *list = l->data;
+		if (!list)
+			return NULL;
 
-		if (list) {
-			if (fd == list->fd)
-				return list;
+		for (iter = list->obj_info; iter != NULL; iter = iter->next) {
+			hdp_obj_info_t *info = iter->data;
+			if (!info)
+				return NULL;
+
+			if (fd == info->fd)
+				return info;
 		}
 	}
 	return NULL;
 }
 
-static hdp_app_list_t *__bt_hdp_internal_gslist_find_using_obj_channel(
-				const char *obj_channel_path)
+static hdp_obj_info_t *__bt_hdp_internal_gslist_obj_find_using_path(const char *obj_channel_path)
 {
 	GSList *l;
+	GSList *iter;
+	hdp_obj_info_t *info = NULL;
+
 	DBG("List length = %d\n", g_slist_length(g_app_list));
 	for (l = g_app_list; l != NULL; l = l->next) {
 		hdp_app_list_t *list = l->data;
-		if (list) {
-			if (0 == g_strcmp0((char *)list->obj_channel_path,
-						obj_channel_path))
-				return list;
+		if (!list)
+			return NULL;
+
+		for (iter = list->obj_info; iter != NULL; iter = iter->next) {
+			 info = iter->data;
+			if (!info)
+				return NULL;
+
+			if (0 == g_strcmp0(info->obj_channel_path, obj_channel_path)) {
+				list->obj_info = g_slist_remove(list->obj_info, info);
+				return info;
+			}
 		}
 	}
 	return NULL;
@@ -779,26 +800,21 @@ static hdp_app_list_t *__bt_hdp_internal_gslist_find_using_obj_channel(
 static gboolean  __bt_hdp_internal_destroy_application_cb(gpointer data)
 {
 	DBG(" +\n");
-	bt_hdp_deactivate_t deact_cfm;
+	const char *app_handle;
 	hdp_app_list_t *list = NULL;
-	deact_cfm.app_handle = (const char *)data;
-	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_HDP_DEACTIVATED,
-					BLUETOOTH_ERROR_NONE, &deact_cfm);
+	app_handle = (const char *)data;
 
-	list = __bt_hdp_internal_gslist_find_app_handler((void *)deact_cfm.app_handle);
+	list = __bt_hdp_internal_gslist_find_app_handler((void *)app_handle);
 	if (NULL == list) {
-		DBG("***** Could not locate the list for %s*****\n",
-					deact_cfm.app_handle);
+		DBG("**** list not found for %s ******\n", app_handle);
 		return FALSE;
 	}
 
 	g_app_list = g_slist_remove(g_app_list, list);
 
-	if (list != NULL) {
-		g_free(list->app_handle);
-		g_free(list->obj_channel_path);
-		g_free(list);
-	}
+	g_free(list->app_handle);
+	g_slist_foreach(list->obj_info, (GFunc)__bt_hdp_obj_info_free, NULL);
+	g_free(list);
 
 	DBG("List length = %d\n", g_slist_length(g_app_list));
 
@@ -810,14 +826,13 @@ static gboolean  __bt_hdp_internal_destroy_application_cb(gpointer data)
 
 static int __bt_hdp_internal_destroy_application(const char *app_handle)
 {
-
 	DBusMessage *msg, *reply;
 	DBusError err;
 	bt_info_t *bt_internal_info = NULL;
 
 	bt_internal_info = _bluetooth_internal_get_information();
 
-	msg = dbus_message_new_method_call("org.bluez", "/org/bluez",
+	msg = dbus_message_new_method_call(BLUEZ_SERVICE_NAME, "/org/bluez",
 			BLUEZ_HDP_MANAGER_INTERFACE, "DestroyApplication");
 
 	if (!msg) {
@@ -833,7 +848,6 @@ static int __bt_hdp_internal_destroy_application(const char *app_handle)
 	reply = dbus_connection_send_with_reply_and_block(
 			dbus_g_connection_get_connection(bt_internal_info->conn),
 			msg, -1, &err);
-
 	dbus_message_unref(msg);
 	if (!reply) {
 		DBG(" HDP:dbus Can't Destroy application");
@@ -842,7 +856,7 @@ static int __bt_hdp_internal_destroy_application(const char *app_handle)
 			DBG("%s", err.message);
 			dbus_error_free(&err);
 		}
-		DBG(" 5\n");
+
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
@@ -914,6 +928,31 @@ BT_EXPORT_API int bluetooth_hdp_send_data(unsigned int channel_id,
 
 	return BLUETOOTH_ERROR_NONE;
 }
+
+
+static void __bt_hdp_connect_request_cb(DBusGProxy *hdp_proxy, DBusGProxyCall *call,
+						 gpointer user_data)
+{
+	GError *g_error = NULL;
+	char *obj_connect_path = NULL;
+	DBusGConnection *conn = NULL;
+
+	conn = (DBusGConnection *) user_data;
+
+	dbus_g_proxy_end_call(hdp_proxy, call, &g_error,
+		DBUS_TYPE_G_OBJECT_PATH, &obj_connect_path, G_TYPE_INVALID);
+
+	g_object_unref(hdp_proxy);
+	dbus_g_connection_unref(conn);
+
+	if (g_error != NULL) {
+		DBG("HDP connection  Dbus Call Error: %s\n", g_error->message);
+		g_error_free(g_error);
+	} else {
+		DBG("Obj Path returned = %s\n", obj_connect_path);
+	}
+}
+
 
 BT_EXPORT_API int bluetooth_hdp_connect(const char *app_handle,
 			bt_hdp_qos_type_t channel_type,
@@ -987,7 +1026,7 @@ BT_EXPORT_API int bluetooth_hdp_connect(const char *app_handle,
 
 	DBG("path  %s\n", dev_path);
 
-	hdp_proxy = dbus_g_proxy_new_for_name(conn, "org.bluez", dev_path,
+	hdp_proxy = dbus_g_proxy_new_for_name(conn, BLUEZ_SERVICE_NAME, dev_path,
 					       BLUEZ_HDP_DEVICE_INTERFACE);
 
 	if (hdp_proxy == NULL) {
@@ -998,31 +1037,44 @@ BT_EXPORT_API int bluetooth_hdp_connect(const char *app_handle,
 	}
 
 	DBG("app path %s\n", app_handle);
-
-	if (!dbus_g_proxy_call(hdp_proxy, "CreateChannel", NULL,
-		DBUS_TYPE_G_OBJECT_PATH, app_handle, G_TYPE_STRING,
-		role, G_TYPE_INVALID, DBUS_TYPE_G_OBJECT_PATH,
-		&obj_connect_path, G_TYPE_INVALID)) {
-
-		DBG("HDP client connection Dbus Call Error");
-
+	if (!dbus_g_proxy_begin_call(hdp_proxy, "CreateChannel",
+				(DBusGProxyCallNotify) __bt_hdp_connect_request_cb,
+				conn,	/*user_data*/
+				NULL,	/*destroy*/
+				DBUS_TYPE_G_OBJECT_PATH, app_handle,
+				G_TYPE_STRING, role,
+				G_TYPE_INVALID)) {
+		DBG("HDP connection Dbus Call Error");
 		g_free(dev_path);
-
 		g_object_unref(hdp_proxy);
-
 		dbus_g_connection_unref(conn);
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	DBG("Obj Path returned = %s\n", obj_connect_path);
-
 	g_free(dev_path);
+	return BLUETOOTH_ERROR_NONE;
+}
+
+
+static void __bt_hdp_disconnect_request_cb(DBusGProxy *hdp_proxy, DBusGProxyCall *call,
+						    gpointer user_data)
+{
+	GError *g_error = NULL;
+	DBusGConnection *conn = NULL;
+
+	conn = (DBusGConnection *) user_data;
+
+	dbus_g_proxy_end_call(hdp_proxy, call, &g_error, G_TYPE_INVALID);
 
 	g_object_unref(hdp_proxy);
-
 	dbus_g_connection_unref(conn);
 
-	return BLUETOOTH_ERROR_NONE;
+	if (g_error != NULL) {
+		DBG("HDP disconnection Dbus Call Error: %s\n", g_error->message);
+		g_error_free(g_error);
+	} else {
+		DBG("HDP disconnection Dbus Call is done\n");
+	}
 }
 
 BT_EXPORT_API int bluetooth_hdp_disconnect(unsigned int channel_id,
@@ -1051,8 +1103,8 @@ BT_EXPORT_API int bluetooth_hdp_disconnect(unsigned int channel_id,
 		return BLUETOOTH_ERROR_INVALID_PARAM;
 	}
 
-	hdp_app_list_t *list = __bt_hdp_internal_gslist_find_using_fd(channel_id);
-	if (NULL == list) {
+	hdp_obj_info_t *info = __bt_hdp_internal_gslist_obj_find_using_fd(channel_id);
+	if (NULL == info) {
 		DBG("*** Could not locate the list for %d*****\n", channel_id);
 		return BLUETOOTH_ERROR_INVALID_PARAM;
 	}
@@ -1087,7 +1139,7 @@ BT_EXPORT_API int bluetooth_hdp_disconnect(unsigned int channel_id,
 
 	DBG("path  %s\n", dev_path);
 
-	hdp_proxy = dbus_g_proxy_new_for_name(conn, "org.bluez", dev_path,
+	hdp_proxy = dbus_g_proxy_new_for_name(conn, BLUEZ_SERVICE_NAME, dev_path,
 					       BLUEZ_HDP_DEVICE_INTERFACE);
 
 	if (hdp_proxy == NULL) {
@@ -1097,23 +1149,20 @@ BT_EXPORT_API int bluetooth_hdp_disconnect(unsigned int channel_id,
 		return BLUETOOTH_ERROR_NOT_PAIRED;
 	}
 
-	if (!dbus_g_proxy_call(hdp_proxy, "DestroyChannel", NULL,
-			DBUS_TYPE_G_OBJECT_PATH, list->obj_channel_path,
-			G_TYPE_INVALID, G_TYPE_INVALID)) {
-		DBG("HDP client connection Dbus Call Error");
+	if (!dbus_g_proxy_begin_call(hdp_proxy, "DestroyChannel",
+				(DBusGProxyCallNotify) __bt_hdp_disconnect_request_cb,
+				conn,	/*user_data*/
+				NULL,	/*destroy*/
+				DBUS_TYPE_G_OBJECT_PATH, info->obj_channel_path,
+				G_TYPE_INVALID)) {
+		DBG("HDP connection Dbus Call Error");
 		g_free(dev_path);
 		g_object_unref(hdp_proxy);
 		dbus_g_connection_unref(conn);
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	DBG("Destroyed Obj Path  = %s\n", list->obj_channel_path);
-
 	g_free(dev_path);
-
-	g_object_unref(hdp_proxy);
-
-	dbus_g_connection_unref(conn);
 
 	return BLUETOOTH_ERROR_NONE;
 }

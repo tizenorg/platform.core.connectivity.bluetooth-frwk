@@ -26,10 +26,10 @@
 #include <string.h>
 #include <unistd.h>
 #include <glib.h>
+#include <dirent.h>
 #include <sys/time.h>
 #include <dbus/dbus-glib.h>
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <vconf.h>
 
@@ -37,9 +37,13 @@
 #include "bluetooth-obex-server-api.h"
 #include "obex-agent.h"
 
+#define BT_AGENT_SIGNAL_OBEX_AUTHORIZE "ObexAuthorize"
+
 static GSList *transfers = NULL;
 char *g_dst_path = NULL;
 obex_server_info_t g_obex_server_info;
+gboolean obex_connected;
+gboolean auto_authorize;
 
 static gboolean __bt_authorize_callback(DBusGMethodInvocation *context,
 					const char *path,
@@ -118,7 +122,142 @@ static void __bt_send_deinit_message(void)
 	return;
 }
 
-BT_EXPORT_API int bluetooth_obex_server_init(char *dst_path)
+/* To support the BOT  */
+static DBusHandlerResult __obex_authorize_event_filter(DBusConnection *sys_conn,
+			DBusMessage *msg, void *data)
+{
+	DBG("+");
+
+	char *member;
+	const char *path = dbus_message_get_path(msg);
+	const char *addr = NULL;
+	const char *name = NULL;
+	bluetooth_device_address_t device_addr = { {0} };
+	int event;
+
+	if (dbus_message_get_type(msg) != DBUS_MESSAGE_TYPE_SIGNAL)
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+	if (path == NULL || strcmp(path, "/") == 0)
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+	member = (char *)dbus_message_get_member(msg);
+	DBG("member (%s)\n", member);
+
+	if (dbus_message_is_signal(msg, BT_AGENT_INTERFACE,
+					BT_AGENT_SIGNAL_OBEX_AUTHORIZE)) {
+		dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_STRING, &addr,
+				DBUS_TYPE_STRING, &name,
+				DBUS_TYPE_INVALID);
+		DBG("Obex Authorize request [%s], [%s]", addr, name);
+
+		if (addr == NULL)
+			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+		event = BLUETOOTH_EVENT_OBEX_SERVER_CONNECTION_AUTHORIZE;
+
+		_bluetooth_internal_convert_addr_string_to_addr_type(
+							&device_addr, addr);
+
+		_bluetooth_internal_event_cb(event,
+					BLUETOOTH_ERROR_NONE, &device_addr);
+	} else {
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+	}
+
+	DBG("-");
+
+	return DBUS_HANDLER_RESULT_HANDLED;
+}
+
+/* To support the BOT  */
+static int __register_agent_authorize_signal(
+			obex_server_info_t *obex_server_info)
+{
+	DBG("+");
+
+	DBusGConnection *conn = NULL;
+	DBusConnection *dbus_connection = NULL;
+	DBusError dbus_error;
+
+	conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
+
+	if (conn == NULL) {
+		DBG("conn is NULL\n");
+		return BLUETOOTH_ERROR_NO_RESOURCES;
+	}
+
+	dbus_connection = dbus_g_connection_get_connection(conn);
+
+	/* Add the filter for authorize functions */
+	dbus_error_init(&dbus_error);
+	dbus_connection_add_filter(dbus_connection,
+				__obex_authorize_event_filter,
+				NULL, NULL);
+
+	dbus_bus_add_match(dbus_connection,
+			   "type=signal,interface=" BT_AGENT_INTERFACE
+			   ",member=ObexAuthorize", &dbus_error);
+	if (dbus_error_is_set(&dbus_error)) {
+		ERR("Fail to add dbus filter signal\n");
+		dbus_error_free(&dbus_error);
+		dbus_connection_remove_filter(dbus_connection,
+					__obex_authorize_event_filter,
+					NULL);
+		dbus_g_connection_unref(conn);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	if (vconf_set_int(BT_MEMORY_OBEX_NO_AGENT, 1) != 0) {
+		DBG("Set vconf failed");
+		dbus_connection_remove_filter(dbus_connection,
+					__obex_authorize_event_filter,
+					NULL);
+		dbus_g_connection_unref(conn);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	obex_server_info->system_bus = conn;
+
+	DBG("-");
+	return BLUETOOTH_ERROR_NONE;
+}
+
+/* To support the BOT  */
+static void __unregister_agent_authorize_signal(
+			obex_server_info_t *obex_server_info)
+{
+	DBG("+");
+
+	DBusConnection *dbus_connection = NULL;
+
+	if (obex_server_info == NULL) {
+		DBG("info is NULL");
+		return;
+	}
+
+	if (obex_server_info->system_bus == NULL) {
+		DBG("connection is NULL");
+		return;
+	}
+
+	dbus_connection = dbus_g_connection_get_connection(
+					obex_server_info->system_bus);
+
+	dbus_connection_remove_filter(dbus_connection,
+				__obex_authorize_event_filter,
+				NULL);
+
+	dbus_g_connection_unref(obex_server_info->system_bus);
+	obex_server_info->system_bus = NULL;
+
+	if (vconf_set_int(BT_MEMORY_OBEX_NO_AGENT, 0) != 0)
+		DBG("Set vconf failed");
+
+	DBG("-");
+}
+
+BT_EXPORT_API int bluetooth_obex_server_init(const char *dst_path)
 {
 	DBG("+\n");
 
@@ -160,8 +299,12 @@ BT_EXPORT_API int bluetooth_obex_server_init(char *dst_path)
 	if (ret != BLUETOOTH_ERROR_NONE) {
 		g_free(g_dst_path);
 		dbus_g_connection_unref(conn);
+		g_obex_server_info.bus = NULL;
 		g_dst_path = NULL;
 	}
+
+	if (vconf_set_int(BT_MEMORY_OBEX_NO_AGENT, 0) != 0)
+		DBG("Set vconf failed");
 
 	DBG("- \n");
 
@@ -193,14 +336,104 @@ BT_EXPORT_API int bluetooth_obex_server_deinit(void)
 	return BLUETOOTH_ERROR_NONE;
 }
 
+/* To support the BOT  */
+BT_EXPORT_API int bluetooth_obex_server_init_without_agent(const char *dst_path)
+{
+	DBG("+\n");
+
+	int ret = BLUETOOTH_ERROR_NONE;
+	DBusGConnection *conn = NULL;
+
+	_bluetooth_internal_session_init();
+
+	if (FALSE == _bluetooth_internal_is_adapter_enabled()) {
+		DBG("Adapter not enabled");
+		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
+	}
+
+	if (g_obex_server_info.obex_server_agent) {
+		DBG("Agent already registered");
+		return BLUETOOTH_ERROR_AGENT_ALREADY_EXIST;
+	}
+
+	if (NULL == dst_path) {
+		DBG("Invalid Param");
+		return BLUETOOTH_ERROR_INVALID_PARAM;
+	}
+
+	/* Get the session bus. This bus reff will be unref during deinit */
+	conn = dbus_g_bus_get(DBUS_BUS_SESSION, NULL);
+
+	if (conn == NULL) {
+		DBG("conn is NULL\n");
+		return BLUETOOTH_ERROR_NO_RESOURCES;
+	}
+
+	/* Send deinit signal (To deinit the native Obex server) */
+	__bt_send_deinit_message();
+
+	g_dst_path = g_strdup(dst_path);
+
+	ret = __bt_obex_agent_register(&g_obex_server_info, conn);
+
+	if (ret != BLUETOOTH_ERROR_NONE) {
+		g_free(g_dst_path);
+		dbus_g_connection_unref(conn);
+		g_obex_server_info.bus = NULL;
+		g_dst_path = NULL;
+	} else {
+		ret = __register_agent_authorize_signal(&g_obex_server_info);
+	}
+
+	DBG("- \n");
+
+	return ret;
+}
+
+/* To support the BOT  */
+BT_EXPORT_API int bluetooth_obex_server_deinit_without_agent(void)
+{
+	DBG("+\n");
+
+	_bluetooth_internal_session_init();
+
+	if (FALSE == _bluetooth_internal_is_adapter_enabled()) {
+		DBG("Adapter not enabled");
+		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
+	}
+
+	if (NULL == g_obex_server_info.obex_server_agent) {
+		DBG("Agent not registered");
+		return BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST;
+	}
+
+	__bt_obex_agent_unregister(&g_obex_server_info);
+
+	__unregister_agent_authorize_signal(&g_obex_server_info);
+
+	g_free(g_dst_path);
+	g_dst_path = NULL;
+
+	DBG("- \n");
+	return BLUETOOTH_ERROR_NONE;
+}
+
 BT_EXPORT_API gboolean bluetooth_obex_server_is_activated(void)
 {
 	gboolean exist = FALSE;
 	DBusGConnection *conn = NULL;
 	DBusGProxy *obex_proxy = NULL;
 	GError *error = NULL;
+	int value = 0;
 
 	DBG("+");
+
+	if (vconf_get_bool(BT_VCONF_OPP_SERVER_INIT, &value) == 0) {
+		if (value == TRUE) {
+			/* Nativate Obex server is activated */
+			return FALSE;
+		}
+	}
 
 	conn = dbus_g_bus_get(DBUS_BUS_SESSION, NULL);
 	if (conn == NULL)
@@ -228,12 +461,118 @@ BT_EXPORT_API gboolean bluetooth_obex_server_is_activated(void)
 		g_error_free(error);
 	}
 
+	dbus_g_proxy_call(obex_proxy, "UnregisterAgent", NULL,
+			  DBUS_TYPE_G_OBJECT_PATH, BT_INVALID_PATH,
+			  G_TYPE_INVALID, G_TYPE_INVALID);
+
 	g_object_unref(obex_proxy);
 	dbus_g_connection_unref(conn);
 
 	DBG("-");
 
 	return exist;
+}
+
+/* To support the BOT  */
+BT_EXPORT_API int bluetooth_obex_server_accept_connection(void)
+{
+	DBG("+");
+
+	int ret = BLUETOOTH_ERROR_NONE;
+	unsigned long block_time = 0;
+	DBusGConnection *conn = NULL;
+	DBusGProxy *agent_proxy = NULL;
+
+	conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
+
+	if (conn == NULL) {
+		DBG("conn is NULL\n");
+		return BLUETOOTH_ERROR_NO_RESOURCES;
+	}
+
+	agent_proxy = dbus_g_proxy_new_for_name(conn,
+			    "org.bluez.frwk_agent",
+			    "/org/bluez/agent/frwk_agent",
+			    "org.bluez.Agent");
+
+	if (agent_proxy == NULL) {
+		DBG("agent proxy is NULL");
+		dbus_g_connection_unref(conn);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	if (!dbus_g_proxy_call(agent_proxy, "ReplyAuthorize", NULL,
+			  G_TYPE_UINT, BT_ACCEPT,
+			  G_TYPE_INVALID, G_TYPE_INVALID)) {
+		DBG("Fail to ReplyAuthorize");
+		ret = BLUETOOTH_ERROR_INTERNAL;
+		goto done;
+	}
+
+	obex_connected = FALSE;
+	auto_authorize = TRUE;
+
+	/* Block until recieve the event (Requirement from BADA) */
+	while (obex_connected == FALSE) {
+		g_main_context_iteration(NULL, TRUE);
+		usleep(SLEEP_TIME); /* Sleep 50ms */
+		block_time += SLEEP_TIME;
+
+		if (block_time >= BLOCK_MAX_TIMEOUT)
+			return BLUETOOTH_ERROR_TIMEOUT;
+	}
+
+	obex_connected = FALSE;
+	auto_authorize = FALSE;
+
+done:
+	g_object_unref(agent_proxy);
+	dbus_g_connection_unref(conn);
+
+	DBG("-");
+
+	return ret;
+}
+
+/* To support the BOT  */
+BT_EXPORT_API int bluetooth_obex_server_reject_connection(void)
+{
+	DBG("+");
+
+	int ret = BLUETOOTH_ERROR_NONE;
+	DBusGConnection *conn = NULL;
+	DBusGProxy *agent_proxy = NULL;
+
+	conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
+
+	if (conn == NULL) {
+		DBG("conn is NULL\n");
+		return BLUETOOTH_ERROR_NO_RESOURCES;
+	}
+
+	agent_proxy = dbus_g_proxy_new_for_name(conn,
+			    "org.bluez.frwk_agent",
+			    "/org/bluez/agent/frwk_agent",
+			    "org.bluez.Agent");
+
+	if (agent_proxy == NULL) {
+		DBG("agent proxy is NULL");
+		dbus_g_connection_unref(conn);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	if (!dbus_g_proxy_call(agent_proxy, "ReplyAuthorize", NULL,
+			  G_TYPE_UINT, BT_REJECT,
+			  G_TYPE_INVALID, G_TYPE_INVALID)) {
+		DBG("Fail to ReplyAuthorize");
+		ret = BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	g_object_unref(agent_proxy);
+	dbus_g_connection_unref(conn);
+
+	DBG("-");
+	return ret;
 }
 
 static transfer_info_t *_bt_find_transfer(const char *transfer_path)
@@ -326,7 +665,7 @@ static int __bt_obex_server_reply_authorize(const guint accept,
 }
 
 
-BT_EXPORT_API int bluetooth_obex_server_accept_authorize(char *filename)
+BT_EXPORT_API int bluetooth_obex_server_accept_authorize(const char *filename)
 {
 	DBG("+\n");
 
@@ -381,26 +720,37 @@ BT_EXPORT_API int bluetooth_obex_server_reject_authorize(void)
 					&g_obex_server_info);
 }
 
-BT_EXPORT_API int bluetooth_obex_server_set_destination_path(char *dst_path)
+BT_EXPORT_API int bluetooth_obex_server_set_destination_path(const char *dst_path)
 {
 	DBG("+\n");
 
+	DIR *dp = NULL;
+
 	_bluetooth_internal_session_init();
 
-	if (FALSE == _bluetooth_internal_is_adapter_enabled()) {
+	if (_bluetooth_internal_is_adapter_enabled() == FALSE) {
 		DBG("Adapter not enabled");
 		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
 	}
 
-	if (NULL == g_obex_server_info.obex_server_agent) {
+	if (g_obex_server_info.obex_server_agent == NULL) {
 		DBG("Agent not registered");
 		return BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST;
 	}
 
-	if (NULL == dst_path) {
+	if (dst_path == NULL) {
 		DBG("Invalid Param");
 		return BLUETOOTH_ERROR_INVALID_PARAM;
 	}
+
+	dp = opendir(dst_path);
+
+	if (dp == NULL) {
+		DBG("The directory does not exist");
+		return BLUETOOTH_ERROR_INVALID_PARAM;
+	}
+
+	closedir(dp);
 
 	g_free(g_dst_path);
 	g_dst_path = g_strdup(dst_path);
@@ -409,22 +759,23 @@ BT_EXPORT_API int bluetooth_obex_server_set_destination_path(char *dst_path)
 	return BLUETOOTH_ERROR_NONE;
 }
 
-BT_EXPORT_API int bluetooth_obex_server_set_root(char *root)
+BT_EXPORT_API int bluetooth_obex_server_set_root(const char *root)
 {
 	GError *error = NULL;
 	GValue folder = { 0 };
+	DIR *dp = NULL;
 	obex_server_info_t *obex_server_info = &g_obex_server_info;
 
 	DBG("+\n");
 
 	_bluetooth_internal_session_init();
 
-	if (FALSE == _bluetooth_internal_is_adapter_enabled()) {
+	if (_bluetooth_internal_is_adapter_enabled() == FALSE) {
 		DBG("Adapter not enabled");
 		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
 	}
 
-	if (NULL == obex_server_info->obex_server_agent) {
+	if (obex_server_info->obex_server_agent == NULL) {
 		DBG("Agent not registered");
 		return BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST;
 	}
@@ -439,6 +790,15 @@ BT_EXPORT_API int bluetooth_obex_server_set_root(char *root)
 		DBG("Invalid parameter \n");
 		return BLUETOOTH_ERROR_INVALID_PARAM;
 	}
+
+	dp = opendir(root);
+
+	if (dp == NULL) {
+		DBG("The directory does not exist");
+		return BLUETOOTH_ERROR_INVALID_PARAM;
+	}
+
+	closedir(dp);
 
 	DBG("Set Root Foler: %s", root);
 
@@ -499,12 +859,50 @@ BT_EXPORT_API int bluetooth_obex_server_cancel_transfer(int transfer_id)
 	return BLUETOOTH_ERROR_NONE;
 }
 
+BT_EXPORT_API int bluetooth_obex_server_cancel_all_transfers(void)
+{
+	obex_server_info_t *obex_server_info = &g_obex_server_info;
+	GSList *l;
+
+	DBG("+\n");
+
+	_bluetooth_internal_session_init();
+
+	if (FALSE == _bluetooth_internal_is_adapter_enabled()) {
+		DBG("Adapter not enabled");
+		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
+	}
+
+	if (NULL == obex_server_info->obex_server_agent) {
+		DBG("Agent not registered");
+		return BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST;
+	}
+
+	if (obex_server_info->obex_proxy == NULL) {
+		DBG("obex_proxy is NULL \n");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	for (l = transfers; l != NULL; l = l->next) {
+		transfer_info_t *transfer = l->data;
+
+		if (transfer && transfer->transfer_proxy) {
+			dbus_g_proxy_call_no_reply(transfer->transfer_proxy,
+						"Cancel", G_TYPE_INVALID,
+						G_TYPE_INVALID);
+		}
+	}
+
+	DBG("+\n");
+
+	return BLUETOOTH_ERROR_NONE;
+}
+
 static char *__bt_get_remote_device_name(const char *bdaddress)
 {
 	GError *error = NULL;
 	char *device_path = NULL;
 	char *name = NULL;
-	DBusGProxy *device = NULL;
 	GHashTable *hash = NULL;
 	GValue *value;
 	DBusGProxy *device_proxy = NULL;
@@ -583,6 +981,12 @@ static gboolean __bt_authorize_callback(DBusGMethodInvocation *context,
 
  	auth_info.filename = obex_server_info->filename;
 	auth_info.length = length;
+
+	if (auto_authorize == TRUE) {
+		/* No need to send the event */
+		bluetooth_obex_server_accept_authorize(obex_server_info->filename);
+		return TRUE;
+	}
 
 	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_AUTHORIZE,
 						BLUETOOTH_ERROR_NONE, &auth_info);
@@ -732,6 +1136,12 @@ static void __bt_transfer_started_cb(DBusGProxy *object,
 		transfer_info->path = g_strdup(transfer_path);
 	}
 
+	if (auto_authorize == TRUE) {
+		/* Unblock the connection accept function */
+		obex_connected = TRUE;
+		auto_authorize = FALSE;
+	}
+
 	transfers = g_slist_append(transfers, transfer_info);
 
  	app_transfer_info.filename = transfer_info->filename;
@@ -878,5 +1288,3 @@ static void __bt_obex_agent_unregister(obex_server_info_t *obex_server_info)
 	g_object_unref(obex_server_info->obex_server_agent);
 	obex_server_info->obex_server_agent = NULL;
 }
-
-
