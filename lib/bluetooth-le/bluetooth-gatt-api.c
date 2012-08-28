@@ -547,9 +547,13 @@ BT_EXPORT_API int bluetooth_gatt_get_characteristics_property(const char *char_h
 			memcpy(characteristic->val, gb_array->data, gb_array->len);
 		} else {
 			characteristic->val = NULL;
+			characteristic->val_len = 0;
 		}
 
 		g_byte_array_free(gb_array, TRUE);
+	} else {
+		characteristic->val = NULL;
+		characteristic->val_len = 0;
 	}
 
 	return BLUETOOTH_ERROR_NONE;

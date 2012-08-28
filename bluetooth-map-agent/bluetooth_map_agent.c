@@ -53,6 +53,10 @@
 
 #include <bluetooth_map_agent.h>
 
+#define OBEX_CLIENT_SERVICE "org.openobex.client"
+#define OBEX_CLIENT_INTERFACE "org.openobex.Client"
+#define OBEX_CLIENT_PATH "/"
+
 #define DBUS_STRUCT_STRING_STRING_UINT (dbus_g_type_get_struct("GValueArray", \
 		G_TYPE_STRING, G_TYPE_STRING,  G_TYPE_STRING, G_TYPE_INVALID))
 
@@ -104,7 +108,9 @@ GType bluetooth_map_agent_get_type(void);
 
 G_DEFINE_TYPE(BluetoothMapAgent, bluetooth_map_agent, G_TYPE_OBJECT)
 
-GMainLoop *mainloop = NULL;
+GMainLoop *g_mainloop = NULL;
+static DBusGConnection *g_connection = NULL;
+static char *g_mns_path = NULL;
 
 static gboolean bluetooth_map_get_folder_tree(BluetoothMapAgent *agent,
 					DBusGMethodInvocation *context);
@@ -120,6 +126,11 @@ static gboolean bluetooth_map_message_status(BluetoothMapAgent *agent,
 					gchar *message_name,
 					int indicator, int value,
 					DBusGMethodInvocation *context);
+static gboolean bluetooth_map_noti_registration(BluetoothMapAgent *agent,
+					gchar *remote_addr,
+					gboolean status,
+					DBusGMethodInvocation *context);
+
 
 #include "bluetooth_map_agent_glue.h"
 
@@ -309,6 +320,98 @@ gboolean static __bt_msg_is_mms(int msg_type)
 	}
 
 	return result;
+}
+
+static void __bt_mns_client_connect(char *address)
+{
+	DBusGProxy *mns_proxy;
+	GHashTable *hash;
+	GValue *addr_value;
+	GValue *tgt_value;
+	GError *error = NULL;
+	const char *session_path = NULL;
+
+	DBG("+ address %s\n", address);
+
+	mns_proxy = dbus_g_proxy_new_for_name(g_connection,
+					OBEX_CLIENT_SERVICE,
+					OBEX_CLIENT_PATH,
+					OBEX_CLIENT_INTERFACE);
+	if (mns_proxy == NULL) {
+		ERR("Failed to get a proxy for D-Bus\n");
+		return;
+	}
+
+	hash = g_hash_table_new_full(g_str_hash, g_str_equal,
+				     NULL, (GDestroyNotify)g_free);
+
+	addr_value = g_new0(GValue, 1);
+	g_value_init(addr_value, G_TYPE_STRING);
+	g_value_set_string(addr_value, address);
+	g_hash_table_insert(hash, "Destination", addr_value);
+
+	tgt_value = g_new0(GValue, 1);
+	g_value_init(tgt_value, G_TYPE_STRING);
+	g_value_set_string(tgt_value, "MNS");
+	g_hash_table_insert(hash, "Target", tgt_value);
+
+	dbus_g_proxy_call(mns_proxy, "CreateSession", &error,
+		dbus_g_type_get_map("GHashTable", G_TYPE_STRING, G_TYPE_VALUE),
+		hash, G_TYPE_INVALID,
+		DBUS_TYPE_G_OBJECT_PATH, &session_path,
+		G_TYPE_INVALID);
+	if (error) {
+		DBG("Error [%s]", error->message);
+		g_error_free(error);
+		g_hash_table_destroy(hash);
+		g_object_unref(mns_proxy);
+		return;
+	}
+
+	g_mns_path = g_strdup(session_path);
+	DBG("g_mns_path = %s\n", g_mns_path);
+
+	g_hash_table_destroy(hash);
+	g_object_unref(mns_proxy);
+
+	DBG("-\n");
+	return;
+}
+
+static void __bt_mns_client_disconnect()
+{
+	DBusGProxy *mns_proxy;
+	GError *error = NULL;
+
+	if (!g_mns_path)
+		return;
+
+	mns_proxy = dbus_g_proxy_new_for_name(g_connection,
+					OBEX_CLIENT_SERVICE,
+					OBEX_CLIENT_PATH,
+					OBEX_CLIENT_INTERFACE);
+	if (mns_proxy == NULL) {
+		DBG("Failed to get a proxy for D-Bus\n");
+		return;
+	}
+
+	dbus_g_proxy_call(mns_proxy, "RemoveSession", &error,
+		DBUS_TYPE_G_OBJECT_PATH, g_mns_path,
+		G_TYPE_INVALID, G_TYPE_INVALID);
+	if (error) {
+		DBG("Error [%s]", error->message);
+		g_error_free(error);
+		g_object_unref(mns_proxy);
+		return;
+	}
+
+	g_free(g_mns_path);
+	g_mns_path = NULL;
+
+	g_object_unref(mns_proxy);
+
+	DBG("-\n");
+	return;
 }
 
 static gboolean bluetooth_map_get_folder_tree(BluetoothMapAgent *agent,
@@ -973,24 +1076,38 @@ done:
 	return flag;
 }
 
+static gboolean bluetooth_map_noti_registration(BluetoothMapAgent *agent,
+					gchar *remote_addr,
+					gboolean status,
+					DBusGMethodInvocation *context)
+{
+	DBG("remote_addr = %s \n", remote_addr);
+
+	if (status == TRUE)
+		__bt_mns_client_connect(remote_addr);
+	else
+		__bt_mns_client_disconnect();
+
+	return TRUE;
+}
+
 int main(int argc, char **argv)
 {
 	BluetoothMapAgent *bluetooth_map_obj = NULL;
-	static DBusGConnection *connection = NULL;
 	DBusGProxy *bus_proxy = NULL;
 	guint result = 0;
 	GError *error = NULL;
 
 	g_type_init();
 
-	mainloop = g_main_loop_new(NULL, FALSE);
+	g_mainloop = g_main_loop_new(NULL, FALSE);
 
-	if (mainloop == NULL) {
+	if (g_mainloop == NULL) {
 		ERR("Couldn't create GMainLoop\n");
 		return EXIT_FAILURE;
 	}
 
-	connection = dbus_g_bus_get(DBUS_BUS_SESSION, &error);
+	g_connection = dbus_g_bus_get(DBUS_BUS_SESSION, &error);
 
 	if (error != NULL) {
 		ERR("Couldn't connect to system bus[%s]\n", error->message);
@@ -998,7 +1115,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	bus_proxy = dbus_g_proxy_new_for_name(connection,
+	bus_proxy = dbus_g_proxy_new_for_name(g_connection,
 					DBUS_SERVICE_DBUS,
 					DBUS_PATH_DBUS, DBUS_INTERFACE_DBUS);
 	if (bus_proxy == NULL) {
@@ -1031,23 +1148,26 @@ int main(int argc, char **argv)
 	}
 
 	/* Registering it on the D-Bus */
-	dbus_g_connection_register_g_object(connection,
+	dbus_g_connection_register_g_object(g_connection,
 					BT_MAP_SERVICE_OBJECT_PATH,
 					G_OBJECT(bluetooth_map_obj));
 
 	if (__bluetooth_map_start_service() == FALSE)
 		goto failure;
 
-	g_main_loop_run(mainloop);
+	g_main_loop_run(g_mainloop);
 
  failure:
 	DBG("Terminate the bluetooth-map-agent\n");
+	if (g_mns_path)
+		__bt_mns_client_disconnect();
 	if (bus_proxy)
 		g_object_unref(bus_proxy);
 	if (bluetooth_map_obj)
 		g_object_unref(bluetooth_map_obj);
-	if (connection)
-		dbus_g_connection_unref(connection);
+	if (g_connection)
+		dbus_g_connection_unref(g_connection);
+
 
 	__bluetooth_map_stop_service();
 	return EXIT_FAILURE;

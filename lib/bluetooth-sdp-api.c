@@ -347,7 +347,7 @@ BT_EXPORT_API int bluetooth_search_service(const bluetooth_device_address_t *dev
 				(void *)bt_info_for_searching_support_service,
 				NULL, 40000, G_TYPE_STRING, "", G_TYPE_INVALID)) {
 			DBG("Could not call dbus proxy\n");
-			return BLUETOOTH_ERROR_NONE;
+			return BLUETOOTH_ERROR_INTERNAL;
 		}
 
 		bt_internal_info->is_service_req = TRUE;

@@ -38,6 +38,8 @@
 #include "bluetooth_pb_agent.h"
 #include "bluetooth_pb_vcard.h"
 
+#define BLUETOOTH_PB_AGENT_TIMEOUT 600
+
 typedef enum {
 	TELECOM_NONE = 0,
 	TELECOM_PB,
@@ -49,6 +51,9 @@ typedef enum {
 
 typedef struct {
 	GObject parent;
+
+	guint timeout_id;
+
 } BluetoothPbAgent;
 
 typedef struct {
@@ -251,6 +256,9 @@ static void __bluetooth_pb_contact_changed(void *user_data);
 
 static void __bluetooth_pb_call_changed(void *user_data);
 
+static void __bluetooth_pb_agent_timeout_add_seconds(BluetoothPbAgent *agent);
+
+static gboolean __bluetooth_pb_agent_timeout_calback(gpointer user_data);
 
 #include "bluetooth_pb_agent_glue.h"
 
@@ -313,6 +321,8 @@ static gboolean bluetooth_pb_get_phonebook(BluetoothPbAgent *agent,
 
 	DBG("\n");
 
+	__bluetooth_pb_agent_timeout_add_seconds(agent);
+
 	pb_type = __bluetooth_pb_get_pb_type(name);
 
 	switch (pb_type) {
@@ -370,6 +380,8 @@ static gboolean bluetooth_pb_get_phonebook_size(BluetoothPbAgent *agent,
 
 	DBG("\n");
 
+	__bluetooth_pb_agent_timeout_add_seconds(agent);
+
 	pb_type = __bluetooth_pb_get_pb_type(name);
 
 	switch (pb_type) {
@@ -414,6 +426,8 @@ static gboolean bluetooth_pb_get_phonebook_list(BluetoothPbAgent *agent,
 
 	DBG("\n");
 
+	__bluetooth_pb_agent_timeout_add_seconds(agent);
+
 	pb_type = __bluetooth_pb_get_pb_type(name);
 
 	if (pb_type == TELECOM_NONE) {
@@ -453,6 +467,8 @@ static gboolean bluetooth_pb_get_phonebook_entry(BluetoothPbAgent *agent,
 	gchar *str = NULL;
 
 	DBG("\n");
+
+	__bluetooth_pb_agent_timeout_add_seconds(agent);
 
 	if (!g_str_has_suffix(id, ".vcf")) {
 		__bluetooth_pb_dbus_return_error(context,
@@ -523,6 +539,8 @@ static gboolean bluetooth_pb_get_phonebook_size_at(BluetoothPbAgent *agent,
 
 	DBG("\n");
 
+	__bluetooth_pb_agent_timeout_add_seconds(agent);
+
 	pb_type = __bluetooth_pb_get_storage_pb_type(command);
 
 	switch (pb_type) {
@@ -565,6 +583,8 @@ static gboolean bluetooth_pb_get_phonebook_entries_at(BluetoothPbAgent *agent,
 	DBG("command %s, start_index %d, end_index %d %s %d\n",
 			command, start_index, end_index, __FILE__, __LINE__);
 
+	__bluetooth_pb_agent_timeout_add_seconds(agent);
+
 	pb_type = __bluetooth_pb_get_storage_pb_type(command);
 
 	if (pb_type == TELECOM_NONE || pb_type == TELECOM_CCH) {
@@ -597,6 +617,8 @@ static gboolean bluetooth_pb_get_phonebook_entries_find_at(BluetoothPbAgent *age
 	PhoneBookType pb_type = TELECOM_NONE;
 
 	GPtrArray *ptr_array = NULL;
+
+	__bluetooth_pb_agent_timeout_add_seconds(agent);
 
 	pb_type = __bluetooth_pb_get_storage_pb_type(command);
 
@@ -1744,6 +1766,33 @@ static void __bluetooth_pb_call_changed(void *user_data)
 	g_signal_emit(agent, signals[CLEAR], 0);
 }
 
+static void __bluetooth_pb_agent_timeout_add_seconds(BluetoothPbAgent *agent)
+{
+	g_return_if_fail(BLUETOOTH_IS_PB_AGENT(agent));
+
+	if(agent->timeout_id)
+		g_source_remove(agent->timeout_id);
+
+	agent->timeout_id = g_timeout_add_seconds(BLUETOOTH_PB_AGENT_TIMEOUT,
+				__bluetooth_pb_agent_timeout_calback,
+				agent);
+}
+
+static gboolean __bluetooth_pb_agent_timeout_calback(gpointer user_data)
+{
+	BluetoothPbAgent *agent;
+
+	g_return_val_if_fail(BLUETOOTH_IS_PB_AGENT(user_data), FALSE);
+
+	agent = BLUETOOTH_PB_AGENT(user_data);
+	agent->timeout_id = 0;
+
+	if (mainloop)
+		g_main_loop_quit(mainloop);
+
+	return FALSE;
+}
+
 int main(int argc, char **argv)
 {
 	BluetoothPbAgent *bluetooth_pb_obj = NULL;
@@ -1829,6 +1878,9 @@ int main(int argc, char **argv)
 				__bluetooth_pb_call_changed,
 				bluetooth_pb_obj);
 
+	__bluetooth_pb_agent_timeout_add_seconds(bluetooth_pb_obj);
+
+
 	/* set signal */
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = __bluetooth_pb_agent_signal_handler;
@@ -1850,8 +1902,14 @@ int main(int argc, char **argv)
 
 	g_signal_emit(bluetooth_pb_obj, signals[CLEAR], 0);
 
-	if (bluetooth_pb_obj)
+	if (bluetooth_pb_obj) {
+		if (bluetooth_pb_obj->timeout_id) {
+			g_source_remove(bluetooth_pb_obj->timeout_id);
+			bluetooth_pb_obj->timeout_id = 0;
+		}
+
 		g_object_unref(bluetooth_pb_obj);
+	}
 
 	if (bus_proxy)
 		g_object_unref(bus_proxy);

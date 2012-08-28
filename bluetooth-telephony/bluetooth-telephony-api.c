@@ -1682,3 +1682,101 @@ BT_EXPORT_API int bluetooth_telephony_indicate_incoming_call(
 	DBG("bluetooth_telephony_indicate_incoming_call -\n");
 	return BLUETOOTH_TELEPHONY_ERROR_NONE;
 }
+
+BT_EXPORT_API int bluetooth_telephony_set_speaker_gain(unsigned short speaker_gain)
+{
+	DBusMessage *msg;
+	DBusMessageIter iter;
+	DBusMessageIter value;
+	DBusConnection *conn;
+	char *spkr_gain_str = "SpeakerGain";
+	int ret = BLUETOOTH_TELEPHONY_ERROR_NONE;
+
+	DBG("+\n");
+	DBG("set speaker_gain= [%d]\n", speaker_gain);
+
+	BT_TELEPHONY_CHECK_BT_STATUS();
+
+	if (telephony_dbus_info.conn == NULL) {
+		DBG("Bluetooth telephony not initilized \n");
+		return BLUETOOTH_TELEPHONY_ERROR_NOT_INITIALIZED;
+	}
+
+	conn = dbus_g_connection_get_connection(telephony_dbus_info.conn);
+
+	if (telephony_info.obj_path == NULL)
+		return BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
+
+	msg = dbus_message_new_method_call(BLUEZ_SERVICE_NAME,
+			telephony_info.obj_path, BLUEZ_HEADSET_INTERFACE,
+			"SetProperty");
+
+	if (NULL != msg) {
+		char sig[2] = {DBUS_TYPE_UINT16, '\0'};
+
+		dbus_message_iter_init_append(msg, &iter);
+		dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING,
+				&spkr_gain_str);
+		dbus_message_iter_open_container(&iter, DBUS_TYPE_VARIANT,
+				sig, &value);
+		dbus_message_iter_append_basic(&value, DBUS_TYPE_UINT16,
+				&speaker_gain);
+		dbus_message_iter_close_container(&iter, &value);
+
+		if (dbus_message_get_type(msg) == DBUS_MESSAGE_TYPE_METHOD_CALL)
+			dbus_message_set_no_reply(msg, TRUE);
+		if (!dbus_connection_send(conn, msg, NULL)) {
+			DBG(" bluetooth_telephony_set_speaker_gain : dbus sending failed\n");
+			ret = BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
+		}
+		dbus_message_unref(msg);
+	} else
+		ret = BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
+
+	DBG(" -\n");
+	return ret;
+}
+
+BT_EXPORT_API int bluetooth_telephony_get_headset_volume(unsigned int *speaker_gain)
+{
+	GHashTable *hash = NULL;
+	GValue *value = NULL;
+	GError *error = NULL;
+	int ret;
+
+	DBG("+");
+	BT_TELEPHONY_CHECK_BT_STATUS();
+
+	if (telephony_dbus_info.conn == NULL) {
+		DBG("Bluetooth telephony not initilized \n");
+		return BLUETOOTH_TELEPHONY_ERROR_NOT_INITIALIZED;
+	}
+
+	if (telephony_dbus_info.proxy == NULL)
+		telephony_dbus_info.proxy =
+			__bluetooth_telephony_get_connected_device_proxy();
+
+	if (telephony_dbus_info.proxy == NULL)
+		return BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
+
+	if (!dbus_g_proxy_call(telephony_dbus_info.proxy, "GetProperties", &error,
+			  G_TYPE_INVALID,
+			  dbus_g_type_get_map("GHashTable", G_TYPE_STRING, G_TYPE_VALUE),
+			  &hash, G_TYPE_INVALID)) {
+		DBG("Dbus Call Failed!\n");
+		if (error != NULL) {
+			ret = __bt_telephony_get_error(error->message);
+			g_error_free(error);
+			return ret;
+		}
+	}
+
+	if (hash == NULL)
+		return BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
+
+	value = g_hash_table_lookup(hash, "SpeakerGain");
+	*speaker_gain = g_value_get_uint(value);
+
+	DBG("-");
+	return BLUETOOTH_TELEPHONY_ERROR_NONE;
+}

@@ -324,6 +324,28 @@ gboolean bluetooth_telephony_is_sco_connected(void);
  */
  int bluetooth_telephony_stop_voice_recognition(void);
 
+
+/**
+ * @brief	The function bluetooth_telephony_get_headset_volume is called to get
+ *	the changed Volume on AG.
+ *
+ * @param[out]	speaker_gain	Speaker gain.
+ * @return	int	Zero on Success or reason for error if any.
+ *
+ */
+int bluetooth_telephony_get_headset_volume(unsigned int *speaker_gain);
+
+/**
+ * @brief	The function bluetooth_telephony_set_speaker_gain is called to indicate
+ *	that the Volume on AG is changed.
+ *
+ * @param[in]	speaker_gain	Speaker gain.
+ * @return	int	Zero on Success or reason for error if any.
+ *
+ */
+int bluetooth_telephony_set_speaker_gain(unsigned short speaker_gain);
+
+
 #ifdef __cplusplus
 }
 #endif /*__cplusplus*/

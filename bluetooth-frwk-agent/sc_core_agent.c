@@ -893,33 +893,41 @@ gboolean sc_core_agent_reply_adapter_enable(ScCoreAgent *agent, const guint chan
 	DBG("+\n");
 
 	ScCoreAgentPrivate *priv = SC_CORE_AGENT_GET_PRIVATE(agent);
+	GError *error;
+	guint result = accept;
+	DBusGMethodInvocation *reply_context = context ? context :
+							priv->reply_context;
 
-	if (accept == SC_CORE_AGENT_ACCEPT) {
-		_sc_core_agent_mode_change(changed_mode);
-		dbus_g_method_return(priv->reply_context);
-	} else {
-		GError *error = NULL;
-		switch (accept) {
-		case SC_CORE_AGENT_CANCEL:
-			error = sc_core_agent_error(SC_CORE_AGENT_ERROR_CANCEL, "CanceledbyUser");
-			break;
-		case SC_CORE_AGENT_TIMEOUT:
-		case SC_CORE_AGENT_REJECT:
-		default:
-			error = sc_core_agent_error(SC_CORE_AGENT_ERROR_REJECT,
-							"Confirming mode request rejected");
-			break;
+	if (result == SC_CORE_AGENT_ACCEPT) {
+		if (!_sc_core_agent_mode_change(changed_mode)) {
+			dbus_g_method_return(reply_context);
+			return TRUE;
 		}
-		dbus_g_method_return_error(priv->reply_context, error);
-		g_error_free(error);
+
+		/* Mode change failed, override result as REJECT */
+		result = SC_CORE_AGENT_REJECT;
 	}
+
+	switch (result) {
+	case SC_CORE_AGENT_CANCEL:
+		error = sc_core_agent_error(SC_CORE_AGENT_ERROR_CANCEL, "CanceledbyUser");
+		break;
+	case SC_CORE_AGENT_TIMEOUT:
+	case SC_CORE_AGENT_REJECT:
+	default:
+		error = sc_core_agent_error(SC_CORE_AGENT_ERROR_REJECT,
+						"Confirming mode request rejected");
+		break;
+	}
+	dbus_g_method_return_error(reply_context, error);
+	g_error_free(error);
 
 	DBG("-\n");
 
 	return TRUE;
 }
 
-void _sc_core_agent_mode_change(int changed_mode)
+int _sc_core_agent_mode_change(int changed_mode)
 {
 	int ret = 0;
 	bt_status_t bt_up_status;
@@ -939,9 +947,7 @@ void _sc_core_agent_mode_change(int changed_mode)
 			DBG("running script failed");
 			ret = system("/usr/etc/bluetooth/bt-dev-end.sh &");
 			_bt_agent_bt_status_set(BT_DEACTIVATED);
-			sc_core_agent_reply_adapter_enable(_sc_core_agent_get_proxy(), changed_mode,
-							   SC_CORE_AGENT_REJECT, NULL);
-			return;
+			return -1;
 		}
 		break;
 
@@ -958,18 +964,16 @@ void _sc_core_agent_mode_change(int changed_mode)
 		if ((ret = system("/usr/etc/bluetooth/bt-stack-down.sh &")) < 0) {
 			DBG("running script failed");
 			_bt_agent_bt_status_set(BT_ACTIVATED);
-			sc_core_agent_reply_adapter_enable(_sc_core_agent_get_proxy(), changed_mode,
-							   SC_CORE_AGENT_REJECT, NULL);
-			return;
+			return -1;
 		}
 		break;
 
 	default:
 		ERR("Unknown mode [%#x]\n", changed_mode);
-		sc_core_agent_reply_adapter_enable(_sc_core_agent_get_proxy(), changed_mode,
-						   SC_CORE_AGENT_REJECT, NULL);
-		return;
+		return -1;
 	}
+
+	return 0;
 }
 
 static gboolean __sc_core_agent_register_on_adapter(ScCoreAgent *agent, DBusGProxy *adapter)

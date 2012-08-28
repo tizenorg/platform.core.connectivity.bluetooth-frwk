@@ -669,8 +669,8 @@ static void __bluetooth_internal_adapter_property_changed(DBusGProxy *adapter,
 		gboolean discovering = g_value_get_boolean(value);
 
 		if (discovering == FALSE) {
-			dbus_g_proxy_call_no_reply(adapter, "StopDiscovery",
-						G_TYPE_INVALID, G_TYPE_INVALID);
+			dbus_g_proxy_call(adapter, "StopDiscovery", NULL,
+					G_TYPE_INVALID, G_TYPE_INVALID);
 			bt_info.is_discovering = FALSE;
 			_bluetooth_internal_discovery_completed_cb();
 		} else {

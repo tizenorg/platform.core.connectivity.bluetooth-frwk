@@ -39,6 +39,7 @@ extern struct bt_agent_appdata *app_data;
 
 #define HFP_AUDIO_GATEWAY_UUID "0000111f-0000-1000-8000-00805f9b34fb"
 #define A2DP_UUID "0000110D-0000-1000-8000-00805F9B34FB"
+#define AVRCP_TARGET_UUID "0000110c-0000-1000-8000-00805f9b34fb"
 #define OPP_UUID "00001105-0000-1000-8000-00805f9b34fb"
 #define FTP_UUID "00001106-0000-1000-8000-00805f9b34fb"
 #define SPP_UUID "00001101-0000-1000-8000-00805f9b34fb"
@@ -466,8 +467,10 @@ static gboolean __authorize_request(DBusGProxy *device, const char *uuid)
 
 	DBG("+\n");
 
-	if (!strcasecmp(uuid, HFP_AUDIO_GATEWAY_UUID) || !strcasecmp(uuid, A2DP_UUID)) {
-		DBG("In case of audio device(HFP,A2DP), we authorize the request [%s]\n", uuid);
+	if (!strcasecmp(uuid, HFP_AUDIO_GATEWAY_UUID) ||
+					!strcasecmp(uuid, A2DP_UUID) ||
+					!strcasecmp(uuid, AVRCP_TARGET_UUID)) {
+		DBG("Auto accept authorization for audio device (HFP, A2DP, AVRCP) [%s]", uuid);
 		sc_core_agent_reply_authorize(_sc_core_agent_get_proxy(), SC_CORE_AGENT_ACCEPT,
 					      NULL);
 

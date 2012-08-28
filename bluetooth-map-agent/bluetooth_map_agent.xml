@@ -26,5 +26,11 @@
 			<arg type="i" name="value"/>
 			<arg type="u" name="update_err" direction="out"/>
 		</method>
+		<method name="NotiRegistration">
+			<annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
+			<arg type="s" name="remote_addr"/>
+			<arg type="b" name="status"/>
+			<arg type="u" name="update_err" direction="out"/>
+		</method>
 	</interface>
 </node>

@@ -816,8 +816,9 @@ static int __bluetooth_internal_discovery_req_timeout_cb(void *data)
 
 	DBG("");
 
-	dbus_g_proxy_call_no_reply(bt_internal_info->adapter_proxy, "StopDiscovery",
-				   G_TYPE_INVALID, G_TYPE_INVALID);
+	dbus_g_proxy_call(bt_internal_info->adapter_proxy, NULL,
+				"StopDiscovery",
+				G_TYPE_INVALID, G_TYPE_INVALID);
 
 	_bluetooth_internal_event_cb(BLUETOOTH_EVENT_DISCOVERY_STARTED,
 					BLUETOOTH_ERROR_TIMEOUT, NULL);

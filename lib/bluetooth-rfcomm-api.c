@@ -532,7 +532,7 @@ static gboolean __rfcomm_server_data_received_cb(GIOChannel *chan, GIOCondition 
 
 	if (cond & (G_IO_NVAL | G_IO_HUP | G_IO_ERR)) {
 		DBG("Unix server  disconnected (fd=%d)\n", rfcomm_server_info->client_sock_fd);
-		__rfcomm_internal_terminate_server(rfcomm_server_info);
+		bluetooth_rfcomm_server_disconnect(rfcomm_server_info->client_sock_fd);
 		return FALSE;
 	}
 
@@ -541,14 +541,14 @@ static gboolean __rfcomm_server_data_received_cb(GIOChannel *chan, GIOCondition 
 	if (g_io_channel_read_chars(chan, buf, sizeof(buf), &len, NULL) == G_IO_STATUS_ERROR) {
 
 		DBG("IO Channel read error server");
-		__rfcomm_internal_terminate_server(rfcomm_server_info);
+		bluetooth_rfcomm_server_disconnect(rfcomm_server_info->client_sock_fd);
 		return FALSE;
 	}
 
 	if (len <= 0) {
 		DBG("Read failed len=%d, fd=%d\n",
 			len,  rfcomm_server_info->client_sock_fd);
-		__rfcomm_internal_terminate_server(rfcomm_server_info);
+		bluetooth_rfcomm_server_disconnect(rfcomm_server_info->client_sock_fd);
 		return FALSE;
 	}
 
@@ -617,9 +617,11 @@ static int __get_default_adapter_path(char **adapter_path)
 	const char *reply_path;
 
 	dbus_error_init(&error);
-	if (NULL == connection) {
+	if (connection == NULL) {
 		DBG("Connection is NULL, so getting the System bus");
 		connection = dbus_bus_get(DBUS_BUS_SYSTEM, &error);
+		if (connection == NULL)
+			return -1;
 	}
 
 	if (dbus_error_is_set(&error)) {
@@ -1689,6 +1691,102 @@ static void __rfcomm_client_connected_cb(DBusGProxy *proxy, DBusGProxyCall *call
 
 }
 
+static void __bluetooth_rfcomm_discover_services_cb(DBusGProxy *proxy, DBusGProxyCall *call,
+						    gpointer user_data)
+{
+	GError *err = NULL;
+	GHashTable *hash;
+	const char *dev_path = NULL;
+	bt_info_t *bt_internal_info = NULL;
+	DBusGConnection *conn;
+	DBusGProxy *rfcomm_proxy = NULL;
+	bluetooth_rfcomm_connection_t con_ind;
+	bluetooth_device_address_t *remote_address = user_data;
+
+	dbus_g_proxy_end_call(proxy, call, &err,
+			dbus_g_type_get_map("GHashTable",
+			G_TYPE_UINT, G_TYPE_STRING),
+			&hash, G_TYPE_INVALID);
+
+	bt_internal_info = _bluetooth_internal_get_information();
+
+	memset(&con_ind, 0x00, sizeof(bluetooth_rfcomm_connection_t));
+	memcpy(&con_ind.device_addr, remote_address, BLUETOOTH_ADDRESS_LENGTH);
+	con_ind.device_role = RFCOMM_ROLE_CLIENT;
+	con_ind.uuid = bt_internal_info->connecting_uuid;
+
+	if (err != NULL) {
+		DBG("Error occured in Proxy call [%s]\n", err->message);
+
+		_bluetooth_internal_event_cb(BLUETOOTH_EVENT_RFCOMM_CONNECTED,
+					BLUETOOTH_ERROR_CONNECTION_ERROR, &con_ind);
+
+		g_error_free(err);
+		goto fail;
+	}
+
+	conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
+	if (!conn) {
+		DBG("ERROR: Can't get on system bus");
+		_bluetooth_internal_event_cb(BLUETOOTH_EVENT_RFCOMM_CONNECTED,
+					BLUETOOTH_ERROR_INTERNAL, &con_ind);
+
+		goto fail;
+	}
+
+	dev_path = dbus_g_proxy_get_path(proxy);
+
+	rfcomm_proxy = dbus_g_proxy_new_for_name(conn, BLUEZ_SERVICE_NAME,
+						dev_path,
+						BLUEZ_SERIAL_CLIENT_INTERFACE);
+
+	g_object_unref(proxy);
+	proxy = NULL;
+
+	dbus_g_connection_unref(conn);
+
+	if (rfcomm_proxy == NULL) {
+		DBG("Failed to get the rfcomm proxy\n");
+
+		_bluetooth_internal_event_cb(BLUETOOTH_EVENT_RFCOMM_CONNECTED,
+					BLUETOOTH_ERROR_SERVICE_NOT_FOUND, &con_ind);
+
+		goto fail;
+	}
+
+	bt_internal_info = _bluetooth_internal_get_information();
+
+	bt_internal_info->rfcomm_proxy = rfcomm_proxy;
+
+	if (!dbus_g_proxy_begin_call(rfcomm_proxy, "Connect",
+			(DBusGProxyCallNotify)__rfcomm_client_connected_cb,
+			(gpointer)remote_address,	/*user_data*/
+			NULL,	/*destroy*/
+			G_TYPE_STRING, bt_internal_info->connecting_uuid,
+			G_TYPE_INVALID)) {
+		DBG("RFCOMM connect Dbus Call Error");
+
+		_bluetooth_internal_event_cb(BLUETOOTH_EVENT_RFCOMM_CONNECTED,
+					BLUETOOTH_ERROR_INTERNAL, &con_ind);
+		goto fail;
+	}
+
+	DBG("-\n");
+
+	return;
+fail:
+	if (rfcomm_proxy)
+		g_object_unref(rfcomm_proxy);
+
+	if (proxy)
+		g_object_unref(proxy);
+
+	g_free(remote_address);
+	g_free(bt_internal_info->connecting_uuid);
+	bt_internal_info->connecting_uuid = NULL;
+	bt_internal_info->rfcomm_proxy = NULL;
+}
+
 BT_EXPORT_API int bluetooth_rfcomm_connect(const bluetooth_device_address_t *remote_bt_address,
 						const char *remote_uuid)
 {
@@ -1696,7 +1794,7 @@ BT_EXPORT_API int bluetooth_rfcomm_connect(const bluetooth_device_address_t *rem
 	gchar *address_up;
 	gchar *remote_device_path;
 	char str_addr[20];
-	DBusGProxy *proxy = NULL;
+	DBusGProxy *device_proxy = NULL;
 	bluetooth_device_address_t *remote_address;
 	GError *err = NULL;
 	DBusGConnection *conn;
@@ -1730,44 +1828,39 @@ BT_EXPORT_API int bluetooth_rfcomm_connect(const bluetooth_device_address_t *rem
 	if (!conn) {
 		DBG("ERROR: Can't get on system bus [%s]", err->message);
 		g_error_free(err);
-		return BLUETOOTH_ERROR_CONNECTION_ERROR;
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	proxy = dbus_g_proxy_new_for_name(conn, BLUEZ_SERVICE_NAME,
-							remote_device_path,
-							BLUEZ_SERIAL_CLIENT_INTERFACE);
+	device_proxy = dbus_g_proxy_new_for_name(conn, BLUEZ_SERVICE_NAME,
+				      remote_device_path, BLUEZ_DEVICE_INTERFACE);
+
+	dbus_g_connection_unref(conn);
+
 	g_free(remote_device_path);
 
-	if (proxy == NULL) {
-		DBG("Failed to get the rfcomm proxy\n");
+	if (device_proxy == NULL)
 		return BLUETOOTH_ERROR_NOT_PAIRED;
-	}
 
-	remote_address = malloc(sizeof(bluetooth_device_address_t));
+	bt_internal_info = _bluetooth_internal_get_information();
+
+	bt_internal_info->connecting_uuid = g_strdup(remote_uuid);
+	remote_address = g_malloc0(sizeof(bluetooth_device_address_t));
 	memcpy(remote_address, remote_bt_address, sizeof(bluetooth_device_address_t));
 
 	DBG("Send BD address = 0x%X:%X:%X:%X:%X:%X", remote_address->addr[0],
 	    remote_address->addr[1], remote_address->addr[2], remote_address->addr[3],
 	    remote_address->addr[4], remote_address->addr[5]);
 
-	bt_internal_info = _bluetooth_internal_get_information();
-
-	bt_internal_info->connecting_uuid = g_strdup(remote_uuid);
-
-	bt_internal_info->rfcomm_proxy = proxy;
-
-	if (!dbus_g_proxy_begin_call(proxy, "Connect",
-					(DBusGProxyCallNotify)__rfcomm_client_connected_cb,
-					(gpointer)remote_address,	/*user_data*/
-					NULL,	/*destroy*/
-					G_TYPE_STRING, remote_uuid,	/*first_arg_type*/
-					G_TYPE_INVALID)) {
-		DBG("Network server register Dbus Call Error");
-		free(remote_address);
+	if (!dbus_g_proxy_begin_call(device_proxy, "DiscoverServices",
+			(DBusGProxyCallNotify)__bluetooth_rfcomm_discover_services_cb,
+			(gpointer)remote_address, NULL,
+			G_TYPE_STRING, bt_internal_info->connecting_uuid,
+			G_TYPE_INVALID)) {
+		DBG("Could not call dbus proxy\n");
+		g_object_unref(device_proxy);
+		g_free(remote_address);
 		g_free(bt_internal_info->connecting_uuid);
-		g_object_unref(proxy);
 		bt_internal_info->connecting_uuid = NULL;
-		bt_internal_info->rfcomm_proxy = NULL;
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 

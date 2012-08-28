@@ -1,9 +1,0 @@
-#!/bin/sh
-
-# root case
-if [ ${USER} == "root" ]
-then
-	# Set vconf values with -g/-u options
-	# 0 is root user id
-	vconftool set -t int db/bluetooth/status "0" -g 6520
-fi

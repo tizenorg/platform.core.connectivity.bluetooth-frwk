@@ -37,7 +37,7 @@ extern "C" {
 
 
 typedef enum {
-	EQUILIZER = 0x00,
+	EQUILIZER = 0x01,
 	REPEAT,
 	SHUFFLE,
 	SCAN,
@@ -74,7 +74,7 @@ typedef enum {
 } media_player_scan_status;
 
 typedef enum {
-	STATUS_STOPPED  = 0x00,
+	STATUS_STOPPED = 0x00,
 	STATUS_PLAYING,
 	STATUS_PAUSED,
 	STATUS_FORWARD_SEEK,
