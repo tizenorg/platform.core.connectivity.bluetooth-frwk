@@ -1561,6 +1561,39 @@ BT_EXPORT_API int bluetooth_rfcomm_server_disconnect(int socket_fd)
 
 }
 
+static int __rfcomm_server_disconnect(int socket_fd)
+{
+	DBG("+\n");
+
+	static char *default_adapter_obj_path = NULL;
+	bt_info_t *bt_internal_info = NULL;
+	int index = 0;
+
+	if (socket_fd <= 0)
+		return BLUETOOTH_ERROR_INVALID_PARAM;
+
+	if (__get_default_adapter_path(&default_adapter_obj_path) < 0) {
+		DBG("Fail to get default hci adapter path\n");
+		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
+	}
+
+	bt_internal_info = _bluetooth_internal_get_information();
+
+	index = __bluetooth_rfcomm_internal_server_get_index_from_client_socket(socket_fd);
+	if (index < 0) {
+		DBG("Invalid index %d  for socket %d\n", index, socket_fd);
+		return BLUETOOTH_ERROR_INVALID_PARAM;
+	}
+
+	g_source_remove(rfcomm_server[index].client_event_src_id);
+	close(rfcomm_server[index].client_sock_fd);
+	rfcomm_server[index].client_sock_fd = -1;
+
+	DBG("-\n");
+
+	return BLUETOOTH_ERROR_NONE;
+
+}
 
 /* Asynchrous implementation */
 static void __rfcomm_client_connected_cb(DBusGProxy *proxy, DBusGProxyCall *call,
@@ -2016,7 +2049,7 @@ BT_EXPORT_API int bluetooth_rfcomm_disconnect(int socket_fd)
 		DBG("Invalid index %d  for socket %d\n", index, socket_fd);
 
 		/* Try to disconnect server socket */
-		return bluetooth_rfcomm_server_disconnect(socket_fd);
+		return __rfcomm_server_disconnect(socket_fd);
 	}
 
 	if (!(socket_fd && (socket_fd == rfcomm_client[index].sock_fd)) ||
@@ -2027,12 +2060,23 @@ BT_EXPORT_API int bluetooth_rfcomm_disconnect(int socket_fd)
 
 	ret = __bluetooth_rfcomm_internal_disconnect(index);
 
-	if (ret == BLUETOOTH_ERROR_NONE)
-		__rfcomm_internal_terminate_client(index);
+	if (ret != BLUETOOTH_ERROR_NONE)
+		return ret;
+
+	g_source_remove(rfcomm_client[index].event_src_id);
+	rfcomm_client[index].event_src_id = -1;
+
+	close(rfcomm_client[index].sock_fd);
+	rfcomm_client[index].sock_fd = -1;
+	if (rfcomm_client[index].dev_node_name != NULL)
+		g_free(rfcomm_client[index].dev_node_name);
+	rfcomm_client[index].dev_node_name = NULL;
+
+	rfcomm_client[index].id = -1;
 
 	DBG("-\n");
 
-	return ret;
+	return BLUETOOTH_ERROR_NONE;
 
 }
 
