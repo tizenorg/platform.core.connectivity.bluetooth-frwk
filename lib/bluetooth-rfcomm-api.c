@@ -1311,15 +1311,20 @@ BT_EXPORT_API int bluetooth_rfcomm_accept_connection(int server_fd, int *client_
 		goto done;
 	}
 
+	g_main_context_iteration(NULL, TRUE);
+
 	/* Block until recieve the event (Requirement from BADA) */
 	while (rfcomm_connected == FALSE) {
-		g_main_context_iteration(NULL, TRUE);
 		usleep(SLEEP_TIME); /* Sleep 50ms */
 		block_time += SLEEP_TIME;
 
-		if (block_time >= BLOCK_MAX_TIMEOUT)
+		if (block_time >= BLOCK_MAX_TIMEOUT) {
+			g_main_context_iteration(NULL, FALSE);
 			return BLUETOOTH_ERROR_TIMEOUT;
+		}
 	}
+
+	g_main_context_iteration(NULL, FALSE);
 
 	*client_fd = connected_fd;
 	rfcomm_connected = FALSE;

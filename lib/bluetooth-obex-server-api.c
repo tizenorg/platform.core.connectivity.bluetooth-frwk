@@ -512,15 +512,20 @@ BT_EXPORT_API int bluetooth_obex_server_accept_connection(void)
 	obex_connected = FALSE;
 	auto_authorize = TRUE;
 
+	g_main_context_iteration(NULL, TRUE);
+
 	/* Block until recieve the event (Requirement from BADA) */
 	while (obex_connected == FALSE) {
-		g_main_context_iteration(NULL, TRUE);
 		usleep(SLEEP_TIME); /* Sleep 50ms */
 		block_time += SLEEP_TIME;
 
-		if (block_time >= BLOCK_MAX_TIMEOUT)
+		if (block_time >= BLOCK_MAX_TIMEOUT) {
+			g_main_context_iteration(NULL, FALSE);
 			return BLUETOOTH_ERROR_TIMEOUT;
+		}
 	}
+
+	g_main_context_iteration(NULL, FALSE);
 
 	obex_connected = FALSE;
 	auto_authorize = FALSE;
