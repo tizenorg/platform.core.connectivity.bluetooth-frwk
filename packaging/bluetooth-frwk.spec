@@ -1,6 +1,6 @@
 Name:       bluetooth-frwk
 Summary:    Bluetooth framework for BlueZ and Obexd. This package is Bluetooth framework based on BlueZ and Obexd stack.
-Version:    0.1.86
+Version:    0.1.87
 Release:    1
 Group:      TO_BE/FILLED_IN
 License:    TO BE FILLED IN

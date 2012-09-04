@@ -649,6 +649,20 @@ static bool __bluetooth_get_discoverable_value(DBusGProxy *adapter)
 	return discoverable;
 }
 
+gboolean _bt_discovery_finished_cb(gpointer user_data)
+{
+	DBG("+");
+
+	if (bluetooth_is_discovering() == FALSE) {
+		bt_info.is_discovering = FALSE;
+		_bluetooth_internal_discovery_completed_cb();
+	}
+
+	DBG("-");
+
+	return FALSE;
+}
+
 static void __bluetooth_internal_adapter_property_changed(DBusGProxy *adapter,
 							const char *property,
 							GValue *value,
@@ -671,11 +685,14 @@ static void __bluetooth_internal_adapter_property_changed(DBusGProxy *adapter,
 		if (discovering == FALSE) {
 			dbus_g_proxy_call(adapter, "StopDiscovery", NULL,
 					G_TYPE_INVALID, G_TYPE_INVALID);
-			bt_info.is_discovering = FALSE;
-			_bluetooth_internal_discovery_completed_cb();
+
+			g_timeout_add(BT_DISCOVERY_FINISHED_DELAY,
+				      (GSourceFunc)_bt_discovery_finished_cb, NULL);
 		} else {
-			bt_info.is_discovering = TRUE;
-			_bluetooth_internal_discovery_started_cb();
+			if (bt_info.is_discovering == FALSE) {
+				bt_info.is_discovering = TRUE;
+				_bluetooth_internal_discovery_started_cb();
+			}
 		}
 	} else if (g_strcmp0(property, "Discoverable") == 0) {
 		gboolean discoverable = g_value_get_boolean(value);
