@@ -930,6 +930,11 @@ BT_EXPORT_API int bluetooth_cancel_discovery(void)
 		return ret;
 	}
 
+	if (bt_internal_info->bt_discovery_req_timer != 0) {
+		g_source_remove(bt_internal_info->bt_discovery_req_timer);
+		bt_internal_info->bt_discovery_req_timer = 0;
+	}
+
 	bt_internal_info->is_discovery_cancel = TRUE;
 
 	DBG("-");

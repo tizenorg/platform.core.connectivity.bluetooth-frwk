@@ -653,6 +653,8 @@ gboolean _bt_discovery_finished_cb(gpointer user_data)
 {
 	DBG("+");
 
+	bt_info.bt_discovery_res_timer = 0;
+
 	if (bluetooth_is_discovering() == FALSE) {
 		bt_info.is_discovering = FALSE;
 		_bluetooth_internal_discovery_completed_cb();
@@ -686,7 +688,7 @@ static void __bluetooth_internal_adapter_property_changed(DBusGProxy *adapter,
 			dbus_g_proxy_call(adapter, "StopDiscovery", NULL,
 					G_TYPE_INVALID, G_TYPE_INVALID);
 
-			g_timeout_add(BT_DISCOVERY_FINISHED_DELAY,
+			bt_info.bt_discovery_res_timer = g_timeout_add(BT_DISCOVERY_FINISHED_DELAY,
 				      (GSourceFunc)_bt_discovery_finished_cb, NULL);
 		} else {
 			if (bt_info.is_discovering == FALSE) {

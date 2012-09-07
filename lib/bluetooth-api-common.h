@@ -182,6 +182,7 @@ typedef struct {
 
 	guint bt_discovery_req_timer;			/**< g_timeout for checking timeout of
 							BT discovery request */
+	guint bt_discovery_res_timer;
 	gboolean is_discovery_req;			/**< application request discovery or not*/
 	gboolean is_discovering;			/**< Currently discovery state */
 	gboolean is_discovery_cancel;			/**< discovery cancel is requested */

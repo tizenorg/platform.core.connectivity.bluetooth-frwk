@@ -1,3 +1,11 @@
+bluetooth-frwk (0.1.88) unstable; urgency=low
+
+  * Tagging and upload the package
+  * Git: slp/pkgs/b/bluetooth-frwk
+  * Tag: bluetooth-frwk_0.1.88
+
+ -- DoHyun Pyun <dh79.pyun@samsung.com>  Fri, 07 Sep 2012 15:23:55 +0900
+
 bluetooth-frwk (0.1.87) unstable; urgency=low
 
   * Tagging and upload the package

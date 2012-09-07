@@ -1076,6 +1076,7 @@ BT_EXPORT_API int bluetooth_telephony_init(bt_telephony_func_ptr cb,
 
 	if (telephony_dbus_info.manager_proxy == NULL) {
 		DBG("Could not create a manager proxy\n");
+		__bluetooth_telephony_proxy_deinit();
 		dbus_g_connection_unref(telephony_dbus_info.conn);
 		telephony_dbus_info.conn = NULL;
 		return BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
@@ -1086,6 +1087,7 @@ BT_EXPORT_API int bluetooth_telephony_init(bt_telephony_func_ptr cb,
 			DBUS_PATH_DBUS, DBUS_INTERFACE_DBUS);
 
 	if (NULL == telephony_dbus_info.dbus_proxy) {
+		__bluetooth_telephony_proxy_deinit();
 		dbus_g_connection_unref(telephony_dbus_info.conn);
 		telephony_dbus_info.conn = NULL;
 		g_object_unref(telephony_dbus_info.manager_proxy);
@@ -1116,21 +1118,6 @@ BT_EXPORT_API int bluetooth_telephony_init(bt_telephony_func_ptr cb,
 	telephony_info.cb = cb;
 	telephony_info.user_data = user_data;
 
-	/*Check for BT status*/
-	ret = __bluetooth_get_default_adapter_path(telephony_dbus_info.conn,
-								object_path);
-	if (ret != BLUETOOTH_TELEPHONY_ERROR_NONE)
-		return BLUETOOTH_TELEPHONY_ERROR_NOT_ENABLED;
-
-	/*Bluetooth is active, therefore set the flag */
-	is_active = TRUE;
-
-	ret = __bluetooth_telephony_register();
-	if (ret != BLUETOOTH_TELEPHONY_ERROR_NONE) {
-		DBG("__bluetooth_telephony_register failed\n");
-		goto fail;
-	}
-
 	dbus_error_init(&dbus_error);
 	conn = dbus_g_connection_get_connection(telephony_dbus_info.conn);
 	dbus_connection_add_filter(conn, __bluetooth_telephony_event_filter,
@@ -1143,10 +1130,24 @@ BT_EXPORT_API int bluetooth_telephony_init(bt_telephony_func_ptr cb,
 	if (dbus_error_is_set(&dbus_error)) {
 		DBG("Fail to add dbus filter signal\n");
 		dbus_error_free(&dbus_error);
-		__bluetooth_telephony_unregister();
 		dbus_connection_remove_filter(dbus_g_connection_get_connection(
 				telephony_dbus_info.conn),
 				__bluetooth_telephony_event_filter, NULL);
+		goto fail;
+	}
+
+	/*Check for BT status*/
+	ret = __bluetooth_get_default_adapter_path(telephony_dbus_info.conn,
+								object_path);
+	if (ret != BLUETOOTH_TELEPHONY_ERROR_NONE)
+		return BLUETOOTH_TELEPHONY_ERROR_NOT_ENABLED;
+
+	/*Bluetooth is active, therefore set the flag */
+	is_active = TRUE;
+
+	ret = __bluetooth_telephony_register();
+	if (ret != BLUETOOTH_TELEPHONY_ERROR_NONE) {
+		DBG("__bluetooth_telephony_register failed\n");
 		goto fail;
 	}
 
@@ -1164,8 +1165,6 @@ fail:
 		"NameOwnerChanged",
 		G_CALLBACK(__bluetooth_telephony_name_owner_changed),
 		NULL);
-
-	g_object_unref(telephony_dbus_info.dbus_proxy);
 
 	/*Remove BT enabled signal*/
 	dbus_g_proxy_disconnect_signal(
@@ -1208,8 +1207,6 @@ BT_EXPORT_API int bluetooth_telephony_deinit(void)
 		"NameOwnerChanged",
 		G_CALLBACK(__bluetooth_telephony_name_owner_changed),
 		NULL);
-
-	g_object_unref(telephony_dbus_info.dbus_proxy);
 
 	/*Remove BT enabled signal*/
 	dbus_g_proxy_disconnect_signal(
