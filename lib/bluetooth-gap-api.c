@@ -1638,9 +1638,6 @@ BT_EXPORT_API int bluetooth_cancel_bonding(void)
 				   G_TYPE_STRING, bt_internal_info->bt_bonding_req_addrstr,
 				   G_TYPE_INVALID, G_TYPE_INVALID);
 
-	bt_internal_info->is_bonding_req = 0;
-	memset(bt_internal_info->bt_bonding_req_addrstr, 0x00, 18);
-
 	if (error) {
 		DBG("CancelDeviceCreation error: [%s]", error->message);
 		g_error_free(error);
