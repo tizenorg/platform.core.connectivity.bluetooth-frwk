@@ -1186,6 +1186,7 @@ static void __bluetooth_internal_bonding_req_finish_cb(DBusGProxy *proxy, DBusGP
 	GValue *value = NULL;
 	DBusGProxy *device_proxy = NULL;
 	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
+	bluetooth_device_info_t device_info = { { { 0 } } };
 
 	DBG("+");
 
@@ -1193,6 +1194,9 @@ static void __bluetooth_internal_bonding_req_finish_cb(DBusGProxy *proxy, DBusGP
 
 	dbus_g_proxy_end_call(proxy, call, &err,
 			      DBUS_TYPE_G_OBJECT_PATH, &device_path, G_TYPE_INVALID);
+
+	_bluetooth_internal_convert_addr_string_to_addr_type(&device_info.device_address,
+							    bt_internal_info->bt_bonding_req_addrstr);
 
 	if (err != NULL) {
 		DBG("Error occured in CreateBonding [%s]", err->message);
@@ -1215,26 +1219,26 @@ static void __bluetooth_internal_bonding_req_finish_cb(DBusGProxy *proxy, DBusGP
 					DBG("RemoveDevice Fail", err->message);
 					g_error_free(err);
 					__bluetooth_internal_bonding_req_reply_cb(BLUETOOTH_ERROR_PARING_FAILED,
-											NULL, 0);
+											&device_info, 0);
 				} else {
 					__bluetooth_internal_bonding_req();
 				}
 			} else {
 				ERR("No device in adapter");
 				__bluetooth_internal_bonding_req_reply_cb
-				    (BLUETOOTH_ERROR_PARING_FAILED, NULL, 0);
+				    (BLUETOOTH_ERROR_PARING_FAILED, &device_info, 0);
 			}
 			return;
 		} else if (!strcmp(err->message, "Authentication Rejected")) {
 			__bluetooth_internal_bonding_req_reply_cb(BLUETOOTH_ERROR_ACCESS_DENIED,
-									NULL, 0);
+									&device_info, 0);
 		} else if (!strcmp(err->message, "CanceledbyUser") ||
 					!strcmp(err->message, "Authentication Canceled")) {
 			__bluetooth_internal_bonding_req_reply_cb(BLUETOOTH_ERROR_CANCEL_BY_USER,
-								NULL, 0);
+								&device_info, 0);
 		} else if (!strcmp(err->message, "In Progress")) {
 			__bluetooth_internal_bonding_req_reply_cb(BLUETOOTH_ERROR_IN_PROGRESS,
-								NULL, 0);
+								&device_info, 0);
 		} else if (!strcmp(err->message, "Authentication Failed")) {
 			dbus_g_proxy_call(bt_internal_info->adapter_proxy, "FindDevice", NULL,
 					  G_TYPE_STRING, bt_internal_info->bt_bonding_req_addrstr,
@@ -1267,7 +1271,7 @@ static void __bluetooth_internal_bonding_req_finish_cb(DBusGProxy *proxy, DBusGP
 			is_headset = __bluetooth_is_headset_class(remote_class);
 
 			__bluetooth_internal_bonding_req_reply_cb(BLUETOOTH_ERROR_AUTHENTICATION_FAILED,
-									NULL, is_headset);
+									&device_info, is_headset);
 		} else if (!strcmp(err->message, "Page Timeout")) {
 			/* This is the special case
 			     As soon as call bluetooth_bond_device, try to cancel bonding.
@@ -1277,19 +1281,19 @@ static void __bluetooth_internal_bonding_req_finish_cb(DBusGProxy *proxy, DBusGP
 
 			if (bt_internal_info->is_bonding_req == FALSE) {
 				__bluetooth_internal_bonding_req_reply_cb(BLUETOOTH_ERROR_CANCEL_BY_USER,
-										NULL, 0);
+										&device_info, 0);
 			} else {
 				if (bt_internal_info->is_headset_bonding)
 					/* Headset auto-pairing fail case */
 					__bluetooth_internal_bonding_req_reply_cb(BLUETOOTH_ERROR_AUTHENTICATION_FAILED,
-										NULL, 1);
+										&device_info, 1);
 				else
 					__bluetooth_internal_bonding_req_reply_cb(BLUETOOTH_ERROR_HOST_DOWN,
-											NULL, 0);
+											&device_info, 0);
 			}
 		} else {
 			__bluetooth_internal_bonding_req_reply_cb(BLUETOOTH_ERROR_PARING_FAILED,
-									NULL, 0);
+									&device_info, 0);
 		}
 
 		if (err != NULL)
@@ -1319,8 +1323,18 @@ static void __bluetooth_internal_bonding_req_finish_cb(DBusGProxy *proxy, DBusGP
 
 static int __bluetooth_internal_bonding_req_timeout_cb(void *data)
 {
+	bt_info_t *bt_internal_info = NULL;
+	bluetooth_device_info_t device_info = { { { 0 } } };
+
 	DBG("+");
-	__bluetooth_internal_bonding_req_reply_cb(BLUETOOTH_ERROR_TIMEOUT, NULL, 0);
+
+	bt_internal_info = _bluetooth_internal_get_information();
+
+	_bluetooth_internal_convert_addr_string_to_addr_type(&device_info.device_address,
+						    bt_internal_info->bt_bonding_req_addrstr);
+
+	__bluetooth_internal_bonding_req_reply_cb(BLUETOOTH_ERROR_TIMEOUT, &device_info, 0);
+
 	DBG("-");
 
 	return 0;
