@@ -81,7 +81,7 @@ BT_EXPORT_API int bluetooth_network_activate_server(void)
 	if (!dbus_g_proxy_call(proxy_net_server, "Register", &err,
 			G_TYPE_STRING, NAP_UUID_NAME, /*first_arg */
 			G_TYPE_STRING, NET_BRIDGE_INTERFACE,/*second_arg */
-			G_TYPE_INVALID)) {
+			G_TYPE_INVALID, G_TYPE_INVALID)) {
 		DBG("Network server register Error: %s\n", err->message);
 		g_error_free(err);
 		ret = BLUETOOTH_ERROR_INTERNAL;
@@ -132,7 +132,7 @@ BT_EXPORT_API int bluetooth_network_deactivate_server(void)
 
 	if (!dbus_g_proxy_call(proxy_net_server, "Unregister", &err,
 			G_TYPE_STRING, NAP_UUID_NAME, /*first_arg */
-			G_TYPE_INVALID)) {
+			G_TYPE_INVALID, G_TYPE_INVALID)) {
 		DBG("Network server unregister Error: %s\n", err->message);
 		g_error_free(err);
 		ret = BLUETOOTH_ERROR_INTERNAL;
