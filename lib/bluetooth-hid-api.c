@@ -22,6 +22,7 @@
  */
 
 #include "bluetooth-api-common.h"
+#include "bluetooth-api.h"
 #include "bluetooth-hid-api.h"
 
 #define BLUEZ_INPUT_NAME "org.bluez.Input"
@@ -48,7 +49,7 @@ static void __hid_connection_changed_cb(gboolean connected,
 
 	bt_event.event = connected ? BLUETOOTH_HID_CONNECTED : \
 				BLUETOOTH_HID_DISCONNECTED;
-	bt_event.result = HID_ERROR_NONE;
+	bt_event.result = BLUETOOTH_ERROR_NONE;
 	bt_event.param_data = (void *)device_addr;
 
 	if (bt_hid_info.app_cb)
@@ -136,7 +137,7 @@ static void __hid_connect_request_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 				address);
 
 		bt_event.event = BLUETOOTH_HID_CONNECTED;
-		bt_event.result = HID_ERROR_CONNECTION_FAILED;
+		bt_event.result = BLUETOOTH_ERROR_CONNECTION_ERROR;
 		bt_event.param_data = (void *)&device_address;
 
 		if (bt_hid_info.app_cb)
@@ -179,7 +180,7 @@ static void __hid_disconnect_request_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 				address);
 
 		bt_event.event = BLUETOOTH_HID_DISCONNECTED;
-		bt_event.result = HID_ERROR_CONNECTION_FAILED;
+		bt_event.result = BLUETOOTH_ERROR_CONNECTION_ERROR;
 		bt_event.param_data = (void *)&device_address;
 
 		if (bt_hid_info.app_cb)
@@ -204,7 +205,7 @@ static void __hid_disconnect_request_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 BT_EXPORT_API int bluetooth_hid_init(hid_cb_func_ptr callback_ptr,
 					void *user_data)
 {
-	int result = HID_ERROR_NONE;
+	int result = BLUETOOTH_ERROR_NONE;
 	GError *err = NULL;
 	DBusError dbus_error;
 	DBusGConnection *conn = NULL;
@@ -216,7 +217,7 @@ BT_EXPORT_API int bluetooth_hid_init(hid_cb_func_ptr callback_ptr,
 
 	if (bt_hid_info.conn) {
 		DBG("HID is already initialized");
-		return HID_ERROR_ALREADY_INITIALIZED;
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
 	conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, &err);
@@ -224,7 +225,7 @@ BT_EXPORT_API int bluetooth_hid_init(hid_cb_func_ptr callback_ptr,
 	if (err != NULL) {
 		DBG("ERROR: Can't get on system bus [%s]", err->message);
 		g_error_free(err);
-		return HID_ERROR_INTERNAL;
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
 	sys_conn = dbus_g_connection_get_connection(conn);
@@ -238,7 +239,7 @@ BT_EXPORT_API int bluetooth_hid_init(hid_cb_func_ptr callback_ptr,
 	if (dbus_error_is_set(&dbus_error)) {
 		DBG("Fail to add dbus filter signal: %s\n", dbus_error.message);
 		dbus_error_free(&dbus_error);
-		result = HID_ERROR_INTERNAL;
+		result = BLUETOOTH_ERROR_INTERNAL;
 		goto failed;
 	}
 
@@ -249,7 +250,7 @@ BT_EXPORT_API int bluetooth_hid_init(hid_cb_func_ptr callback_ptr,
 
 	DBG("-");
 
-	return HID_ERROR_NONE;
+	return BLUETOOTH_ERROR_NONE;
 failed:
 	if (conn)
 		dbus_g_connection_unref(conn);
@@ -263,7 +264,7 @@ BT_EXPORT_API int bluetooth_hid_deinit(void)
 
 	if (bt_hid_info.conn == NULL) {
 		DBG("HID is not initialized");
-		return HID_ERROR_NOT_INITIALIZED;
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
 	if (bt_hid_info.sys_conn) {
@@ -303,17 +304,17 @@ BT_EXPORT_API int bluetooth_hid_connect(hid_device_address_t *device_address)
 	DBG("+\n");
 
 	if (device_address == NULL)
-		return HID_ERROR_INVALID_PARAM;
+		return BLUETOOTH_ERROR_INVALID_PARAM;
 
 	if (bt_hid_info.conn == NULL) {
 		DBG("HID is not initialized");
-		return HID_ERROR_NOT_INITIALIZED;
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
 	/* If the adapter path is wrong, we can think the BT is not enabled. */
 	if (_bluetooth_internal_get_adapter_path(bt_hid_info.conn, adapter_path) < 0) {
 		DBG("Could not get adapter path\n");
-		return HID_ERROR_NOT_ENABLED;
+		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
 	}
 
 	adapter_proxy = dbus_g_proxy_new_for_name(bt_hid_info.conn, BLUEZ_SERVICE_NAME,
@@ -321,7 +322,7 @@ BT_EXPORT_API int bluetooth_hid_connect(hid_device_address_t *device_address)
 
 	if (adapter_proxy == NULL) {
 		DBG("dbus_g_proxy_new_for_name() failed\n");
-		return HID_ERROR_INTERNAL;
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
 	_bluetooth_internal_addr_type_to_addr_string(address,
@@ -336,7 +337,7 @@ BT_EXPORT_API int bluetooth_hid_connect(hid_device_address_t *device_address)
 		DBG("Failed to Find device: %s\n", g_error->message);
 		g_error_free(g_error);
 		g_object_unref(adapter_proxy);
-		return HID_ERROR_NOT_PAIRED;
+		return BLUETOOTH_ERROR_NOT_PAIRED;
 	}
 
 	hid_proxy = dbus_g_proxy_new_for_name(bt_hid_info.conn, BLUEZ_SERVICE_NAME,
@@ -345,7 +346,7 @@ BT_EXPORT_API int bluetooth_hid_connect(hid_device_address_t *device_address)
 	if (hid_proxy == NULL) {
 		DBG("Failed to get hidh proxy\n");
 		g_object_unref(adapter_proxy);
-		return HID_ERROR_NOT_PAIRED;
+		return BLUETOOTH_ERROR_NOT_PAIRED;
 	}
 
 	bt_hid_info.hid_proxy = hid_proxy;
@@ -358,14 +359,14 @@ BT_EXPORT_API int bluetooth_hid_connect(hid_device_address_t *device_address)
 		g_object_unref(hid_proxy);
 		g_object_unref(adapter_proxy);
 		bt_hid_info.hid_proxy = NULL;
-		return HID_ERROR_CONNECTION_FAILED;
+		return BLUETOOTH_ERROR_CONNECTION_ERROR;
 	}
 
 	g_object_unref(adapter_proxy);
 
 	DBG("-\n");
 
-	return HID_ERROR_NONE;
+	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_hid_disconnect(hid_device_address_t *device_address)
@@ -380,17 +381,17 @@ BT_EXPORT_API int bluetooth_hid_disconnect(hid_device_address_t *device_address)
 	DBG("+\n");
 
 	if (device_address == NULL)
-		return HID_ERROR_INVALID_PARAM;
+		return BLUETOOTH_ERROR_INVALID_PARAM;
 
 	if (bt_hid_info.conn == NULL) {
 		DBG("HID is not initialized");
-		return HID_ERROR_NOT_INITIALIZED;
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
 	/* If the adapter path is wrong, we can think the BT is not enabled. */
 	if (_bluetooth_internal_get_adapter_path(bt_hid_info.conn, adapter_path) < 0) {
 		DBG("Could not get adapter path\n");
-		return HID_ERROR_NOT_ENABLED;
+		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
 	}
 
 	adapter_proxy = dbus_g_proxy_new_for_name(bt_hid_info.conn, BLUEZ_SERVICE_NAME,
@@ -398,7 +399,7 @@ BT_EXPORT_API int bluetooth_hid_disconnect(hid_device_address_t *device_address)
 
 	if (adapter_proxy == NULL) {
 		DBG("dbus_g_proxy_new_for_name() failed\n");
-		return HID_ERROR_INTERNAL;
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
 	_bluetooth_internal_addr_type_to_addr_string(address,
@@ -413,7 +414,7 @@ BT_EXPORT_API int bluetooth_hid_disconnect(hid_device_address_t *device_address)
 		DBG("Failed to Find device: %s\n", g_error->message);
 		g_error_free(g_error);
 		g_object_unref(adapter_proxy);
-		return HID_ERROR_NOT_PAIRED;
+		return BLUETOOTH_ERROR_NOT_PAIRED;
 	}
 
 	hid_proxy = dbus_g_proxy_new_for_name(bt_hid_info.conn, BLUEZ_SERVICE_NAME,
@@ -422,7 +423,7 @@ BT_EXPORT_API int bluetooth_hid_disconnect(hid_device_address_t *device_address)
 	if (hid_proxy == NULL) {
 		DBG("Failed to get hidh proxy\n");
 		g_object_unref(adapter_proxy);
-		return HID_ERROR_NOT_PAIRED;
+		return BLUETOOTH_ERROR_NOT_PAIRED;
 	}
 
 	bt_hid_info.hid_proxy = hid_proxy;
@@ -435,7 +436,7 @@ BT_EXPORT_API int bluetooth_hid_disconnect(hid_device_address_t *device_address)
 		g_object_unref(adapter_proxy);
 		g_object_unref(hid_proxy);
 		bt_hid_info.hid_proxy = NULL;
-		return HID_ERROR_CONNECTION_FAILED;
+		return BLUETOOTH_ERROR_CONNECTION_ERROR;
 	}
 
 	g_object_unref(adapter_proxy);
