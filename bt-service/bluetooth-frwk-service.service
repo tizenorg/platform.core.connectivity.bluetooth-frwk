@@ -2,6 +2,7 @@
 
 [Unit]
 Description=Bluetooth Framework Service
+After=dbus.service
 
 [Service]
 Type=dbus
@@ -11,4 +12,4 @@ ExecStart=/usr/bin/bt-service
 RemainAfterExit=yes
 
 [Install]
-WantedBy=bluetooth.target
+WantedBy=tizen-middleware.target.wants

@@ -73,9 +73,10 @@ mkdir -p %{buildroot}%{_sysconfdir}/rc.d/rc5.d/
 ln -s %{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service %{buildroot}%{_sysconfdir}/rc.d/rc3.d/S80bluetooth-frwk-service
 ln -s %{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service %{buildroot}%{_sysconfdir}/rc.d/rc5.d/S80bluetooth-frwk-service
 
-mkdir -p %{buildroot}%{_libdir}/systemd/system/multi-user.target.wants
-install -m 0644 bt-service/bluetooth-frwk-service.service %{buildroot}%{_libdir}/systemd/system/
-ln -s ../bluetooth-frwk-service.service %{buildroot}%{_libdir}/systemd/system/multi-user.target.wants/bluetooth-frwk-service.service
+mkdir -p %{buildroot}%{_libdir}/systemd/user
+mkdir -p %{buildroot}%{_libdir}/systemd/user/tizen-middleware.target.wants
+install -m 0644 bt-service/bluetooth-frwk-service.service %{buildroot}%{_libdir}/systemd/user/
+ln -s ../bluetooth-frwk-service.service %{buildroot}%{_libdir}/systemd/user/tizen-middleware.target.wants/bluetooth-frwk-service.service
 
 
 %post
@@ -108,8 +109,8 @@ vconftool set -tf int memory/bluetooth/btsco "0" -g 6520 -i
 %{_sysconfdir}/rc.d/rc5.d/S80bluetooth-frwk-service
 %{_datadir}/dbus-1/services/org.projectx.bt.service
 %{_bindir}/bt-service
-%{_libdir}/systemd/system/multi-user.target.wants/bluetooth-frwk-service.service
-%{_libdir}/systemd/system/bluetooth-frwk-service.service
+%{_libdir}/systemd/user/tizen-middleware.target.wants/bluetooth-frwk-service.service
+%{_libdir}/systemd/user/bluetooth-frwk-service.service
 %attr(0666,-,-) /opt/var/lib/bluetooth/auto-pair-blacklist
 
 %files core
