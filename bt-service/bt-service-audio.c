@@ -598,7 +598,8 @@ int _bt_audio_disconnect(int request_id, int type,
 
 	return BLUETOOTH_ERROR_NONE;
 fail:
-	g_array_append_vals(*out_param1, address,
+	if (out_param1 != NULL)
+		g_array_append_vals(*out_param1, address,
 				BT_ADDRESS_STR_LEN);
 
 	return result;
