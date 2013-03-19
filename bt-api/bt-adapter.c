@@ -34,8 +34,8 @@ static int __bt_fill_device_list(GArray *out_param2, GPtrArray **dev_list)
 	guint size;
 	bluetooth_device_info_t info;
 
-	BT_CHECK_PARAMETER(out_param2);
-	BT_CHECK_PARAMETER(dev_list);
+	BT_CHECK_PARAMETER(out_param2, return);
+	BT_CHECK_PARAMETER(dev_list, return);
 
 	size = out_param2->len;
 	retv_if(size == 0, BLUETOOTH_ERROR_NONE);
@@ -90,7 +90,7 @@ BT_EXPORT_API int bluetooth_disable_adapter(void)
 {
 	int result;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -103,12 +103,27 @@ BT_EXPORT_API int bluetooth_disable_adapter(void)
 	return result;
 }
 
+BT_EXPORT_API int bluetooth_reset_adapter(void)
+{
+	int result;
+
+	BT_INIT_PARAMS();
+	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_RESET_ADAPTER,
+		in_param1, in_param2, in_param3, in_param4, &out_param);
+
+	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	return result;
+}
+
 BT_EXPORT_API int bluetooth_get_local_address(bluetooth_device_address_t *local_address)
 {
 	int result;
 
-	BT_CHECK_PARAMETER(local_address);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(local_address, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -130,8 +145,8 @@ BT_EXPORT_API int bluetooth_get_local_name(bluetooth_device_name_t *local_name)
 {
 	int result;
 
-	BT_CHECK_PARAMETER(local_name);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(local_name, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -153,8 +168,8 @@ BT_EXPORT_API int bluetooth_set_local_name(const bluetooth_device_name_t *local_
 {
 	int result;
 
-	BT_CHECK_PARAMETER(local_name);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(local_name, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -175,9 +190,9 @@ BT_EXPORT_API int bluetooth_is_service_used(const char *service_uuid,
 	int result;
 	char uuid[BLUETOOTH_UUID_STRING_MAX];
 
-	BT_CHECK_PARAMETER(service_uuid);
-	BT_CHECK_PARAMETER(used);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(service_uuid, return);
+	BT_CHECK_PARAMETER(used, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -203,7 +218,7 @@ BT_EXPORT_API int bluetooth_get_discoverable_mode(bluetooth_discoverable_mode_t 
 	int result;
 	int timeout = 0;
 
-	BT_CHECK_PARAMETER(discoverable_mode_ptr);
+	BT_CHECK_PARAMETER(discoverable_mode_ptr, return);
 
 	/* Requirement in OSP */
 	if (bluetooth_check_adapter() == BLUETOOTH_ADAPTER_DISABLED) {
@@ -242,7 +257,7 @@ BT_EXPORT_API int bluetooth_set_discoverable_mode(bluetooth_discoverable_mode_t 
 {
 	int result;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -262,8 +277,8 @@ BT_EXPORT_API int bluetooth_get_timeout_value(int *timeout)
 {
 	int result;
 
-	BT_CHECK_PARAMETER(timeout);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(timeout, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -286,7 +301,7 @@ BT_EXPORT_API int bluetooth_start_discovery(unsigned short max_response,
 {
 	int result;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -303,7 +318,7 @@ BT_EXPORT_API int bluetooth_cancel_discovery(void)
 {
 	int result;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -322,7 +337,7 @@ BT_EXPORT_API int bluetooth_is_discovering(void)
 	int result;
 	int is_discovering = FALSE;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -346,8 +361,8 @@ BT_EXPORT_API int bluetooth_get_bonded_device_list(GPtrArray **dev_list)
 {
 	int result;
 
-	BT_CHECK_PARAMETER(dev_list);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(dev_list, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);

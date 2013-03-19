@@ -28,7 +28,7 @@ BT_EXPORT_API int bluetooth_network_activate_server()
 {
 	int result;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -45,7 +45,7 @@ BT_EXPORT_API int bluetooth_network_deactivate_server(void)
 {
 	int result;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -65,8 +65,8 @@ BT_EXPORT_API int bluetooth_network_connect(const bluetooth_device_address_t *de
 	int result;
 	bt_user_info_t *user_info;
 
-	BT_CHECK_PARAMETER(device_address);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(device_address, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -92,8 +92,8 @@ BT_EXPORT_API int bluetooth_network_disconnect(const bluetooth_device_address_t 
 	int result;
 	bt_user_info_t *user_info;
 
-	BT_CHECK_PARAMETER(device_address);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(device_address, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);

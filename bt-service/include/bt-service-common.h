@@ -55,12 +55,12 @@ extern "C" {
 		} \
 	} while (0)
 
-#define BT_CHECK_PARAMETER(arg) \
+#define BT_CHECK_PARAMETER(arg, func) \
 	do { \
 		if (arg == NULL) \
 		{ \
 			BT_ERR("INVALID PARAMETER"); \
-			return BLUETOOTH_ERROR_INVALID_PARAM; \
+			func BLUETOOTH_ERROR_INVALID_PARAM; \
 		} \
 	} while (0)
 

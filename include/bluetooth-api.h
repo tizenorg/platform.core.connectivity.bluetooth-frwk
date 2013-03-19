@@ -291,6 +291,7 @@ typedef enum {
 				/**<Discovered GATT service characteristics event*/
 	BLUETOOTH_EVENT_GATT_CHAR_VAL_CHANGED,
 				/**<Remote GATT charateristic value changed event*/
+	BLUETOOTH_EVENT_GATT_GET_CHAR_FROM_UUID,
 
 	BLUETOOTH_EVENT_AG_CONNECTED = BLUETOOTH_EVENT_AUDIO_BASE, /**<AG service connected event*/
 	BLUETOOTH_EVENT_AG_DISCONNECTED, /**<AG service disconnected event*/
@@ -761,6 +762,7 @@ typedef struct {
 
 typedef struct {
 	char *uuid;
+	char *handle;
 	bt_gatt_handle_info_t handle_info;
 } bt_gatt_service_property_t;
 
@@ -790,6 +792,7 @@ typedef struct {
  */
 
 typedef struct {
+	char *handle;
 	char *uuid;
 	char *name;
 	char *description;
@@ -1030,6 +1033,31 @@ ret = bluetooth_disable_adapter();
  */
 int bluetooth_disable_adapter(void);
 
+/**
+ * @fn int bluetooth_reset_adapter(void)
+ * @brief Reset the Bluetooth H/W and values
+ *
+ *
+ * This function resets Bluetooth protocol stack and hardware. This function is called when
+ * an user want to initialize Bluetooth environment.
+ *
+ * The various error codes are BLUETOOTH_ERROR_NONE for success and BLUETOOTH_ERROR_INTERNAL for
+ * internal error.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success\n
+ * @exception   BLUETOOTH_ERROR_INTERNAL - Dbus proxy call is fail
+ * @remark      None
+ * @see         bluetooth_check_adapter, bluetooth_enable_adapter
+@code
+...
+
+int ret = 0;
+ret = bluetooth_reset_adapter();
+@endcode
+ */
+int bluetooth_reset_adapter(void);
 
 /**
  * @fn int bluetooth_is_supported(void)
@@ -2708,6 +2736,23 @@ int bluetooth_opc_cancel_push(void);
 
 gboolean bluetooth_opc_session_is_exist(void);
 
+/**
+ * @fn int bluetooth_opc_is_sending(gboolean *is_sending)
+ * @brief Informs whether opc session exists or not.
+ *
+ * This function is a synchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *               BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Not enabled \n
+ *               BLUETOOTH_ERROR_INTERNAL \n
+ *
+ * @exception   None
+ * @param[out] is_sending The sending status: (@c TRUE = in sending , @c  false = not in sending)
+ *
+ * @remark       None
+ * @see            None
+ */
+int bluetooth_opc_is_sending(gboolean *is_sending);
 
 /**
  * @fn int bluetooth_obex_server_init(const char *dst_path)
@@ -2979,6 +3024,25 @@ int bluetooth_obex_server_cancel_all_transfers(void);
 
 
 /**
+ * @fn int bluetooth_obex_server_is_receiving(gboolean *is_receiving)
+ * @brief Informs whether obex server is receiving or not.
+ *
+ * This function is a synchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *               BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Not enabled \n
+ *               BLUETOOTH_ERROR_INTERNAL \n
+ *
+ * @exception   None
+ * @param[out] is_receiving The receiving status: (@c TRUE = in receiving , @c  false = not in receiving)
+ *
+ * @remark       None
+ * @see            None
+ */
+int bluetooth_obex_server_is_receiving(gboolean *is_receiving);
+
+
+/**
  * @fn int bluetooth_oob_read_local_data(bt_oob_data_t *local_oob_data)
  * @brief Read the local Hash and Randmizer.
  *
@@ -3202,6 +3266,56 @@ int bluetooth_gatt_get_characteristics_property(const char *char_handle,
  */
 int bluetooth_gatt_set_characteristics_value(const char *char_handle,
 						const guint8 *value, int length);
+
+/**
+ * @fn int bluetooth_gatt_get_service_from_uuid(bluetooth_device_address_t *address,
+ *					const char *service_uuid,
+ *					bt_gatt_service_property_t *service)
+ *
+ * @brief Gets the service property from a device based on a particular uuid
+ *
+ * This function is a synchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+ *
+ * @exception	None
+ * @param[in]	address - BD address of the remote device
+ * @param[in]	service_uuid - uuid of the service.
+ * @param[out] service - Structure containing the service property.
+ *
+ * @remark	None
+ * @see		None
+ */
+ int bluetooth_gatt_get_service_from_uuid(bluetooth_device_address_t *address,
+					const char *service_uuid,
+					bt_gatt_service_property_t *service);
+
+/**
+ * @fn int bluetooth_gatt_get_char_from_uuid(const char *service_handle,
+ *							const char *char_uuid)
+ *
+ * @brief Gets the characteristic property from a service based on a particular char uuid
+ *
+ * This function is an asynchronous call.
+ * This API is responded with BLUETOOTH_EVENT_GATT_GET_CHAR_FROM_UUID
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+ *
+ * @exception	None
+ * @param[in]	service_handle - Service handle.
+ * @param[in]	uuid - Characteristic uuid.
+ *
+ * @remark	None
+ * @see		None
+ */
+int bluetooth_gatt_get_char_from_uuid(const char *service_handle,
+						const char *char_uuid);
 
 /**
  * @fn int bluetooth_gatt_free_primary_services(bt_gatt_handle_info_t *prim_svc);

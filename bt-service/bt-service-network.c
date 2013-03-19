@@ -254,7 +254,7 @@ int _bt_network_connect(int request_id, int role,
 	DBusGProxy *profile_proxy;
 	DBusGConnection *conn;
 
-	BT_CHECK_PARAMETER(device_address);
+	BT_CHECK_PARAMETER(device_address, return);
 
 	switch (role) {
 	case BLUETOOTH_NETWORK_PANU_ROLE:
@@ -322,7 +322,7 @@ int _bt_network_disconnect(int request_id,
 	DBusGProxy *profile_proxy;
 	DBusGConnection *conn;
 
-	BT_CHECK_PARAMETER(device_address);
+	BT_CHECK_PARAMETER(device_address, return);
 
 	adapter_proxy = _bt_get_adapter_proxy();
 	retv_if(adapter_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);

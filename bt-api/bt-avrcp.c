@@ -62,14 +62,13 @@ BT_EXPORT_API int bluetooth_media_player_deinit(void)
 	return BLUETOOTH_ERROR_NONE;
 }
 
-
 BT_EXPORT_API int bluetooth_media_player_change_property(
 			media_player_property_type type,
 			unsigned int value)
 {
 	int result;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -90,8 +89,8 @@ BT_EXPORT_API int bluetooth_media_player_set_properties(
 {
 	int result;
 
-	BT_CHECK_PARAMETER(setting);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(setting, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -112,18 +111,23 @@ BT_EXPORT_API int bluetooth_media_player_change_track(
 	int result;
 	media_metadata_t meta_data;
 
-	BT_CHECK_PARAMETER(metadata);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(metadata, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
 	memset(&meta_data, 0x00, sizeof(media_metadata_t));
 
-	g_strlcpy(meta_data.title, metadata->title, BT_NAME_MAX);
-	g_strlcpy(meta_data.artist, metadata->artist, BT_NAME_MAX);
-	g_strlcpy(meta_data.album, metadata->album, BT_NAME_MAX);
-	g_strlcpy(meta_data.genre, metadata->genre, BT_NAME_MAX);
+	if (_bt_copy_utf8_string(meta_data.title, metadata->title, BT_NAME_MAX))
+		BT_DBG("Error in copying Title\n");
+	if (_bt_copy_utf8_string(meta_data.artist, metadata->artist, BT_NAME_MAX))
+		BT_DBG("Error in copying Artist\n");
+	if (_bt_copy_utf8_string(meta_data.album, metadata->album, BT_NAME_MAX))
+		BT_DBG("Error in copying Album\n");
+	if (_bt_copy_utf8_string(meta_data.genre, metadata->genre, BT_NAME_MAX))
+		BT_DBG("Error in copying Genre\n");
+
 	meta_data.total_tracks = metadata->total_tracks;
 	meta_data.number = metadata->number;
 	meta_data.duration = metadata->duration;

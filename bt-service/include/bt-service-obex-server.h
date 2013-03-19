@@ -60,6 +60,7 @@ int _bt_obex_server_accept_connection(int request_id);
 
 int _bt_obex_server_reject_connection(void);
 
+int _bt_obex_server_is_receiving(gboolean *receiving);
 
 void _bt_obex_transfer_started(const char *transfer_path);
 

@@ -33,8 +33,8 @@ BT_EXPORT_API int bluetooth_rfcomm_create_socket(const char *uuid)
 	int socket_fd = -1;
 	char uuid_str[BLUETOOTH_UUID_STRING_MAX];
 
-	BT_CHECK_ENABLED();
-	BT_CHECK_PARAMETER(uuid);
+	BT_CHECK_ENABLED(return);
+	BT_CHECK_PARAMETER(uuid, return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -62,7 +62,7 @@ BT_EXPORT_API int bluetooth_rfcomm_remove_socket(int socket_fd)
 {
 	int result;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -87,7 +87,7 @@ BT_EXPORT_API int bluetooth_rfcomm_server_disconnect(int socket_fd)
 {
 	int result;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -141,7 +141,7 @@ BT_EXPORT_API int bluetooth_rfcomm_listen_and_accept(int socket_fd, int max_pend
 	int result;
 	gboolean native_service = TRUE;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -165,7 +165,7 @@ BT_EXPORT_API int bluetooth_rfcomm_listen(int socket_fd, int max_pending_connect
 	int result;
 	gboolean native_service = FALSE;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -192,7 +192,7 @@ BT_EXPORT_API int bluetooth_rfcomm_accept_connection(int server_fd, int *client_
 {
 	int result;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -219,7 +219,7 @@ BT_EXPORT_API int bluetooth_rfcomm_reject_connection(int server_fd)
 {
 	int result;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);

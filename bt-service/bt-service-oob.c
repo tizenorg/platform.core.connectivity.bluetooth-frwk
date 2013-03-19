@@ -38,7 +38,7 @@ int _bt_oob_read_local_data(bt_oob_data_t *local_oob_data)
 	unsigned char *local_randomizer = NULL;
 	DBusConnection *conn;
 
-	BT_CHECK_PARAMETER(local_oob_data);
+	BT_CHECK_PARAMETER(local_oob_data, return);
 
 	conn = _bt_get_system_conn();
 	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -104,8 +104,8 @@ int _bt_oob_add_remote_data(
 	unsigned char *remote_randomizer;
 	DBusConnection *conn;
 
-	BT_CHECK_PARAMETER(remote_device_address);
-	BT_CHECK_PARAMETER(remote_oob_data);
+	BT_CHECK_PARAMETER(remote_device_address, return);
+	BT_CHECK_PARAMETER(remote_oob_data, return);
 
 	conn = _bt_get_system_conn();
 	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -169,7 +169,7 @@ int _bt_oob_remove_remote_data(
 	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
 	DBusConnection *conn;
 
-	BT_CHECK_PARAMETER(remote_device_address);
+	BT_CHECK_PARAMETER(remote_device_address, return);
 
 	conn = _bt_get_system_conn();
 	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);

@@ -336,8 +336,8 @@ static int __bt_retry_bond(void)
 {
 	DBusGProxy *adapter_proxy;
 
-	BT_CHECK_PARAMETER(bonding_info);
-	BT_CHECK_PARAMETER(bonding_info->addr);
+	BT_CHECK_PARAMETER(bonding_info, return);
+	BT_CHECK_PARAMETER(bonding_info->addr, return);
 
 	adapter_proxy = _bt_get_adapter_proxy();
 	retv_if(adapter_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -366,8 +366,8 @@ static int __bt_remove_and_bond(void)
 	GError *err = NULL;
 	char *device_path = NULL;
 
-	BT_CHECK_PARAMETER(bonding_info);
-	BT_CHECK_PARAMETER(bonding_info->addr);
+	BT_CHECK_PARAMETER(bonding_info, return);
+	BT_CHECK_PARAMETER(bonding_info->addr, return);
 
 	adapter_proxy = _bt_get_adapter_proxy();
 	retv_if(adapter_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -398,8 +398,8 @@ static int __bt_cancel_and_bond(void)
 	DBusGProxy *adapter_proxy;
 	GError *err = NULL;
 
-	BT_CHECK_PARAMETER(bonding_info);
-	BT_CHECK_PARAMETER(bonding_info->addr);
+	BT_CHECK_PARAMETER(bonding_info, return);
+	BT_CHECK_PARAMETER(bonding_info->addr, return);
 
 	adapter_proxy = _bt_get_adapter_proxy();
 	retv_if(adapter_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -441,7 +441,9 @@ static void __bt_bond_device_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 	if (bonding_info == NULL) {
 		/* Send reply */
 		BT_ERR("bonding_info == NULL");
-		goto done;
+		if (err)
+			g_error_free(err);
+		return;
 	}
 
 	req_info = _bt_get_request_info(bonding_info->req_id);
@@ -558,7 +560,7 @@ int _bt_bond_device(int request_id,
 	void *agent;
 	bluetooth_device_info_t dev_info;
 
-	BT_CHECK_PARAMETER(device_address);
+	BT_CHECK_PARAMETER(device_address, return);
 
 	if (bonding_info) {
 		BT_ERR("Bonding in progress");
@@ -720,7 +722,7 @@ int _bt_unbond_device(int request_id,
 	int result = BLUETOOTH_ERROR_INTERNAL;
 	bluetooth_device_info_t dev_info;
 
-	BT_CHECK_PARAMETER(device_address);
+	BT_CHECK_PARAMETER(device_address, return);
 
 	adapter_proxy = _bt_get_adapter_proxy();
 	retv_if(adapter_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -979,7 +981,7 @@ int _bt_search_device(int request_id,
 	DBusGConnection *conn;
 	int result = BLUETOOTH_ERROR_INTERNAL;
 
-	BT_CHECK_PARAMETER(device_address);
+	BT_CHECK_PARAMETER(device_address, return);
 
 	if (searching_info) {
 		BT_ERR("Service searching in progress");
@@ -1101,8 +1103,8 @@ int _bt_set_alias(bluetooth_device_address_t *device_address,
 	GValue name = { 0 };
 	DBusGConnection *conn;
 
-	BT_CHECK_PARAMETER(device_address);
-	BT_CHECK_PARAMETER(alias);
+	BT_CHECK_PARAMETER(device_address, return);
+	BT_CHECK_PARAMETER(alias, return);
 
 	adapter_proxy = _bt_get_adapter_proxy();
 	retv_if(adapter_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -1161,7 +1163,7 @@ int _bt_set_authorization(bluetooth_device_address_t *device_address,
 	DBusGConnection *conn;
 	int ret = BLUETOOTH_ERROR_NONE;
 
-	BT_CHECK_PARAMETER(device_address);
+	BT_CHECK_PARAMETER(device_address, return);
 
 	adapter_proxy = _bt_get_adapter_proxy();
 	retv_if(adapter_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);

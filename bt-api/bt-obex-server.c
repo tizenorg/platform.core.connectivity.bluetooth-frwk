@@ -34,7 +34,7 @@ BT_EXPORT_API int bluetooth_obex_server_init(const char *dst_path)
 	gboolean native_service = TRUE;
 	char path[BT_FILE_PATH_MAX];
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	if (_bt_get_obex_server_id() != BT_NO_SERVER)
 		return BLUETOOTH_ERROR_AGENT_ALREADY_EXIST;
@@ -74,7 +74,7 @@ BT_EXPORT_API int bluetooth_obex_server_deinit(void)
 	int app_pid;
 	gboolean native_service = TRUE;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	if (_bt_get_obex_server_id() != BT_NATIVE_SERVER)
 		return BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST;
@@ -106,7 +106,7 @@ BT_EXPORT_API int bluetooth_obex_server_init_without_agent(const char *dst_path)
 	gboolean native_service = FALSE;
 	char path[BT_FILE_PATH_MAX];
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	if (_bt_get_obex_server_id() != BT_NO_SERVER)
 		return BLUETOOTH_ERROR_AGENT_ALREADY_EXIST;
@@ -146,7 +146,7 @@ BT_EXPORT_API int bluetooth_obex_server_deinit_without_agent(void)
 	int app_pid;
 	gboolean native_service = FALSE;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	/* Can't call this API after using bluetooth_obex_server_init
 	     in same process */
@@ -241,8 +241,8 @@ BT_EXPORT_API int bluetooth_obex_server_accept_authorize(const char *filename)
 	int result;
 	char name[BT_FILE_PATH_MAX];
 
-	BT_CHECK_PARAMETER(filename);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(filename, return);
+	BT_CHECK_ENABLED(return);
 
 	if (_bt_get_obex_server_id() != BT_NATIVE_SERVER)
 		return BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST;
@@ -266,7 +266,7 @@ BT_EXPORT_API int bluetooth_obex_server_reject_authorize(void)
 {
 	int result;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	if (_bt_get_obex_server_id() != BT_NATIVE_SERVER)
 		return BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST;
@@ -289,8 +289,8 @@ BT_EXPORT_API int bluetooth_obex_server_set_destination_path(const char *dst_pat
 	gboolean native_service = FALSE;
 	char path[BT_FILE_PATH_MAX];
 
-	BT_CHECK_PARAMETER(dst_path);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(dst_path, return);
+	BT_CHECK_ENABLED(return);
 
 	server_id = _bt_get_obex_server_id();
 
@@ -320,8 +320,8 @@ BT_EXPORT_API int bluetooth_obex_server_set_root(const char *root)
 	int result;
 	char root_path[BT_FILE_PATH_MAX];
 
-	BT_CHECK_PARAMETER(root);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(root, return);
+	BT_CHECK_ENABLED(return);
 
 	if (_bt_get_obex_server_id() == BT_NO_SERVER)
 		return BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST;
@@ -346,7 +346,7 @@ BT_EXPORT_API int bluetooth_obex_server_cancel_transfer(int transfer_id)
 	int server_type;
 	int service_function = BT_OBEX_SERVER_CANCEL_TRANSFER;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	server_type = _bt_get_obex_server_id();
 
@@ -372,7 +372,7 @@ BT_EXPORT_API int bluetooth_obex_server_cancel_all_transfers(void)
 {
 	int result;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	if (_bt_get_obex_server_id() == BT_NO_SERVER)
 		return BLUETOOTH_ERROR_AGENT_DOES_NOT_EXIST;
@@ -382,6 +382,31 @@ BT_EXPORT_API int bluetooth_obex_server_cancel_all_transfers(void)
 
 	result = _bt_send_request(BT_OBEX_SERVICE, BT_OBEX_SERVER_CANCEL_ALL_TRANSFERS,
 		in_param1, in_param2, in_param3, in_param4, &out_param);
+
+	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	return result;
+}
+
+BT_EXPORT_API int bluetooth_obex_server_is_receiving(gboolean *is_receiving)
+{
+	int result;
+
+	*is_receiving = FALSE;
+
+	BT_CHECK_ENABLED(return);
+
+	BT_INIT_PARAMS();
+	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	result = _bt_send_request(BT_OBEX_SERVICE, BT_OBEX_SERVER_IS_RECEIVING,
+		in_param1, in_param2, in_param3, in_param4, &out_param);
+
+	if (result == BLUETOOTH_ERROR_NONE) {
+		*is_receiving = g_array_index(out_param, gboolean, 0);
+	} else {
+		BT_ERR("Fail to send request");
+	}
 
 	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 

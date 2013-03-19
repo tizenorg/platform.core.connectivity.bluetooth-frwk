@@ -36,6 +36,7 @@
 #include "bt-service-device.h"
 #include "bt-service-obex-server.h"
 #include "bt-service-rfcomm-server.h"
+#include "bt-service-audio.h"
 
 static DBusGConnection *manager_conn;
 static DBusGConnection *obexd_conn;
@@ -277,6 +278,7 @@ void _bt_handle_adapter_event(DBusMessage *msg)
 		}
 
 		dbus_message_iter_get_basic(&item_iter, &property);
+		BT_DBG("member = PropertyChanged[%s]", property);
 
 		ret_if(property == NULL);
 
@@ -376,6 +378,14 @@ void _bt_handle_adapter_event(DBusMessage *msg)
 					DBUS_TYPE_INT32, &result,
 					DBUS_TYPE_INT16, &mode,
 					DBUS_TYPE_INVALID);
+		} else if (strcasecmp(property, "Powered") == 0) {
+			gboolean powered = FALSE;
+			dbus_message_iter_next(&item_iter);
+			dbus_message_iter_recurse(&item_iter, &value_iter);
+			dbus_message_iter_get_basic(&value_iter, &powered);
+			BT_DBG("Powered = %d", powered);
+			if (powered == FALSE)
+				_bt_disable_adapter();
 		}
 	} else if (strcasecmp(member, "DeviceFound") == 0) {
 		const char *bdaddr;
@@ -766,9 +776,12 @@ void _bt_handle_headset_event(DBusMessage *msg)
 
 	ret_if(property == NULL);
 
+	BT_DBG("Property = %s \n", property);
+
 	/* We allow only 1 headset connection (HSP or HFP)*/
 	if (strcasecmp(property, "Connected") == 0) {
 		int event = BLUETOOTH_EVENT_NONE;
+		bt_headset_wait_t *wait_list;
 		char *address;
 
 		dbus_message_iter_next(&item_iter);
@@ -792,6 +805,29 @@ void _bt_handle_headset_event(DBusMessage *msg)
 			DBUS_TYPE_STRING, &address,
 			DBUS_TYPE_INVALID);
 
+		if (event == BLUETOOTH_EVENT_AG_DISCONNECTED) {
+			/* Remove data from the connected list */
+			_bt_remove_headset_from_list(BT_AUDIO_HSP, address);
+
+			wait_list = _bt_get_audio_wait_data();
+			if (wait_list == NULL) {
+				g_free(address);
+				return;
+			}
+
+			bluetooth_device_address_t device_address;
+
+			_bt_set_audio_wait_data_flag(TRUE);
+
+			_bt_convert_addr_string_to_type(device_address.addr,
+							wait_list->address);
+			_bt_audio_connect(wait_list->req_id, wait_list->type,
+					&device_address, wait_list->out_param1);
+		} else if (event == BLUETOOTH_EVENT_AG_CONNECTED) {
+			/* Add data to the connected list */
+			_bt_add_headset_to_list(BT_AUDIO_HSP,
+						BT_STATE_CONNECTED, address);
+		}
 		g_free(address);
 	} else if (strcasecmp(property, "State") == 0) {
 		int event = BLUETOOTH_EVENT_NONE;
@@ -809,15 +845,15 @@ void _bt_handle_headset_event(DBusMessage *msg)
 
 		/* This code assumes we support only 1 headset connection */
 		/* Need to use the headset list, if we support multi-headsets */
-		if (strcasecmp(property, "Playing") == 0) {
+		if (strcasecmp(state, "Playing") == 0) {
 			event = BLUETOOTH_EVENT_AG_AUDIO_CONNECTED;
 			sco_connected = TRUE;
-		} else if (strcasecmp(property, "connected") == 0 ||
-			    strcasecmp(property, "disconnected") == 0) {
+		} else if (strcasecmp(state, "connected") == 0 ||
+			    strcasecmp(state, "disconnected") == 0) {
 			event = BLUETOOTH_EVENT_AG_AUDIO_DISCONNECTED;
 			sco_connected = FALSE;
 		} else {
-			BT_ERR("Not handled state");
+			BT_ERR("Not handled state - %s", state);
 			g_free(address);
 			return;
 		}
@@ -882,6 +918,8 @@ void _bt_handle_sink_event(DBusMessage *msg)
 	const char *path = dbus_message_get_path(msg);
 	const char *property = NULL;
 
+	bt_headset_wait_t *wait_list;
+
 	ret_if(member == NULL);
 
 	dbus_message_iter_init(msg, &item_iter);
@@ -922,6 +960,53 @@ void _bt_handle_sink_event(DBusMessage *msg)
 			DBUS_TYPE_STRING, &address,
 			DBUS_TYPE_INVALID);
 
+		if (event == BLUETOOTH_EVENT_AV_DISCONNECTED) {
+			/* Remove data from the connected list */
+			_bt_remove_headset_from_list(BT_AUDIO_A2DP, address);
+			wait_list = _bt_get_audio_wait_data();
+			if (wait_list == NULL) {
+				g_free(address);
+				return;
+			}
+
+			if (((wait_list->type == BT_AUDIO_ALL) &&
+				(wait_list->ag_flag == TRUE)) ||
+				(wait_list->type == BT_AUDIO_A2DP) ||
+				(wait_list->disconnection_type == BT_AUDIO_A2DP)) {
+				bluetooth_device_address_t device_address;
+				_bt_convert_addr_string_to_type(
+							device_address.addr,
+							wait_list->address);
+
+				_bt_audio_connect(wait_list->req_id,
+							wait_list->type,
+							&device_address,
+							wait_list->out_param1);
+			}
+		} else if (event == BLUETOOTH_EVENT_AV_CONNECTED){
+			/* Check for existing Media device to disconnect */
+			char connected_address[BT_ADDRESS_STRING_SIZE + 1];
+			bluetooth_device_address_t device_address;
+			gboolean connected;
+
+			connected = _bt_is_headset_type_connected(BT_AUDIO_A2DP,
+								connected_address);
+			if (connected) {
+				/* Match connected device address */
+				if (g_strcmp0(connected_address, address) != 0) {
+					/* Convert BD adress from string type */
+					_bt_convert_addr_string_to_type(
+							device_address.addr,
+							connected_address);
+					_bt_audio_disconnect(0, BT_AUDIO_A2DP,
+							&device_address, NULL);
+				}
+			}
+
+			/* Add data to the connected list */
+			_bt_add_headset_to_list(BT_AUDIO_A2DP,
+					BT_STATE_CONNECTED, address);
+		}
 		g_free(address);
 	}
 }

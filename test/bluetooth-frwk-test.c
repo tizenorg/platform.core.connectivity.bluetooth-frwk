@@ -641,6 +641,15 @@ int test_input_callback(void *data)
 			TC_PRT("connected : %d", connected);
 			break;
 		}
+		case 28:
+		{
+			TC_PRT("TC : %s", tc_table[27].tc_name);
+
+			ret = bluetooth_reset_adapter();
+			if (ret < 0)
+				TC_PRT("%s failed with [0x%04x]", tc_table[27].tc_name, ret);
+			break;
+		}
 
 		case 29:
 		{

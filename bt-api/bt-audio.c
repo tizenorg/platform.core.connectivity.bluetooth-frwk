@@ -59,8 +59,8 @@ BT_EXPORT_API int bluetooth_audio_connect(bluetooth_device_address_t *remote_add
 	int result;
 	bt_user_info_t *user_info;
 
-	BT_CHECK_PARAMETER(remote_address);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(remote_address, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -84,8 +84,8 @@ BT_EXPORT_API int bluetooth_audio_disconnect(bluetooth_device_address_t *remote_
 	int result;
 	bt_user_info_t *user_info;
 
-	BT_CHECK_PARAMETER(remote_address);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(remote_address, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -109,8 +109,8 @@ BT_EXPORT_API int bluetooth_ag_connect(bluetooth_device_address_t *remote_addres
 	int result;
 	bt_user_info_t *user_info;
 
-	BT_CHECK_PARAMETER(remote_address);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(remote_address, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -134,8 +134,8 @@ BT_EXPORT_API int bluetooth_ag_disconnect(bluetooth_device_address_t *remote_add
 	int result;
 	bt_user_info_t *user_info;
 
-	BT_CHECK_PARAMETER(remote_address);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(remote_address, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -159,8 +159,8 @@ BT_EXPORT_API int bluetooth_av_connect(bluetooth_device_address_t *remote_addres
 	int result;
 	bt_user_info_t *user_info;
 
-	BT_CHECK_PARAMETER(remote_address);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(remote_address, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -184,8 +184,8 @@ BT_EXPORT_API int bluetooth_av_disconnect(bluetooth_device_address_t *remote_add
 	int result;
 	bt_user_info_t *user_info;
 
-	BT_CHECK_PARAMETER(remote_address);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(remote_address, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -208,8 +208,8 @@ BT_EXPORT_API int bluetooth_ag_get_headset_volume(unsigned int *speaker_gain)
 {
 	int result;
 
-	BT_CHECK_PARAMETER(speaker_gain);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(speaker_gain, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -231,7 +231,7 @@ BT_EXPORT_API int bluetooth_ag_set_speaker_gain(unsigned int speaker_gain)
 {
 	int result;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);

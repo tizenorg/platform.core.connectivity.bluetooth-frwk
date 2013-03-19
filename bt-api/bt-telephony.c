@@ -172,6 +172,7 @@ static int __bluetooth_telephony_register(void);
 static int __bluetooth_telephony_unregister(void);
 static int __bluetooth_get_default_adapter_path(DBusGConnection *GConn,
 							char *path);
+static gboolean __bluetooth_telephony_is_headset(uint32_t device_class);
 static int __bluetooth_telephony_get_connected_device(void);
 static DBusGProxy *__bluetooth_telephony_get_connected_device_proxy(void);
 
@@ -513,7 +514,7 @@ static DBusHandlerResult __bluetooth_telephony_event_filter(
 	if (dbus_message_is_signal(msg, HFP_AGENT_SERVICE,
 				HFP_NREC_STATUS_CHANGE)) {
 		__bluetooth_handle_nrec_status_change(msg);
-		return DBUS_HANDLER_RESULT_HANDLED;
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 	}
 
 	if (!dbus_message_has_interface(msg, BLUEZ_HEADSET_INTERFACE))
@@ -566,7 +567,7 @@ static DBusHandlerResult __bluetooth_telephony_event_filter(
 			telephony_info.headset_state = BLUETOOTH_STATE_DISCONNETED;
 		}
 
-		return DBUS_HANDLER_RESULT_HANDLED;
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 	}
 
 	if (g_strcmp0(property, "Connected") == 0) {
@@ -624,7 +625,7 @@ static DBusHandlerResult __bluetooth_telephony_event_filter(
 					BLUETOOTH_EVENT_TELEPHONY_HFP_DISCONNECTED,
 					BLUETOOTH_TELEPHONY_ERROR_NONE, NULL);
 		}
-		return DBUS_HANDLER_RESULT_HANDLED;
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 	}
 
 	if (g_strcmp0(property, "SpeakerGain") == 0) {
@@ -642,7 +643,7 @@ static DBusHandlerResult __bluetooth_telephony_event_filter(
 					BLUETOOTH_TELEPHONY_ERROR_NONE,
 					(void *)&spkr_gain);
 
-		return DBUS_HANDLER_RESULT_HANDLED;
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 	}
 
 	if (g_strcmp0(property, "MicrophoneGain") == 0) {
@@ -660,7 +661,7 @@ static DBusHandlerResult __bluetooth_telephony_event_filter(
 					BLUETOOTH_TELEPHONY_ERROR_NONE,
 					(void *)&mic_gain);
 
-		return DBUS_HANDLER_RESULT_HANDLED;
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 	}
 
 	if (g_strcmp0(property, "Playing") == 0) {
@@ -694,7 +695,7 @@ static DBusHandlerResult __bluetooth_telephony_event_filter(
 				BLUETOOTH_TELEPHONY_ERROR_NONE, NULL);
 		}
 
-		return DBUS_HANDLER_RESULT_HANDLED;
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 	}
 	return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
@@ -870,6 +871,35 @@ static int __bluetooth_get_default_adapter_path(DBusGConnection *GConn,
 	return BLUETOOTH_TELEPHONY_ERROR_NONE;
 }
 
+static gboolean __bluetooth_telephony_is_headset(uint32_t device_class)
+{
+	gboolean flag = FALSE;
+	BT_DBG("+");
+
+	switch ((device_class & 0x1f00) >> 8) {
+	case 0x04:
+		switch ((device_class & 0xfc) >> 2) {
+		case 0x01:
+		case 0x02:
+			flag = TRUE;
+			break;
+		case 0x06:
+			flag = TRUE;
+			break;
+		case 0x0b:
+		case 0x0c:
+		case 0x0d:
+			break;
+		default:
+			flag = TRUE;
+			break;
+		}
+		break;
+	}
+	BT_DBG("-");
+	return flag;
+}
+
 static int __bluetooth_telephony_get_connected_device(void)
 {
 	DBusGProxy *list_proxy = NULL;
@@ -880,6 +910,7 @@ static int __bluetooth_telephony_get_connected_device(void)
 	GHashTable *list_hash;
 	GHashTable *device_hash;
 	GValue *value = {0};
+	uint32_t device_class;
 	gboolean playing = FALSE;
 	gboolean connected = FALSE;
 	const gchar *address;
@@ -937,6 +968,18 @@ static int __bluetooth_telephony_get_connected_device(void)
 
 		if (list_hash == NULL)
 			goto done;
+
+		value = g_hash_table_lookup(list_hash, "Class");
+		device_class = value ? g_value_get_uint(value) : 0;
+
+		if (!__bluetooth_telephony_is_headset(device_class)) {
+			g_object_unref(proxy);
+			proxy = NULL;
+			g_free(gp_path);
+			gp_path = NULL;
+			g_hash_table_destroy(list_hash);
+			continue;
+		}
 
 		/*Check for Connection*/
 		device_proxy = dbus_g_proxy_new_for_name(

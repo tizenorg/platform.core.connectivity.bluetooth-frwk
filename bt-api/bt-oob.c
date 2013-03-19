@@ -28,8 +28,8 @@ BT_EXPORT_API int bluetooth_oob_read_local_data(bt_oob_data_t *local_oob_data)
 {
 	int result;
 
-	BT_CHECK_PARAMETER(local_oob_data);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(local_oob_data, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -53,9 +53,9 @@ BT_EXPORT_API int bluetooth_oob_add_remote_data(
 {
 	int result;
 
-	BT_CHECK_PARAMETER(remote_device_address);
-	BT_CHECK_PARAMETER(remote_oob_data);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(remote_device_address, return);
+	BT_CHECK_PARAMETER(remote_oob_data, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -78,8 +78,8 @@ BT_EXPORT_API int bluetooth_oob_remove_remote_data(
 {
 	int result;
 
-	BT_CHECK_PARAMETER(remote_device_address);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(remote_device_address, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);

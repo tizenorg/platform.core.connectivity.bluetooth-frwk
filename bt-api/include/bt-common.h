@@ -107,21 +107,21 @@ extern "C" {
 	        IP = g_array_new(FALSE, FALSE, sizeof(gchar));	\
 	} while (0)
 
-#define BT_CHECK_PARAMETER(arg) \
+#define BT_CHECK_PARAMETER(arg, func) \
 	do { \
 		if (arg == NULL) \
 		{ \
 			BT_ERR("INVALID PARAMETER"); \
-			return BLUETOOTH_ERROR_INVALID_PARAM; \
+			func BLUETOOTH_ERROR_INVALID_PARAM; \
 		} \
 	} while (0)
 
-#define BT_CHECK_ENABLED() \
+#define BT_CHECK_ENABLED(func) \
 	do { \
 		if (bluetooth_check_adapter() == BLUETOOTH_ADAPTER_DISABLED) \
 		{ \
 			BT_ERR("BT is not enabled"); \
-			return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED; \
+			func BLUETOOTH_ERROR_DEVICE_NOT_ENABLED; \
 		} \
 	} while (0)
 
@@ -211,6 +211,8 @@ void _bt_convert_addr_string_to_type(unsigned char *addr,
 
 void _bt_convert_addr_type_to_string(char *address,
 				unsigned char *addr);
+
+int _bt_copy_utf8_string(char *dest, const char *src, unsigned int length);
 
 int _bt_get_adapter_path(DBusGConnection *conn, char *path);
 

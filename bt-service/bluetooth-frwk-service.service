@@ -7,7 +7,6 @@ After=dbus.service
 [Service]
 Type=dbus
 BusName=org.projectx.bt
-Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/app/dbus/user_bus_socket
 ExecStart=/usr/bin/bt-service
 RemainAfterExit=yes
 

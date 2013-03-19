@@ -66,9 +66,9 @@ BT_EXPORT_API int bluetooth_opc_push_files(bluetooth_device_address_t *remote_ad
 	bt_user_info_t *user_info;
 	char filename[BT_FILE_PATH_MAX];
 
-	BT_CHECK_PARAMETER(remote_address);
-	BT_CHECK_PARAMETER(file_name_array);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(remote_address, return);
+	BT_CHECK_PARAMETER(file_name_array, return);
+	BT_CHECK_ENABLED(return);
 
 	__bt_get_file_size(file_name_array, &size, &file_count);
 	retv_if(file_count == 0, BLUETOOTH_ERROR_INVALID_PARAM);
@@ -101,7 +101,7 @@ BT_EXPORT_API int bluetooth_opc_cancel_push(void)
 {
 	int result;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -119,7 +119,7 @@ BT_EXPORT_API gboolean bluetooth_opc_session_is_exist(void)
 	int result;
 	gboolean exist = FALSE;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -129,6 +129,31 @@ BT_EXPORT_API gboolean bluetooth_opc_session_is_exist(void)
 
 	if (result == BLUETOOTH_ERROR_NONE) {
 		exist = g_array_index(out_param, gboolean, 0);
+	} else {
+		BT_ERR("Fail to send request");
+	}
+
+	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	return result;
+}
+
+BT_EXPORT_API int bluetooth_opc_is_sending(gboolean *is_sending)
+{
+	int result;
+
+	*is_sending = FALSE;
+
+	BT_CHECK_ENABLED(return);
+
+	BT_INIT_PARAMS();
+	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	result = _bt_send_request(BT_OBEX_SERVICE, BT_OPP_IS_PUSHING_FILES,
+		in_param1, in_param2, in_param3, in_param4, &out_param);
+
+	if (result == BLUETOOTH_ERROR_NONE) {
+		*is_sending = g_array_index(out_param, gboolean, 0);
 	} else {
 		BT_ERR("Fail to send request");
 	}

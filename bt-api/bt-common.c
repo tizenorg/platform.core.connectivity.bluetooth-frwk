@@ -152,6 +152,31 @@ void _bt_convert_addr_type_to_string(char *address,
 			addr[3], addr[4], addr[5]);
 }
 
+int _bt_copy_utf8_string(char *dest, const char *src, unsigned int length)
+{
+	int i;
+	char *p = src;
+	char *next;
+	int count;
+
+	if (dest == NULL || src == NULL)
+		return BLUETOOTH_ERROR_INVALID_PARAM;
+
+	i = 0;
+	while (*p != '\0' && i < length) {
+		next = g_utf8_next_char(p);
+		count = next - p;
+
+		while (count > 0 && ((i + count) < length)) {
+			dest[i++] = *p;
+			p++;
+			count --;
+		}
+		p = next;
+	}
+	return BLUETOOTH_ERROR_NONE;
+}
+
 int _bt_get_adapter_path(DBusGConnection *conn, char *path)
 {
 	GError *err = NULL;

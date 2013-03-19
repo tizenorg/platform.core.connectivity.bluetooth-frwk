@@ -34,7 +34,8 @@ INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 INCLUDE(FindPkgConfig)
-pkg_check_modules(service_pkgs REQUIRED vconf aul vconf syspopup-caller dbus-glib-1 libprivilege-control status)
+pkg_check_modules(service_pkgs REQUIRED vconf aul vconf syspopup-caller dbus-glib-1 capi-network-tethering
+libprivilege-control status alarm-service)
 
 FOREACH(flag ${service_pkgs_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag} -Wall")

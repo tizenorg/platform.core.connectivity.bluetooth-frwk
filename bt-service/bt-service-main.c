@@ -45,6 +45,8 @@ static void __bt_release_service(void)
 	_bt_deinit_proxys();
 
 	_bt_clear_request_list();
+
+	BT_DBG("Terminating the bt-service daemon");
 }
 
 static void __bt_sigterm_handler(int signo)
@@ -123,9 +125,10 @@ static gboolean __bt_check_bt_service(void *data)
 	return FALSE;
 }
 
-int main(int argc, char *argv[])
+int main(void)
 {
 	struct sigaction sa;
+	BT_DBG("Starting the bt-service daemon");
 
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = __bt_sigterm_handler;
@@ -175,8 +178,6 @@ int main(int argc, char *argv[])
 	}
 
 	__bt_release_service();
-
-	BT_DBG("-");
 
 	return 0;
 }

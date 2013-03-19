@@ -24,6 +24,7 @@
 #include <stacktrim.h>
 #include <syspopup_caller.h>
 #include <vconf.h>
+#include <tethering.h>
 
 #include "bt-internal-types.h"
 #include "bt-service-common.h"
@@ -33,6 +34,7 @@
 #include "bt-service-event.h"
 #include "bt-service-rfcomm-server.h"
 #include "bt-service-device.h"
+#include "bt-service-audio.h"
 
 #define BT_APP_AUTHENTICATION_TIMEOUT		35
 #define BT_APP_AUTHORIZATION_TIMEOUT		15
@@ -45,6 +47,10 @@
 #define SPP_UUID "00001101-0000-1000-8000-00805f9b34fb"
 #define PBAP_UUID "0000112f-0000-1000-8000-00805f9b34fb"
 #define MAP_UUID "00001132-0000-1000-8000-00805f9b34fb"
+#define NAP_UUID "00001116-0000-1000-8000-00805f9b34fb"
+#define GN_UUID "00001117-0000-1000-8000-00805f9b34fb"
+#define BNEP_UUID "0000000f-0000-1000-8000-00805f9b34fb"
+#define HID_UUID "00001124-0000-1000-8000-00805f9b34fb"
 
 #define BT_AGENT_OBJECT "/org/bluez/agent/frwk_agent"
 #define BT_AGENT_INTERFACE "org.bluez.Agent"
@@ -52,7 +58,7 @@
 #define BT_AGENT_SIGNAL_OBEX_AUTHORIZE "ObexAuthorize"
 
 #define BT_PIN_MAX_LENGTH 16
-#define BT_PASSKEY_MAX_LENGTH 6
+#define BT_PASSKEY_MAX_LENGTH 4
 
 #define BT_AGENT_SYSPOPUP_TIMEOUT_FOR_MULTIPLE_POPUPS 200
 
@@ -232,9 +238,14 @@ static gboolean __pincode_request(GapAgent *agent, DBusGProxy *device)
 		gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, "0000",
 									NULL);
 	} else if (__bt_agent_is_hid_keyboard(device_class)) {
-		char str_passkey[7] = { 0 };
+		char str_passkey[BT_PASSKEY_MAX_LENGTH + 1] = { 0 };
 
-		__bt_agent_generate_passkey(str_passkey, sizeof(str_passkey));
+		if (__bt_agent_generate_passkey(str_passkey,
+					BT_PASSKEY_MAX_LENGTH) != 0) {
+			gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT,
+						"", NULL);
+			goto done;
+		}
 
 		gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT,
 							str_passkey, NULL);
@@ -428,6 +439,12 @@ static gboolean __pairing_cancel_request(GapAgent *agent, const char *address)
 	return TRUE;
 }
 
+static gboolean __a2dp_authorize_request_check(void)
+{
+	/* Check for existing Media device to disconnect */
+	return _bt_is_headset_type_connected(BT_AUDIO_A2DP, NULL);
+}
+
 static gboolean __authorize_request(GapAgent *agent, DBusGProxy *device,
 							const char *uuid)
 {
@@ -435,23 +452,80 @@ static gboolean __authorize_request(GapAgent *agent, DBusGProxy *device,
 	GValue *value;
 	const gchar *address;
 	const gchar *name;
+	bool enabled;
 	gboolean trust;
 	gboolean paired;
+	tethering_h tethering = NULL;
 	GError *error = NULL;
+	int ret;
 	int result = BLUETOOTH_ERROR_NONE;
 	int request_type = BT_AGENT_EVENT_AUTHORIZE_REQUEST;
 
 	BT_DBG("+\n");
 
+	BT_DBG("+\n");
+
+	/* Check if already Media connection exsist */
+	if (!strcasecmp(uuid, A2DP_UUID)) {
+		gboolean ret = FALSE;
+
+		ret = __a2dp_authorize_request_check();
+
+		if (ret) {
+			BT_DBG("Already one A2DP device connected \n");
+			gap_agent_reply_authorize(agent, GAP_AGENT_REJECT,
+					      NULL);
+			goto done;
+		}
+	}
+	/* Check completed */
+
 	if (!strcasecmp(uuid, HFP_AUDIO_GATEWAY_UUID) ||
-					!strcasecmp(uuid, A2DP_UUID) ||
-					!strcasecmp(uuid, AVRCP_TARGET_UUID)) {
+	     !strcasecmp(uuid, A2DP_UUID) ||
+	      !strcasecmp(uuid, HID_UUID) ||
+	       !strcasecmp(uuid, AVRCP_TARGET_UUID)) {
 		BT_DBG("Auto accept authorization for audio device (HFP, A2DP, AVRCP) [%s]", uuid);
 		gap_agent_reply_authorize(agent, GAP_AGENT_ACCEPT,
 					      NULL);
 
 		goto done;
 	}
+
+	if (!strcasecmp(uuid, NAP_UUID) ||
+	     !strcasecmp(uuid, GN_UUID) ||
+	      !strcasecmp(uuid, BNEP_UUID)) {
+
+		BT_DBG("Network connection request: %s", uuid);
+		ret = tethering_create(&tethering);
+
+		if (ret != TETHERING_ERROR_NONE) {
+			BT_ERR("Fail to create tethering: %d", ret);
+			goto fail;
+		}
+
+		enabled = tethering_is_enabled(tethering, TETHERING_TYPE_BT);
+
+		ret = tethering_destroy(tethering);
+
+		if (ret != TETHERING_ERROR_NONE) {
+			BT_ERR("Fail to create tethering: %d", ret);
+		}
+
+		if (enabled != true) {
+			BT_ERR("BT tethering is not enabled");
+			goto fail;
+		}
+
+		gap_agent_reply_authorize(agent, GAP_AGENT_ACCEPT,
+					      NULL);
+		goto done;
+fail:
+		gap_agent_reply_authorize(agent, GAP_AGENT_REJECT,
+		      NULL);
+
+		goto done;
+	}
+
 
 	dbus_g_proxy_call(device, "GetProperties", &error, G_TYPE_INVALID,
 				dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
@@ -839,14 +913,12 @@ static int __bt_agent_generate_passkey(char *passkey, int size)
 	if (random_fd < 0)
 		return -1;
 
-	for (i = 0; i < size - 1; i++) {
+	for (i = 0; i < size; i++) {
 		len = read(random_fd, &value, sizeof(value));
 		passkey[i] = '0' + (value % 10);
 	}
 
 	close(random_fd);
-
-	passkey[size - 1] = '\0';
 
 	BT_DBG("passkey: %s", passkey);
 

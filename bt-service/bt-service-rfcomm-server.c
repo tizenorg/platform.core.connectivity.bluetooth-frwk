@@ -242,7 +242,7 @@ int _bt_rfcomm_create_socket(char *sender, char *uuid)
 	int socket_fd;
 	bt_rfcomm_server_info_t *server_info;
 
-	BT_CHECK_PARAMETER(uuid);
+	BT_CHECK_PARAMETER(uuid, return);
 
 	server_id = __bt_rfcomm_assign_server_id();
 	retv_if(server_id < 0, BLUETOOTH_ERROR_INTERNAL);
@@ -379,7 +379,7 @@ int __bt_rfcomm_server_get_address(bt_rfcomm_server_info_t *server_info)
 	DBusConnection *conn;
 	const char *property;
 
-	BT_CHECK_PARAMETER(server_info);
+	BT_CHECK_PARAMETER(server_info, return);
 
 	/* GetInfo Proxy Part */
 	msg = dbus_message_new_method_call(BT_BLUEZ_NAME,
@@ -684,6 +684,8 @@ int _bt_rfcomm_remove_socket(int socket_fd)
 
 	server_list = g_slist_remove(server_list, server_info);
 
+	__bt_rfcomm_delete_server_id(server_info->server_id);
+
 	g_free(server_info->serial_path);
 	g_free(server_info->uuid);
 	g_free(server_info->sender);
@@ -763,8 +765,8 @@ int _bt_rfcomm_is_uuid_available(char *uuid, gboolean *available)
 	GSList *l;
 	bt_rfcomm_server_info_t *server_info;
 
-	BT_CHECK_PARAMETER(uuid);
-	BT_CHECK_PARAMETER(available);
+	BT_CHECK_PARAMETER(uuid, return);
+	BT_CHECK_PARAMETER(available, return);
 
 	*available = FALSE;
 
@@ -897,7 +899,7 @@ int _bt_rfcomm_server_disconnect_all_connection(void)
 
 int _bt_rfcomm_server_check_existence(gboolean *existence)
 {
-	BT_CHECK_PARAMETER(existence);
+	BT_CHECK_PARAMETER(existence, return);
 
 	if (server_list && g_slist_length(server_list) > 0) {
 		*existence = TRUE;
@@ -913,7 +915,7 @@ int _bt_rfcomm_server_check_termination(char *name)
 	GSList *l;
 	bt_rfcomm_server_info_t *server_info;
 
-	BT_CHECK_PARAMETER(name);
+	BT_CHECK_PARAMETER(name, return);
 
 	for (l = server_list; l != NULL; l = l->next) {
 		server_info = l->data;

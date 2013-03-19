@@ -1,11 +1,13 @@
 Name:       bluetooth-frwk
 Summary:    Bluetooth framework for BlueZ and Obexd. This package is Bluetooth framework based on BlueZ and Obexd stack.
-Version:    0.2.55
-Release:    2
+Version:    0.2.56
+Release:    1
 Group:      TO_BE/FILLED_IN
 License:    Apache License, Version 2.0
 Source0:    %{name}-%{version}.tar.gz
-
+Requires: sys-assert
+Requires: dbus
+Requires: syspopup
 BuildRequires:  pkgconfig(aul)
 BuildRequires:  pkgconfig(dbus-glib-1)
 BuildRequires:  pkgconfig(dlog)
@@ -15,12 +17,14 @@ BuildRequires:  pkgconfig(vconf)
 BuildRequires:  pkgconfig(libxml-2.0)
 BuildRequires:  pkgconfig(dbus-1)
 BuildRequires:  pkgconfig(utilX)
+BuildRequires:  pkgconfig(capi-network-tethering)
 BuildRequires:  pkgconfig(libprivilege-control)
 BuildRequires:  pkgconfig(status)
+BuildRequires:  pkgconfig(alarm-service)
 BuildRequires:  cmake
 
-Requires(post): /sbin/ldconfig
-Requires(postun): /sbin/ldconfig
+Requires(post): vconf
+Requires(postun): eglibc
 
 %description
 Bluetooth framework for BlueZ and Obexd. This package is Bluetooth framework based on BlueZ and Obexd stack.
@@ -103,6 +107,7 @@ vconftool set -tf int memory/bluetooth/btsco "0" -g 6520 -i
 %{_libdir}/libbluetooth-api.so
 
 %files service
+%manifest bluetooth-frwk.manifest
 %defattr(-, root, root)
 %{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service
 %{_sysconfdir}/rc.d/rc3.d/S80bluetooth-frwk-service

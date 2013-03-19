@@ -34,9 +34,9 @@ BT_EXPORT_API int bluetooth_rfcomm_connect(const bluetooth_device_address_t *rem
 	bt_user_info_t *user_info;
 	char uuid[BLUETOOTH_UUID_STRING_MAX];
 
-	BT_CHECK_PARAMETER(remote_bt_address);
-	BT_CHECK_PARAMETER(remote_uuid);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(remote_bt_address, return);
+	BT_CHECK_PARAMETER(remote_uuid, return);
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -74,7 +74,7 @@ BT_EXPORT_API gboolean bluetooth_rfcomm_is_client_connected(void)
 	int result;
 	int connected = FALSE;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -101,7 +101,7 @@ BT_EXPORT_API int bluetooth_rfcomm_disconnect(int socket_fd)
 	int result;
 	int service_function;
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -130,8 +130,8 @@ BT_EXPORT_API int bluetooth_rfcomm_write(int fd, const char *buf, int length)
 	int result;
 	char *buffer;
 
-	BT_CHECK_PARAMETER(buf);
-	BT_CHECK_ENABLED();
+	BT_CHECK_PARAMETER(buf, return);
+	BT_CHECK_ENABLED(return);
 	retv_if(length <= 0, BLUETOOTH_ERROR_INVALID_PARAM);
 
 	BT_INIT_PARAMS();

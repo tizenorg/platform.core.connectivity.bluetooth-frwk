@@ -98,7 +98,7 @@ BT_EXPORT_API int bluetooth_hdp_activate(unsigned short data_type,
 
 	BT_DBG("+");
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	/*For source role is mandatory */
 	if (role == HDP_ROLE_SOURCE && channel_type == HDP_QOS_ANY) {
@@ -739,8 +739,8 @@ BT_EXPORT_API int bluetooth_hdp_deactivate(const char *app_handle)
 {
 	BT_DBG("+");
 
-	BT_CHECK_ENABLED();
-	BT_CHECK_PARAMETER(app_handle);
+	BT_CHECK_ENABLED(return);
+	BT_CHECK_PARAMETER(app_handle, return);
 
 	return __bt_hdp_internal_destroy_application(app_handle);
 }
@@ -914,7 +914,7 @@ BT_EXPORT_API int bluetooth_hdp_send_data(unsigned int channel_id,
 
 	BT_DBG("+");
 
-	BT_CHECK_ENABLED();
+	BT_CHECK_ENABLED(return);
 
 	if ((channel_id == 0) || (NULL == buffer) || (size == 0)) {
 		BT_DBG("Invalid arguments..\n");
@@ -982,9 +982,9 @@ BT_EXPORT_API int bluetooth_hdp_connect(const char *app_handle,
 
 	BT_DBG("+");
 
-	BT_CHECK_ENABLED();
-	BT_CHECK_PARAMETER(app_handle);
-	BT_CHECK_PARAMETER(device_address);
+	BT_CHECK_ENABLED(return);
+	BT_CHECK_PARAMETER(app_handle, return);
+	BT_CHECK_PARAMETER(device_address, return);
 
 	if (channel_type == HDP_QOS_RELIABLE) {
 		role = "Reliable";
@@ -1106,8 +1106,8 @@ BT_EXPORT_API int bluetooth_hdp_disconnect(unsigned int channel_id,
 
 	BT_DBG("+\n");
 
-	BT_CHECK_ENABLED();
-	BT_CHECK_PARAMETER(device_address);
+	BT_CHECK_ENABLED(return);
+	BT_CHECK_PARAMETER(device_address, return);
 
 	hdp_obj_info_t *info = __bt_hdp_internal_gslist_obj_find_using_fd(channel_id);
 	if (NULL == info) {

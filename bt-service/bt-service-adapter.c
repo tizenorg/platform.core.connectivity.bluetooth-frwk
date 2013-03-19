@@ -25,8 +25,10 @@
 #include <string.h>
 #include <vconf.h>
 #include <status.h>
-#include <aul.h>
 #include <syspopup_caller.h>
+#include <aul.h>
+
+#include "alarm.h"
 
 #include "bluetooth-api.h"
 #include "bt-internal-types.h"
@@ -44,6 +46,8 @@
 typedef struct {
 	guint event_id;
 	int timeout;
+	time_t start_time;
+	int alarm_id;
 } bt_adapter_timer_t;
 
 bt_adapter_timer_t visible_timer;
@@ -57,39 +61,75 @@ static DBusGProxy *core_proxy = NULL;
 #define BT_CORE_PATH "/org/projectx/bt_core"
 #define BT_CORE_INTERFACE "org.projectx.btcore"
 
-
 static gboolean __bt_timeout_handler(gpointer user_data)
 {
 	int result = BLUETOOTH_ERROR_NONE;
+	time_t current_time;
+	int time_diff;
 
-	visible_timer.timeout--;
+	/* Take current time */
+	time(&current_time);
+	time_diff = difftime(current_time, visible_timer.start_time);
 
 	/* Send event to application */
 	_bt_send_event(BT_ADAPTER_EVENT,
 			BLUETOOTH_EVENT_DISCOVERABLE_TIMEOUT_CHANGED,
 			DBUS_TYPE_INT32, &result,
-			DBUS_TYPE_INT16, &visible_timer.timeout,
+			DBUS_TYPE_INT16, &time_diff,
 			DBUS_TYPE_INVALID);
 
-	if (visible_timer.timeout <= 0) {
+	if (visible_timer.timeout <= time_diff) {
 		g_source_remove(visible_timer.event_id);
 		visible_timer.event_id = 0;
 		visible_timer.timeout = 0;
 
 		if (vconf_set_int(BT_FILE_VISIBLE_TIME, 0) != 0)
 			BT_DBG("Set vconf failed\n");
-
 		return FALSE;
 	}
 
 	return TRUE;
 }
 
+static int __bt_visibility_alarm_cb(alarm_id_t alarm_id, void* user_param)
+{
+	BT_DBG("__bt_visibility_alarm_cb \n");
+
+	/* Switch Off visibility in Bluez */
+	_bt_set_discoverable_mode(BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE, 0);
+	visible_timer.alarm_id = 0;
+	alarmmgr_fini();
+	return 0;
+}
+
+static void __bt_visibility_alarm_create()
+{
+	alarm_id_t alarm_id;
+	int result;
+
+	result = alarmmgr_add_alarm(ALARM_TYPE_VOLATILE, visible_timer.timeout,
+						0, NULL, &alarm_id);
+	if(result < 0) {
+		BT_DBG("Failed to create alarm error = %d\n", result);
+		alarmmgr_fini();
+	} else {
+		BT_DBG("Alarm created = %d\n", alarm_id);
+		visible_timer.alarm_id = alarm_id;
+	}
+}
+
 int __bt_set_visible_time(int timeout)
 {
+	int result;
+
 	if (visible_timer.event_id > 0) {
 		g_source_remove(visible_timer.event_id);
 		visible_timer.event_id = 0;
+	}
+
+	if (visible_timer.alarm_id > 0) {
+		alarmmgr_remove_alarm(visible_timer.alarm_id);
+		visible_timer.alarm_id = 0;
 	}
 
 	visible_timer.timeout = timeout;
@@ -100,8 +140,21 @@ int __bt_set_visible_time(int timeout)
 	if (timeout <= 0)
 		return BLUETOOTH_ERROR_NONE;
 
+	/* Take start time */
+	time(&(visible_timer.start_time));
 	visible_timer.event_id = g_timeout_add_seconds(1,
-			__bt_timeout_handler, NULL);
+				__bt_timeout_handler, NULL);
+
+	/* Set Alarm timer to switch off BT */
+	result = alarmmgr_init("bt-service");
+	if (result != 0)
+		return BLUETOOTH_ERROR_INTERNAL;
+
+	result = alarmmgr_set_cb(__bt_visibility_alarm_cb, NULL);
+	if (result != 0)
+		return BLUETOOTH_ERROR_INTERNAL;
+
+	__bt_visibility_alarm_create();
 
 	return BLUETOOTH_ERROR_NONE;
 }
@@ -152,8 +205,8 @@ static int __bt_get_bonded_device_info(gchar *device_path,
 	int ret;
 	DBusGConnection *conn;
 
-	BT_CHECK_PARAMETER(device_path);
-	BT_CHECK_PARAMETER(dev_info);
+	BT_CHECK_PARAMETER(device_path, return);
+	BT_CHECK_PARAMETER(dev_info, return);
 
 	conn = _bt_get_system_gconn();
 	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -452,6 +505,9 @@ void _bt_handle_adapter_added(void)
 	if (_bt_register_obex_server() != BLUETOOTH_ERROR_NONE)
 		BT_ERR("Fail to init obex server");
 
+	if (_bt_network_activate() != BLUETOOTH_ERROR_NONE)
+		BT_ERR("Fail to activate network");
+
 	/* add the vconf noti handler */
 	vconf_notify_key_changed(VCONFKEY_SETAPPL_DEVICE_NAME_STR,
 					__bt_phone_name_changed_cb, NULL);
@@ -648,7 +704,7 @@ int _bt_check_adapter(int *status)
 	DBusGProxy *proxy;
 	char *adapter_path = NULL;
 
-	BT_CHECK_PARAMETER(status);
+	BT_CHECK_PARAMETER(status, return);
 
 	*status = 0; /* 0: disabled */
 
@@ -676,7 +732,7 @@ int _bt_get_local_address(bluetooth_device_address_t *local_address)
 	GValue *value;
 	char *address = NULL;
 
-	BT_CHECK_PARAMETER(local_address);
+	BT_CHECK_PARAMETER(local_address, return);
 
 	proxy = _bt_get_adapter_proxy();
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -712,7 +768,7 @@ int _bt_get_local_name(bluetooth_device_name_t *local_name)
 	char *ptr = NULL;
 	int ret = BLUETOOTH_ERROR_NONE;
 
-	BT_CHECK_PARAMETER(local_name);
+	BT_CHECK_PARAMETER(local_name, return);
 
 	proxy = _bt_get_adapter_proxy();
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -750,7 +806,7 @@ int _bt_set_local_name(char *local_name)
 	GError *error = NULL;
 	char *ptr = NULL;
 
-	BT_CHECK_PARAMETER(local_name);
+	BT_CHECK_PARAMETER(local_name, return);
 
 	proxy = _bt_get_adapter_proxy();
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -785,8 +841,8 @@ int _bt_is_service_used(char *service_uuid, gboolean *used)
 	GValue *value;
 	int ret = BLUETOOTH_ERROR_NONE;
 
-	BT_CHECK_PARAMETER(service_uuid);
-	BT_CHECK_PARAMETER(used);
+	BT_CHECK_PARAMETER(service_uuid, return);
+	BT_CHECK_PARAMETER(used, return);
 
 	proxy = _bt_get_adapter_proxy();
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -827,7 +883,7 @@ int _bt_get_discoverable_mode(int *mode)
 	GValue *value;
 	GValue *timeout_value;
 
-	BT_CHECK_PARAMETER(mode);
+	BT_CHECK_PARAMETER(mode, return);
 
 	proxy = _bt_get_adapter_proxy();
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -936,7 +992,7 @@ int _bt_set_discoverable_mode(int discoverable_mode, int timeout)
 	if (discoverable_mode == BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE)
 		timeout = -1;
 
-	__bt_set_visible_time(timeout);
+	ret = __bt_set_visible_time(timeout);
 
 done:
 	g_value_unset(&val_timeout);
@@ -1053,7 +1109,7 @@ int _bt_get_bonded_devices(GArray **dev_list)
 	GError *error = NULL;
 	DBusGProxy *proxy;
 
-	BT_CHECK_PARAMETER(dev_list);
+	BT_CHECK_PARAMETER(dev_list, return);
 
 	proxy = _bt_get_adapter_proxy();
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -1102,8 +1158,8 @@ int _bt_get_bonded_device_info(bluetooth_device_address_t *device_address,
 	DBusGProxy *adapter_proxy;
 	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
 
-	BT_CHECK_PARAMETER(device_address);
-	BT_CHECK_PARAMETER(dev_info);
+	BT_CHECK_PARAMETER(device_address, return);
+	BT_CHECK_PARAMETER(dev_info, return);
 
 	adapter_proxy = _bt_get_adapter_proxy();
 	retv_if(adapter_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -1129,9 +1185,16 @@ int _bt_get_bonded_device_info(bluetooth_device_address_t *device_address,
 
 int _bt_get_timeout_value(int *timeout)
 {
-	*timeout = 0;
+	time_t current_time;
+	int time_diff;
 
-	*timeout = visible_timer.timeout;
+	/* Take current time */
+	time(&current_time);
+	time_diff = difftime(current_time, visible_timer.start_time);
+
+	BT_DBG("Time diff = %d\n", time_diff);
+
+	*timeout = visible_timer.timeout - time_diff;
 
 	return BLUETOOTH_ERROR_NONE;
 }

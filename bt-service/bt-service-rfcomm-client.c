@@ -517,8 +517,8 @@ int _bt_rfcomm_connect_using_uuid(int request_id,
 	gchar *device_path = NULL;
 	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
 
-	BT_CHECK_PARAMETER(address);
-	BT_CHECK_PARAMETER(remote_uuid);
+	BT_CHECK_PARAMETER(address, return);
+	BT_CHECK_PARAMETER(remote_uuid, return);
 	retv_if(rfcomm_info != NULL, BLUETOOTH_ERROR_DEVICE_BUSY);
 
 	adapter_proxy = _bt_get_adapter_proxy();
@@ -573,7 +573,7 @@ int _bt_rfcomm_connect_using_channel(int request_id,
 	gchar *device_path = NULL;
 	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
 
-	BT_CHECK_PARAMETER(address);
+	BT_CHECK_PARAMETER(address, return);
 	retv_if(rfcomm_info != NULL, BLUETOOTH_ERROR_DEVICE_BUSY);
 
 	adapter_proxy = _bt_get_adapter_proxy();
@@ -711,7 +711,7 @@ int _bt_rfcomm_cancel_connect(void)
 
 int _bt_rfcomm_is_connected(gboolean *connected)
 {
-	BT_CHECK_PARAMETER(connected);
+	BT_CHECK_PARAMETER(connected, return);
 
 	*connected = (client_list == NULL || g_slist_length(client_list) == 0) ?
 					FALSE : TRUE;
@@ -726,8 +726,8 @@ int _bt_rfcomm_is_device_connected(bluetooth_device_address_t *device_address,
 	bt_rfcomm_info_t *client_info;
 	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
 
-	BT_CHECK_PARAMETER(device_address);
-	BT_CHECK_PARAMETER(connected);
+	BT_CHECK_PARAMETER(device_address, return);
+	BT_CHECK_PARAMETER(connected, return);
 
 	_bt_convert_addr_type_to_string(address, device_address->addr);
 

@@ -791,6 +791,15 @@ static int __bt_obexd_request(int function_name,
 
 		break;
 	}
+	case BT_OBEX_SERVER_IS_RECEIVING: {
+		gboolean is_receiving = FALSE;
+
+		result = _bt_obex_server_is_receiving(&is_receiving);
+
+		g_array_append_vals(*out_param1, &is_receiving,
+				sizeof(gboolean));
+		break;
+	}
 	default:
 		BT_ERR("Unknown function!");
 		result = BLUETOOTH_ERROR_INTERNAL;
@@ -923,10 +932,6 @@ int _bt_service_register(void)
 	}
 
 	bt_service = g_object_new(BT_SERVICE_TYPE, NULL);
-	if (bt_service == NULL) {
-		BT_ERR("bt_service is NULL");
-		goto fail;
-	}
 
 	dbus_g_connection_register_g_object(conn, BT_SERVICE_PATH,
 					G_OBJECT(bt_service));

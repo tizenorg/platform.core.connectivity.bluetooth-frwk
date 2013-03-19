@@ -39,10 +39,12 @@ static bt_status_t adapter_status = BT_DEACTIVATED;
 
 static void __bt_core_terminate(void)
 {
-	if (main_loop)
+	if (main_loop) {
 		g_main_loop_quit(main_loop);
-	else
+	} else {
+		BT_DBG("Terminating bt-core daemon");
 		exit(0);
+	}
 }
 
 static void __bt_core_set_status(bt_status_t status)
@@ -394,7 +396,7 @@ static void __bt_core_sigterm_handler(int signo)
 	__bt_core_terminate();
 }
 
-int main()
+int main(void)
 {
 	DBusGConnection *conn = NULL;
 	GError *error = NULL;
@@ -403,7 +405,7 @@ int main()
 	DBusGProxy *dbus_proxy = NULL;
 	struct sigaction sa;
 
-	BT_DBG("+");
+	BT_DBG("Starting bt-core daemeon");
 
 	g_type_init();
 
@@ -415,10 +417,6 @@ int main()
 	}
 
 	bt_core = g_object_new(BT_CORE_TYPE, NULL);
-	if (bt_core == NULL) {
-		BT_ERR("bt_service is NULL");
-		goto fail;
-	}
 
 	dbus_proxy = __bt_core_register(conn, bt_core);
 	if (!dbus_proxy) {
@@ -453,6 +451,6 @@ fail:
 
 	dbus_g_connection_unref(conn);
 
-	BT_DBG("-");
+	BT_DBG("Terminating bt-core daemon");
 	return FALSE;
 }

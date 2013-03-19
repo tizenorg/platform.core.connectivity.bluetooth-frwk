@@ -454,8 +454,8 @@ static int __bt_opp_client_start_sending(int request_id, char *address,
 	DBusGProxyCall *proxy_call;
 	char *agent_path;
 
-	BT_CHECK_PARAMETER(address);
-	BT_CHECK_PARAMETER(file_name_array);
+	BT_CHECK_PARAMETER(address, return);
+	BT_CHECK_PARAMETER(file_name_array, return);
 
 	/* Get the session bus. */
 	g_conn = _bt_get_session_gconn();
@@ -522,8 +522,8 @@ int _bt_opp_client_push_files(int request_id, DBusGMethodInvocation *context,
 	int result = BLUETOOTH_ERROR_NONE;
 	int i;
 
-	BT_CHECK_PARAMETER(remote_address);
-	BT_CHECK_PARAMETER(file_path);
+	BT_CHECK_PARAMETER(remote_address, return);
+	BT_CHECK_PARAMETER(file_path, return);
 
 	/* Implement the queue */
 	_bt_convert_addr_type_to_string(address, remote_address->addr);
@@ -612,7 +612,7 @@ int _bt_opp_client_cancel_all_transfers(void)
 
 int _bt_opp_client_is_sending(gboolean *sending)
 {
-	BT_CHECK_PARAMETER(sending);
+	BT_CHECK_PARAMETER(sending, return);
 
 	*sending = sending_info ? TRUE : FALSE;
 

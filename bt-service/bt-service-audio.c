@@ -33,6 +33,20 @@
 #include "bt-service-event.h"
 #include "bt-service-util.h"
 
+typedef struct {
+	unsigned int type;
+	int device_state;
+	char device_address[BT_ADDRESS_STRING_SIZE + 1];
+} bt_connected_headset_data_t;
+
+static GList *g_connected_list;
+
+static bt_headset_wait_t *g_wait_data;
+
+static void __bt_remove_device_from_wait_list();
+
+static void __bt_free_wait_data();
+
 static void __bt_audio_request_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 				    gpointer user_data)
 {
@@ -61,10 +75,26 @@ static void __bt_audio_request_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 		goto done;
 	}
 
-	if (g_error != NULL) {
-		BT_ERR("Audio Connect Dbus Call Error: %s\n", g_error->message);
-		result = BLUETOOTH_ERROR_INTERNAL;
+	if (g_error == NULL)
 		goto dbus_return;
+
+	BT_ERR("Audio Connect Dbus Call Error: %s\n", g_error->message);
+
+	result = BLUETOOTH_ERROR_INTERNAL;
+
+	/* Remove the device from the list */
+	_bt_remove_headset_from_list(BT_AUDIO_ALL, func_data->address);
+
+	/* Error, check if any waiting device is there */
+	if (g_wait_data == NULL)
+		goto dbus_return;
+
+	if (g_strcmp0(g_wait_data->address, func_data->address) != 0) {
+		bluetooth_device_address_t device_address;
+		_bt_convert_addr_string_to_type(device_address.addr,
+							g_wait_data->address);
+		_bt_audio_connect(g_wait_data->req_id, g_wait_data->type,
+				&device_address, g_wait_data->out_param1);
 	}
 
 	/* Event will be sent by the event reciever */
@@ -132,6 +162,7 @@ static char *__bt_get_audio_path(bluetooth_device_address_t *address)
 					BT_BLUEZ_NAME,
 					object_path,
 					BT_HEADSET_INTERFACE);
+
 	retv_if(audio_proxy == NULL, NULL);
 
 	g_object_unref(audio_proxy);
@@ -176,6 +207,208 @@ static char *__bt_get_connected_audio_path(void)
 	return audio_path;
 }
 
+static void __bt_free_wait_data()
+{
+	if (g_wait_data != NULL) {
+		g_free(g_wait_data->address);
+		g_free(g_wait_data);
+		g_wait_data = NULL;
+	}
+}
+
+static void __bt_remove_device_from_wait_list()
+{
+	/* Before deleting the request update the UI */
+	GArray *out_param_1 = NULL;
+	GArray *out_param_2 = NULL;
+	int result = BLUETOOTH_ERROR_INTERNAL;
+	request_info_t *req_info;
+
+	req_info = _bt_get_request_info(g_wait_data->req_id);
+	if (req_info == NULL) {
+		BT_ERR("req_info == NULL");
+		return;
+	}
+
+	out_param_1 = g_array_new(FALSE, FALSE, sizeof(gchar));
+	out_param_2 = g_array_new(FALSE, FALSE, sizeof(gchar));
+	g_array_append_vals(out_param_1, g_wait_data->address,
+				BT_ADDRESS_STR_LEN);
+	g_array_append_vals(out_param_2, &result, sizeof(int));
+	dbus_g_method_return(req_info->context,
+				out_param_1, out_param_2);
+	g_array_free(out_param_1, TRUE);
+	g_array_free(out_param_2, TRUE);
+	_bt_delete_request_list(g_wait_data->req_id);
+}
+
+static void __bt_set_headset_disconnection_type(const char *address)
+{
+	bt_connected_headset_data_t *connected_device;
+	GList *node;
+
+	BT_DBG("__bt_set_headset_disconnection_type \n");
+
+	node = g_list_first(g_connected_list);
+	while (node != NULL) {
+		connected_device = node->data;
+		if (g_strcmp0(connected_device->device_address, address) == 0) {
+			g_wait_data->disconnection_type = connected_device->type;
+			return;
+		}
+		node = g_list_next(node);
+	}
+}
+
+gboolean _bt_is_headset_type_connected(int type, char *address)
+{
+	GList *node;
+
+	BT_DBG("_bt_is_headset_type_connected \n");
+
+	node = g_list_first(g_connected_list);
+	while (node != NULL) {
+		bt_connected_headset_data_t *connected_device = node->data;
+
+		if (connected_device->type & type) {
+			if (address != NULL)
+				g_strlcpy(address, connected_device->device_address,
+						BT_ADDRESS_STRING_SIZE + 1);
+			return TRUE;
+		}
+
+		node = g_list_next(node);
+	}
+	return FALSE;
+}
+
+static gboolean __bt_is_headset_connected(int type, int req_id,
+				const char *address, GArray **out_param1)
+{
+	gboolean connected;
+	char connected_address[BT_ADDRESS_STRING_SIZE + 1];
+	bluetooth_device_address_t device_address;
+
+	BT_DBG("__bt_is_headset_connected \n");
+
+	/* Check if any other headset is connected */
+	connected = _bt_is_headset_type_connected(type, connected_address);
+
+	if (!connected)
+		return FALSE;
+
+	/* If already one device is waiting, remove current waiting device and add new */
+	if (g_wait_data != NULL) {
+		if (g_strcmp0(g_wait_data->address, address) != 0) {
+			__bt_remove_device_from_wait_list();
+			__bt_free_wait_data();
+		}
+	}
+
+	if (g_wait_data == NULL) {
+		g_wait_data = g_malloc0(sizeof(bt_headset_wait_t));
+		g_wait_data->address = g_strdup(address);
+		g_wait_data->req_id = req_id;
+		g_wait_data->type = type;
+		g_wait_data->ag_flag = FALSE;
+		g_wait_data->out_param1 = out_param1;
+
+		/* Set disconnection type */
+		__bt_set_headset_disconnection_type(connected_address);
+	}
+
+	/* Convert BD adress from string type */
+	_bt_convert_addr_string_to_type(device_address.addr, connected_address);
+	_bt_audio_disconnect(0, type, &device_address, NULL);
+	return TRUE;
+}
+
+void _bt_set_audio_wait_data_flag(gboolean flag)
+{
+	BT_DBG("_bt_set_audio_wait_data_flag \n");
+	g_wait_data->ag_flag = flag;
+}
+
+bt_headset_wait_t *_bt_get_audio_wait_data(void)
+{
+	BT_DBG("_bt_get_audio_wait_data \n");
+	return g_wait_data;
+}
+
+void _bt_add_headset_to_list(int type, int status, const char *address)
+{
+	bt_connected_headset_data_t *connected_device;
+	bt_connected_headset_data_t *device;
+	GList *node;
+
+	BT_DBG("_bt_add_headset_to_list \n");
+
+	node = g_list_first(g_connected_list);
+	while (node != NULL) {
+		device = (bt_connected_headset_data_t *)node->data;
+
+		if (g_strcmp0(device->device_address, address) == 0) {
+			BT_DBG("Address match, update connection type \n");
+			device->type |= type;
+			device->device_state = status;
+			return;
+		}
+		node = g_list_next(node);
+	}
+
+	connected_device = g_malloc0(sizeof(bt_connected_headset_data_t));
+	connected_device->type |= type;
+	connected_device->device_state = status;
+	g_strlcpy(connected_device->device_address, address,
+				sizeof(connected_device->device_address));
+	g_connected_list = g_list_append(g_connected_list, connected_device);
+}
+
+void _bt_remove_headset_from_list(int type, const char *address)
+{
+	GList *node;
+
+	BT_DBG("_bt_remove_headset_from_list \n");
+
+	node = g_list_first(g_connected_list);
+	while (node != NULL) {
+		bt_connected_headset_data_t *connected_device = node->data;
+
+		if (g_strcmp0(connected_device->device_address, address) != 0) {
+			node = g_list_next(node);
+			continue;
+		}
+
+		BT_DBG("Address match \n");
+
+		BT_DBG("Connection type = %x\n", connected_device->type);
+
+		switch (type) {
+		case BT_AUDIO_A2DP:
+			if (connected_device->type & BT_AUDIO_A2DP)
+				connected_device->type &= ~(BT_AUDIO_A2DP);
+			break;
+		case BT_AUDIO_HSP:
+			if (connected_device->type & BT_AUDIO_HSP)
+				connected_device->type &= ~(BT_AUDIO_HSP);
+			break;
+		case BT_AUDIO_ALL:
+			if (connected_device->type & BT_AUDIO_ALL)
+				connected_device->type &= ~(BT_AUDIO_ALL);
+			break;
+		}
+
+		BT_DBG("Connection type = %x\n", connected_device->type);
+
+		if (connected_device->type == 0x00) {
+			g_connected_list = g_list_remove(g_connected_list, connected_device);
+			g_free(connected_device);
+		}
+
+		node = g_list_next(node);
+	}
+}
+
 int _bt_audio_connect(int request_id, int type,
 		bluetooth_device_address_t *device_address,
 		GArray **out_param1)
@@ -189,7 +422,7 @@ int _bt_audio_connect(int request_id, int type,
 	DBusGProxy *profile_proxy;
 	DBusGConnection *g_conn;
 
-	BT_CHECK_PARAMETER(device_address);
+	BT_CHECK_PARAMETER(device_address, return);
 
 	_bt_convert_addr_type_to_string(address, device_address->addr);
 
@@ -208,6 +441,9 @@ int _bt_audio_connect(int request_id, int type,
 		result = BLUETOOTH_ERROR_INTERNAL;
 		goto fail;
 	}
+
+	if (__bt_is_headset_connected(type, request_id, address, out_param1))
+		return BLUETOOTH_ERROR_NONE;
 
 	adapter_proxy = _bt_get_adapter_proxy();
 	if (adapter_proxy == NULL) {
@@ -258,6 +494,9 @@ int _bt_audio_connect(int request_id, int type,
 		result = BLUETOOTH_ERROR_INTERNAL;
 		goto fail;
 	}
+	/* Add data to the connected list */
+	_bt_add_headset_to_list(type, BT_STATE_CONNECTING, address);
+	__bt_free_wait_data();
 
 	return BLUETOOTH_ERROR_NONE;
 fail:
@@ -280,7 +519,7 @@ int _bt_audio_disconnect(int request_id, int type,
 	DBusGProxy *profile_proxy;
 	DBusGConnection *g_conn;
 
-	BT_CHECK_PARAMETER(device_address);
+	BT_CHECK_PARAMETER(device_address, return);
 
 	_bt_convert_addr_type_to_string(address, device_address->addr);
 
@@ -331,22 +570,30 @@ int _bt_audio_disconnect(int request_id, int type,
 		goto fail;
 	}
 
-	func_data = g_malloc0(sizeof(bt_function_data_t));
-	func_data->address = g_strdup(address);
-	func_data->req_id = request_id;
+	if (g_wait_data != NULL) {
+		if (!dbus_g_proxy_begin_call(profile_proxy, "Disconnect",
+				NULL, NULL, NULL, G_TYPE_INVALID)) {
+			BT_ERR("Audio disconnect Dbus Call Error");
+			g_object_unref(profile_proxy);
+			return BLUETOOTH_ERROR_INTERNAL;
+		}
+	} else {
+		func_data = g_malloc0(sizeof(bt_function_data_t));
+		func_data->address = g_strdup(address);
+		func_data->req_id = request_id;
+		if (!dbus_g_proxy_begin_call(profile_proxy, "Disconnect",
+				(DBusGProxyCallNotify)__bt_audio_request_cb,
+				func_data, NULL,
+				G_TYPE_INVALID)) {
+			BT_ERR("Audio disconnect Dbus Call Error");
+			g_object_unref(profile_proxy);
 
-	if (!dbus_g_proxy_begin_call(profile_proxy, "Disconnect",
-			(DBusGProxyCallNotify)__bt_audio_request_cb,
-			func_data, NULL,
-			G_TYPE_INVALID)) {
-		BT_ERR("Audio disconnect Dbus Call Error");
-		g_object_unref(profile_proxy);
+			g_free(func_data->address);
+			g_free(func_data);
 
-		g_free(func_data->address);
-		g_free(func_data);
-
-		result = BLUETOOTH_ERROR_INTERNAL;
-		goto fail;
+			result = BLUETOOTH_ERROR_INTERNAL;
+			goto fail;
+		}
 	}
 
 	return BLUETOOTH_ERROR_NONE;
