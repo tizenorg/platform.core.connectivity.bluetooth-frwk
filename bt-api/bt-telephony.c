@@ -704,8 +704,6 @@ static void __bluetooth_telephony_adapter_added_cb(DBusGProxy *manager_proxy,
 				const char *adapter_path, gpointer user_data)
 {
 	int ret;
-	DBusError dbus_error;
-	DBusConnection *conn;
 
 	BT_DBG("Adapter added [%s] \n", adapter_path);
 
@@ -717,27 +715,6 @@ static void __bluetooth_telephony_adapter_added_cb(DBusGProxy *manager_proxy,
 		if (ret != BLUETOOTH_TELEPHONY_ERROR_NONE) {
 			BT_DBG("__bluetooth_telephony_register failed\n");
 			return;
-		}
-
-		dbus_error_init(&dbus_error);
-		conn = dbus_g_connection_get_connection(telephony_dbus_info.conn);
-		dbus_connection_add_filter(conn, __bluetooth_telephony_event_filter,
-				NULL, NULL);
-
-		dbus_bus_add_match(conn,
-				"type='signal',interface='" BLUEZ_HEADSET_INTERFACE
-				"',member='PropertyChanged'", &dbus_error);
-		dbus_bus_add_match(conn,
-			"type='signal',interface='"HFP_AGENT_SERVICE
-			"',member='"HFP_NREC_STATUS_CHANGE"'" , &dbus_error);
-
-		if (dbus_error_is_set(&dbus_error)) {
-			BT_DBG("Fail to add dbus filter signal\n");
-			dbus_error_free(&dbus_error);
-			__bluetooth_telephony_unregister();
-			dbus_connection_remove_filter(dbus_g_connection_get_connection(
-					telephony_dbus_info.conn),
-					__bluetooth_telephony_event_filter, NULL);
 		}
 	}
 }
@@ -1210,9 +1187,6 @@ BT_EXPORT_API int bluetooth_telephony_init(bt_telephony_func_ptr cb,
 	if (dbus_error_is_set(&dbus_error)) {
 		BT_ERR("Fail to add dbus filter signal\n");
 		dbus_error_free(&dbus_error);
-		dbus_connection_remove_filter(dbus_g_connection_get_connection(
-				telephony_dbus_info.conn),
-				__bluetooth_telephony_event_filter, NULL);
 		goto fail;
 	}
 
@@ -1234,40 +1208,31 @@ BT_EXPORT_API int bluetooth_telephony_init(bt_telephony_func_ptr cb,
 	BT_DBG("-");
 	return ret;
 fail:
-	telephony_info.cb = NULL;
-	telephony_info.user_data = NULL;
-	telephony_info.call_count = 0;
-
-	__bluetooth_telephony_proxy_deinit();
-
-	/*Remove BT enabled signal*/
-	dbus_g_proxy_disconnect_signal(
-		telephony_dbus_info.manager_proxy,
-		"AdapterAdded",
-		G_CALLBACK(__bluetooth_telephony_adapter_added_cb),
-		NULL);
-
-	dbus_g_connection_unref(telephony_dbus_info.conn);
-	telephony_dbus_info.conn = NULL;
-	g_object_unref(telephony_dbus_info.manager_proxy);
-	telephony_dbus_info.manager_proxy = NULL;
-	g_object_unref(telephony_dbus_info.dbus_proxy);
-	telephony_dbus_info.dbus_proxy = NULL;
-	is_initialized = FALSE;
+	bluetooth_telephony_deinit();
 	return ret;
 }
 
 BT_EXPORT_API int bluetooth_telephony_deinit(void)
 {
 	BT_DBG("+");
+	DBusConnection *conn;
 
 	BT_TELEPHONY_CHECK_INITIALIZED();
 
 	is_initialized = FALSE;
 
-	dbus_connection_remove_filter(dbus_g_connection_get_connection(
-				telephony_dbus_info.conn),
-				__bluetooth_telephony_event_filter, NULL);
+	conn = dbus_g_connection_get_connection(telephony_dbus_info.conn);
+
+	dbus_bus_remove_match(conn,
+	                        "type='signal',interface='" BLUEZ_HEADSET_INTERFACE
+	                        "',member='PropertyChanged'", NULL);
+
+	dbus_bus_remove_match(conn,
+	                "type='signal',interface='"HFP_AGENT_SERVICE
+	                "',member='"HFP_NREC_STATUS_CHANGE"'", NULL);
+
+	dbus_connection_remove_filter(conn, __bluetooth_telephony_event_filter,
+		 NULL);
 
 	if (bluetooth_check_adapter() == BLUETOOTH_ADAPTER_ENABLED)
 		__bluetooth_telephony_unregister();
