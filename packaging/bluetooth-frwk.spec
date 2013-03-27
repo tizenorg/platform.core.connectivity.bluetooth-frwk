@@ -21,6 +21,7 @@ BuildRequires:  pkgconfig(capi-network-tethering)
 BuildRequires:  pkgconfig(libprivilege-control)
 BuildRequires:  pkgconfig(status)
 BuildRequires:  pkgconfig(alarm-service)
+BuildRequires:  pkgconfig(notification)
 BuildRequires:  cmake
 
 Requires(post): vconf

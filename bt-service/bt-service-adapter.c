@@ -27,6 +27,7 @@
 #include <status.h>
 #include <syspopup_caller.h>
 #include <aul.h>
+#include <notification.h>
 
 #include "alarm.h"
 
@@ -580,7 +581,7 @@ gboolean __bt_enable_timeout_cb(gpointer user_data)
 	__bt_set_disabled(BLUETOOTH_ERROR_TIMEOUT);
 
 	/* Display notification */
-	status_message_post(BT_STR_NOT_SUPPORT);
+	notification_status_message_post(BT_STR_NOT_SUPPORT);
 
 	_bt_terminate_service(NULL);
 
@@ -629,7 +630,7 @@ int _bt_enable_adapter(void)
 		}
 
 		/* Display notification */
-		status_message_post(BT_STR_NOT_SUPPORT);
+		notification_status_message_post(BT_STR_NOT_SUPPORT);
 
 		/* Terminate myself */
 		g_idle_add((GSourceFunc)_bt_terminate_service, NULL);
