@@ -61,10 +61,15 @@ This package is Bluetooth core daemon to manage activation / deactivation.
 
 
 %build
-export CFLAGS+=" -fpie"
-export LDFLAGS+=" -Wl,--rpath=/usr/lib -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs -pie"
 
-cmake . -DCMAKE_INSTALL_PREFIX=/usr
+%ifarch x86_64
+export CFLAGS+="   -Wall -g -fvisibility=hidden -fPIC"
+export LDFLAGS+=" -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs" 
+%else
+export CFLAGS+=" -fpie"
+export LDFLAGS+=" -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs -pie"
+%endif
+%cmake .
 
 make
 
