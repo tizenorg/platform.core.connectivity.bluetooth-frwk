@@ -41,8 +41,6 @@
 static DBusGConnection *manager_conn;
 static DBusGConnection *obexd_conn;
 
-static guint event_id;
-
 static gboolean __bt_parse_device_properties(DBusMessageIter *item_iter,
 						bt_remote_dev_info_t *dev_info)
 {
@@ -234,27 +232,6 @@ static int __bt_get_agent_signal_info(DBusMessage *msg, char **address,
 	return BLUETOOTH_ERROR_NONE;
 }
 
-gboolean _bt_discovery_finished_cb(gpointer user_data)
-{
-	int result = BLUETOOTH_ERROR_NONE;
-	event_id = 0;
-
-	if (_bt_get_discoverying_property() == FALSE) {
-		if (_bt_get_cancel_by_user() == TRUE) {
-			result = BLUETOOTH_ERROR_CANCEL_BY_USER;
-		}
-
-		_bt_set_cancel_by_user(FALSE);
-		_bt_set_discovery_status(FALSE);
-		_bt_send_event(BT_ADAPTER_EVENT,
-			BLUETOOTH_EVENT_DISCOVERY_FINISHED,
-			DBUS_TYPE_INT32, &result,
-			DBUS_TYPE_INVALID);
-	}
-
-	return FALSE;
-}
-
 void _bt_handle_adapter_event(DBusMessage *msg)
 {
 	int mode = 0;
@@ -296,20 +273,12 @@ void _bt_handle_adapter_event(DBusMessage *msg)
 					DBUS_TYPE_INT32, &result,
 					DBUS_TYPE_INVALID);
 			} else {
-				ret_if(event_id > 0);
-
-				adapter_proxy = _bt_get_adapter_proxy();
-				ret_if(adapter_proxy == NULL);
-
-				/* Need to stop searching */
-				dbus_g_proxy_call(adapter_proxy,
-							"StopDiscovery",
-							NULL,
-							G_TYPE_INVALID,
-							G_TYPE_INVALID);
-
-				event_id = g_timeout_add(BT_DISCOVERY_FINISHED_DELAY,
-					      (GSourceFunc)_bt_discovery_finished_cb, NULL);
+				_bt_set_cancel_by_user(FALSE);
+				_bt_set_discovery_status(FALSE);
+				_bt_send_event(BT_ADAPTER_EVENT,
+					BLUETOOTH_EVENT_DISCOVERY_FINISHED,
+					DBUS_TYPE_INT32, &result,
+					DBUS_TYPE_INVALID);
 			}
 		} else if (strcasecmp(property, "Name") == 0) {
 			char *name = NULL;
@@ -1390,7 +1359,4 @@ void _bt_deinit_service_event_reciever(void)
 		dbus_g_connection_unref(obexd_conn);
 		obexd_conn = NULL;
 	}
-
-	if (event_id > 0)
-		g_source_remove(event_id);
 }
