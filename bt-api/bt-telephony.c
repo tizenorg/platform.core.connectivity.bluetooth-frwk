@@ -1171,6 +1171,7 @@ BT_EXPORT_API int bluetooth_telephony_init(bt_telephony_func_ptr cb,
 	/*Callback and user applicaton data*/
 	telephony_info.cb = cb;
 	telephony_info.user_data = user_data;
+	telephony_info.headset_state = BLUETOOTH_STATE_DISCONNETED;
 
 	dbus_error_init(&dbus_error);
 	conn = dbus_g_connection_get_connection(telephony_dbus_info.conn);
@@ -1242,6 +1243,7 @@ BT_EXPORT_API int bluetooth_telephony_deinit(void)
 	telephony_info.cb = NULL;
 	telephony_info.user_data = NULL;
 	telephony_info.call_count = 0;
+	telephony_info.headset_state = BLUETOOTH_STATE_DISCONNETED;
 
 	/*Remove BT enabled signal*/
 	dbus_g_proxy_disconnect_signal(
