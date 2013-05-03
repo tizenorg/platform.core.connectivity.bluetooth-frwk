@@ -22,6 +22,7 @@ BuildRequires:  pkgconfig(libprivilege-control)
 BuildRequires:  pkgconfig(status)
 BuildRequires:  pkgconfig(alarm-service)
 BuildRequires:  pkgconfig(notification)
+BuildRequires:  pkgconfig(security-server)
 BuildRequires:  cmake
 
 Requires(post): vconf

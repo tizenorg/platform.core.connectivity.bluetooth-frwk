@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <security-server.h>
 
 #include "bluetooth-api.h"
 #include "bluetooth-audio-api.h"
@@ -35,6 +36,8 @@
 
 static bt_user_info_t user_info[BT_MAX_USER_INFO];
 static DBusGConnection *system_conn = NULL;
+static char *cookie;
+static size_t cookie_size;
 
 void _bt_print_device_address_t(const bluetooth_device_address_t *addr)
 {
@@ -313,6 +316,39 @@ DBusConnection *_bt_get_system_conn(void)
 	return dbus_g_connection_get_connection(g_conn);
 }
 
+static void __bt_generate_cookie(void)
+{
+	int retval;
+
+	ret_if(cookie != NULL);
+
+	cookie_size = security_server_get_cookie_size();
+
+	cookie = g_malloc0((cookie_size*sizeof(char))+1);
+
+	retval = security_server_request_cookie(cookie, cookie_size);
+	if(retval < 0) {
+		BT_ERR("Fail to get cookie: %d", retval);
+	}
+}
+
+static void __bt_destroy_cookie(void)
+{
+	g_free(cookie);
+	cookie = NULL;
+	cookie_size = 0;
+}
+
+char *_bt_get_cookie(void)
+{
+	return cookie;
+}
+
+int _bt_get_cookie_size(void)
+{
+	return cookie_size;
+}
+
 BT_EXPORT_API int bluetooth_is_supported(void)
 {
 	int is_supported = 0;
@@ -371,6 +407,8 @@ BT_EXPORT_API int bluetooth_register_callback(bluetooth_cb_func_ptr callback_ptr
 		return ret;
 	}
 
+	__bt_generate_cookie();
+
 	_bt_set_user_data(BT_COMMON, (void *)callback_ptr, user_data);
 
 	/* Register All events */
@@ -385,6 +423,8 @@ BT_EXPORT_API int bluetooth_register_callback(bluetooth_cb_func_ptr callback_ptr
 
 BT_EXPORT_API int bluetooth_unregister_callback(void)
 {
+	__bt_destroy_cookie();
+
 	_bt_unregister_event(BT_ADAPTER_EVENT);
 	_bt_unregister_event(BT_DEVICE_EVENT);
 	_bt_unregister_event(BT_NETWORK_EVENT);

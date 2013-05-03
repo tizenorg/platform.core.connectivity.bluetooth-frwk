@@ -131,6 +131,14 @@ extern "C" {
 #define BT_FREEDESKTOP_INTERFACE "org.freedesktop.DBus"
 #define BT_FREEDESKTOP_PATH "/org/freedesktop/DBus"
 
+/* Privilege */
+#define BT_PRIVILEGE_MANAGER "bt-service::manager"
+#define BT_PRIVILEGE_ADMIN "bt-service::admin"
+#define BT_PRIVILEGE_GAP "bt-service::gap"
+#define BT_PRIVILEGE_OPP "bt-service::opp"
+#define BT_PRIVILEGE_SPP "bt-service::spp"
+#define BT_PRIVILEGE_HEALTH "bt-service::health"
+
 typedef enum {
 	BT_OBEX_SERVER = 0x00,
 	BT_RFCOMM_SERVER = 0x01,

@@ -226,6 +226,10 @@ DBusGConnection *_bt_get_system_gconn(void);
 
 DBusConnection *_bt_get_system_conn(void);
 
+char *_bt_get_cookie(void);
+
+int _bt_get_cookie_size(void);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

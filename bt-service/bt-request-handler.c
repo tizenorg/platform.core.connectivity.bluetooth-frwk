@@ -23,6 +23,7 @@
 #include <dbus/dbus-glib-lowlevel.h>
 #include <glib.h>
 #include <dlog.h>
+#include <security-server.h>
 
 #include "bluetooth-api.h"
 #include "bt-service-common.h"
@@ -809,6 +810,126 @@ static int __bt_obexd_request(int function_name,
 	return result;
 }
 
+gboolean __bt_service_check_privilege(int function_name,
+					int service_type,
+					GArray *in_param5)
+{
+	const char *cookie;
+	int ret_val;
+	gboolean result = TRUE;
+
+	cookie = (const char *)&g_array_index(in_param5, char, 0);
+
+	retv_if(cookie == NULL, TRUE);
+
+	if (service_type == BT_OBEX_SERVICE) {
+		ret_val = security_server_check_privilege_by_cookie(cookie,
+						BT_PRIVILEGE_OPP, "w");
+		if (ret_val == SECURITY_SERVER_API_ERROR_ACCESS_DENIED) {
+			BT_ERR("[SMACK] Fail to access: %s", BT_PRIVILEGE_OPP);
+			return FALSE;
+		} else {
+			return TRUE;
+		}
+	}
+
+	switch (function_name) {
+	case BT_SET_DISCOVERABLE_MODE:
+		ret_val = security_server_check_privilege_by_cookie(cookie,
+						BT_PRIVILEGE_MANAGER, "w");
+		if (ret_val == SECURITY_SERVER_API_ERROR_ACCESS_DENIED) {
+			BT_ERR("[SMACK] Fail to access: %s", BT_PRIVILEGE_MANAGER);
+			result = FALSE;
+		}
+		break;
+	case BT_ENABLE_ADAPTER:
+	case BT_DISABLE_ADAPTER:
+	case BT_CHECK_ADAPTER:
+	case BT_SET_LOCAL_NAME:
+		ret_val = security_server_check_privilege_by_cookie(cookie,
+						BT_PRIVILEGE_ADMIN, "w");
+		if (ret_val == SECURITY_SERVER_API_ERROR_ACCESS_DENIED) {
+			BT_ERR("[SMACK] Fail to access: %s", BT_PRIVILEGE_ADMIN);
+			result = FALSE;
+		}
+		break;
+	case BT_START_DISCOVERY:
+	case BT_CANCEL_DISCOVERY:
+	case BT_BOND_DEVICE:
+	case BT_CANCEL_BONDING:
+	case BT_UNBOND_DEVICE:
+	case BT_SEARCH_SERVICE:
+		ret_val = security_server_check_privilege_by_cookie(cookie,
+						BT_PRIVILEGE_GAP, "w");
+		if (ret_val == SECURITY_SERVER_API_ERROR_ACCESS_DENIED) {
+			BT_ERR("[SMACK] Fail to access: %s", BT_PRIVILEGE_GAP);
+			result = FALSE;
+		}
+		break;
+
+	case BT_RFCOMM_CLIENT_CONNECT:
+	case BT_RFCOMM_CLIENT_CANCEL_CONNECT:
+	case BT_RFCOMM_SOCKET_DISCONNECT:
+	case BT_RFCOMM_SOCKET_WRITE:
+	case BT_RFCOMM_CREATE_SOCKET:
+	case BT_RFCOMM_REMOVE_SOCKET:
+	case BT_RFCOMM_LISTEN:
+	case BT_RFCOMM_ACCEPT_CONNECTION:
+	case BT_RFCOMM_REJECT_CONNECTION:
+		ret_val = security_server_check_privilege_by_cookie(cookie,
+						BT_PRIVILEGE_SPP, "w");
+		if (ret_val == SECURITY_SERVER_API_ERROR_ACCESS_DENIED) {
+			BT_ERR("[SMACK] Fail to access: %s", BT_PRIVILEGE_SPP);
+			result = FALSE;
+		}
+		break;
+	case BT_GET_LOCAL_NAME:
+	case BT_RESET_ADAPTER:
+	case BT_GET_LOCAL_ADDRESS:
+	case BT_IS_SERVICE_USED:
+	case BT_GET_DISCOVERABLE_MODE:
+	case BT_GET_DISCOVERABLE_TIME:
+	case BT_IS_DISCOVERYING:
+	case BT_GET_BONDED_DEVICES:
+	case BT_GET_BONDED_DEVICE:
+	case BT_SET_ALIAS:
+	case BT_CANCEL_SEARCH_SERVICE:
+	case BT_SET_AUTHORIZATION:
+	case BT_IS_DEVICE_CONNECTED:
+	case BT_HID_CONNECT:
+	case BT_HID_DISCONNECT:
+	case BT_NETWORK_ACTIVATE:
+	case BT_NETWORK_DEACTIVATE:
+	case BT_NETWORK_CONNECT:
+	case BT_NETWORK_DISCONNECT:
+	case BT_AUDIO_CONNECT:
+	case BT_AUDIO_DISCONNECT:
+	case BT_AG_CONNECT:
+	case BT_AG_DISCONNECT:
+	case BT_AV_CONNECT:
+	case BT_AV_DISCONNECT:
+	case BT_GET_SPEAKER_GAIN:
+	case BT_SET_SPEAKER_GAIN:
+	case BT_OOB_READ_LOCAL_DATA:
+	case BT_OOB_ADD_REMOTE_DATA:
+	case BT_OOB_REMOVE_REMOTE_DATA:
+	case BT_AVRCP_SET_TRACK_INFO:
+	case BT_AVRCP_SET_PROPERTY:
+	case BT_AVRCP_SET_PROPERTIES:
+	case BT_RFCOMM_CLIENT_IS_CONNECTED:
+	case BT_RFCOMM_IS_UUID_AVAILABLE:
+		/* Non-privilege control */
+		BT_DBG("Non-privilege control");
+		break;
+	default:
+		BT_ERR("Unknown function!");
+		result = FALSE;
+		break;
+	}
+
+	return result;
+}
+
 gboolean bt_service_request(
 		BtService *service,
 		int service_type,
@@ -828,6 +949,12 @@ gboolean bt_service_request(
 
 	out_param1 = g_array_new(FALSE, FALSE, sizeof(gchar));
 	out_param2 = g_array_new(FALSE, FALSE, sizeof(gchar));
+
+	if (__bt_service_check_privilege(service_function,
+				service_type, in_param5) == FALSE) {
+
+		/* Will return access error! */
+	}
 
 	if (request_type == BT_ASYNC_REQ
 	     || service_function == BT_OBEX_SERVER_ACCEPT_CONNECTION
