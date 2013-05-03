@@ -1,6 +1,23 @@
 <manifest>
     <define>
         <domain name="bt-service"/>
+	<provide>
+		<label name="bt-service::manager"/>
+		<label name="bt-service::admin"/>
+		<label name="bt-service::gap"/>
+		<label name="bt-service::opp"/>
+		<label name="bt-service::spp"/>
+		<label name="bt-service::health"/>
+	</provide>
+	<request>
+		<smack request="system::vconf" type="rwxat"/>
+		<smack request="system::share" type="rwxat"/>
+		<smack request="system::media" type="rwxat"/>
+		<smack request="dbus" type="rwx"/>
+		<smack request="device::app_logging" type="w"/>
+		<smack request="syspopup::db" type="rwx"/>
+		<smack request="device::dialout" type="rw"/>
+	</request>
     </define>
 
     <assign>
