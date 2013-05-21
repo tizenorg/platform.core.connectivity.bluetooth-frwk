@@ -1,10 +1,11 @@
 Name:       bluetooth-frwk
-Summary:    Bluetooth framework for BlueZ and Obexd. This package is Bluetooth framework based on BlueZ and Obexd stack.
+Summary:    Bluetooth framework for BlueZ and Obexd
 Version:    0.2.57
 Release:    1
-Group:      TO_BE/FILLED_IN
-License:    Apache License, Version 2.0
+Group:      Connectivity/Bluetooth
+License:    Apache-2.0
 Source0:    %{name}-%{version}.tar.gz
+URL:        https://review.tizen.org/git/?p=platform/core/connectivity/bluetooth-frwk.git;a=summary
 Requires: sys-assert
 Requires: dbus
 Requires: syspopup
@@ -26,7 +27,8 @@ BuildRequires:  pkgconfig(security-server)
 BuildRequires:  cmake
 
 Requires(post): vconf
-Requires(postun): eglibc
+Requires(post): /sbin/ldconfig
+Requires(postun): /sbin/ldconfig
 
 %description
 Bluetooth framework for BlueZ and Obexd. This package is Bluetooth framework based on BlueZ and Obexd stack.
@@ -35,7 +37,7 @@ Bluetooth framework for BlueZ and Obexd. This package is Bluetooth framework bas
 
 %package devel
 Summary:    Bluetooth framework for BlueZ and Obexd
-Group:      TO_BE/FILLED
+Group:      Development/Libraries
 Requires:   %{name} = %{version}-%{release}
 
 %description devel
@@ -44,7 +46,7 @@ This package contains API set for BT GAP, BT SDP, and BT RFCOMM.
 
 %package service
 Summary:    Bluetooth Service daemon
-Group:      TO_BE/FILLED
+Group:      Connectivity/Bluetooth
 Requires:   %{name} = %{version}-%{release}
 
 %description service
@@ -52,7 +54,7 @@ This package is Bluetooth Service daemon to manage BT services.
 
 %package core
 Summary:    Bluetooth Core daemon
-Group:      TO_BE/FILLED
+Group:      Connectivity/Bluetooth
 Requires:   %{name} = %{version}-%{release}
 
 %description core
@@ -91,6 +93,7 @@ ln -s ../bluetooth-frwk-service.service %{buildroot}%{_libdir}/systemd/user/tize
 
 
 %post
+/sbin/ldconfig
 vconftool set -tf int db/bluetooth/status "0" -g 6520
 vconftool set -tf int file/private/bt-service/flight_mode_deactivated "0" -g 6520 -i
 vconftool set -tf string memory/bluetooth/sco_headset_name "" -g 6520 -i
