@@ -2,9 +2,18 @@
 #include <glib.h>
 #include <glib-object.h>
 #include "common.h"
+#include "bluez.h"
+
 GMainLoop *loop;
 
-void *adapter;
+bluez_adapter_t *adapter;
+
+static void adapter_powered_cb (bluez_adapter_t *adapter,
+					gboolean powered,
+					gpointer user_data)
+{
+	DBG("adapter 0x%p changed to %d", adapter, powered);
+}
 
 gboolean idle_work(gpointer user_data)
 {
@@ -42,7 +51,8 @@ int main(int argc, char **argv)
 	bluez_lib_init();
 	adapter = bluez_adapter_get_adapter("hci0");
 	if (adapter != NULL) {
-
+		bluez_adapter_set_powered_changed_cb(adapter,
+						adapter_powered_cb, NULL);
 		bluez_adapter_set_powered(adapter, 1);
 
 		idle_work(NULL);
