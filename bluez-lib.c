@@ -264,6 +264,8 @@ static void destruct_bluez_adapter(gpointer data)
 	struct bluez_adapter *adapter = data;
 	GList *interface_list = adapter->parent->interfaces;
 
+	DBG("0x%p", adapter);
+
 	interface_list = g_list_remove(interface_list, data);
 
 	bluez_adapter_list = g_list_remove(bluez_adapter_list,
@@ -292,7 +294,7 @@ static void destruct_bluez_object(gpointer data)
 {
 	struct bluez_object *object = data;
 
-	DBG("");
+	DBG("0x%p", object);
 
 	bluez_object_list = g_list_remove(bluez_object_list, data);
 
@@ -452,4 +454,33 @@ void bluez_adapter_stop_discovery(struct bluez_adapter *adapter)
 			0, -1, NULL, NULL, NULL);
 
 	DBG("done");
+}
+
+int bluez_adapter_get_property_powered(struct bluez_adapter *adapter,
+						gboolean *powered)
+{
+	GVariant *powered_v;
+	gchar **names;
+	int i;
+
+	DBG("");
+
+	if (check_adapter(adapter)) {
+		ERROR("adapter does not exist");
+		return -1;
+	}
+
+	powered_v = g_dbus_proxy_get_cached_property(
+					adapter->proxy,
+					"Powered");
+	if (powered_v == NULL) {
+		ERROR("no cached property");
+		return -1;
+	}
+
+	*powered = g_variant_get_boolean(powered_v);
+
+	g_variant_unref(powered_v);
+
+	return 0;
 }
