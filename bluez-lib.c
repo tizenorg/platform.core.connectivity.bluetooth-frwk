@@ -25,6 +25,8 @@ struct _bluez_adapter {
 	struct _bluez_object *parent;
 	bluez_adapter_powered_cb_t powered_cb;
 	gpointer powered_cb_data;
+	bluez_adapter_alias_cb_t alias_cb;
+	gpointer alias_cb_data;
 };
 
 struct _bluez_device {
@@ -89,10 +91,23 @@ static void handle_adapter_powered_changed(GVariant *changed_properties,
 	if (!variant_found)
 		return;
 
-	if (adapter->powered_cb)
-		adapter->powered_cb(adapter,
-					powered,
-					adapter->powered_cb_data);
+	adapter->powered_cb(adapter,
+				powered,
+				adapter->powered_cb_data);
+}
+
+static void handle_adapter_alias_changed(GVariant *changed_properties,
+						struct _bluez_adapter *adapter)
+{
+	const gchar *alias;
+	gboolean variant_found = g_variant_lookup(changed_properties,
+							"Alias", "s", alias);
+	if (!variant_found)
+		return;
+
+	adapter->alias_cb(adapter,
+			alias,
+			adapter->alias_cb_data);
 }
 
 static void adapter_properties_changed(GDBusProxy *proxy,
@@ -101,10 +116,14 @@ static void adapter_properties_changed(GDBusProxy *proxy,
 					gpointer user_data) 
 {
 	gchar *properties = g_variant_print(changed_properties, TRUE);
+	struct _bluez_adapter *adapter = user_data;
 
 	DBG("properties %s", properties);
+	if (adapter->powered_cb)
+		handle_adapter_powered_changed(changed_properties, user_data);
 
-	handle_adapter_powered_changed(changed_properties, user_data);
+	if (adapter->alias_cb)
+		handle_adapter_alias_changed(changed_properties, user_data);
 }
 
 static struct _bluez_adapter *create_adapter(struct _bluez_object *object)
@@ -439,6 +458,25 @@ void bluez_lib_deinit(void)
 	destruct_bluez_object_manager();
 }
 
+void bluez_adapter_set_alias(struct _bluez_adapter *adapter, const gchar *alias)
+{
+
+	GVariant *val = g_variant_new("s", alias);
+	GVariant *parameters = g_variant_new("(ssv)",
+			ADAPTER_INTERFACE, "Alias", val);
+
+	if (check_adapter(adapter)) {
+		ERROR("adapter does not exist");
+		return;
+	}
+
+	DBG("Alias %s", alias);
+
+	g_dbus_proxy_call(adapter->parent->properties_proxy,
+					"Set", parameters, 0,
+					-1, NULL, NULL, NULL);
+}
+
 void bluez_adapter_set_powered(struct _bluez_adapter *adapter, gboolean power)
 {
 
@@ -521,4 +559,38 @@ void bluez_adapter_set_powered_changed_cb(struct _bluez_adapter *adapter,
 {
 	adapter->powered_cb = cb;
 	adapter->powered_cb_data=  user_data;
+}
+
+int bluez_adapter_get_property_alias(struct _bluez_adapter *adapter, const gchar **alias)
+{
+	GVariant *alias_v;
+
+	DBG("");
+
+	if (check_adapter(adapter)) {
+		ERROR("adapter does not exist");
+		return -1;
+	}
+
+	alias_v = g_dbus_proxy_get_cached_property(
+					adapter->proxy,
+					"Alias");
+	if (alias_v == NULL) {
+		ERROR("no cached property");
+		return -1;
+	}
+
+	*alias = g_variant_get_string(alias_v, 0);
+	DBG("alias %s", *alias);
+	g_variant_unref(alias_v);
+
+	return 0;
+}
+
+void bluez_adapter_set_alias_changed_cb(struct _bluez_adapter *adapter,
+					bluez_adapter_alias_cb_t cb,
+					gpointer user_data)
+{
+	adapter->alias_cb = cb;
+	adapter->alias_cb_data=  user_data;
 }
