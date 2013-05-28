@@ -1,5 +1,6 @@
 #include <gio/gio.h>
 #include "common.h"
+#include "bluez.h"
 
 #define BLUEZ_NAME "org.bluez"
 #define OBJECT_MANAGE_PATH "/"
@@ -9,29 +10,31 @@
 
 GDBusObjectManager *object_manager;
 
-struct bluez_object {
+struct _bluez_object {
 	char *path_name;
 	GDBusObject *obj;
 	GList *interfaces;
 	GDBusProxy *properties_proxy;
 };
 
-struct bluez_adapter {
+struct _bluez_adapter {
 	char *interface_name;
 	char *object_path;
 	GDBusInterface *interface;
 	GDBusProxy *proxy;
-	struct bluez_object *parent;
+	struct _bluez_object *parent;
+	bluez_adapter_powered_cb_t powered_cb;
+	gpointer powered_cb_data;
 };
 
-struct bluez_device {
+struct _bluez_device {
 	char *interface_name;
 	char *object_path;
 	GDBusProxy *proxy;
-	struct bluez_object *parent;
+	struct _bluez_object *parent;
 };
 
-struct bluez_adapter *tmp_adapter;
+struct _bluez_adapter *tmp_adapter;
 
 static GList *bluez_adapter_list;
 static GList *bluez_device_list;
@@ -39,15 +42,15 @@ static GList *bluez_device_list;
 static GHashTable *bluez_adapter_hash;
 static GHashTable *bluez_device_hash;
 
-static struct bluez_object *create_object(GDBusObject *obj)
+static struct _bluez_object *create_object(GDBusObject *obj)
 {
 	GDBusProxy *properties_proxy;
-	struct bluez_object *object;
+	struct _bluez_object *object;
 	const char *path = g_dbus_object_get_object_path(obj);
 
 	DBG("obj 0x%p, object path %s", obj, path);
 
-	object = g_try_new0(struct bluez_object, 1);
+	object = g_try_new0(struct _bluez_object, 1);
 	if (object == NULL) {
 		ERROR("no memeory");
 		return NULL;
@@ -74,13 +77,43 @@ static struct bluez_object *create_object(GDBusObject *obj)
 	return object;
 }
 
-static struct bluez_adapter *create_adapter(struct bluez_object *object)
+static void handle_adapter_powered_changed(GVariant *changed_properties,
+						struct _bluez_adapter *adapter)
 {
-	struct bluez_adapter *adapter;
+	gboolean powered, variant_found;
+
+	variant_found = g_variant_lookup(changed_properties,
+					"Powered",
+					"b",
+					&powered);
+	if (!variant_found)
+		return;
+
+	if (adapter->powered_cb)
+		adapter->powered_cb(adapter,
+					powered,
+					adapter->powered_cb_data);
+}
+
+static void adapter_properties_changed(GDBusProxy *proxy,
+					GVariant *changed_properties,
+					GStrv *invalidated_properties,
+					gpointer user_data)
+{
+	gchar *properties = g_variant_print(changed_properties, TRUE);
+
+	DBG("properties %s", properties);
+
+	handle_adapter_powered_changed(changed_properties, user_data);
+}
+
+static struct _bluez_adapter *create_adapter(struct _bluez_object *object)
+{
+	struct _bluez_adapter *adapter;
 	GDBusInterface *interface;
 	GDBusInterfaceInfo *interface_info;
 
-	adapter = g_try_new0(struct bluez_adapter, 1);
+	adapter = g_try_new0(struct _bluez_adapter, 1);
 	if (adapter == NULL) {
 		ERROR("no memory");
 		return NULL;
@@ -109,6 +142,11 @@ static struct bluez_adapter *create_adapter(struct bluez_object *object)
 		return NULL;
 	}
 
+	g_signal_connect(adapter->proxy,
+			"g-properties-changed",
+			G_CALLBACK(adapter_properties_changed),
+			adapter);
+
 	adapter->interface_name = g_strdup(ADAPTER_INTERFACE);
 
 	adapter->object_path = g_strdup(object->path_name);
@@ -123,7 +161,7 @@ static struct bluez_adapter *create_adapter(struct bluez_object *object)
 static GList *bluez_object_list;
 static GHashTable *bluez_object_hash;
 
-static void register_bluez_object(struct bluez_object *object)
+static void register_bluez_object(struct _bluez_object *object)
 {
 
 	bluez_object_list = g_list_prepend(bluez_object_list,
@@ -136,7 +174,7 @@ static void register_bluez_object(struct bluez_object *object)
 static GList *bluez_adapter_list;
 static GHashTable *bluez_adapter_hash;
 
-static void register_bluez_adapter(struct bluez_adapter *adapter)
+static void register_bluez_adapter(struct _bluez_adapter *adapter)
 {
 	GList *interface_list = adapter->parent->interfaces;
 
@@ -149,18 +187,18 @@ static void register_bluez_adapter(struct bluez_adapter *adapter)
 	interface_list = g_list_prepend(interface_list, (gpointer) adapter);
 }
 
-static struct bluez_device *create_device(struct bluez_object *object)
+static struct _bluez_device *create_device(struct _bluez_object *object)
 {
 	DBG("");
 
 	return NULL;
 #if 0
 
-	struct bluez_device *device;
+	struct _bluez_device *device;
 	GDBusInterfaceInfo *interface_info =
 				g_dbus_interface_get_info(interface);
 
-	device = g_try_new0(struct bluez_device, 1);
+	device = g_try_new0(struct _bluez_device, 1);
 	if (device == NULL) {
 		ERROR("no memory");
 		return NULL;
@@ -189,7 +227,7 @@ static struct bluez_device *create_device(struct bluez_object *object)
 static GList *bluez_device_list;
 static GHashTable *bluez_device_hash;
 
-static void register_bluez_device(struct bluez_device *device)
+static void register_bluez_device(struct _bluez_device *device)
 {
 
 	DBG("");
@@ -208,9 +246,9 @@ static void parse_object(gpointer data, gpointer user_data)
 {
 	GDBusObject *obj = data;
 	GDBusInterface *interface;
-	struct bluez_object *object;
-	struct bluez_adapter *adapter;
-	struct bluez_device *device;
+	struct _bluez_object *object;
+	struct _bluez_adapter *adapter;
+	struct _bluez_device *device;
 
 	object = create_object(obj);
 	if (object == NULL)
@@ -227,7 +265,7 @@ static void parse_object(gpointer data, gpointer user_data)
 		register_bluez_device(device);
 }
 
-static int check_adapter(struct bluez_adapter *adapter)
+static int check_adapter(struct _bluez_adapter *adapter)
 {
 	if (adapter == NULL)
 		return -1;
@@ -236,7 +274,7 @@ static int check_adapter(struct bluez_adapter *adapter)
 	/* TODO: check adapter hash */
 }
 
-static int check_device(struct bluez_device *device)
+static int check_device(struct _bluez_device *device)
 {
 	if (device == NULL)
 		return -1;
@@ -244,14 +282,14 @@ static int check_device(struct bluez_device *device)
 	return 0;
 	/* TODO: check deivce hash */
 }
-struct bluez_adapter *bluez_adapter_get_adapter(const char *name)
+struct _bluez_adapter *bluez_adapter_get_adapter(const char *name)
 {
 	/* TODO: Check bluez_adapter hash table */
 	return tmp_adapter;
 }
 
 #if 0
-static void unregister_free_bluez_adapter(struct bluez_adapter *adapter)
+static void unregister_free_bluez_adapter(struct _bluez_adapter *adapter)
 {
 	DBG("");
 	g_hash_table_remove(bluez_adapter_hash,
@@ -261,7 +299,7 @@ static void unregister_free_bluez_adapter(struct bluez_adapter *adapter)
 
 static void destruct_bluez_adapter(gpointer data)
 {
-	struct bluez_adapter *adapter = data;
+	struct _bluez_adapter *adapter = data;
 	GList *interface_list = adapter->parent->interfaces;
 
 	DBG("0x%p", adapter);
@@ -282,7 +320,7 @@ static void destruct_bluez_adapter(gpointer data)
 }
 
 #if 0
-static void unregister_free_bluez_object(struct bluez_object *object)
+static void unregister_free_bluez_object(struct _bluez_object *object)
 {
 	DBG("");
 	g_hash_table_remove(bluez_object_hash,
@@ -292,7 +330,7 @@ static void unregister_free_bluez_object(struct bluez_object *object)
 
 static void destruct_bluez_object(gpointer data)
 {
-	struct bluez_object *object = data;
+	struct _bluez_object *object = data;
 
 	DBG("0x%p", object);
 
@@ -308,7 +346,7 @@ static void destruct_bluez_object(gpointer data)
 }
 
 #if 0
-static void unregister_free_bluez_device(struct bluez_device *device)
+static void unregister_free_bluez_device(struct _bluez_device *device)
 {
 	DBG("");
 	g_hash_table_remove(bluez_device_hash,
@@ -318,7 +356,7 @@ static void unregister_free_bluez_device(struct bluez_device *device)
 
 static void destruct_bluez_device(gpointer data)
 {
-	struct bluez_device *device = data;
+	struct _bluez_device *device = data;
 
 	DBG("");
 #if 0
@@ -360,7 +398,6 @@ int bluez_lib_init(void)
 	obj_list = g_dbus_object_manager_get_objects(object_manager);
 
 	g_list_foreach(obj_list, parse_object, NULL);
-
 }
 
 static void destruct_bluez_objects(void)
@@ -403,7 +440,7 @@ void bluez_lib_deinit(void)
 	destruct_bluez_object_manager();
 }
 
-void bluez_adapter_set_powered(struct bluez_adapter *adapter, gboolean power)
+void bluez_adapter_set_powered(struct _bluez_adapter *adapter, gboolean power)
 {
 
 	GVariant *val = g_variant_new("b", power);
@@ -420,11 +457,9 @@ void bluez_adapter_set_powered(struct bluez_adapter *adapter, gboolean power)
 	g_dbus_proxy_call(adapter->parent->properties_proxy,
 					"Set", parameters, 0,
 					-1, NULL, NULL, NULL);
-
-	DBG("done");
 }
 
-void bluez_adapter_start_discovery(struct bluez_adapter *adapter)
+void bluez_adapter_start_discovery(struct _bluez_adapter *adapter)
 {
 
 	if (check_adapter(adapter)) {
@@ -438,10 +473,9 @@ void bluez_adapter_start_discovery(struct bluez_adapter *adapter)
 			"StartDiscovery", NULL,
 			0, -1, NULL, NULL, NULL);
 
-	DBG("done");
 }
 
-void bluez_adapter_stop_discovery(struct bluez_adapter *adapter)
+void bluez_adapter_stop_discovery(struct _bluez_adapter *adapter)
 {
 
 	if (check_adapter(adapter)) {
@@ -452,11 +486,9 @@ void bluez_adapter_stop_discovery(struct bluez_adapter *adapter)
 	g_dbus_proxy_call(adapter->proxy,
 			"StopDiscovery", NULL,
 			0, -1, NULL, NULL, NULL);
-
-	DBG("done");
 }
 
-int bluez_adapter_get_property_powered(struct bluez_adapter *adapter,
+int bluez_adapter_get_property_powered(struct _bluez_adapter *adapter,
 						gboolean *powered)
 {
 	GVariant *powered_v;
@@ -483,4 +515,12 @@ int bluez_adapter_get_property_powered(struct bluez_adapter *adapter,
 	g_variant_unref(powered_v);
 
 	return 0;
+}
+
+void bluez_adapter_set_powered_changed_cb(struct _bluez_adapter *adapter,
+					bluez_adapter_powered_cb_t cb,
+					gpointer user_data)
+{
+	adapter->powered_cb = cb;
+	adapter->powered_cb_data = user_data;
 }
