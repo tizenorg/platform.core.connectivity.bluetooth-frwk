@@ -1,3 +1,6 @@
+* Wed May 29 2013 Anas Nashif <anas.nashif@intel.com> accepted/tizen/20130522.164550@48f114b
+- Fixed build and remove hardcoding of libdir
+
 * Tue May 21 2013 Rusty Lynch <rusty.lynch@intel.com> submit/tizen/20130517.044858@4269c84
 - Fix rpmlint errors
 
