@@ -857,3 +857,28 @@ void bluez_adapter_set_alias_changed_cb(struct _bluez_adapter *adapter,
 	adapter->alias_cb = cb;
 	adapter->alias_cb_data = user_data;
 }
+
+struct _bluez_device *bluez_adapter_get_device(
+				struct _bluez_adapter *adapter,
+				const char *addr)
+{
+	char *device_path;
+	struct _bluez_device *device;
+	int size = strlen(adapter->object_path) + strlen(addr);
+
+	device_path = malloc(size);
+
+	sprintf(device_path, "%s/dev_%s", adapter->object_path, addr);
+
+	DBG("device_path");
+
+	device = g_hash_table_lookup(adapter->device_head->device_hash,
+				(gconstpointer) device_path);
+
+	free(device_path);
+
+	return device;
+}
+
+/* Device Functions */
+

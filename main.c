@@ -22,6 +22,8 @@ static void adapter_powered_cb(bluez_adapter_t *adapter,
 	DBG("adapter 0x%p changed to %d", adapter, powered);
 }
 
+bluez_device_t *device;
+
 gboolean idle_work(gpointer user_data)
 {
 
@@ -31,7 +33,12 @@ gboolean idle_work(gpointer user_data)
 
 	times++;
 
-	bluez_adapter_start_discovery(adapter); /*
+	bluez_adapter_start_discovery(adapter);
+
+	device = bluez_adapter_get_device(adapter, "00_1F_20_24_9B_9E");
+
+	DBG("Find device %p", device);
+/*
 	if (!bluez_adapter_get_property_powered(adapter, &powered)) {
 		DBG("adapter hci0 state %d", powered);
 
@@ -49,7 +56,7 @@ gboolean idle_work(gpointer user_data)
 		new_alias[0] = new_alias[0] - 1;
 
 		bluez_adapter_set_alias(adapter, new_alias);
-	}
+
 */
 	if (times > 10) {
 		bluez_lib_deinit();

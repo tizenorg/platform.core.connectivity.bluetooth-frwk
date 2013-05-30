@@ -11,4 +11,7 @@ typedef void (*bluez_adapter_powered_cb_t) (bluez_adapter_t *adapter,
 typedef void (*bluez_adapter_alias_cb_t) (bluez_adapter_t *adapter,
 						const gchar **alias,
 						gpointer user_data);
+
+struct _bluez_device;
+typedef struct _bluez_device bluez_device_t;
 #endif
