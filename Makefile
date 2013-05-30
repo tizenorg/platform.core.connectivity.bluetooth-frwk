@@ -1,6 +1,7 @@
-CFLAGS := `pkg-config --cflags  dbus-1 glib-2.0 gio-2.0 gthread-2.0`
+CFLAGS := ` pkg-config --cflags  dbus-1 glib-2.0 gio-2.0 gthread-2.0`
 LDFLAGS := `pkg-config --libs dbus-1 glib-2.0 gio-2.0 gthread-2.0`
 
+CFLAGS += -g
 bluez-lib-test: main.o bluez-lib.o
 	$(CC) $^ -o $@ $(LDFLAGS)
 
