@@ -31,6 +31,7 @@ gboolean idle_work(gpointer user_data)
 
 	times++;
 
+	bluez_adapter_start_discovery(adapter); /*
 	if (!bluez_adapter_get_property_powered(adapter, &powered)) {
 		DBG("adapter hci0 state %d", powered);
 
@@ -49,7 +50,7 @@ gboolean idle_work(gpointer user_data)
 
 		bluez_adapter_set_alias(adapter, new_alias);
 	}
-
+*/
 	if (times > 10) {
 		bluez_lib_deinit();
 		return FALSE;
@@ -73,8 +74,6 @@ int main(int argc, char **argv)
 		bluez_adapter_set_alias_changed_cb(adapter,
 						adapter_alias_cb, NULL);
 		bluez_adapter_set_powered(adapter, 1);
-
-		idle_work(NULL);
 
 		g_timeout_add(2000, idle_work, NULL);
 	}
