@@ -77,7 +77,8 @@ int main(int argc, char **argv)
 
 		g_timeout_add(2000, idle_work, NULL);
 
-	}
+	} else
+		DBG("Can't get adapter");
 
 	g_main_loop_run(loop);
 
