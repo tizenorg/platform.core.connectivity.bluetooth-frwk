@@ -1,3 +1,5 @@
+#include <stdlib.h>
+#include <string.h>
 #include <gio/gio.h>
 #include "common.h"
 #include "bluez.h"
@@ -46,8 +48,6 @@ struct _bluez_device {
 	GDBusProxy *proxy;
 	struct _bluez_object *parent;
 };
-
-struct _bluez_adapter *tmp_adapter;
 
 static GList *bluez_adapter_list;
 static GList *bluez_device_list;
@@ -183,8 +183,6 @@ static struct _bluez_adapter *create_adapter(struct _bluez_object *object)
 	adapter->object_path = g_strdup(object->path_name);
 
 	adapter->parent = object;
-
-	tmp_adapter = adapter;
 
 	return adapter;
 }
@@ -463,8 +461,20 @@ static int check_device(struct _bluez_device *device)
 }
 struct _bluez_adapter *bluez_adapter_get_adapter(const char *name)
 {
-	/* TODO: Check bluez_adapter hash table */
-	return tmp_adapter;
+	struct _bluez_adapter *adapter;
+	char *adapter_path;
+	int size = 12 + strlen(name);
+
+	adapter_path = malloc(size);
+
+	sprintf(adapter_path, "/org/bluez/%s", name);
+
+	adapter = g_hash_table_lookup(bluez_adapter_hash,
+				(gconstpointer) adapter_path);
+
+	free(adapter_path);
+
+	return adapter;
 }
 
 #if 0

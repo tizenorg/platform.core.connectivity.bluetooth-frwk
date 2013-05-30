@@ -76,7 +76,8 @@ int main(int argc, char **argv)
 		bluez_adapter_set_powered(adapter, 1);
 
 		g_timeout_add(2000, idle_work, NULL);
-	}
+	} else
+		DBG("Can't get adapter");
 
 	g_main_loop_run(loop);
 
