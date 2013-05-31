@@ -4,6 +4,9 @@
 #include "common.h"
 #include "bluez.h"
 
+#define MOUSE "00_1F_20_24_9B_9E"
+#define MY_IPHONE "F0_DC_E2_7F_41_3D"
+
 GMainLoop *loop;
 
 bluez_adapter_t *adapter;
@@ -33,11 +36,14 @@ gboolean idle_work(gpointer user_data)
 
 	times++;
 
-	bluez_adapter_start_discovery(adapter);
+	device = bluez_adapter_get_device(adapter, MY_IPHONE);
 
-	device = bluez_adapter_get_device(adapter, "00_1F_20_24_9B_9E");
+	if (device) {
+		DBG("Pair device %p", device);
 
-	DBG("Find device %p", device);
+		bluez_device_pair(device);
+	}
+
 /*
 	if (!bluez_adapter_get_property_powered(adapter, &powered)) {
 		DBG("adapter hci0 state %d", powered);
@@ -58,11 +64,7 @@ gboolean idle_work(gpointer user_data)
 		bluez_adapter_set_alias(adapter, new_alias);
 
 */
-	if (times > 10) {
-		bluez_lib_deinit();
-		return FALSE;
-	}
-	return TRUE;
+	return FALSE;
 }
 
 int main(int argc, char **argv)
@@ -78,9 +80,9 @@ int main(int argc, char **argv)
 
 	adapter = bluez_adapter_get_adapter("hci0");
 	if (adapter != NULL) {
-		bluez_adapter_set_alias_changed_cb(adapter,
-						adapter_alias_cb, NULL);
 		bluez_adapter_set_powered(adapter, 1);
+
+		bluez_adapter_start_discovery(adapter);
 
 		g_timeout_add(2000, idle_work, NULL);
 	} else
