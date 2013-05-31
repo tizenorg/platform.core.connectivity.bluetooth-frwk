@@ -50,10 +50,8 @@ struct _bluez_device {
 };
 
 static GList *bluez_adapter_list;
-static GList *bluez_device_list;
 
 static GHashTable *bluez_adapter_hash;
-static GHashTable *bluez_device_hash;
 
 static struct _bluez_object *create_object(GDBusObject *obj)
 {
@@ -247,7 +245,6 @@ static void device_properties_changed(GDBusProxy *proxy,
 					gpointer user_data) 
 {
 	gchar *properties = g_variant_print(changed_properties, TRUE);
-	struct _bluez_device *device = user_data;
 
 	DBG("properties %s", properties);
 }
@@ -356,7 +353,7 @@ static void add_to_device_head_list(struct _bluez_device *device,
 					const char *adapter_path)
 {
 	struct _device_head *new_head;
-	GList *list, *next;
+	GList *list, *next = NULL;
 
 	DBG("");
 
@@ -418,7 +415,6 @@ static void register_bluez_device(struct _bluez_device *device)
 static void parse_object(gpointer data, gpointer user_data)
 {
 	GDBusObject *obj = data;
-	GDBusInterface *interface;
 	struct _bluez_object *object;
 	struct _bluez_adapter *adapter;
 	struct _bluez_device *device;
@@ -451,6 +447,7 @@ static int check_adapter(struct _bluez_adapter *adapter)
 	/* TODO: check adapter hash */
 }
 
+#if 0
 static int check_device(struct _bluez_device *device)
 {
 	if (device == NULL)
@@ -459,6 +456,8 @@ static int check_device(struct _bluez_device *device)
 	return 0;
 	/* TODO: check deivce hash */
 }
+#endif
+
 struct _bluez_adapter * bluez_adapter_get_adapter(const char *name)
 {
 	struct _bluez_adapter *adapter;
@@ -550,7 +549,6 @@ GDBusProxy *manager_proxy;
 static void interfaces_removed(GVariant *parameters) 
 {
 	gchar *object_path;
-	GVariant *interfaces;
  	GVariantIter *iter;
 
 	g_variant_get(parameters, "(oa{sa{sv}})", &object_path, &iter);
@@ -561,7 +559,6 @@ static void interfaces_removed(GVariant *parameters)
 static void interfaces_added(GVariant *parameters)
 {
 	gchar *object_path;
-	GVariant *interfaces;
  	GVariantIter *iter;
 	GDBusObject *obj;
 
@@ -589,12 +586,11 @@ static void interfaces_changed(GDBusProxy *proxy,
 int bluez_lib_init(void)
 {
 	GList *obj_list;
-	GDBusObject *test_obj;
 
 	DBG("");
 
 	if (object_manager != NULL)
-		return;
+		return 0;
 
 	object_manager = g_dbus_object_manager_client_new_for_bus_sync(
 							G_BUS_TYPE_SYSTEM,
@@ -637,6 +633,8 @@ int bluez_lib_init(void)
 				G_CALLBACK(interfaces_changed),
 				NULL);
 	}
+
+	return 0;
 }
 
 static void destruct_bluez_objects(void)
@@ -718,10 +716,11 @@ void bluez_adapter_set_alias(struct _bluez_adapter *adapter,
 					-1, NULL, NULL, NULL);
 }
 
-void bluez_adapter_set_powered(struct _bluez_adapter *adapter, gboolean power)
+void bluez_adapter_set_powered(struct _bluez_adapter *adapter,
+				gboolean powered)
 {
 
-	GVariant *val = g_variant_new("b", power);
+	GVariant *val = g_variant_new("b", powered);
 	GVariant *parameters = g_variant_new("(ssv)",
 			ADAPTER_INTERFACE, "Powered", val);
 
@@ -730,7 +729,7 @@ void bluez_adapter_set_powered(struct _bluez_adapter *adapter, gboolean power)
 		return;
 	}
 
-	DBG("powered %d", power);
+	DBG("powered %d", powered);
 
 	g_dbus_proxy_call(adapter->parent->properties_proxy,
 					"Set", parameters, 0,
@@ -770,8 +769,6 @@ int bluez_adapter_get_property_powered(struct _bluez_adapter *adapter,
 						gboolean *powered)
 {
 	GVariant *powered_v;
-	gchar **names;
-	int i;
 
 	DBG("");
 
