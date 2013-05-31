@@ -766,26 +766,6 @@ void bluez_adapter_stop_discovery(struct _bluez_adapter *adapter)
 			0, -1, NULL, NULL, NULL);
 }
 
-void bluez_adapter_remove_device(struct _bluez_adapter *adapter,
-					struct _bluez_device *device)
-{
-
-	if (check_adapter(adapter)) {
-		ERROR("adapter does not exist");
-		return;
-	}
-
-	if (check_device(device)) {
-		DBG("device does not exist");
-		return;
-	}
-
-
-	g_dbus_proxy_call(adapter->proxy,
-			"RemoveDevice", NULL,
-			0, -1, NULL, NULL, NULL);
-}
-
 int bluez_adapter_get_property_powered(struct _bluez_adapter *adapter,
 						gboolean *powered)
 {
@@ -880,5 +860,25 @@ struct _bluez_device *bluez_adapter_get_device(
 	return device;
 }
 
+void bluez_adapter_remove_device(struct _bluez_adapter *adapter,
+					struct _bluez_device *device)
+{
+
+	DBG("device %s", device->object_path);
+
+	GVariant *parameter_v =
+			g_variant_new("(o)", device->object_path);
+
+	g_dbus_proxy_call(adapter->proxy,
+			"RemoveDevice", parameter_v,
+			0, -1, NULL, NULL, NULL);
+}
+
 /* Device Functions */
 
+void bluez_device_pair(struct _bluez_device *device)
+{
+	g_dbus_proxy_call(device->proxy,
+			"Pair", NULL,
+			0, -1, NULL, NULL, NULL);
+}
