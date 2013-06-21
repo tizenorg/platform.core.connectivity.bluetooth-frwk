@@ -1,0 +1,11 @@
+Change-Id: I6b63442401fd7d1b361a2fba8cceb7bedac3fdfc
+Code-Review+2: Anas Nashif <anas.nashif@intel.com>
+Code-Review+1: Baptiste DURAND <baptiste.durand@eurogiciel.fr>
+Verified+1: Baptiste DURAND <baptiste.durand@eurogiciel.fr>
+Code-Review+1: Victor Hakoun <victor.hakoun@eurogiciel.fr>
+Verified+1: Victor Hakoun <victor.hakoun@eurogiciel.fr>
+Submitted-by: Anas Nashif <anas.nashif@intel.com>
+Submitted-at: Fri, 21 Jun 2013 04:35:49 -0700
+Reviewed-on: https://review.tizen.org/gerrit/4188
+Project: platform/core/connectivity/bluetooth-frwk
+Branch: refs/heads/tizen
