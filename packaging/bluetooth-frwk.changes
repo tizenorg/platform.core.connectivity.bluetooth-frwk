@@ -1,3 +1,6 @@
+* Fri Jun 21 2013 Baptiste DURAND <baptiste.durand@eurogiciel.fr> accepted/tizen/20130529.191100@62b0858
+- Replace manifest with default floor
+
 * Wed May 29 2013 Anas Nashif <anas.nashif@intel.com> accepted/tizen/20130522.164550@48f114b
 - Fixed build and remove hardcoding of libdir
 
