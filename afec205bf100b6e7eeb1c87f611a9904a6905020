@@ -1,0 +1,9 @@
+Change-Id: Iafec205bf100b6e7eeb1c87f611a9904a6905020
+Code-Review+2: Anas Nashif <anas.nashif@intel.com>
+Code-Review+1: Victor Hakoun <victor.hakoun@eurogiciel.fr>
+Verified+1: Victor Hakoun <victor.hakoun@eurogiciel.fr>
+Submitted-by: Anas Nashif <anas.nashif@intel.com>
+Submitted-at: Wed, 26 Jun 2013 05:22:41 -0700
+Reviewed-on: https://review.tizen.org/gerrit/4247
+Project: platform/core/connectivity/bluetooth-frwk
+Branch: refs/heads/tizen
