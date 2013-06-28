@@ -1,3 +1,9 @@
+* Fri Jun 28 2013 Patrick McCarty <patrick.mccarty@linux.intel.com> 083ac72
+- packaging: remove explicit requires on sys-assert
+
+* Fri Jun 28 2013 Alexandru Cornea <alexandru.cornea@intel.com> 2ab9e05
+- resetting manifest requested domain to floor
+
 * Tue Jun 25 2013 Victor Hakoun <victor.hakoun@eurogiciel.fr> submit/tizen/20130621.103930@afec205
 - Use macro %{_unitdir_user} unstead  of %{_libdir}/systemd/user in specfile
 
