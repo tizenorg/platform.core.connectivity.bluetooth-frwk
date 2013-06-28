@@ -5,6 +5,7 @@ Release:    1
 Group:      Connectivity/Bluetooth
 License:    Apache-2.0
 Source0:    %{name}-%{version}.tar.gz
+Source1001: 	bluetooth-frwk.manifest
 URL:        https://review.tizen.org/git/?p=platform/core/connectivity/bluetooth-frwk.git;a=summary
 Requires: sys-assert
 Requires: dbus
@@ -62,6 +63,7 @@ This package is Bluetooth core daemon to manage activation / deactivation.
 
 %prep
 %setup -q
+cp %{SOURCE1001} .
 
 
 %build
@@ -103,10 +105,12 @@ vconftool set -tf int memory/bluetooth/btsco "0" -g 6520 -i
 %postun -p /sbin/ldconfig
 
 %files
+%manifest %{name}.manifest
 %defattr(-, root, root)
 %{_libdir}/libbluetooth-api.so.*
 
 %files devel
+%manifest %{name}.manifest
 %defattr(-, root, root)
 %{_includedir}/bt-service/bluetooth-api.h
 %{_includedir}/bt-service/bluetooth-hid-api.h
@@ -117,7 +121,7 @@ vconftool set -tf int memory/bluetooth/btsco "0" -g 6520 -i
 %{_libdir}/libbluetooth-api.so
 
 %files service
-%manifest bluetooth-frwk.manifest
+%manifest %{name}.manifest
 %defattr(-, root, root)
 %{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service
 %{_sysconfdir}/rc.d/rc3.d/S80bluetooth-frwk-service
@@ -129,6 +133,7 @@ vconftool set -tf int memory/bluetooth/btsco "0" -g 6520 -i
 %attr(0666,-,-) /opt/var/lib/bluetooth/auto-pair-blacklist
 
 %files core
+%manifest %{name}.manifest
 %defattr(-, root, root)
 %{_datadir}/dbus-1/services/org.projectx.bt_core.service
 %{_bindir}/bt-core
