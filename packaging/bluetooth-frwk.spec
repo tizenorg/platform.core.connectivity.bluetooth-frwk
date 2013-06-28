@@ -6,7 +6,6 @@ Group:      Connectivity/Bluetooth
 License:    Apache-2.0
 Source0:    %{name}-%{version}.tar.gz
 URL:        https://review.tizen.org/git/?p=platform/core/connectivity/bluetooth-frwk.git;a=summary
-Requires: sys-assert
 Requires: dbus
 Requires: syspopup
 BuildRequires:  pkgconfig(aul)
