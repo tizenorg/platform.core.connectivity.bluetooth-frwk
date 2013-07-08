@@ -1,0 +1,8 @@
+Change-Id: I2ab9e057182687511d84c5023babc22aa877158c
+Code-Review+2: Ryan Ware <ware@linux.intel.com>
+Verified+1: Ryan Ware <ware@linux.intel.com>
+Submitted-by: Ryan Ware <ware@linux.intel.com>
+Submitted-at: Mon, 08 Jul 2013 10:06:58 -0700
+Reviewed-on: https://review.tizen.org/gerrit/4519
+Project: platform/core/connectivity/bluetooth-frwk
+Branch: refs/heads/tizen
