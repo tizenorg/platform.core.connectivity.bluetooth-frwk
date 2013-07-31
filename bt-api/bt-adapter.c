@@ -19,7 +19,9 @@
 
 
 #include <vconf.h>
+#ifndef LIBNOTIFY_SUPPORT
 #include <syspopup_caller.h>
+#endif
 
 #include "bluetooth-api.h"
 #include "bt-internal-types.h"

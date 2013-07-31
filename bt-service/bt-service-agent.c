@@ -22,7 +22,9 @@
 #include <string.h>
 #include <malloc.h>
 #include <stacktrim.h>
+#ifndef LIBNOTIFY_SUPPORT
 #include <syspopup_caller.h>
+#endif
 #include <vconf.h>
 #include <tethering.h>
 
@@ -35,6 +37,12 @@
 #include "bt-service-rfcomm-server.h"
 #include "bt-service-device.h"
 #include "bt-service-audio.h"
+
+#ifdef LIBNOTIFY_SUPPORT
+#include "bt-popup.h"
+#else
+#include <syspopup_caller.h>
+#endif
 
 #define BT_APP_AUTHENTICATION_TIMEOUT		35
 #define BT_APP_AUTHORIZATION_TIMEOUT		15
@@ -76,6 +84,18 @@ static void __bt_agent_release_memory(void)
 	stack_trim();
 }
 
+static int __syspopup_launch(gpointer user_data)
+{
+	int ret;
+	bundle *b = (bundle *) user_data;
+#ifdef LIBNOTIFY_SUPPORT
+	ret = notify_launch(b);
+#else
+	ret = syspopup_launch("bt-syspopup", b);
+#endif
+	return ret;
+}
+
 static gboolean __bt_agent_system_popup_timer_cb(gpointer user_data)
 {
 	int ret;
@@ -85,7 +105,7 @@ static gboolean __bt_agent_system_popup_timer_cb(gpointer user_data)
 		BT_DBG("There is some problem with the user data..popup can not be created\n");
 		return FALSE;
 	}
-	ret = syspopup_launch("bt-syspopup", b);
+	ret = __syspopup_launch(b);
 
 	if (0 > ret)
 		BT_DBG("Sorry Can not launch popup\n");
@@ -179,7 +199,7 @@ static int __launch_system_popup(bt_agent_event_type_t event_type,
 
 	bundle_add(b, "event-type", event_str);
 
-	ret = syspopup_launch("bt-syspopup", b);
+	ret = __syspopup_launch(b);
 	if (0 > ret) {
 		BT_DBG("Popup launch failed...retry %d\n", ret);
 		g_timeout_add(BT_AGENT_SYSPOPUP_TIMEOUT_FOR_MULTIPLE_POPUPS,
@@ -432,7 +452,9 @@ static gboolean __pairing_cancel_request(GapAgent *agent, const char *address)
 
 	gap_agent_reply_pin_code(agent, GAP_AGENT_CANCEL, "", NULL);
 
+#ifndef LIBNOTIFY_SUPPORT
 	syspopup_destroy_all();
+#endif
 
 	__bt_agent_release_memory();
 
@@ -631,7 +653,9 @@ static gboolean __authorization_cancel_request(GapAgent *agent,
 
 	gap_agent_reply_authorize(agent, GAP_AGENT_CANCEL, NULL);
 
+#ifndef LIBNOTIFY_SUPPORT
 	syspopup_destroy_all();
+#endif
 
 	__bt_agent_release_memory();
 
