@@ -1,3 +1,8 @@
+* Wed Jul 31 2013 Victor Hakoun <victor.hakoun@eurogiciel.fr> accepted/tizen/20130710.221452@ed65cd5
+- Add a libnotify/gtk popup system to bluetooth-frwk. This is helping having Bluetooth popups with no OSP application dependencies (bt-syspopup and osp-launcher) and gtk/libnotify on the patform.
+- Tethering: Remove register NAP service for ConnMan tethering
+- resetting manifest requested domain to floor
+
 * Tue Jun 25 2013 Victor Hakoun <victor.hakoun@eurogiciel.fr> submit/tizen/20130621.103930@afec205
 - Use macro %{_unitdir_user} unstead  of %{_libdir}/systemd/user in specfile
 

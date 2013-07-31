@@ -25,7 +25,9 @@
 #include <string.h>
 #include <vconf.h>
 #include <status.h>
+#ifndef LIBNOTIFY_SUPPORT
 #include <syspopup_caller.h>
+#endif
 #include <aul.h>
 #include <notification.h>
 
