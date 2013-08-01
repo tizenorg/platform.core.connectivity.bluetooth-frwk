@@ -22,7 +22,9 @@
 #include <glib.h>
 #include <dlog.h>
 #include <string.h>
+#ifndef LIBNOTIFY_SUPPORT
 #include <syspopup_caller.h>
+#endif
 #include "bluetooth-api.h"
 #include "bt-service-network.h"
 #include "bt-service-common.h"
