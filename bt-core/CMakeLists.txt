@@ -51,5 +51,7 @@ INSTALL(TARGETS ${PROJECT_NAME} DESTINATION bin)
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt_core.service DESTINATION share/dbus-1/services)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt_core.service DESTINATION share/dbus-1/system-services)
+
+install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-core.conf DESTINATION /etc/dbus-1/system.d)
 

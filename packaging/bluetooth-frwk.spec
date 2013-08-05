@@ -126,14 +126,16 @@ vconftool set -tf int memory/bluetooth/btsco "0" -g 6520 -i
 %{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service
 %{_sysconfdir}/rc.d/rc3.d/S80bluetooth-frwk-service
 %{_sysconfdir}/rc.d/rc5.d/S80bluetooth-frwk-service
-%{_datadir}/dbus-1/services/org.projectx.bt.service
+%{_datadir}/dbus-1/system-services/org.projectx.bt.service
 %{_bindir}/bt-service
 %{_unitdir_user}/tizen-middleware.target.wants/bluetooth-frwk-service.service
 %{_unitdir_user}/bluetooth-frwk-service.service
 %attr(0666,-,-) /opt/var/lib/bluetooth/auto-pair-blacklist
+%{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-service.conf
 
 %files core
 %manifest %{name}.manifest
 %defattr(-, root, root)
-%{_datadir}/dbus-1/services/org.projectx.bt_core.service
+%{_datadir}/dbus-1/system-services/org.projectx.bt_core.service
 %{_bindir}/bt-core
+%{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-core.conf
