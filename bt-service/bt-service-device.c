@@ -22,7 +22,9 @@
 #include <glib.h>
 #include <dlog.h>
 #include <string.h>
+#ifndef LIBNOTIFY_SUPPORT
 #include <syspopup_caller.h>
+#endif
 
 #include "bluetooth-api.h"
 #include "bt-internal-types.h"
@@ -431,7 +433,9 @@ static void __bt_bond_device_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 	bt_remote_dev_info_t *remote_dev_info;
 
 	/* Terminate ALL system popup */
+#ifndef LIBNOTIFY_SUPPORT
 	syspopup_destroy_all();
+#endif
 
 	dbus_g_proxy_end_call(proxy, call, &err,
 			      DBUS_TYPE_G_OBJECT_PATH, &device_path, G_TYPE_INVALID);

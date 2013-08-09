@@ -40,8 +40,15 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 INCLUDE(FindPkgConfig)
+
+IF(LIBNOTIFY_SUPPORT)
+pkg_check_modules(packages REQUIRED dlog dbus-glib-1 gobject-2.0 gmodule-2.0 vconf
+libxml-2.0 security-server)
+ELSE(LIBNOTIFY_SUPPORT)
 pkg_check_modules(packages REQUIRED dlog dbus-glib-1 gobject-2.0 gmodule-2.0 vconf
 libxml-2.0 syspopup-caller security-server)
+ENDIF(LIBNOTIFY_SUPPORT)
+
 
 FOREACH(flag ${packages_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")

@@ -25,6 +25,12 @@ bt-service-agent.c
 bt-service-gap-agent.c
 )
 
+IF(LIBNOTIFY_SUPPORT)
+LIST(APPEND SRCS
+bt-popup.c
+)
+ENDIF(LIBNOTIFY_SUPPORT)
+
 IF("${CMAKE_BUILD_TYPE}" STREQUAL "")
 	SET(CMAKE_BUILD_TYPE "Release")
 ENDIF("${CMAKE_BUILD_TYPE}" STREQUAL "")
@@ -34,8 +40,12 @@ INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 INCLUDE(FindPkgConfig)
-pkg_check_modules(service_pkgs REQUIRED vconf aul vconf syspopup-caller dbus-glib-1 capi-network-tethering
-libprivilege-control status alarm-service notification security-server)
+
+IF(LIBNOTIFY_SUPPORT)
+	pkg_check_modules(service_pkgs REQUIRED vconf aul vconf dbus-glib-1 capi-network-tethering libprivilege-control status alarm-service notification security-server libnotify gdk-pixbuf-2.0 gtk+-3.0)
+ELSE(LIBNOTIFY_SUPPORT)
+	pkg_check_modules(service_pkgs REQUIRED vconf aul vconf syspopup-caller dbus-glib-1 capi-network-tethering libprivilege-control status alarm-service notification security-server)
+ENDIF(LIBNOTIFY_SUPPORT)
 
 FOREACH(flag ${service_pkgs_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag} -Wall")
@@ -70,10 +80,22 @@ ADD_DEFINITIONS("-DAPP_DIR=\"${APP_DIR}\"")
 ADD_DEFINITIONS("-DAPP_LOCALEDIR=\"${APP_LOCALEDIR}\"")
 ADD_DEFINITIONS("-DAPP_SYSCONFDIR=\"${APP_SYSCONFDIR}\"")
 
+IF(LIBNOTIFY_SUPPORT)
+	ADD_DEFINITIONS("-DDATA_DIR_ICON=\"${SHARE_INSTALL_PREFIX}\"")
+	MESSAGE("Icon used for notification is : ${SHARE_INSTALL_PREFIX}/icons/default/bt-icon.png")
+ENDIF(LIBNOTIFY_SUPPORT)
+
 SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed -pie")
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SRCS})
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS})
+
+# to permit usage of bluetooth_cancel_bonding in bt-popup.c. This build bluetooth-api first.
+IF(LIBNOTIFY_SUPPORT)
+	ADD_DEPENDENCIES(${PROJECT_NAME} bluetooth-api)
+	TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS} bluetooth-api)
+ELSE(LIBNOTIFY_SUPPORT)
+	TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS})
+ENDIF(LIBNOTIFY_SUPPORT)
 
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service DESTINATION share/dbus-1/system-services)
 INSTALL(TARGETS ${PROJECT_NAME} DESTINATION bin)
