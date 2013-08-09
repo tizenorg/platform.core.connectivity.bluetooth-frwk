@@ -1,3 +1,6 @@
+* Thu Aug 08 2013 Jimmy Huang <jimmy.huang@intel.com> accepted/tizen/20130710.221452@4dcc5cd
+- Fixes Tizen bluetooth device api fails to work for web apps TIVI-1275
+
 * Fri Jun 28 2013 Patrick McCarty <patrick.mccarty@linux.intel.com> 083ac72
 - packaging: remove explicit requires on sys-assert
 
