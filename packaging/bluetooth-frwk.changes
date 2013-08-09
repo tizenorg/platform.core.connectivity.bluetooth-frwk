@@ -1,3 +1,6 @@
+* Fri Aug 09 2013 Victor Hakoun <victor.hakoun@eurogiciel.fr> submit/tizen/20130809.031242@26a0212
+- Add a libnotify/gtk popup system to bluetooth-frwk. This is helping having Bluetooth popups with no OSP application dependencies (bt-syspopup and osp-launcher) and gtk/libnotify on the patform.
+
 * Thu Aug 08 2013 Jimmy Huang <jimmy.huang@intel.com> accepted/tizen/20130710.221452@4dcc5cd
 - Fixes Tizen bluetooth device api fails to work for web apps TIVI-1275
 
