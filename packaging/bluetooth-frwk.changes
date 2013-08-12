@@ -1,3 +1,6 @@
+* Mon Aug 12 2013 Rusty Lynch <rusty.lynch@intel.com> submit/tizen/20130809.082724@76f3be9
+- Only Require bluetooth-tools when building with libinotify
+
 * Fri Aug 09 2013 Victor Hakoun <victor.hakoun@eurogiciel.fr> submit/tizen/20130809.031242@26a0212
 - Add a libnotify/gtk popup system to bluetooth-frwk. This is helping having Bluetooth popups with no OSP application dependencies (bt-syspopup and osp-launcher) and gtk/libnotify on the patform.
 
