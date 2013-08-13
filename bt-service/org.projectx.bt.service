@@ -1,4 +1,4 @@
 [D-BUS Service]
 Name=org.projectx.bt
 Exec=/usr/bin/bt-service
-User=app
+SystemdService=bluetooth-frwk-service.service
