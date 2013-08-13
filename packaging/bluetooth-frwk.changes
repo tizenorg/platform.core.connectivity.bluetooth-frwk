@@ -1,4 +1,7 @@
 * Mon Aug 12 2013 Chengwei Yang <chengwei.yang@intel.com>
+- Change to systemd activated dbus service to work in multi-user environment
+
+* Mon Aug 12 2013 Chengwei Yang <chengwei.yang@intel.com>
 - Fix dbus service file
 
 * Fri Aug 09 2013 Victor Hakoun <victor.hakoun@eurogiciel.fr> submit/tizen/20130809.031242@26a0212

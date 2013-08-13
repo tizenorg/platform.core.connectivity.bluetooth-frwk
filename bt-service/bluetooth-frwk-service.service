@@ -5,7 +5,8 @@ Description=Bluetooth Framework Service
 After=dbus.service
 
 [Service]
-Type=simple
+Type=bus
+BusName=org.projectx.bt
 ExecStart=/usr/bin/bt-service
 RemainAfterExit=yes
 
