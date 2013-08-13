@@ -102,9 +102,7 @@ ln -s %{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service %{buildroot}%{_sysconfdi
 ln -s %{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service %{buildroot}%{_sysconfdir}/rc.d/rc5.d/S80bluetooth-frwk-service
 
 mkdir -p %{buildroot}%{_unitdir_user}
-mkdir -p %{buildroot}%{_unitdir_user}/tizen-middleware.target.wants
 install -m 0644 bt-service/bluetooth-frwk-service.service %{buildroot}%{_unitdir_user}
-ln -s ../bluetooth-frwk-service.service %{buildroot}%{_unitdir_user}/tizen-middleware.target.wants/bluetooth-frwk-service.service
 
 %if %{with bluetooth_frwk_libnotify}
 mkdir -p %{buildroot}%{_datadir}/icons/default
@@ -145,7 +143,6 @@ vconftool set -tf int memory/bluetooth/btsco "0" -g 6520 -i
 %{_sysconfdir}/rc.d/rc5.d/S80bluetooth-frwk-service
 %{_datadir}/dbus-1/system-services/org.projectx.bt.service
 %{_bindir}/bt-service
-%{_unitdir_user}/tizen-middleware.target.wants/bluetooth-frwk-service.service
 %{_unitdir_user}/bluetooth-frwk-service.service
 %attr(0666,-,-) /opt/var/lib/bluetooth/auto-pair-blacklist
 %{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-service.conf
