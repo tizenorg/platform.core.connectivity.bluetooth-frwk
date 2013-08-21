@@ -10,4 +10,4 @@ ExecStart=/usr/bin/bt-service
 RemainAfterExit=yes
 
 [Install]
-WantedBy=tizen-middleware.target.wants
+WantedBy=tizen-middleware.target
