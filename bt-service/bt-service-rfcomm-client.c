@@ -66,8 +66,14 @@ static bt_rfcomm_info_t *__bt_rfcomm_get_client_info(int socket_fd)
 static int __bt_rfcomm_open_socket(char *dev_node)
 {
 	int socket_fd;
+	int retryCounter = 0;
+	int MAX_RETRY = 3;
 
-	socket_fd = open(dev_node, O_RDWR | O_NOCTTY);
+	do {
+		socket_fd = open(dev_node, O_RDWR | O_NOCTTY);
+	    if (socket_fd < 0) retryCounter++;
+	    usleep(10*1000);
+	} while ((retryCounter < MAX_RETRY) && (socket_fd < 0));
 
 	if (socket_fd < 0) {
 		BT_ERR("\nCan't open TTY : %s(%d)",dev_node, errno);

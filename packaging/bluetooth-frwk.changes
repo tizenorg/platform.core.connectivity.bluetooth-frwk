@@ -1,3 +1,6 @@
+* Fri Aug 23 2013 Victor Hakoun <victor.hakoun@eurogiciel.fr> submit/tizen/20130822.094138@03300bb
+- Fix permission denied on open dev node /dev/rfcomm
+
 * Wed Aug 21 2013 Victor Hakoun <victor.hakoun@eurogiciel.fr> submit/tizen/20130809.082724@2a3c24d
 - Start bt-service with systemd user with multi-user option
 
