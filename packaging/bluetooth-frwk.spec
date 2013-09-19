@@ -1,5 +1,7 @@
 %bcond_with bluetooth_frwk_libnotify
+%bcond_with bluetooth_frwk_libnotification
 %bcond_with multi_user
+
 Name:       bluetooth-frwk
 Summary:    Bluetooth framework for BlueZ and Obexd
 Version:    0.2.57
@@ -91,9 +93,14 @@ export LDFLAGS+=" -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbol
 	-DMULTI_USER_SUPPORT=Off \
 %endif
 %if %{with bluetooth_frwk_libnotify}
- -DLIBNOTIFY_SUPPORT=On
+ -DLIBNOTIFY_SUPPORT=On \
 %else
- -DLIBNOTIFY_SUPPORT=Off
+ -DLIBNOTIFY_SUPPORT=Off \
+%endif
+%if %{with bluetooth_frwk_libnotification}
+ -DLIBNOTIFICATION_SUPPORT=On
+%else
+ -DLIBNOTIFICATION_SUPPORT=Off
 %endif
 
 make
