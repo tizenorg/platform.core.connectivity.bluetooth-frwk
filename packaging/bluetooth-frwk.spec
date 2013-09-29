@@ -1,3 +1,4 @@
+%bcond_with bluetooth_frwk_libnotify
 Name:       bluetooth-frwk
 Summary:    Bluetooth framework for BlueZ and Obexd.
 Version:    0.2.55
@@ -6,13 +7,21 @@ Group:      connectivity/bluetooth-frwk
 License:    Apache License, Version 2.0
 Source0:    %{name}-%{version}.tar.gz
 Source1001:    bluetooth-frwk.manifest
+Source1002:	bt-icon.png
 Requires: dbus
 Requires: syspopup
+Requires: bluetooth-tools
 BuildRequires:  pkgconfig(aul)
 BuildRequires:  pkgconfig(dbus-glib-1)
 BuildRequires:  pkgconfig(dlog)
 BuildRequires:  pkgconfig(glib-2.0)
+%if %{with bluetooth_frwk_libnotify}
+BuildRequires:  pkgconfig(libnotify)
+BuildRequires:  pkgconfig(gdk-pixbuf-2.0)
+BuildRequires:  pkgconfig(gtk+-3.0)
+%else
 BuildRequires:  pkgconfig(syspopup-caller)
+%endif
 BuildRequires:  pkgconfig(vconf)
 BuildRequires:  pkgconfig(libxml-2.0)
 BuildRequires:  pkgconfig(dbus-1)
@@ -65,7 +74,12 @@ cp %{SOURCE1001} .
 export CFLAGS+=" -fpie"
 export LDFLAGS+=" -Wl,--rpath=/usr/lib -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs -pie"
 
-cmake . -DCMAKE_INSTALL_PREFIX=/usr
+cmake . -DCMAKE_INSTALL_PREFIX=/usr  \
+%if %{with bluetooth_frwk_libnotify}
+ -DLIBNOTIFY_SUPPORT=On
+%else
+ -DLIBNOTIFY_SUPPORT=Off
+%endif
 
 make
 
@@ -83,6 +97,10 @@ mkdir -p %{buildroot}%{_unitdir_user}/tizen-middleware.target.wants
 install -m 0644 bt-service/bluetooth-frwk-service.service %{buildroot}%{_unitdir_user}
 ln -s ../bluetooth-frwk-service.service %{buildroot}%{_unitdir_user}/tizen-middleware.target.wants/bluetooth-frwk-service.service
 
+%if %{with bluetooth_frwk_libnotify}
+mkdir -p %{buildroot}%{_datadir}/icons/default
+install -m 0644 %{SOURCE1002} %{buildroot}%{_datadir}/icons/default/bt-icon.png
+%endif
 
 %post -p /sbin/ldconfig
 vconftool set -tf int db/bluetooth/status "0" -g 6520
@@ -121,6 +139,9 @@ vconftool set -tf int memory/bluetooth/btsco "0" -g 6520 -i
 %{_unitdir_user}/bluetooth-frwk-service.service
 %attr(0666,-,-) /opt/var/lib/bluetooth/auto-pair-blacklist
 %{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-service.conf
+%if %{with bluetooth_frwk_libnotify}
+%{_datadir}/icons/default/bt-icon.png
+%endif
 
 %files core
 %manifest %{name}.manifest

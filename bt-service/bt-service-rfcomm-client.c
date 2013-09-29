@@ -23,6 +23,7 @@
 #include <dlog.h>
 #include <string.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include "bluetooth-api.h"
 #include "bt-internal-types.h"
@@ -69,7 +70,7 @@ static int __bt_rfcomm_open_socket(char *dev_node)
 	socket_fd = open(dev_node, O_RDWR | O_NOCTTY);
 
 	if (socket_fd < 0) {
-		BT_ERR("\nCan't open TTY : %s(%d)");
+		BT_ERR("\nCan't open TTY : %s(%d)",dev_node, errno);
 		return socket_fd;
 	}
 
@@ -308,7 +309,7 @@ static void __bt_rfcomm_connected_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 	}
 
 	if (err != NULL) {
-		BT_ERR("Error occured in connecting port [%s]", err->message);
+		BT_ERR("Error occurred in connecting port [%s]", err->message);
 
 		if (!strcmp("Host is down", err->message))
 			result = BLUETOOTH_ERROR_HOST_DOWN;
@@ -318,7 +319,7 @@ static void __bt_rfcomm_connected_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 		goto dbus_return;
 	}
 
-	BT_DBG("Succss Connect REMOTE Device RFCOMM Node[%s]", rfcomm_device_node);
+	BT_DBG("Success Connect REMOTE Device RFCOMM Node[%s]", rfcomm_device_node);
 
 	socket_fd = __bt_rfcomm_open_socket(rfcomm_device_node);
 
