@@ -5,6 +5,7 @@ Release:    2
 Group:      connectivity/bluetooth-frwk
 License:    Apache License, Version 2.0
 Source0:    %{name}-%{version}.tar.gz
+Source1001:    bluetooth-frwk.manifest
 Requires: sys-assert
 Requires: dbus
 Requires: syspopup
@@ -58,6 +59,7 @@ This package is Bluetooth core daemon to manage activation / deactivation.
 
 %prep
 %setup -q
+cp %{SOURCE1001} .
 
 
 %build
@@ -77,9 +79,10 @@ mkdir -p %{buildroot}%{_sysconfdir}/rc.d/rc5.d/
 ln -s %{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service %{buildroot}%{_sysconfdir}/rc.d/rc3.d/S80bluetooth-frwk-service
 ln -s %{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service %{buildroot}%{_sysconfdir}/rc.d/rc5.d/S80bluetooth-frwk-service
 
-mkdir -p %{buildroot}%{_libdir}/systemd/system/multi-user.target.wants
-install -m 0644 bt-service/bluetooth-frwk-service.service %{buildroot}%{_libdir}/systemd/system/
-ln -s ../bluetooth-frwk-service.service %{buildroot}%{_libdir}/systemd/system/multi-user.target.wants/bluetooth-frwk-service.service
+mkdir -p %{buildroot}%{_unitdir_user}
+mkdir -p %{buildroot}%{_unitdir_user}/tizen-middleware.target.wants
+install -m 0644 bt-service/bluetooth-frwk-service.service %{buildroot}%{_unitdir_user}
+ln -s ../bluetooth-frwk-service.service %{buildroot}%{_unitdir_user}/tizen-middleware.target.wants/bluetooth-frwk-service.service
 
 
 %post -p /sbin/ldconfig
@@ -92,10 +95,12 @@ vconftool set -tf int memory/bluetooth/btsco "0" -g 6520 -i
 %postun -p /sbin/ldconfig
 
 %files
+%manifest %{name}.manifest
 %defattr(-, root, root)
 %{_libdir}/libbluetooth-api.so.*
 
 %files devel
+%manifest %{name}.manifest
 %defattr(-, root, root)
 %{_includedir}/bt-service/bluetooth-api.h
 %{_includedir}/bt-service/bluetooth-hid-api.h
@@ -106,18 +111,19 @@ vconftool set -tf int memory/bluetooth/btsco "0" -g 6520 -i
 %{_libdir}/libbluetooth-api.so
 
 %files service
-%manifest bluetooth-frwk.manifest
+%manifest %{name}.manifest
 %defattr(-, root, root)
 %{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service
 %{_sysconfdir}/rc.d/rc3.d/S80bluetooth-frwk-service
 %{_sysconfdir}/rc.d/rc5.d/S80bluetooth-frwk-service
 %{_datadir}/dbus-1/services/org.projectx.bt.service
 %{_bindir}/bt-service
-%{_libdir}/systemd/system/multi-user.target.wants/bluetooth-frwk-service.service
-%{_libdir}/systemd/system/bluetooth-frwk-service.service
+%{_unitdir_user}/tizen-middleware.target.wants/bluetooth-frwk-service.service
+%{_unitdir_user}/bluetooth-frwk-service.service
 %attr(0666,-,-) /opt/var/lib/bluetooth/auto-pair-blacklist
 
 %files core
+%manifest %{name}.manifest
 %defattr(-, root, root)
 %{_datadir}/dbus-1/services/org.projectx.bt_core.service
 %{_bindir}/bt-core
