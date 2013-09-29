@@ -35,8 +35,10 @@
 #include "bt-service-device.h"
 #include "bt-service-audio.h"
 
-#ifdef LIBNOTIFY_SUPPORT
+#if defined(LIBNOTIFY_SUPPORT)
 #include "bt-popup.h"
+#elif defined(LIBNOTIFICATION_SUPPORT)
+#include "bt-service-agent-notification.h"
 #else
 #include <syspopup_caller.h>
 #endif
@@ -84,8 +86,10 @@ static int __syspopup_launch(gpointer user_data)
 {
 	int ret;
 	bundle *b = (bundle *) user_data;
-#ifdef LIBNOTIFY_SUPPORT
+#if defined(LIBNOTIFY_SUPPORT)
 	ret = notify_launch(b);
+#elif defined(LIBNOTIFICATION_SUPPORT)
+	ret = notification_launch(b);
 #else
 	ret = syspopup_launch("bt-syspopup", b);
 #endif

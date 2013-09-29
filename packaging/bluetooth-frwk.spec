@@ -1,5 +1,7 @@
 %bcond_with bluetooth_frwk_libnotify
+%bcond_with bluetooth_frwk_libnotification
 %bcond_with multi_user
+
 Name:       bluetooth-frwk
 Summary:    Bluetooth framework for BlueZ and Obexd.
 Version:    0.2.55
@@ -31,6 +33,8 @@ BuildRequires:  pkgconfig(capi-network-tethering)
 BuildRequires:  pkgconfig(libprivilege-control)
 BuildRequires:  pkgconfig(status)
 BuildRequires:  pkgconfig(alarm-service)
+BuildRequires:  pkgconfig(notification)
+BuildRequires:  pkgconfig(security-server)
 BuildRequires:  cmake
 
 Requires(post): vconf
@@ -82,9 +86,14 @@ cmake . -DCMAKE_INSTALL_PREFIX=/usr  \
 	-DMULTI_USER_SUPPORT=Off \
 %endif
 %if %{with bluetooth_frwk_libnotify}
- -DLIBNOTIFY_SUPPORT=On
+ -DLIBNOTIFY_SUPPORT=On \
 %else
- -DLIBNOTIFY_SUPPORT=Off
+ -DLIBNOTIFY_SUPPORT=Off \
+%endif
+%if %{with bluetooth_frwk_libnotification}
+ -DLIBNOTIFICATION_SUPPORT=On
+%else
+ -DLIBNOTIFICATION_SUPPORT=Off
 %endif
 
 make

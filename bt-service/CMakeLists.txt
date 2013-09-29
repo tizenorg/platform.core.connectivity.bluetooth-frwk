@@ -31,6 +31,12 @@ bt-popup.c
 )
 ENDIF(LIBNOTIFY_SUPPORT)
 
+IF(LIBNOTIFICATION_SUPPORT)
+LIST(APPEND SRCS
+bt-service-agent-notification.c
+)
+ENDIF(LIBNOTIFICATION_SUPPORT)
+
 IF("${CMAKE_BUILD_TYPE}" STREQUAL "")
 	SET(CMAKE_BUILD_TYPE "Release")
 ENDIF("${CMAKE_BUILD_TYPE}" STREQUAL "")
@@ -42,9 +48,9 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/include)
 INCLUDE(FindPkgConfig)
 
 IF(LIBNOTIFY_SUPPORT)
-	pkg_check_modules(service_pkgs REQUIRED vconf aul vconf dbus-glib-1 capi-network-tethering libprivilege-control status alarm-service libnotify gdk-pixbuf-2.0 gtk+-3.0)
+	pkg_check_modules(service_pkgs REQUIRED vconf aul vconf dbus-glib-1 capi-network-tethering libprivilege-control status alarm-service notification security-server libnotify gdk-pixbuf-2.0 gtk+-3.0)
 ELSE(LIBNOTIFY_SUPPORT)
-	pkg_check_modules(service_pkgs REQUIRED vconf aul vconf syspopup-caller dbus-glib-1 capi-network-tethering libprivilege-control status alarm-service)
+	pkg_check_modules(service_pkgs REQUIRED vconf aul vconf syspopup-caller dbus-glib-1 capi-network-tethering libprivilege-control status alarm-service notification security-server)
 ENDIF(LIBNOTIFY_SUPPORT)
 
 FOREACH(flag ${service_pkgs_CFLAGS})
@@ -80,10 +86,10 @@ ADD_DEFINITIONS("-DAPP_DIR=\"${APP_DIR}\"")
 ADD_DEFINITIONS("-DAPP_LOCALEDIR=\"${APP_LOCALEDIR}\"")
 ADD_DEFINITIONS("-DAPP_SYSCONFDIR=\"${APP_SYSCONFDIR}\"")
 
-IF(LIBNOTIFY_SUPPORT)
+IF(LIBNOTIFY_SUPPORT OR LIBNOTIFICATION_SUPPORT)
 	ADD_DEFINITIONS("-DDATA_DIR_ICON=\"${SHARE_INSTALL_PREFIX}\"")
 	MESSAGE("Icon used for notification is : ${SHARE_INSTALL_PREFIX}/icons/default/bt-icon.png")
-ENDIF(LIBNOTIFY_SUPPORT)
+ENDIF(LIBNOTIFY_SUPPORT OR LIBNOTIFICATION_SUPPORT)
 
 SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed -pie")
 
@@ -100,7 +106,7 @@ ENDIF(LIBNOTIFY_SUPPORT)
 
 IF(NOT MULTI_USER_SUPPORT)
 	INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service DESTINATION share/dbus-1/system-services)
-ENDIF(MULTI_USER_SUPPORT)
+ENDIF(NOT MULTI_USER_SUPPORT)
 INSTALL(TARGETS ${PROJECT_NAME} DESTINATION bin)
 
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/auto-pair-blacklist DESTINATION /opt/var/lib/bluetooth)
@@ -108,7 +114,7 @@ INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/auto-pair-blacklist DESTINATION /opt/v
 # install booting script
 IF(NOT MULTI_USER_SUPPORT)
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service DESTINATION /etc/rc.d/init.d)
-ENDIF(MULTI_USER_SUPPORT)
+ENDIF(NOT MULTI_USER_SUPPORT)
 
 IF(MULTI_USER_SUPPORT)
 	install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service_user.conf DESTINATION /etc/dbus-1/system.d)
