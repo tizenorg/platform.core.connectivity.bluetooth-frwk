@@ -723,9 +723,10 @@ void _bt_handle_adapter_added(void)
 
 	if (_bt_register_obex_server() != BLUETOOTH_ERROR_NONE)
 		BT_ERR("Fail to init obex server");
-
+/*
 	if (_bt_network_activate() != BLUETOOTH_ERROR_NONE)
 		BT_ERR("Fail to activate network");
+*/
 
 	/* add the vconf noti handler */
 	vconf_notify_key_changed(VCONFKEY_SETAPPL_DEVICE_NAME_STR,
