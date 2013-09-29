@@ -6,7 +6,6 @@ Group:      connectivity/bluetooth-frwk
 License:    Apache License, Version 2.0
 Source0:    %{name}-%{version}.tar.gz
 Source1001:    bluetooth-frwk.manifest
-Requires: sys-assert
 Requires: dbus
 Requires: syspopup
 BuildRequires:  pkgconfig(aul)
