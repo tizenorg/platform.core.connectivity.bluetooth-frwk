@@ -1,4 +1,5 @@
 %bcond_with bluetooth_frwk_libnotify
+%bcond_with multi_user
 Name:       bluetooth-frwk
 Summary:    Bluetooth framework for BlueZ and Obexd.
 Version:    0.2.55
@@ -75,6 +76,11 @@ export CFLAGS+=" -fpie"
 export LDFLAGS+=" -Wl,--rpath=/usr/lib -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs -pie"
 
 cmake . -DCMAKE_INSTALL_PREFIX=/usr  \
+%if %{with multi_user}
+	-DMULTI_USER_SUPPORT=On \
+%else
+	-DMULTI_USER_SUPPORT=Off \
+%endif
 %if %{with bluetooth_frwk_libnotify}
  -DLIBNOTIFY_SUPPORT=On
 %else
@@ -86,11 +92,14 @@ make
 %install
 rm -rf %{buildroot}
 %make_install
-
-mkdir -p %{buildroot}%{_sysconfdir}/rc.d/rc3.d/
-mkdir -p %{buildroot}%{_sysconfdir}/rc.d/rc5.d/
-ln -s %{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service %{buildroot}%{_sysconfdir}/rc.d/rc3.d/S80bluetooth-frwk-service
-ln -s %{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service %{buildroot}%{_sysconfdir}/rc.d/rc5.d/S80bluetooth-frwk-service
+%if !%{with multi_user}
+	mkdir -p %{buildroot}%{_sysconfdir}/rc.d/rc3.d/
+	mkdir -p %{buildroot}%{_sysconfdir}/rc.d/rc5.d/
+	ln -s %{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service %{buildroot}%{_sysconfdir}/rc.d/rc3.d/S80bluetooth-frwk-service
+	ln -s %{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service %{buildroot}%{_sysconfdir}/rc.d/rc5.d/S80bluetooth-frwk-service
+%else
+	mv %{buildroot}%{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-service_user.conf %{buildroot}%{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-service.conf
+%endif
 
 mkdir -p %{buildroot}%{_unitdir_user}
 mkdir -p %{buildroot}%{_unitdir_user}/tizen-middleware.target.wants
@@ -130,10 +139,12 @@ vconftool set -tf int memory/bluetooth/btsco "0" -g 6520 -i
 %files service
 %manifest %{name}.manifest
 %defattr(-, root, root)
-%{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service
-%{_sysconfdir}/rc.d/rc3.d/S80bluetooth-frwk-service
-%{_sysconfdir}/rc.d/rc5.d/S80bluetooth-frwk-service
-%{_datadir}/dbus-1/system-services/org.projectx.bt.service
+%if !%{with multi_user}
+	%{_datadir}/dbus-1/system-services/org.projectx.bt.service
+	%{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service
+	%{_sysconfdir}/rc.d/rc3.d/S80bluetooth-frwk-service
+	%{_sysconfdir}/rc.d/rc5.d/S80bluetooth-frwk-service
+%endif
 %{_bindir}/bt-service
 %{_unitdir_user}/tizen-middleware.target.wants/bluetooth-frwk-service.service
 %{_unitdir_user}/bluetooth-frwk-service.service

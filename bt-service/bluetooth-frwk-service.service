@@ -11,4 +11,4 @@ ExecStart=/usr/bin/bt-service
 RemainAfterExit=yes
 
 [Install]
-WantedBy=bluetooth.target
+WantedBy=tizen-middleware.target
