@@ -34,6 +34,12 @@ void _bt_deinit_service_event_sender(void);
 int _bt_init_service_event_receiver(void);
 void _bt_deinit_service_event_reciever(void);
 
+int _bt_opp_client_event_init(void);
+void _bt_opp_client_event_deinit(void);
+
+void _bt_get_temp_remote_devinfo(void);
+
+void _bt_stop_discovery_timeout(void);
 
 #ifdef __cplusplus
 }

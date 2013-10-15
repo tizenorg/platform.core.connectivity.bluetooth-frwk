@@ -3,18 +3,17 @@
 %bcond_with multi_user
 
 Name:       bluetooth-frwk
-Summary:    Bluetooth framework for BlueZ and Obexd
-Version:    0.2.57
-Release:    1
-Group:      Connectivity/Bluetooth
-License:    Apache-2.0
+Summary:    Bluetooth framework for BlueZ and Obexd.
+Version:    0.2.55
+Release:    2
+Group:      connectivity/bluetooth-frwk
+License:    Apache License, Version 2.0
 Source0:    %{name}-%{version}.tar.gz
-Source1001: bluetooth-frwk.manifest
-Source1002: bt-icon.png
-URL:        https://review.tizen.org/git/?p=platform/core/connectivity/bluetooth-frwk.git;a=summary
+Source1001:    bluetooth-frwk.manifest
+Source1002:	bt-icon.png
 Requires: dbus
 Requires: syspopup
-Requires:bluetooth-tools
+Requires: bluetooth-tools
 BuildRequires:  pkgconfig(aul)
 BuildRequires:  pkgconfig(dbus-glib-1)
 BuildRequires:  pkgconfig(dlog)
@@ -39,11 +38,10 @@ BuildRequires:  pkgconfig(security-server)
 BuildRequires:  cmake
 
 Requires(post): vconf
-Requires(post): /sbin/ldconfig
-Requires(postun): /sbin/ldconfig
+Requires(postun): eglibc
 
 %description
-Bluetooth framework for BlueZ and Obexd. This package is Bluetooth framework based on BlueZ and Obexd stack.
+Bluetooth framework for BlueZ and Obexd.
  This package contains API set for BT GAP, BT SDP, and BT RFCOMM.
 
 
@@ -58,7 +56,7 @@ This package contains API set for BT GAP, BT SDP, and BT RFCOMM.
 
 %package service
 Summary:    Bluetooth Service daemon
-Group:      Connectivity/Bluetooth
+Group:      connectivity/bluetooth-frwk
 Requires:   %{name} = %{version}-%{release}
 
 %description service
@@ -66,7 +64,7 @@ This package is Bluetooth Service daemon to manage BT services.
 
 %package core
 Summary:    Bluetooth Core daemon
-Group:      Connectivity/Bluetooth
+Group:      connectivity/bluetooth-frwk
 Requires:   %{name} = %{version}-%{release}
 
 %description core
@@ -78,15 +76,10 @@ cp %{SOURCE1001} .
 
 
 %build
-
-%ifarch x86_64
-export CFLAGS+="   -Wall -g -fvisibility=hidden -fPIC"
-export LDFLAGS+=" -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs" 
-%else
 export CFLAGS+=" -fpie"
-export LDFLAGS+=" -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs -pie"
-%endif
-%cmake . \
+export LDFLAGS+=" -Wl,--rpath=/usr/lib -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs -pie"
+
+cmake . -DCMAKE_INSTALL_PREFIX=/usr  \
 %if %{with multi_user}
 	-DMULTI_USER_SUPPORT=On \
 %else
@@ -127,8 +120,7 @@ mkdir -p %{buildroot}%{_datadir}/icons/default
 install -m 0644 %{SOURCE1002} %{buildroot}%{_datadir}/icons/default/bt-icon.png
 %endif
 
-%post
-/sbin/ldconfig
+%post -p /sbin/ldconfig
 vconftool set -tf int db/bluetooth/status "0" -g 6520
 vconftool set -tf int file/private/bt-service/flight_mode_deactivated "0" -g 6520 -i
 vconftool set -tf string memory/bluetooth/sco_headset_name "" -g 6520 -i

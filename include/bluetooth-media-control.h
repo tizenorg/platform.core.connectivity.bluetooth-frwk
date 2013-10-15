@@ -24,6 +24,8 @@
 extern "C" {
 #endif /*__cplusplus*/
 
+#include <glib.h>
+
 #define BT_MEDIA_ERROR_NONE ((int)0)
 
 #define BT_MEDIA_ERROR_BASE ((int)0)
@@ -31,27 +33,26 @@ extern "C" {
 #define BT_MEDIA_ERROR_ALREADY_INITIALIZED ((int)BT_MEDIA_ERROR_BASE - 0x02)
 
 typedef enum {
-	EQUALIZER = 0x01,
-	REPEAT,
+	PLAYBACKSTATUS = 0x1,
 	SHUFFLE,
-	SCAN,
-	STATUS,
-	POSITION
+	LOOPSTATUS,
+	POSITION,
+	METADATA
 } media_player_property_type;
 
 typedef enum {
-	EQUALIZER_OFF = 0x01,
-	EQUALIZER_ON,
-	EQUALIZER_INVALID,
-} media_player_equalizer_status;
+        REPEAT_MODE_OFF = 0x01,
+        REPEAT_SINGLE_TRACK,
+        REPEAT_ALL_TRACK,
+        REPEAT_INVALID,
+} media_player_repeat_status;
 
 typedef enum {
-	REPEAT_MODE_OFF = 0x01,
-	REPEAT_SINGLE_TRACK,
-	REPEAT_ALL_TRACK,
-	REPEAT_GROUP,
-	REPEAT_INVALID,
-} media_player_repeat_status;
+        STATUS_STOPPED = 0x00,
+        STATUS_PLAYING,
+        STATUS_PAUSED,
+        STATUS_INVALID
+} media_player_status;
 
 typedef enum {
 	SHUFFLE_MODE_OFF = 0x01,
@@ -60,41 +61,22 @@ typedef enum {
 	SHUFFLE_INVALID,
 } media_player_shuffle_status;
 
-typedef enum {
-	SCAN_MODE_OFF = 0x01,
-	SCAN_ALL_TRACK,
-	SCAN_GROUP,
-	SCAN_INVALID,
-} media_player_scan_status;
-
-typedef enum {
-	STATUS_STOPPED = 0x00,
-	STATUS_PLAYING,
-	STATUS_PAUSED,
-	STATUS_FORWARD_SEEK,
-	STATUS_REVERSE_SEEK,
-	STATUS_ERROR,
-	STATUS_INVALID
-} media_player_status;
-
-typedef struct {
-	media_player_equalizer_status equalizer;
-	media_player_repeat_status  repeat;
-	media_player_shuffle_status  shuffle;
-	media_player_scan_status scan;
-	media_player_status status;
-	unsigned int position;
-} media_player_settings_t;
-
 typedef struct {
 	const char *title;
-	const char *artist;
+	const char **artist;
 	const char *album;
-	const char *genre;
-	unsigned int total_tracks;
-	unsigned int number;
+	const char **genre;
+	unsigned int tracknumber;
 	unsigned int duration;
 } media_metadata_attributes_t;
+
+typedef struct {
+	media_player_repeat_status	loopstatus;
+	media_player_status	playbackstatus;
+	gboolean	shuffle;
+	gint64	position;
+	media_metadata_attributes_t	metadata;
+} media_player_settings_t;
 
 typedef struct {
 	int event;

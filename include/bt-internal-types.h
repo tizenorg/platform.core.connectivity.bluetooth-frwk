@@ -45,6 +45,7 @@ typedef enum {
 
 typedef enum {
 	BT_MANAGER_EVENT = 0x01,
+	BT_OBJECT_MANAGER_EVENT,
 	BT_ADAPTER_EVENT,
 	BT_DEVICE_EVENT,
 	BT_HID_EVENT,
@@ -56,6 +57,7 @@ typedef enum {
 	BT_RFCOMM_CLIENT_EVENT,
 	BT_RFCOMM_SERVER_EVENT,
 	BT_AGENT_EVENT,
+	BT_MEDIA_TRANSFER_EVENT,
 	/* Will be added */
 } bt_event_type_t;
 
@@ -187,16 +189,6 @@ typedef struct {
 
 /* Need to convert the design ID */
 #define BT_STR_NOT_SUPPORT "Not support"
-
-#ifndef __TIZEN_OPEN__
-#define BT_MDM_LIMITED_VISIBLE_TIMEOUT 120
-
-#define BT_STR_DISABLED_RESTRICTS \
-	dgettext(BT_COMMON_PKG, "IDS_BT_BODY_SECURITY_POLICY_RESTRICTS_USE_OF_BLUETOOTH_CONNECTION")
-
-#define BT_STR_HANDS_FREE_RESTRICTS \
-	dgettext(BT_COMMON_PKG, "IDS_BT_BODY_SECURITY_POLICY_RESTRICTS_USE_OF_BLUETOOTH_CONNECTION_TO_HANDS_FREE_FEATURES_ONLY")
-#endif
 
 #define BT_FILE_VISIBLE_TIME "file/private/libug-setting-bluetooth-efl/visibility_time"
 #define BT_OFF_DUE_TO_FLIGHT_MODE "file/private/bt-service/flight_mode_deactivated"

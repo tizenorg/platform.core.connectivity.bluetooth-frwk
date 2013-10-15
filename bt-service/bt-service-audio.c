@@ -147,23 +147,14 @@ static char *__bt_get_audio_path(bluetooth_device_address_t *address)
 
 	_bt_convert_addr_type_to_string(addr_str, address->addr);
 
-	dbus_g_proxy_call(adapter_proxy, "FindDevice",
-			  &error, G_TYPE_STRING, addr_str,
-			  G_TYPE_INVALID, DBUS_TYPE_G_OBJECT_PATH,
-			  &object_path, G_TYPE_INVALID);
+	object_path = _bt_get_device_object_path(addr_str);
 
-	if (error != NULL) {
-		BT_ERR("Failed to Find device: %s\n", error->message);
-		g_error_free(error);
-		return NULL;
-	}
-
-	retv_if(object_path == NULL, NULL);
+	retv_if(object_path == NULL, BLUETOOTH_ERROR_NOT_FOUND);
 
 	audio_proxy = dbus_g_proxy_new_for_name(g_conn,
 					BT_BLUEZ_NAME,
 					object_path,
-					BT_HEADSET_INTERFACE);
+					BT_HFP_AGENT_INTERFACE);
 
 	retv_if(audio_proxy == NULL, NULL);
 
@@ -417,7 +408,7 @@ int _bt_audio_connect(int request_id, int type,
 {
 	int result = BLUETOOTH_ERROR_NONE;
 	gchar *device_path = NULL;
-	char *interface;
+	char *uuid = NULL;
 	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
 	bt_function_data_t *func_data;
 	DBusGProxy *adapter_proxy;
@@ -430,13 +421,13 @@ int _bt_audio_connect(int request_id, int type,
 
 	switch (type) {
 	case BT_AUDIO_HSP:
-		interface = BT_HEADSET_INTERFACE;
+		uuid = HFP_HS_UUID;
 		break;
 	case BT_AUDIO_A2DP:
-		interface = BT_SINK_INTERFACE;
+		uuid = A2DP_SOURCE_UUID;
 		break;
 	case BT_AUDIO_ALL:
-		interface = BT_AUDIO_INTERFACE;
+		uuid = GENERIC_AUDIO_UUID;
 		break;
 	default:
 		BT_ERR("Unknown role");
@@ -453,24 +444,20 @@ int _bt_audio_connect(int request_id, int type,
 		goto fail;
 	}
 
+	device_path = _bt_get_device_object_path(address);
+	if (device_path == NULL) {
+		result = BLUETOOTH_ERROR_INTERNAL;
+		goto fail;
+	}
+
 	g_conn = _bt_get_system_gconn();
 	if (g_conn == NULL) {
 		result = BLUETOOTH_ERROR_INTERNAL;
 		goto fail;
 	}
 
-	dbus_g_proxy_call(adapter_proxy, "FindDevice", NULL,
-			  G_TYPE_STRING, address, G_TYPE_INVALID,
-			  DBUS_TYPE_G_OBJECT_PATH, &device_path, G_TYPE_INVALID);
-
-	if (device_path == NULL) {
-		BT_ERR("No paired device");
-		result = BLUETOOTH_ERROR_NOT_PAIRED;
-		goto fail;
-	}
-
 	profile_proxy = dbus_g_proxy_new_for_name(g_conn, BT_BLUEZ_NAME,
-				      device_path, interface);
+					device_path, BT_DEVICE_INTERFACE);
 
 	g_free(device_path);
 
@@ -483,18 +470,35 @@ int _bt_audio_connect(int request_id, int type,
 	func_data->address = g_strdup(address);
 	func_data->req_id = request_id;
 
-	if (!dbus_g_proxy_begin_call(profile_proxy, "Connect",
-			(DBusGProxyCallNotify)__bt_audio_request_cb,
-			func_data, NULL,
-			G_TYPE_INVALID)) {
-		BT_ERR("Audio connect Dbus Call Error");
-		g_object_unref(profile_proxy);
+	if (g_strcmp0(uuid, GENERIC_AUDIO_UUID) == 0){
+		if (!dbus_g_proxy_begin_call(profile_proxy, "Connect",
+				(DBusGProxyCallNotify)__bt_audio_request_cb,
+				func_data, NULL,
+				G_TYPE_INVALID)) {
+			BT_ERR("Audio connect Dbus Call Error");
+			g_object_unref(profile_proxy);
 
-		g_free(func_data->address);
-		g_free(func_data);
+			g_free(func_data->address);
+			g_free(func_data);
 
-		result = BLUETOOTH_ERROR_INTERNAL;
-		goto fail;
+			result = BLUETOOTH_ERROR_INTERNAL;
+			goto fail;
+		}
+	}else {
+		if (!dbus_g_proxy_begin_call(profile_proxy, "ConnectProfile",
+				(DBusGProxyCallNotify)__bt_audio_request_cb,
+				func_data, NULL,
+				G_TYPE_STRING, uuid,
+				G_TYPE_INVALID)) {
+			BT_ERR("Audio connect Dbus Call Error");
+			g_object_unref(profile_proxy);
+
+			g_free(func_data->address);
+			g_free(func_data);
+
+			result = BLUETOOTH_ERROR_INTERNAL;
+			goto fail;
+		}
 	}
 	/* Add data to the connected list */
 	_bt_add_headset_to_list(type, BT_STATE_CONNECTING, address);
@@ -514,7 +518,7 @@ int _bt_audio_disconnect(int request_id, int type,
 {
 	int result = BLUETOOTH_ERROR_NONE;
 	gchar *device_path = NULL;
-	char *interface;
+	char *uuid = NULL;
 	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
 	bt_function_data_t *func_data;
 	DBusGProxy *adapter_proxy;
@@ -527,13 +531,13 @@ int _bt_audio_disconnect(int request_id, int type,
 
 	switch (type) {
 	case BT_AUDIO_HSP:
-		interface = BT_HEADSET_INTERFACE;
+		uuid = HFP_HS_UUID;
 		break;
 	case BT_AUDIO_A2DP:
-		interface = BT_SINK_INTERFACE;
+		uuid = A2DP_SOURCE_UUID;
 		break;
 	case BT_AUDIO_ALL:
-		interface = BT_AUDIO_INTERFACE;
+		uuid = GENERIC_AUDIO_UUID;
 		break;
 	default:
 		BT_ERR("Unknown role");
@@ -546,24 +550,20 @@ int _bt_audio_disconnect(int request_id, int type,
 		goto fail;
 	}
 
+	device_path = _bt_get_device_object_path(address);
+	if (device_path == NULL) {
+		result = BLUETOOTH_ERROR_INTERNAL;
+		goto fail;
+	}
+
 	g_conn = _bt_get_system_gconn();
 	if (g_conn == NULL) {
 		result = BLUETOOTH_ERROR_INTERNAL;
 		goto fail;
 	}
 
-	dbus_g_proxy_call(adapter_proxy, "FindDevice", NULL,
-			  G_TYPE_STRING, address, G_TYPE_INVALID,
-			  DBUS_TYPE_G_OBJECT_PATH, &device_path, G_TYPE_INVALID);
-
-	if (device_path == NULL) {
-		BT_ERR("No paired device");
-		result = BLUETOOTH_ERROR_NOT_PAIRED;
-		goto fail;
-	}
-
 	profile_proxy = dbus_g_proxy_new_for_name(g_conn, BT_BLUEZ_NAME,
-				      device_path, interface);
+					device_path, BT_DEVICE_INTERFACE);
 
 	g_free(device_path);
 
@@ -573,35 +573,65 @@ int _bt_audio_disconnect(int request_id, int type,
 	}
 
 	if (g_wait_data != NULL) {
-		if (!dbus_g_proxy_begin_call(profile_proxy, "Disconnect",
-				NULL, NULL, NULL, G_TYPE_INVALID)) {
-			BT_ERR("Audio disconnect Dbus Call Error");
-			g_object_unref(profile_proxy);
-			return BLUETOOTH_ERROR_INTERNAL;
+		if (g_strcmp0(uuid, GENERIC_AUDIO_UUID) == 0){
+			if (!dbus_g_proxy_begin_call(profile_proxy,
+				"Disconnect",NULL, NULL, NULL,
+				G_TYPE_INVALID)) {
+				BT_ERR("Audio disconnect Dbus Call Error");
+				g_object_unref(profile_proxy);
+				return BLUETOOTH_ERROR_INTERNAL;
+			}
+		} else {
+			if (!dbus_g_proxy_begin_call(profile_proxy,
+				"DisconnectProfile",NULL, NULL, NULL,
+				G_TYPE_STRING, uuid,
+				G_TYPE_INVALID)) {
+				BT_ERR("Audio disconnect Dbus Call Error");
+				g_object_unref(profile_proxy);
+				return BLUETOOTH_ERROR_INTERNAL;
+			}
 		}
 	} else {
 		func_data = g_malloc0(sizeof(bt_function_data_t));
 		func_data->address = g_strdup(address);
 		func_data->req_id = request_id;
-		if (!dbus_g_proxy_begin_call(profile_proxy, "Disconnect",
+		if (g_strcmp0(uuid, GENERIC_AUDIO_UUID) == 0){
+			if (!dbus_g_proxy_begin_call(profile_proxy,
+				"Disconnect",
 				(DBusGProxyCallNotify)__bt_audio_request_cb,
 				func_data, NULL,
 				G_TYPE_INVALID)) {
-			BT_ERR("Audio disconnect Dbus Call Error");
-			g_object_unref(profile_proxy);
+				BT_ERR("Audio disconnect Dbus Call Error");
+				g_object_unref(profile_proxy);
 
-			g_free(func_data->address);
-			g_free(func_data);
+				g_free(func_data->address);
+				g_free(func_data);
 
-			result = BLUETOOTH_ERROR_INTERNAL;
-			goto fail;
+				result = BLUETOOTH_ERROR_INTERNAL;
+				goto fail;
+			}
+		} else {
+			if (!dbus_g_proxy_begin_call(profile_proxy,
+				"DisconnectProfile",
+				(DBusGProxyCallNotify)__bt_audio_request_cb,
+				func_data, NULL,
+				G_TYPE_STRING, uuid,
+				G_TYPE_INVALID)) {
+				BT_ERR("Audio disconnect Dbus Call Error");
+				g_object_unref(profile_proxy);
+
+				g_free(func_data->address);
+				g_free(func_data);
+
+				result = BLUETOOTH_ERROR_INTERNAL;
+				goto fail;
+			}
 		}
 	}
 
 	return BLUETOOTH_ERROR_NONE;
 fail:
-	if (out_param1 != NULL)
-		g_array_append_vals(*out_param1, address,
+	g_array_append_vals(*out_param1, address,
 				BT_ADDRESS_STR_LEN);
 
 	return result;
@@ -626,7 +656,7 @@ int _bt_audio_get_speaker_gain(unsigned int *gain)
 	retv_if(device_path == NULL, BLUETOOTH_ERROR_NOT_CONNECTED);
 
 	profile_proxy = dbus_g_proxy_new_for_name(g_conn, BT_BLUEZ_NAME,
-				      device_path, BT_HEADSET_INTERFACE);
+				      device_path, BT_HFP_AGENT_INTERFACE);
 
 	g_free(device_path);
 
@@ -666,7 +696,7 @@ int _bt_audio_set_speaker_gain(unsigned int gain)
 	retv_if(device_path == NULL, BLUETOOTH_ERROR_NOT_CONNECTED);
 
 	msg = dbus_message_new_method_call(BT_BLUEZ_NAME,
-			device_path, BT_HEADSET_INTERFACE,
+			device_path, BT_HFP_AGENT_INTERFACE,
 			"SetProperty");
 
 	g_free(device_path);

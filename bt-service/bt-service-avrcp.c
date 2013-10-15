@@ -40,11 +40,19 @@ struct player_settinngs_t {
 	const char *property;
 };
 
-static struct player_settinngs_t equalizer_settings[] = {
-	{ EQUALIZER_INVALID, "" },
-	{ EQUALIZER_OFF, "off" },
-	{ EQUALIZER_ON, "on" },
-	{ EQUALIZER_INVALID, "" }
+static struct player_settinngs_t loopstatus_settings[] = {
+	{ REPEAT_INVALID, "" },
+	{ REPEAT_MODE_OFF, "None" },
+	{ REPEAT_SINGLE_TRACK, "Track" },
+	{ REPEAT_ALL_TRACK, "Playlist" },
+	{ REPEAT_INVALID, "" }
+};
+
+static struct player_settinngs_t playback_status[] = {
+	{ STATUS_STOPPED, "Stopped" },
+	{ STATUS_PLAYING, "Playing" },
+	{ STATUS_PAUSED, "Paused" },
+	{ STATUS_INVALID, "" }
 };
 
 static struct player_settinngs_t repeat_settings[] = {
@@ -52,34 +60,7 @@ static struct player_settinngs_t repeat_settings[] = {
 	{ REPEAT_MODE_OFF, "off" },
 	{ REPEAT_SINGLE_TRACK, "singletrack" },
 	{ REPEAT_ALL_TRACK, "alltracks" },
-	{ REPEAT_GROUP, "group" },
 	{ REPEAT_INVALID, "" }
-};
-
-static struct player_settinngs_t shuffle_settings[] = {
-	{ SHUFFLE_INVALID, "" },
-	{ SHUFFLE_MODE_OFF, "off" },
-	{ SHUFFLE_ALL_TRACK, "alltracks" },
-	{ SHUFFLE_GROUP, "group" },
-	{ SHUFFLE_INVALID, "" }
-};
-
-static struct player_settinngs_t scan_settings[] = {
-	{ SCAN_INVALID, "" },
-	{ SCAN_MODE_OFF, "off" },
-	{ SCAN_ALL_TRACK, "alltracks" },
-	{ SCAN_GROUP, "group" },
-	{ SCAN_INVALID, "" }
-};
-
-static struct player_settinngs_t player_status[] = {
-	{ STATUS_STOPPED, "stopped" },
-	{ STATUS_PLAYING, "playing" },
-	{ STATUS_PAUSED, "paused" },
-	{ STATUS_FORWARD_SEEK, "forward-seek" },
-	{ STATUS_REVERSE_SEEK, "reverse-seek" },
-	{ STATUS_ERROR, "error" },
-	{ STATUS_INVALID, "" }
 };
 
 typedef struct {
@@ -91,6 +72,8 @@ typedef struct {
 } BtMediaAgentClass;
 
 GType bt_media_agent_get_type(void);
+
+DBusConnection *g_bt_dbus_conn = NULL;
 
 #define BT_MEDIA_TYPE_AGENT (bt_media_agent_get_type())
 #define BT_MEDIA_GET_AGENT(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), BT_MEDIA_TYPE_AGENT, BtMediaAgent))
@@ -180,111 +163,220 @@ static gboolean bt_media_agent_set_property(BtMediaAgent *agent,
 
 	BT_DBG("property %s\n", property);
 
-	if (!(G_VALUE_TYPE (val) == G_TYPE_STRING)) {
-		error = bt_media_agent_error(
-					BT_MEDIA_AGENT_ERROR_INVALID_PARAM,
-					"Invalid Arguments");
-		dbus_g_method_return_error(context, error);
-		g_error_free(error);
-		return FALSE;
-	}
-	value = g_value_get_string (val);
-	BT_DBG("value %s\n", value);
-
-	if (g_strcmp0(property, "Shuffle") == 0) {
-		if (g_strcmp0(value, "alltracks") == 0)
-			status = SHUFFLE_ALL_TRACK;
-		else if (g_strcmp0(value, "group") == 0)
-			status = SHUFFLE_GROUP;
-		else if (g_strcmp0(value, "off") == 0)
-			status = SHUFFLE_MODE_OFF;
-		else
-			status = SHUFFLE_INVALID;
-
-		_bt_send_event(BT_AVRCP_EVENT,
-				BLUETOOTH_EVENT_AVRCP_SETTING_SHUFFLE_STATUS,
-				DBUS_TYPE_UINT32, &status,
-				DBUS_TYPE_INVALID);
-
-	} else if (g_strcmp0(property, "Equalizer") == 0) {
-		status = (g_strcmp0(value, "off") == 0) ? EQUALIZER_OFF : EQUALIZER_ON;
-
-		_bt_send_event(BT_AVRCP_EVENT,
-				BLUETOOTH_EVENT_AVRCP_SETTING_EQUALIZER_STATUS,
-				DBUS_TYPE_UINT32, &status,
-				DBUS_TYPE_INVALID);
-
-	} else if (g_strcmp0(property, "Repeat") == 0) {
-		if (g_strcmp0(value, "singletrack") == 0)
-			status = REPEAT_SINGLE_TRACK;
-		else if (g_strcmp0(value, "alltracks") == 0)
-			status = REPEAT_ALL_TRACK;
-		else if (g_strcmp0(value, "group") == 0)
-			status = REPEAT_GROUP;
-		else if (g_strcmp0(value, "off") == 0)
-			status = REPEAT_MODE_OFF;
-		else
-			status = REPEAT_INVALID;
-
-		_bt_send_event(BT_AVRCP_EVENT,
-				BLUETOOTH_EVENT_AVRCP_SETTING_REPEAT_STATUS,
-				DBUS_TYPE_UINT32, &status,
-				DBUS_TYPE_INVALID);
-	} else if (g_strcmp0(property, "Scan") == 0) {
-		if (g_strcmp0(value, "alltracks") == 0)
-			status = SCAN_ALL_TRACK;
-		else if (g_strcmp0(value, "group") == 0)
-			status = SCAN_GROUP;
-		else if (g_strcmp0(value, "off") == 0)
-			status = SCAN_MODE_OFF;
-		else
-			status = SCAN_INVALID;
-
-		_bt_send_event(BT_AVRCP_EVENT,
-				BLUETOOTH_EVENT_AVRCP_SETTING_SCAN_STATUS,
-				DBUS_TYPE_UINT32, &status,
-				DBUS_TYPE_INVALID);
-	}
 	dbus_g_method_return(context);
 	return TRUE;
 
 }
 
+static const char *loopstatus_to_repeat(const char *value)
+{
+	if (strcasecmp(value, "None") == 0)
+		return "off";
+	else if (strcasecmp(value, "Track") == 0)
+		return "singletrack";
+	else if (strcasecmp(value, "Playlist") == 0)
+		return "alltracks";
+
+	return NULL;
+}
+
+void set_shuffle(DBusMessageIter *iter)
+{
+	dbus_bool_t shuffle;
+	const char *value;
+	unsigned int status;
+
+	if (dbus_message_iter_get_arg_type(iter) !=
+					DBUS_TYPE_BOOLEAN) {
+		BT_DBG("Invalid arguments in method call");
+		return;
+	}
+
+	dbus_message_iter_get_basic(iter, &shuffle);
+	value = shuffle ? "alltracks" : "off";
+
+	if (g_strcmp0(value, "alltracks") == 0)
+		status = SHUFFLE_ALL_TRACK;
+	else if (g_strcmp0(value, "off") == 0)
+		status = SHUFFLE_MODE_OFF;
+	else
+		status = SHUFFLE_INVALID;
+
+	_bt_send_event(BT_AVRCP_EVENT,
+			BLUETOOTH_EVENT_AVRCP_SETTING_SHUFFLE_STATUS,
+			DBUS_TYPE_UINT32, &status,
+			DBUS_TYPE_INVALID);
+}
+
+void set_loopstatus(DBusMessageIter *iter)
+{
+	const char *value;
+	unsigned int status;
+
+	if (dbus_message_iter_get_arg_type(iter) !=
+					DBUS_TYPE_STRING) {
+		BT_DBG("Invalid arguments in method call");
+		return;
+	}
+
+	dbus_message_iter_get_basic(iter, &value);
+
+	value = loopstatus_to_repeat(value);
+
+	if (g_strcmp0(value, "singletrack") == 0)
+		status = REPEAT_SINGLE_TRACK;
+	else if (g_strcmp0(value, "alltracks") == 0)
+		status = REPEAT_ALL_TRACK;
+	else if (g_strcmp0(value, "off") == 0)
+		status = REPEAT_MODE_OFF;
+	else
+		status = REPEAT_INVALID;
+
+	_bt_send_event(BT_AVRCP_EVENT,
+			BLUETOOTH_EVENT_AVRCP_SETTING_REPEAT_STATUS,
+			DBUS_TYPE_UINT32, &status,
+			DBUS_TYPE_INVALID);
+}
+
+static DBusHandlerResult bt_properties_message(DBusConnection *connection,
+						DBusMessage *message)
+{
+	DBusMessageIter iter, sub;
+	const char *name, *interface;
+	DBusMessage *reply;
+
+	if (!dbus_message_iter_init(message, &iter)){
+		reply = dbus_message_new_error(message,
+			DBUS_ERROR_INVALID_ARGS, "No arguments given");
+		goto done;
+	}
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING){
+		reply = dbus_message_new_error(message,
+			DBUS_ERROR_INVALID_ARGS, "Invalid argument type");
+		goto done;
+	}
+
+	dbus_message_iter_get_basic(&iter, &interface);
+	dbus_message_iter_next(&iter);
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING){
+		reply = dbus_message_new_error(message,
+			DBUS_ERROR_INVALID_ARGS, "Invalid argument type");
+		goto done;
+	}
+
+	dbus_message_iter_get_basic(&iter, &name);
+	dbus_message_iter_next(&iter);
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_VARIANT){
+		reply = dbus_message_new_error(message,
+			DBUS_ERROR_INVALID_ARGS, "Invalid argument type");
+		goto done;
+	}
+
+	dbus_message_iter_recurse(&iter, &sub);
+
+	if (g_strcmp0(interface, BT_MEDIA_PLAYER_INTERFACE) == 0){
+		if (g_strcmp0(name, "LoopStatus") == 0)
+			set_loopstatus(&sub);
+		else if (g_strcmp0(name, "Shuffle") == 0)
+			set_shuffle(&sub);
+	}
+
+	reply = dbus_message_new_method_return(message);
+	if (reply == NULL)
+		return DBUS_HANDLER_RESULT_NEED_MEMORY;
+
+done:
+	dbus_connection_send(connection, reply, NULL);
+	dbus_message_unref(reply);
+
+	return DBUS_HANDLER_RESULT_HANDLED;
+}
+
+static DBusHandlerResult bt_dbus_message(DBusConnection *connection,
+				DBusMessage *message, void *user_data)
+{
+	const char *interface;
+
+	interface = dbus_message_get_interface(message);
+
+	if (interface == NULL)
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+	if (g_strcmp0(interface, BT_PROPERTIES_INTERFACE) == 0)
+		return bt_properties_message(connection, message);
+
+	return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+}
+
+static DBusObjectPathVTable bt_object_table = {
+        .message_function       = bt_dbus_message,
+};
+
+gboolean bt_dbus_register_object_path(DBusConnection *connection,
+						const char *path)
+{
+	if (!dbus_connection_register_object_path(connection, path,
+				&bt_object_table, NULL))
+		return FALSE;
+
+	return TRUE;
+}
+
+void bt_dbus_unregister_object_path(DBusConnection *connection,
+						const char *path)
+{
+	dbus_connection_unregister_object_path(connection, path);
+}
+
+static inline void bt_dbus_queue_dispatch(DBusConnection *conn,
+					DBusDispatchStatus status)
+{
+	if (status == DBUS_DISPATCH_DATA_REMAINS){
+		dbus_connection_ref(conn);
+		 while (dbus_connection_dispatch(conn)
+				== DBUS_DISPATCH_DATA_REMAINS)
+				;
+
+		dbus_connection_unref(conn);
+	}
+}
+
+static void bt_dbus_dispatch_status(DBusConnection *conn,
+				DBusDispatchStatus status, void *data)
+{
+	if (!dbus_connection_get_is_connected(conn))
+		return;
+
+	bt_dbus_queue_dispatch(conn, status);
+}
+
+DBusConnection *bt_dbus_setup_private(DBusBusType type, DBusError *error)
+{
+	DBusConnection *conn;
+	DBusDispatchStatus status;
+
+	conn = dbus_bus_get_private(type, error);
+
+	if (conn == NULL)
+		return NULL;
+
+	dbus_connection_set_dispatch_status_function(conn,
+				bt_dbus_dispatch_status, NULL, NULL);
+
+	status = dbus_connection_get_dispatch_status(conn);
+	bt_dbus_queue_dispatch(conn, status);
+
+	return conn;
+}
+
 static void __bt_media_append_variant(DBusMessageIter *iter,
 			int type, void *value)
 {
-	const char *sig;
+	char sig[2] = { type, '\0'};
 	DBusMessageIter value_iter;
-
-	switch (type) {
-	case DBUS_TYPE_BOOLEAN:
-		sig = DBUS_TYPE_BOOLEAN_AS_STRING;
-		break;
-	case DBUS_TYPE_STRING:
-		sig = DBUS_TYPE_STRING_AS_STRING;
-		break;
-	case DBUS_TYPE_BYTE:
-		sig = DBUS_TYPE_BYTE_AS_STRING;
-		break;
-	case DBUS_TYPE_UINT16:
-		sig = DBUS_TYPE_UINT16_AS_STRING;
-		break;
-	case DBUS_TYPE_UINT32:
-		sig = DBUS_TYPE_UINT32_AS_STRING;
-		break;
-	case DBUS_TYPE_INT16:
-		sig = DBUS_TYPE_INT16_AS_STRING;
-		break;
-	case DBUS_TYPE_INT32:
-		sig = DBUS_TYPE_INT32_AS_STRING;
-		break;
-	case DBUS_TYPE_OBJECT_PATH:
-		sig = DBUS_TYPE_OBJECT_PATH_AS_STRING;
-		break;
-	default:
-		sig = DBUS_TYPE_VARIANT_AS_STRING;
-		break;
-	}
 
 	dbus_message_iter_open_container(iter, DBUS_TYPE_VARIANT, sig,
 							&value_iter);
@@ -292,33 +384,6 @@ static void __bt_media_append_variant(DBusMessageIter *iter,
 	dbus_message_iter_append_basic(&value_iter, type, value);
 
 	dbus_message_iter_close_container(iter, &value_iter);
-}
-
-static gboolean __bt_media_emit_property_changed(
-				DBusConnection *connection,
-				const char *path,
-				const char *interface,
-				const char *name,
-				int type,
-				void *property)
-{
-	DBusMessage *sig;
-	DBusMessageIter entry;
-	gboolean ret;
-
-	sig = dbus_message_new_signal(path, interface,
-					"PropertyChanged");
-	retv_if(sig == NULL, FALSE);
-
-	dbus_message_iter_init_append(sig, &entry);
-	dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &name);
-
-	__bt_media_append_variant(&entry, type, property);
-
-	ret = dbus_connection_send(connection, sig, NULL);
-	dbus_message_unref(sig);
-
-	return ret;
 }
 
 static void __bt_media_append_dict_entry(DBusMessageIter *iter,
@@ -343,13 +408,177 @@ static void __bt_media_append_dict_entry(DBusMessageIter *iter,
 	dbus_message_iter_close_container(iter, &dict_entry);
 }
 
+static void __bt_media_append_array_variant(DBusMessageIter *iter, int type,
+			void *val, int n_elements)
+{
+	DBusMessageIter variant, array;
+	char type_sig[2] = { type, '\0' };
+	char array_sig[3] = { DBUS_TYPE_ARRAY, type, '\0' };
+
+	dbus_message_iter_open_container(iter, DBUS_TYPE_VARIANT,
+						array_sig, &variant);
+
+	dbus_message_iter_open_container(&variant, DBUS_TYPE_ARRAY,
+						type_sig, &array);
+
+	if (dbus_type_is_fixed(type) == TRUE) {
+		dbus_message_iter_append_fixed_array(&array, type, val,
+							n_elements);
+	} else if (type == DBUS_TYPE_STRING ||
+				type == DBUS_TYPE_OBJECT_PATH) {
+		const char ***str_array = val;
+		int i;
+
+		for (i = 0; i < n_elements; i++)
+			dbus_message_iter_append_basic(&array, type,
+						&((*str_array)[i]));
+	}
+
+	dbus_message_iter_close_container(&variant, &array);
+	dbus_message_iter_close_container(iter, &variant);
+}
+
+static void __bt_media_append_array(DBusMessageIter *dict, const char *key,
+			int type, void *val, int n_elements)
+{
+	DBusMessageIter entry;
+
+	dbus_message_iter_open_container(dict, DBUS_TYPE_DICT_ENTRY,
+							NULL, &entry);
+
+	BT_DBG("key = %s", key);
+	dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &key);
+
+	__bt_media_append_array_variant(&entry, type, val, n_elements);
+
+	dbus_message_iter_close_container(dict, &entry);
+}
+
+static void __bt_media_append_metadata_variant(DBusMessageIter *iter,
+		const char *key, int type, void *property, int count)
+{
+	DBusMessageIter value, metadata;
+
+	dbus_message_iter_open_container(iter, DBUS_TYPE_VARIANT, "a{sv}",
+								&value);
+
+	dbus_message_iter_open_container(&value, DBUS_TYPE_ARRAY,
+			DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
+			DBUS_TYPE_STRING_AS_STRING DBUS_TYPE_VARIANT_AS_STRING
+			DBUS_DICT_ENTRY_END_CHAR_AS_STRING, &metadata);
+
+	if (type == DBUS_TYPE_ARRAY)
+		__bt_media_append_array(&metadata, key,
+			DBUS_TYPE_STRING, property, count);
+	else
+	__bt_media_append_dict_entry(&metadata, key, type, property);
+
+	dbus_message_iter_close_container(&value, &metadata);
+	dbus_message_iter_close_container(iter, &value);
+}
+
+static void __bt_media_append_metadata_dict_entry(DBusMessageIter *iter,
+			const char *key, int type, void *property, int count)
+{
+	DBusMessageIter dict_entry;
+	const char *str_ptr;
+	char * metadata = "Metadata";
+
+	if (type == DBUS_TYPE_STRING) {
+		str_ptr = *((const char **)property);
+		ret_if(str_ptr == NULL);
+	}
+
+	dbus_message_iter_open_container(iter,
+					DBUS_TYPE_DICT_ENTRY,
+					NULL, &dict_entry);
+
+	dbus_message_iter_append_basic(&dict_entry, DBUS_TYPE_STRING, &metadata);
+
+	__bt_media_append_metadata_variant(&dict_entry, key, type, property, count);
+
+	dbus_message_iter_close_container(iter, &dict_entry);
+}
+
+static void __bt_metadata_append_property_changed(DBusMessageIter *property_dict,
+                                        media_metadata_attributes_t *metadata)
+{
+	if(property_dict == NULL || metadata == NULL)
+		return
+
+	__bt_media_append_metadata_dict_entry(property_dict,
+		"xesam:title",
+		DBUS_TYPE_STRING, &metadata->title, 0);
+
+	__bt_media_append_array(property_dict,
+		"xesam:artist",
+		DBUS_TYPE_ARRAY,&metadata->artist, 1);
+
+	__bt_media_append_metadata_dict_entry(property_dict,
+		"xesam:album",
+		DBUS_TYPE_STRING, &metadata->album, 0);
+
+	__bt_media_append_array(property_dict,
+		"xesam:genre",
+		DBUS_TYPE_ARRAY,&metadata->genre, 1);
+
+	__bt_media_append_metadata_dict_entry(property_dict,
+		"mpris:length",
+		DBUS_TYPE_INT64, &metadata->duration, 0);
+
+	__bt_media_append_metadata_dict_entry(property_dict,
+		"xesam:trackNumber",
+		DBUS_TYPE_INT32, &metadata->tracknumber, 0);
+}
+
+static gboolean __bt_media_emit_property_changed(
+                                DBusConnection *connection,
+                                const char *path,
+                                const char *interface,
+                                const char *name,
+                                int type,
+                                void *property)
+{
+	DBusMessage *sig;
+	DBusMessageIter entry, dict;
+	gboolean ret;
+
+	BT_DBG("+");
+	sig = dbus_message_new_signal(path, DBUS_INTERFACE_PROPERTIES,
+						"PropertiesChanged");
+	retv_if(sig == NULL, FALSE);
+
+	dbus_message_iter_init_append(sig, &entry);
+	dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &interface);
+
+	dbus_message_iter_open_container(&entry, DBUS_TYPE_ARRAY,
+			DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
+			DBUS_TYPE_STRING_AS_STRING DBUS_TYPE_VARIANT_AS_STRING
+			DBUS_DICT_ENTRY_END_CHAR_AS_STRING, &dict);
+
+	if (g_strcmp0(name, "Metadata") == 0)
+		__bt_metadata_append_property_changed(&dict,
+			(media_metadata_attributes_t *)property);
+	else
+		__bt_media_append_dict_entry(&dict,
+					name, type, property);
+
+	dbus_message_iter_close_container(&entry, &dict);
+
+	ret = dbus_connection_send(connection, sig, NULL);
+	dbus_message_unref(sig);
+
+	BT_DBG("-");
+
+	return ret;
+}
+
 int _bt_register_media_player(void)
 {
 	DBusMessage *msg;
 	DBusMessage *reply;
 	DBusMessageIter iter;
 	DBusMessageIter property_dict;
-	DBusMessageIter metadata_dict;
 	DBusError err;
 	char *object;
 	char *adapter_path;
@@ -359,26 +588,22 @@ int _bt_register_media_player(void)
 	media_player_settings_t player_settings = {0,};
 	media_metadata_attributes_t metadata = {0,};
 
-	player_settings.equalizer = EQUALIZER_OFF;
-	player_settings.repeat  = REPEAT_MODE_OFF;
-	player_settings.shuffle = SHUFFLE_MODE_OFF;
-	player_settings.scan = SCAN_MODE_OFF;
-	player_settings.status = STATUS_STOPPED;
+	player_settings.loopstatus  = REPEAT_MODE_OFF;
+	player_settings.playbackstatus = STATUS_STOPPED;
+	player_settings.shuffle = FALSE;
 	player_settings.position = 0;
 
 	metadata.title = "\0";
-	metadata.artist = "\0";
 	metadata.album = "\0";
-	metadata.genre = "\0";
-	metadata.total_tracks = 0;
-	metadata.number = 0;
+	metadata.tracknumber = 0;
 	metadata.duration = 0;
 
 	gconn = _bt_get_system_gconn();
 	retv_if(gconn  == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	conn = _bt_get_system_conn();
+	conn = bt_dbus_setup_private(DBUS_BUS_SYSTEM, NULL);
 	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
+	g_bt_dbus_conn = conn;
 
 	if (!bt_media_obj) {
 		bt_media_obj = __bt_media_agent_new();
@@ -390,11 +615,16 @@ int _bt_register_media_player(void)
 							G_OBJECT(bt_media_obj));
 	}
 
+	if (!bt_dbus_register_object_path(conn, BT_MEDIA_OBJECT_PATH)){
+		BT_DBG("Could not register interface %s",
+					MPRIS_PLAYER_INTERFACE);
+	}
+
 	adapter_path = _bt_get_adapter_path();
 	retv_if(adapter_path == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	msg = dbus_message_new_method_call(BT_BLUEZ_NAME, adapter_path,
-				BT_MEDIA_INTERFACE, "RegisterPlayer");
+					BT_MEDIA_INTERFACE, "RegisterPlayer");
 
 	g_free(adapter_path);
 
@@ -412,79 +642,63 @@ int _bt_register_media_player(void)
 			DBUS_DICT_ENTRY_END_CHAR_AS_STRING, &property_dict);
 
 	__bt_media_append_dict_entry(&property_dict,
-		"Equalizer",
+		"LoopStatus",
 		DBUS_TYPE_STRING,
-		&equalizer_settings[player_settings.equalizer].property);
-
-	__bt_media_append_dict_entry(&property_dict,
-		"Repeat",
-		DBUS_TYPE_STRING,
-		&repeat_settings[player_settings.repeat].property);
+		&loopstatus_settings[player_settings.loopstatus].property);
 
 	__bt_media_append_dict_entry(&property_dict,
 		"Shuffle",
-		DBUS_TYPE_STRING,
-		&shuffle_settings[player_settings.shuffle].property);
+		DBUS_TYPE_BOOLEAN,
+		&player_settings.shuffle);
 
 	__bt_media_append_dict_entry(&property_dict,
-		"Scan",
+		"PlaybackStatus",
 		DBUS_TYPE_STRING,
-		&scan_settings[player_settings.scan].property);
-
-	__bt_media_append_dict_entry(&property_dict,
-		"Status",
-		DBUS_TYPE_STRING,
-		&player_status[player_settings.status].property);
+		&playback_status[player_settings.playbackstatus].property);
 
 	__bt_media_append_dict_entry(&property_dict,
 		"Position",
-		DBUS_TYPE_UINT32, &player_settings.position);
+		DBUS_TYPE_INT64, &player_settings.position);
+
+	__bt_media_append_metadata_dict_entry(&property_dict,
+		"xesam:title",
+		DBUS_TYPE_STRING, &metadata.title, 0);
+
+	metadata.artist = g_malloc0(sizeof(char *));
+	metadata.artist[0] = "";
+
+	__bt_media_append_metadata_dict_entry(&property_dict,
+		"xesam:artist",
+		DBUS_TYPE_ARRAY, &metadata.artist, 1);
+
+	__bt_media_append_metadata_dict_entry(&property_dict,
+		"xesam:album",
+		DBUS_TYPE_STRING, &metadata.album, 0);
+
+	metadata.genre = g_malloc0(sizeof(char *));
+	metadata.genre[0] = "";
+
+	__bt_media_append_metadata_dict_entry(&property_dict,
+		"xesam:genre",
+		DBUS_TYPE_ARRAY, &metadata.genre, 1);
+
+	__bt_media_append_metadata_dict_entry(&property_dict,
+		"mpris:length",
+		DBUS_TYPE_INT64, &metadata.duration, 0);
+
+	__bt_media_append_metadata_dict_entry(&property_dict,
+		"xesam:trackNumber",
+		DBUS_TYPE_INT32, &metadata.tracknumber, 0);
 
 	dbus_message_iter_close_container(&iter, &property_dict);
 
-	dbus_message_iter_init_append(msg, &iter);
-	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
-			DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
-			DBUS_TYPE_STRING_AS_STRING DBUS_TYPE_VARIANT_AS_STRING
-			DBUS_DICT_ENTRY_END_CHAR_AS_STRING, &metadata_dict);
-
-	__bt_media_append_dict_entry(&metadata_dict,
-		"Title",
-		DBUS_TYPE_STRING, &metadata.title);
-
-	__bt_media_append_dict_entry(&metadata_dict,
-		"Artist",
-		DBUS_TYPE_STRING, &metadata.artist);
-
-	__bt_media_append_dict_entry(&metadata_dict,
-		"Album",
-		DBUS_TYPE_STRING, &metadata.album);
-
-	__bt_media_append_dict_entry(&metadata_dict,
-		"Genre",
-		DBUS_TYPE_STRING, &metadata.genre);
-
-	__bt_media_append_dict_entry(&metadata_dict,
-		"NumberOfTracks",
-		DBUS_TYPE_UINT32, &metadata.total_tracks);
-
-	__bt_media_append_dict_entry(&metadata_dict,
-		"Number",
-		DBUS_TYPE_UINT32, &metadata.number);
-
-	__bt_media_append_dict_entry(&metadata_dict,
-		"Duration",
-		DBUS_TYPE_UINT32, &metadata.duration);
-
-	dbus_message_iter_close_container(&iter, &metadata_dict);
-
 	dbus_error_init(&err);
 	reply = dbus_connection_send_with_reply_and_block(conn,
-				msg, -1, &err);
+					msg, -1, &err);
 	dbus_message_unref(msg);
 
 	if (!reply) {
-		BT_ERR("Error in registering the Music Player \n");
+		BT_DBG("Error in registering the Music Player \n");
 
 		if (dbus_error_is_set(&err)) {
 			BT_ERR("%s", err.message);
@@ -494,7 +708,7 @@ int _bt_register_media_player(void)
 
 		if (bt_media_obj) {
 			dbus_g_connection_unregister_g_object(gconn,
-							G_OBJECT(bt_media_obj));
+						G_OBJECT(bt_media_obj));
 			g_object_unref(bt_media_obj);
 			bt_media_obj = NULL;
 		}
@@ -502,6 +716,9 @@ int _bt_register_media_player(void)
 
 	if (reply)
 		dbus_message_unref(reply);
+
+	g_free(metadata.artist);
+	g_free(metadata.genre);
 
 	return BLUETOOTH_ERROR_NONE;
 }
@@ -515,7 +732,7 @@ int _bt_unregister_media_player(void)
 	char *adapter_path;
 	DBusConnection *conn;
 
-	conn = _bt_get_system_conn();
+	conn = g_bt_dbus_conn;
 	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	adapter_path = _bt_get_adapter_path();
@@ -523,6 +740,8 @@ int _bt_unregister_media_player(void)
 
 	msg = dbus_message_new_method_call(BT_BLUEZ_NAME, adapter_path,
 				BT_MEDIA_INTERFACE, "UnregisterPlayer");
+
+	g_free(adapter_path);
 
 	retv_if(msg == NULL, BLUETOOTH_ERROR_INTERNAL);
 
@@ -558,112 +777,125 @@ int _bt_unregister_media_player(void)
 		bt_media_obj = NULL;
 	}
 
+	bt_dbus_unregister_object_path(conn, BT_MEDIA_OBJECT_PATH);
+	g_bt_dbus_conn = NULL;
+
 	return BLUETOOTH_ERROR_NONE;
 }
 
-int _bt_avrcp_set_track_info(media_metadata_attributes_t *meta_data)
+int _bt_avrcp_set_interal_property(int type, media_player_settings_t *properties)
 {
-	DBusMessage *signal;
-	DBusMessageIter iter;
-	DBusMessageIter metadata_dict;
 	DBusConnection *conn;
+	int value;
+	media_metadata_attributes_t meta_data;
+	dbus_bool_t shuffle;
 
-	retv_if(meta_data == NULL, BLUETOOTH_ERROR_INTERNAL);
-
-	conn = _bt_get_system_conn();
+	conn = g_bt_dbus_conn;
 	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	signal = dbus_message_new_signal(BT_MEDIA_OBJECT_PATH,
-			BT_MEDIA_PLAYER_INTERFACE, "TrackChanged");
+	switch (type) {
+	case LOOPSTATUS:
+		value = properties->loopstatus;
+		if (!__bt_media_emit_property_changed(
+			conn,
+			BT_MEDIA_OBJECT_PATH,
+			BT_MEDIA_PLAYER_INTERFACE,
+			"LoopStatus",
+			DBUS_TYPE_STRING,
+			&loopstatus_settings[value].property)) {
+			BT_DBG("Error sending the PropertyChanged signal \n");
+			return BLUETOOTH_ERROR_INTERNAL;
+		}
+		break;
+	case SHUFFLE:
+		value = properties->shuffle;
+		if (g_strcmp0(repeat_settings[value].property, "alltracks") == 0)
+			shuffle = 1;
+		else
+			shuffle = 0;
 
-	retv_if(signal == NULL, BLUETOOTH_ERROR_INTERNAL);
-
-	dbus_message_iter_init_append(signal, &iter);
-
-	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
-			DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
-			DBUS_TYPE_STRING_AS_STRING DBUS_TYPE_VARIANT_AS_STRING
-			DBUS_DICT_ENTRY_END_CHAR_AS_STRING, &metadata_dict);
-
-	if (meta_data->title) {
-		__bt_media_append_dict_entry(&metadata_dict,
-			"Title",
-			DBUS_TYPE_STRING, &meta_data->title);
+		if (!__bt_media_emit_property_changed(
+			conn,
+			BT_MEDIA_OBJECT_PATH,
+			BT_MEDIA_PLAYER_INTERFACE,
+			"Shuffle",
+			DBUS_TYPE_BOOLEAN,
+			&shuffle)) {
+			BT_DBG("Error sending the PropertyChanged signal \n");
+			return BLUETOOTH_ERROR_INTERNAL;
+		}
+		break;
+	case PLAYBACKSTATUS:
+		value = properties->playbackstatus;
+		if (!__bt_media_emit_property_changed(
+			conn,
+			BT_MEDIA_OBJECT_PATH,
+			BT_MEDIA_PLAYER_INTERFACE,
+			"PlaybackStatus",
+			DBUS_TYPE_STRING,
+			&playback_status[value].property)) {
+			BT_DBG("Error sending the PropertyChanged signal \n");
+			return BLUETOOTH_ERROR_INTERNAL;
+		}
+		break;
+	case POSITION:
+		value = properties->position;
+		if (!__bt_media_emit_property_changed(
+			conn,
+			BT_MEDIA_OBJECT_PATH,
+			BT_MEDIA_PLAYER_INTERFACE,
+			"Position",
+			DBUS_TYPE_UINT32,
+			&value)) {
+			BT_DBG("Error sending the PropertyChanged signal \n");
+			return BLUETOOTH_ERROR_INTERNAL;
+		}
+		break;
+	case METADATA:
+		meta_data = properties->metadata;
+		if (!__bt_media_emit_property_changed(
+			conn,
+			BT_MEDIA_OBJECT_PATH,
+			BT_MEDIA_PLAYER_INTERFACE,
+			"Metadata",
+			DBUS_TYPE_ARRAY,
+			&meta_data)) {
+			BT_DBG("Error sending the PropertyChanged signal \n");
+			return BLUETOOTH_ERROR_INTERNAL;
+		}
+		break;
+	default:
+		BT_DBG("Invalid Type\n");
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
-
-	if (meta_data->artist) {
-		__bt_media_append_dict_entry(&metadata_dict,
-			"Artist",
-			DBUS_TYPE_STRING, &meta_data->artist);
-	}
-
-	if (meta_data->album) {
-		__bt_media_append_dict_entry(&metadata_dict,
-			"Album",
-			DBUS_TYPE_STRING, &meta_data->album);
-	}
-
-	if (meta_data->genre) {
-		__bt_media_append_dict_entry(&metadata_dict,
-			"Genre",
-			DBUS_TYPE_STRING, &meta_data->genre);
-	}
-
-	if (0 != meta_data->total_tracks)
-		__bt_media_append_dict_entry(&metadata_dict,
-			"NumberOfTracks",
-			DBUS_TYPE_UINT32, &meta_data->total_tracks);
-
-	if (0 != meta_data->number)
-		__bt_media_append_dict_entry(&metadata_dict,
-			"Number",
-			DBUS_TYPE_UINT32, &meta_data->number);
-
-	if (0 != meta_data->duration)
-		__bt_media_append_dict_entry(&metadata_dict,
-			"Duration",
-			DBUS_TYPE_UINT32, &meta_data->duration);
-
-	dbus_message_iter_close_container(&iter, &metadata_dict);
-
-	if (!dbus_connection_send(conn, signal, NULL))
-		BT_ERR("Unable to send TrackChanged signal\n");
-
-	dbus_message_unref(signal);
 
 	return BLUETOOTH_ERROR_NONE;
 }
-
 
 int _bt_avrcp_set_properties(media_player_settings_t *properties)
 {
-	if (_bt_avrcp_set_property(EQUALIZER,
-			properties->equalizer) != BLUETOOTH_ERROR_NONE) {
+	if (_bt_avrcp_set_interal_property(LOOPSTATUS,
+			properties) != BLUETOOTH_ERROR_NONE) {
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	if (_bt_avrcp_set_property(REPEAT,
-			properties->repeat) != BLUETOOTH_ERROR_NONE) {
+	if (_bt_avrcp_set_interal_property(SHUFFLE,
+			properties) != BLUETOOTH_ERROR_NONE) {
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	if (_bt_avrcp_set_property(SHUFFLE,
-			properties->shuffle) != BLUETOOTH_ERROR_NONE) {
+	if (_bt_avrcp_set_interal_property(PLAYBACKSTATUS,
+			properties) != BLUETOOTH_ERROR_NONE) {
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	if (_bt_avrcp_set_property(SCAN,
-			properties->scan) != BLUETOOTH_ERROR_NONE) {
+	if (_bt_avrcp_set_interal_property(POSITION,
+			properties) != BLUETOOTH_ERROR_NONE) {
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	if (_bt_avrcp_set_property(STATUS,
-			properties->status) != BLUETOOTH_ERROR_NONE) {
-		return BLUETOOTH_ERROR_INTERNAL;
-	}
-
-	if (_bt_avrcp_set_property(POSITION,
-			properties->position) != BLUETOOTH_ERROR_NONE) {
+	if (_bt_avrcp_set_interal_property(METADATA,
+			properties) != BLUETOOTH_ERROR_NONE) {
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
@@ -672,89 +904,31 @@ int _bt_avrcp_set_properties(media_player_settings_t *properties)
 
 int _bt_avrcp_set_property(int type, unsigned int value)
 {
-	DBusConnection *conn;
+	media_player_settings_t properties;
 
-	conn = _bt_get_system_conn();
-	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
+	BT_DBG("+");
 
 	switch (type) {
-	case EQUALIZER:
-		if (!__bt_media_emit_property_changed(
-			conn,
-			BT_MEDIA_OBJECT_PATH,
-			BT_MEDIA_PLAYER_INTERFACE,
-			"Equalizer",
-			DBUS_TYPE_STRING,
-			&equalizer_settings[value].property)) {
-			BT_ERR("Error sending the PropertyChanged signal \n");
-			return BLUETOOTH_ERROR_INTERNAL;
-		}
-		break;
-	case REPEAT:
-		if (!__bt_media_emit_property_changed(
-			conn,
-			BT_MEDIA_OBJECT_PATH,
-			BT_MEDIA_PLAYER_INTERFACE,
-			"Repeat",
-			DBUS_TYPE_STRING,
-			&repeat_settings[value].property)) {
-			BT_ERR("Error sending the PropertyChanged signal \n");
-			return BLUETOOTH_ERROR_INTERNAL;
-		}
+	case LOOPSTATUS:
+		properties.loopstatus = value;
 		break;
 	case SHUFFLE:
-		if (!__bt_media_emit_property_changed(
-			conn,
-			BT_MEDIA_OBJECT_PATH,
-			BT_MEDIA_PLAYER_INTERFACE,
-			"Shuffle",
-			DBUS_TYPE_STRING,
-			&shuffle_settings[value].property)) {
-			BT_ERR("Error sending the PropertyChanged signal \n");
-			return BLUETOOTH_ERROR_INTERNAL;
-		}
+		properties.shuffle = value;
 		break;
-	case SCAN:
-		if (!__bt_media_emit_property_changed(
-			conn,
-			BT_MEDIA_OBJECT_PATH,
-			BT_MEDIA_PLAYER_INTERFACE,
-			"Scan",
-			DBUS_TYPE_STRING,
-			&scan_settings[value].property)) {
-			BT_ERR("Error sending the PropertyChanged signal \n");
-			return BLUETOOTH_ERROR_INTERNAL;
-		}
-		break;
-	case STATUS:
-		if (!__bt_media_emit_property_changed(
-			conn,
-			BT_MEDIA_OBJECT_PATH,
-			BT_MEDIA_PLAYER_INTERFACE,
-			"Status",
-			DBUS_TYPE_STRING,
-			&player_status[value].property)) {
-			BT_ERR("Error sending the PropertyChanged signal \n");
-			return BLUETOOTH_ERROR_INTERNAL;
-		}
+	case PLAYBACKSTATUS:
+		properties.playbackstatus = value;
 		break;
 	case POSITION:
-		if (!__bt_media_emit_property_changed(
-			conn,
-			BT_MEDIA_OBJECT_PATH,
-			BT_MEDIA_PLAYER_INTERFACE,
-			"Position",
-			DBUS_TYPE_UINT32,
-			&value)) {
-			BT_ERR("Error sending the PropertyChanged signal \n");
-			return BLUETOOTH_ERROR_INTERNAL;
-		}
+		properties.position = value;
 		break;
 	default:
-		BT_ERR("Invalid Type\n");
+		BT_DBG("Invalid Type\n");
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
+	_bt_avrcp_set_interal_property(type, &properties);
+
+	BT_DBG("-");
+
 	return BLUETOOTH_ERROR_NONE;
 }
-

@@ -45,6 +45,10 @@ typedef struct {
 typedef struct {
 	int request_id;
 	int result;
+	int file_count;
+	int file_offset;
+	char **file_name_array;
+	char *session_path;
 	char *address;
 	gboolean is_canceled;
 	DBusGProxyCall *sending_proxy;
@@ -68,6 +72,13 @@ int _bt_opp_client_cancel_all_transfers(void);
 
 int _bt_opp_client_is_sending(gboolean *sending);
 
+void _bt_sending_files();
+
+gboolean _bt_obex_client_progress(int transferred);
+
+gboolean _bt_obex_client_started(const char *transfer_path);
+
+gboolean _bt_obex_client_completed(gboolean success);
 
 #ifdef __cplusplus
 }

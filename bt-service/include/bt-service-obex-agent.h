@@ -51,11 +51,6 @@ GType bt_obex_agent_get_type(void);
 
 typedef gboolean(*bt_obex_authorize_cb)(DBusGMethodInvocation *context,
 					   const char *path,
-					   const char *bdaddress,
-					   const char *name,
-					   const char *type,
-					   gint length,
-					   gint time,
 					   gpointer data);
 
 typedef gboolean(*bt_obex_request_cb)(DBusGMethodInvocation *context,
@@ -112,9 +107,7 @@ gboolean _bt_obex_setup(BtObexAgent *agent, const char *path);
 gboolean bt_obex_agent_request(BtObexAgent *agent, const char *path,
 				   DBusGMethodInvocation *context);
 
-gboolean bt_obex_agent_authorize(BtObexAgent *agent, const char *path,
-			const char *bdaddress, const char *name,
-			const char *type, gint length, gint time,
+gboolean bt_obex_agent_authorize_push(BtObexAgent *agent, const char *path,
 			     DBusGMethodInvocation *context);
 
 gboolean bt_obex_agent_progress(BtObexAgent *agent, const char *path,

@@ -22,7 +22,6 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <stdlib.h>
-#include <security-server.h>
 
 #include "bluetooth-api.h"
 #include "bluetooth-audio-api.h"
@@ -36,8 +35,6 @@
 
 static bt_user_info_t user_info[BT_MAX_USER_INFO];
 static DBusGConnection *system_conn = NULL;
-static char *cookie;
-static size_t cookie_size;
 
 void _bt_print_device_address_t(const bluetooth_device_address_t *addr)
 {
@@ -180,86 +177,153 @@ int _bt_copy_utf8_string(char *dest, const char *src, unsigned int length)
 	return BLUETOOTH_ERROR_NONE;
 }
 
-int _bt_get_adapter_path(DBusGConnection *conn, char *path)
+static char *__bt_extract_adapter_path(DBusMessageIter *msg_iter)
 {
-	GError *err = NULL;
-	DBusGProxy *manager_proxy = NULL;
-	char *adapter_path = NULL;
-	int ret = BLUETOOTH_ERROR_NONE;
+	char *object_path = NULL;
+	DBusMessageIter value_iter;
 
+	/* Parse the signature:  oa{sa{sv}}} */
+	retv_if(dbus_message_iter_get_arg_type(msg_iter) !=
+				DBUS_TYPE_OBJECT_PATH, NULL);
+
+	dbus_message_iter_get_basic(msg_iter, &object_path);
+	retv_if(object_path == NULL, NULL);
+
+	/* object array (oa) */
+	retv_if(dbus_message_iter_next(msg_iter) == FALSE, NULL);
+	retv_if(dbus_message_iter_get_arg_type(msg_iter) !=
+				DBUS_TYPE_ARRAY, NULL);
+
+	dbus_message_iter_recurse(msg_iter, &value_iter);
+
+	/* string array (sa) */
+	while (dbus_message_iter_get_arg_type(&value_iter) ==
+					DBUS_TYPE_DICT_ENTRY) {
+		char *interface_name = NULL;
+		DBusMessageIter interface_iter;
+
+		dbus_message_iter_recurse(&value_iter, &interface_iter);
+
+		retv_if(dbus_message_iter_get_arg_type(&interface_iter) !=
+			DBUS_TYPE_STRING, NULL);
+
+		dbus_message_iter_get_basic(&interface_iter, &interface_name);
+
+		if (g_strcmp0(interface_name, "org.bluez.Adapter1") == 0) {
+			/* Tizen don't allow the multi-adapter */
+			BT_DBG("Found an adapter: %s", object_path);
+			return g_strdup(object_path);
+		}
+
+		dbus_message_iter_next(&value_iter);
+	}
+
+	BT_DBG("There is no adapter");
+
+	return NULL;
+}
+
+/* TO DO */
+/* Change DBusGConnection to DBusConnection*/
+int _bt_get_adapter_path(DBusGConnection *g_conn, char *path)
+{
+	DBusMessage *msg;
+	DBusMessage *reply;
+	DBusMessageIter reply_iter;
+	DBusMessageIter value_iter;
+	DBusError err;
+	DBusConnection *conn;
+	char *adapter_path = NULL;
+
+	retv_if(g_conn == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	conn = dbus_g_connection_get_connection(g_conn);
 	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	manager_proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
-				BT_MANAGER_PATH, BT_MANAGER_INTERFACE);
+	msg = dbus_message_new_method_call(BT_BLUEZ_NAME, BT_MANAGER_PATH,
+						BT_MANAGER_INTERFACE,
+						"GetManagedObjects");
 
-	retv_if(manager_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+	if (msg == NULL) {
+		BT_ERR("Can't allocate D-Bus message");
+		goto fail;
+	}
 
-	if (!dbus_g_proxy_call(manager_proxy, "DefaultAdapter", &err,
-				G_TYPE_INVALID, DBUS_TYPE_G_OBJECT_PATH,
-				&adapter_path,
-				G_TYPE_INVALID)) {
-		if (err != NULL) {
-			BT_ERR("Getting DefaultAdapter failed: [%s]\n", err->message);
-			g_error_free(err);
+	/* Synchronous call */
+	dbus_error_init(&err);
+	reply = dbus_connection_send_with_reply_and_block(
+					conn, msg,
+					-1, &err);
+	dbus_message_unref(msg);
+
+	if (!reply) {
+		BT_ERR("Can't get managed objects");
+
+		if (dbus_error_is_set(&err)) {
+			BT_ERR("%s", err.message);
+			dbus_error_free(&err);
 		}
-		g_object_unref(manager_proxy);
-		return BLUETOOTH_ERROR_INTERNAL;
+		goto fail;
 	}
 
-	if (adapter_path == NULL || strlen(adapter_path) >= BT_ADAPTER_OBJECT_PATH_MAX) {
-		BT_ERR("Adapter path is inproper\n");
-		ret = BLUETOOTH_ERROR_INTERNAL;
-		goto done;
+	if (dbus_message_iter_init(reply, &reply_iter) == FALSE) {
+	    BT_ERR("Fail to iterate the reply");
+	    goto fail;
 	}
+
+	dbus_message_iter_recurse(&reply_iter, &value_iter);
+
+	/* signature of GetManagedObjects:  a{oa{sa{sv}}} */
+	while (dbus_message_iter_get_arg_type(&value_iter) ==
+						DBUS_TYPE_DICT_ENTRY) {
+		DBusMessageIter msg_iter;
+
+		dbus_message_iter_recurse(&value_iter, &msg_iter);
+
+		adapter_path = __bt_extract_adapter_path(&msg_iter);
+		if (adapter_path != NULL) {
+			BT_DBG("Found the adapter path");
+			break;
+		}
+
+		dbus_message_iter_next(&value_iter);
+	}
+
+	if (adapter_path == NULL ||
+	     strlen(adapter_path) >= BT_ADAPTER_OBJECT_PATH_MAX) {
+		BT_ERR("Adapter path is inproper\n");
+		goto fail;
+	}
+
+	BT_DBG("adapter path: %s", adapter_path);
 
 	if (path)
 		g_strlcpy(path, adapter_path, BT_ADAPTER_OBJECT_PATH_MAX);
-done:
-	g_free(adapter_path);
-	g_object_unref(manager_proxy);
 
-	return ret;
+	g_free(adapter_path);
+
+	return BLUETOOTH_ERROR_NONE;
+
+fail:
+	g_free(adapter_path);
+
+	return BLUETOOTH_ERROR_INTERNAL;
 }
 
 DBusGProxy *_bt_get_adapter_proxy(DBusGConnection *conn)
 {
-	GError *err = NULL;
-	DBusGProxy *manager_proxy = NULL;
 	DBusGProxy *adapter_proxy = NULL;
-	char *adapter_path = NULL;
+	char adapter_path[BT_ADAPTER_OBJECT_PATH_MAX] = { 0 };
 
 	retv_if(conn == NULL, NULL);
 
-	manager_proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
-				BT_MANAGER_PATH, BT_MANAGER_INTERFACE);
-
-	retv_if(manager_proxy == NULL, NULL);
-
-	if (!dbus_g_proxy_call(manager_proxy, "DefaultAdapter", &err,
-				G_TYPE_INVALID, DBUS_TYPE_G_OBJECT_PATH,
-				&adapter_path,
-				G_TYPE_INVALID)) {
-		if (err != NULL) {
-			BT_ERR("Getting DefaultAdapter failed: [%s]\n", err->message);
-			g_error_free(err);
-		}
-		g_object_unref(manager_proxy);
+	if (_bt_get_adapter_path(conn, adapter_path) < 0) {
+		BT_DBG("Could not get adapter path\n");
 		return NULL;
 	}
 
-	if (adapter_path == NULL || strlen(adapter_path) >= BT_ADAPTER_OBJECT_PATH_MAX) {
-		BT_ERR("Adapter path is inproper\n");
-		g_free(adapter_path);
-		g_object_unref(manager_proxy);
-		return NULL;
-	}
-
-	adapter_proxy = dbus_g_proxy_new_for_name(conn,
-					BT_BLUEZ_NAME,
-					adapter_path,
-					BT_ADAPTER_INTERFACE);
-	g_free(adapter_path);
-	g_object_unref(manager_proxy);
+	adapter_proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
+				adapter_path, BT_ADAPTER_INTERFACE);
 
 	return adapter_proxy;
 }
@@ -314,39 +378,6 @@ DBusConnection *_bt_get_system_conn(void)
 	retv_if(g_conn == NULL, NULL);
 
 	return dbus_g_connection_get_connection(g_conn);
-}
-
-static void __bt_generate_cookie(void)
-{
-	int retval;
-
-	ret_if(cookie != NULL);
-
-	cookie_size = security_server_get_cookie_size();
-
-	cookie = g_malloc0((cookie_size*sizeof(char))+1);
-
-	retval = security_server_request_cookie(cookie, cookie_size);
-	if(retval < 0) {
-		BT_ERR("Fail to get cookie: %d", retval);
-	}
-}
-
-static void __bt_destroy_cookie(void)
-{
-	g_free(cookie);
-	cookie = NULL;
-	cookie_size = 0;
-}
-
-char *_bt_get_cookie(void)
-{
-	return cookie;
-}
-
-int _bt_get_cookie_size(void)
-{
-	return cookie_size;
 }
 
 BT_EXPORT_API int bluetooth_is_supported(void)
@@ -407,8 +438,6 @@ BT_EXPORT_API int bluetooth_register_callback(bluetooth_cb_func_ptr callback_ptr
 		return ret;
 	}
 
-	__bt_generate_cookie();
-
 	_bt_set_user_data(BT_COMMON, (void *)callback_ptr, user_data);
 
 	/* Register All events */
@@ -423,8 +452,6 @@ BT_EXPORT_API int bluetooth_register_callback(bluetooth_cb_func_ptr callback_ptr
 
 BT_EXPORT_API int bluetooth_unregister_callback(void)
 {
-	__bt_destroy_cookie();
-
 	_bt_unregister_event(BT_ADAPTER_EVENT);
 	_bt_unregister_event(BT_DEVICE_EVENT);
 	_bt_unregister_event(BT_NETWORK_EVENT);

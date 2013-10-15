@@ -119,6 +119,8 @@ int _bt_oob_add_remote_data(
 	msg = dbus_message_new_method_call(BT_BLUEZ_NAME, adapter_path,
 				BT_OOB_INTERFACE, "AddRemoteData");
 
+	g_free(adapter_path);
+
 	retv_if(msg == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	BT_DBG("remote hash len = [%d] and remote random len = [%d]\n",
@@ -182,6 +184,8 @@ int _bt_oob_remove_remote_data(
 
 	msg = dbus_message_new_method_call(BT_BLUEZ_NAME, adapter_path,
 				BT_OOB_INTERFACE, "RemoveRemoteData");
+
+	g_free(adapter_path);
 
 	retv_if(msg == NULL, BLUETOOTH_ERROR_INTERNAL);
 

@@ -80,7 +80,7 @@ extern "C" {
 #define MANAGER_EVENT_MATCH_RULE \
 			"type='signal'," \
 			"interface='%s'," \
-			"path='%s'"
+			"member='%s'"
 
 #define EVENT_MATCH_RULE \
 			"type='signal'," \
@@ -95,49 +95,78 @@ extern "C" {
 			"was broken."
 
 #define BT_BLUEZ_NAME "org.bluez"
+#define BT_BLUEZ_PATH "/org/bluez"
+#define BT_BLUEZ_HCI_PATH "/org/bluez/hci0"
 #define BT_AGENT_NAME "org.bluez.frwk_agent"
 #define BT_AGENT_PATH "/org/bluez/agent/frwk_agent"
 #define BT_DEVICE_AGENT_PATH "/org/tizen/device_agent"
 #define BT_ADAPTER_AGENT_PATH "/org/tizen/adapter_agent"
 #define BT_MANAGER_PATH "/"
-#define BT_MANAGER_INTERFACE "org.bluez.Manager"
-#define BT_ADAPTER_INTERFACE "org.bluez.Adapter"
-#define BT_AGENT_INTERFACE "org.bluez.Agent"
-#define BT_DEVICE_INTERFACE "org.bluez.Device"
+#define BT_MANAGER_INTERFACE "org.freedesktop.DBus.ObjectManager"
+#define BT_ADAPTER_INTERFACE "org.bluez.Adapter1"
+#define BT_AGENT_INTERFACE "org.bluez.Agent1"
+#define BT_AGENT_MANAGER_INTERFACE "org.bluez.AgentManager1"
+#define BT_DEVICE_INTERFACE "org.bluez.Device1"
 #define BT_INPUT_INTERFACE "org.bluez.Input"
-#define BT_NETWORK_INTERFACE "org.bluez.Network"
-#define BT_NETWORK_SERVER_INTERFACE "org.bluez.NetworkServer"
-#define BT_NETWORK_CLIENT_INTERFACE "org.bluez.Network"
+#define BT_NETWORK_INTERFACE "org.bluez.Network1"
+#define BT_NETWORK_SERVER_INTERFACE "org.bluez.NetworkServer1"
+#define BT_NETWORK_CLIENT_INTERFACE "org.bluez.Network1"
 #define BT_SERIAL_INTERFACE "org.bluez.Serial"
 #define BT_SERIAL_MANAGER_INTERFACE "org.bluez.SerialProxyManager"
 #define BT_SERIAL_PROXY_INTERFACE "org.bluez.SerialProxy"
-#define BT_HEADSET_INTERFACE "org.bluez.Headset"
+#define BT_HFP_AGENT_INTERFACE "Org.Hfp.App.Interface"
 #define BT_SINK_INTERFACE "org.bluez.AudioSink"
 #define BT_AUDIO_INTERFACE "org.bluez.Audio"
 #define BT_OOB_INTERFACE "org.bluez.OutOfBand"
-#define BT_MEDIA_INTERFACE "org.bluez.Media"
-#define BT_MEDIA_PLAYER_INTERFACE "org.bluez.MediaPlayer"
-#define BT_OBEXD_INTERFACE "org.openobex"
-#define BT_OBEXD_MANAGER_INTERFACE "org.openobex.Manager"
-#define BT_OBEXD_TRANSFER_INTERFACE "org.openobex.Transfer"
+#define BT_MEDIA_INTERFACE "org.bluez.Media1"
+#define BT_MEDIA_PLAYER_INTERFACE "org.mpris.MediaPlayer2.Player"
+#define BT_OBEXD_DBUS_NAME "org.bluez.obex"
+#define BT_OBEXD_MANAGER_INTERFACE "org.bluez.obex.AgentManager1"
+#define BT_OBEXD_TRANSFER_INTERFACE "org.bluez.obex.Transfer1"
+#define BT_PROPERTIES_INTERFACE "org.freedesktop.DBus.Properties"
+#define BT_MEDIA_CONTROL_INTERFACE "org.bluez.MediaControl1"
+#define MPRIS_PLAYER_INTERFACE "org.mpris.MediaPlayer2.Player"
 
-#define BT_OBEX_SERVICE_NAME "org.openobex.client"
+#define BT_OBEX_SERVICE_NAME "org.bluez.obex"
 
-#define BT_OBEX_CLIENT_PATH "/"
-#define BT_OBEX_CLIENT_INTERFACE "org.openobex.Client"
-#define BT_OBEX_TRANSFER_INTERFACE "org.openobex.Transfer"
-#define BT_OBEX_AGENT_INTERFACE "org.openobex.Agent"
+#define BT_OBEX_CLIENT_PATH "/org/bluez/obex"
+#define BT_OBEX_CLIENT_INTERFACE "org.bluez.obex.Client1"
+#define BT_OBEX_OBJECT_PUSH_INTERFACE "org.bluez.obex.ObjectPush1"
+#define BT_OBEX_TRANSFER_INTERFACE "org.bluez.obex.Transfer1"
+#define BT_OBEX_AGENT_INTERFACE "org.bluez.obex.Agent1"
+
+#define BT_SESSION_BASEPATH_SERVER "/org/bluez/obex/server"
+#define BT_SESSION_BASEPATH_CLIENT "/org/bluez/obex/client"
 
 #define BT_FREEDESKTOP_INTERFACE "org.freedesktop.DBus"
 #define BT_FREEDESKTOP_PATH "/org/freedesktop/DBus"
 
-/* Privilege */
-#define BT_PRIVILEGE_MANAGER "bt-service::manager"
-#define BT_PRIVILEGE_ADMIN "bt-service::admin"
-#define BT_PRIVILEGE_GAP "bt-service::gap"
-#define BT_PRIVILEGE_OPP "bt-service::opp"
-#define BT_PRIVILEGE_SPP "bt-service::spp"
-#define BT_PRIVILEGE_HEALTH "bt-service::health"
+#define BT_INTERFACES_ADDED "InterfacesAdded"
+#define BT_INTERFACES_REMOVED "InterfacesRemoved"
+#define BT_NAME_OWNER_CHANGED "NameOwnerChanged"
+#define BT_PROPERTIES_CHANGED "PropertiesChanged"
+#define DBUS_INTERFACE_OBJECT_MANAGER "/"
+
+#define GENERIC_AUDIO_UUID      "00001203-0000-1000-8000-00805f9b34fb"
+
+#define HSP_HS_UUID             "00001108-0000-1000-8000-00805f9b34fb"
+#define HSP_AG_UUID             "00001112-0000-1000-8000-00805f9b34fb"
+
+#define HFP_HS_UUID             "0000111e-0000-1000-8000-00805f9b34fb"
+#define HFP_AG_UUID             "0000111f-0000-1000-8000-00805f9b34fb"
+
+#define ADVANCED_AUDIO_UUID     "0000110d-0000-1000-8000-00805f9b34fb"
+
+#define A2DP_SOURCE_UUID        "0000110a-0000-1000-8000-00805f9b34fb"
+#define A2DP_SINK_UUID          "0000110b-0000-1000-8000-00805f9b34fb"
+
+#define AVRCP_REMOTE_UUID       "0000110e-0000-1000-8000-00805f9b34fb"
+#define AVRCP_TARGET_UUID       "0000110c-0000-1000-8000-00805f9b34fb"
+
+#define HID_UUID                "00001124-0000-1000-8000-00805f9b34fb"
+#define PNP_UUID                "00001200-0000-1000-8000-00805f9b34fb"
+
+#define BT_STOP_DISCOVERY_TIMEOUT 1000*15
 
 typedef enum {
 	BT_OBEX_SERVER = 0x00,
@@ -181,6 +210,8 @@ DBusGProxy *_bt_get_manager_proxy(void);
 
 DBusGProxy *_bt_get_adapter_proxy(void);
 
+DBusGProxy *_bt_get_adapter_properties_proxy(void);
+
 char *_bt_get_adapter_path(void);
 
 void _bt_deinit_proxys(void);
@@ -210,6 +241,8 @@ int _bt_set_socket_non_blocking(int socket_fd);
 int _bt_set_non_blocking_tty(int sk);
 
 gboolean _bt_is_headset_class(int dev_class);
+
+char *_bt_get_device_object_path(char *address);
 
 void _bt_deinit_bluez_proxy(void);
 

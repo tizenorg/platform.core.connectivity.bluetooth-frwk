@@ -87,7 +87,7 @@ struct _GapAgentClass {
 
 GapAgent *_gap_agent_new(void);
 void _gap_agent_setup_dbus(GapAgent *agent, GAP_AGENT_FUNC_CB *func_cb,
-					const char *path, DBusGProxy *adapter);
+					const char *path);
 gboolean _gap_agent_register(GapAgent *agent);
 void _gap_agent_reset_dbus(GapAgent *agent);
 

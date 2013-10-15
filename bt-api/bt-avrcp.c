@@ -121,15 +121,14 @@ BT_EXPORT_API int bluetooth_media_player_change_track(
 
 	if (_bt_copy_utf8_string(meta_data.title, metadata->title, BT_NAME_MAX))
 		BT_DBG("Error in copying Title\n");
-	if (_bt_copy_utf8_string(meta_data.artist, metadata->artist, BT_NAME_MAX))
+	if (_bt_copy_utf8_string(meta_data.artist, metadata->artist[0], BT_NAME_MAX))
 		BT_DBG("Error in copying Artist\n");
 	if (_bt_copy_utf8_string(meta_data.album, metadata->album, BT_NAME_MAX))
 		BT_DBG("Error in copying Album\n");
-	if (_bt_copy_utf8_string(meta_data.genre, metadata->genre, BT_NAME_MAX))
+	if (_bt_copy_utf8_string(meta_data.genre, metadata->genre[0], BT_NAME_MAX))
 		BT_DBG("Error in copying Genre\n");
 
-	meta_data.total_tracks = metadata->total_tracks;
-	meta_data.number = metadata->number;
+	meta_data.number = metadata->tracknumber;
 	meta_data.duration = metadata->duration;
 
 	g_array_append_vals(in_param1, &meta_data, sizeof(media_metadata_t));
@@ -141,4 +140,3 @@ BT_EXPORT_API int bluetooth_media_player_change_track(
 
 	return result;
 }
-

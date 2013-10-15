@@ -134,9 +134,9 @@ extern "C" {
 
 #define BT_EVENT_MANAGER "org.bluez.Manager"
 #define BT_MANAGER_PATH "/"
-#define BT_MANAGER_INTERFACE "org.bluez.Manager"
-#define BT_ADAPTER_INTERFACE "org.bluez.Adapter"
-#define BT_DEVICE_INTERFACE "org.bluez.Device"
+#define BT_MANAGER_INTERFACE "org.freedesktop.DBus.ObjectManager"
+#define BT_ADAPTER_INTERFACE "org.bluez.Adapter1"
+#define BT_DEVICE_INTERFACE "org.bluez.Device1"
 
 #define BT_BLUEZ_NAME "org.bluez"
 #define BT_DBUS_NAME "org.projectx.bt"
@@ -144,7 +144,7 @@ extern "C" {
 
 #define BT_AGENT_NAME "org.bluez.frwk_agent"
 #define BT_AGENT_PATH "/org/bluez/agent/frwk_agent"
-#define BT_AGENT_INTERFACE "org.bluez.Agent"
+#define BT_AGENT_INTERFACE "org.bluez.Agent1"
 
 #define BT_MAX_USER_INFO 5
 #define RFKILL_EVENT_SIZE 8
@@ -214,7 +214,7 @@ void _bt_convert_addr_type_to_string(char *address,
 
 int _bt_copy_utf8_string(char *dest, const char *src, unsigned int length);
 
-int _bt_get_adapter_path(DBusGConnection *conn, char *path);
+int _bt_get_adapter_path(DBusGConnection *g_conn, char *path);
 
 DBusGProxy *_bt_get_adapter_proxy(DBusGConnection *conn);
 
@@ -225,10 +225,6 @@ DBusGConnection *__bt_init_system_gconn(void);
 DBusGConnection *_bt_get_system_gconn(void);
 
 DBusConnection *_bt_get_system_conn(void);
-
-char *_bt_get_cookie(void);
-
-int _bt_get_cookie_size(void);
 
 #ifdef __cplusplus
 }

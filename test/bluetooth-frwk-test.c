@@ -112,6 +112,7 @@ tc_table_t tc_table[] =
 	{"bluetooth_search_service"	, 25},
 	{"bluetooth_cancel_service_search"	, 26},
 	{"bluetooth_is_device_connected"	, 27},
+	{"bluetooth_reset_adapter"		, 28},
 
 	{"bluetooth_audio_init"	, 29},
 	{"bluetooth_audio_deinit" , 30},

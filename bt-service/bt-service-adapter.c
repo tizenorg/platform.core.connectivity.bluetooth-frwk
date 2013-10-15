@@ -29,7 +29,6 @@
 #include <syspopup_caller.h>
 #endif
 #include <aul.h>
-#include <notification.h>
 
 #include "alarm.h"
 
@@ -191,6 +190,227 @@ static void __bt_get_service_list(GValue *value, bluetooth_device_info_t *dev)
 	}
 }
 
+static bt_remote_dev_info_t *__bt_parse_remote_device_info(
+					DBusMessageIter *item_iter)
+{
+	DBusMessageIter value_iter;
+	bt_remote_dev_info_t *dev_info;
+
+	dbus_message_iter_recurse(item_iter, &value_iter);
+
+	if (dbus_message_iter_get_arg_type(&value_iter) !=
+					DBUS_TYPE_DICT_ENTRY) {
+		BT_DBG("No entry");
+		return NULL;
+	}
+
+	dev_info = g_malloc0(sizeof(bt_remote_dev_info_t));
+
+	while (dbus_message_iter_get_arg_type(&value_iter) ==
+						DBUS_TYPE_DICT_ENTRY) {
+		char *value = NULL;
+		char *key;
+		DBusMessageIter dict_entry;
+		DBusMessageIter iter_dict_val;
+
+		dbus_message_iter_recurse(&value_iter, &dict_entry);
+
+		dbus_message_iter_get_basic(&dict_entry, &key);
+
+		if (key == NULL) {
+			dbus_message_iter_next(&value_iter);
+			continue;
+		}
+
+		if (!dbus_message_iter_next(&dict_entry)) {
+			dbus_message_iter_next(&value_iter);
+			continue;
+		}
+		dbus_message_iter_recurse(&dict_entry, &iter_dict_val);
+
+		if (strcasecmp(key, "Address") == 0) {
+			const char *address = NULL;
+			dbus_message_iter_get_basic(&iter_dict_val,
+							&address);
+			dev_info->address = g_strdup(address);
+		} else if (strcasecmp(key, "Class") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val,
+						&dev_info->class);
+		} else if (strcasecmp(key, "Name") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val,
+							&value);
+			if (dev_info->name == NULL)
+				dev_info->name = g_strdup(value);
+		} else if (strcasecmp(key, "Connected") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val,
+						&dev_info->connected);
+		} else if (strcasecmp(key, "paired") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val,
+						&dev_info->paired);
+		} else if (strcasecmp(key, "Trusted") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val,
+						&dev_info->trust);
+		} else if (strcasecmp(key, "RSSI") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val,
+						&dev_info->rssi);
+		} else if (strcasecmp(key, "UUIDs") == 0) {
+			DBusMessageIter uuid_iter;
+			DBusMessageIter tmp_iter;
+			int i = 0;
+
+			dbus_message_iter_recurse(&iter_dict_val,
+							&uuid_iter);
+			tmp_iter = uuid_iter;
+
+			/* Store the uuid count */
+			while (dbus_message_iter_get_arg_type(&tmp_iter) !=
+							DBUS_TYPE_INVALID) {
+
+				dbus_message_iter_get_basic(&tmp_iter,
+								&value);
+
+				dev_info->uuid_count++;
+				if (!dbus_message_iter_next(&tmp_iter))
+					break;
+			}
+
+			/* Store the uuids */
+			if (dev_info->uuid_count > 0) {
+				dev_info->uuids = g_new0(char *,
+						dev_info->uuid_count + 1);
+			} else {
+				dbus_message_iter_next(&value_iter);
+				continue;
+			}
+
+			while (dbus_message_iter_get_arg_type(&uuid_iter) !=
+							DBUS_TYPE_INVALID) {
+				dbus_message_iter_get_basic(&uuid_iter,
+								&value);
+				dev_info->uuids[i] = g_strdup(value);
+				i++;
+				if (!dbus_message_iter_next(&uuid_iter)) {
+					break;
+				}
+			}
+		}
+
+		dbus_message_iter_next(&value_iter);
+	}
+
+	return dev_info;
+}
+
+static void __bt_extract_remote_devinfo(DBusMessageIter *msg_iter,
+						GArray **dev_list)
+{
+	bt_remote_dev_info_t *dev_info = NULL;
+	char *object_path = NULL;
+	DBusMessageIter value_iter;
+
+	/* Parse the signature:  oa{sa{sv}}} */
+	ret_if(dbus_message_iter_get_arg_type(msg_iter) !=
+					DBUS_TYPE_OBJECT_PATH);
+
+	dbus_message_iter_get_basic(msg_iter, &object_path);
+	ret_if(object_path == NULL);
+
+	/* object array (oa) */
+	ret_if(dbus_message_iter_next(msg_iter) == FALSE);
+	ret_if(dbus_message_iter_get_arg_type(msg_iter) != DBUS_TYPE_ARRAY);
+
+	dbus_message_iter_recurse(msg_iter, &value_iter);
+
+	/* string array (sa) */
+	while (dbus_message_iter_get_arg_type(&value_iter) ==
+					DBUS_TYPE_DICT_ENTRY) {
+		char *interface_name = NULL;
+		DBusMessageIter interface_iter;
+
+		dbus_message_iter_recurse(&value_iter, &interface_iter);
+
+		ret_if(dbus_message_iter_get_arg_type(&interface_iter) !=
+							DBUS_TYPE_STRING);
+
+		dbus_message_iter_get_basic(&interface_iter, &interface_name);
+
+		ret_if(dbus_message_iter_next(&interface_iter) == FALSE);
+
+		ret_if(dbus_message_iter_get_arg_type(&interface_iter) !=
+							DBUS_TYPE_ARRAY);
+
+		if (g_strcmp0(interface_name, "org.bluez.Device1") == 0) {
+			BT_DBG("Found a device: %s", object_path);
+			dev_info = __bt_parse_remote_device_info(
+							&interface_iter);
+
+			if (dev_info) {
+				g_array_append_vals(*dev_list, dev_info,
+					sizeof(bt_remote_dev_info_t));
+			}
+		}
+
+		dbus_message_iter_next(&value_iter);
+	}
+}
+
+int _bt_get_remote_found_devices(GArray **dev_list)
+{
+	DBusMessage *msg;
+	DBusMessage *reply;
+	DBusMessageIter reply_iter;
+	DBusMessageIter value_iter;
+	DBusError err;
+	DBusConnection *conn;
+
+	conn = _bt_get_system_conn();
+	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	msg = dbus_message_new_method_call(BT_BLUEZ_NAME, BT_MANAGER_PATH,
+						BT_MANAGER_INTERFACE,
+						"GetManagedObjects");
+
+	retv_if(msg == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	/* Synchronous call */
+	dbus_error_init(&err);
+	reply = dbus_connection_send_with_reply_and_block(
+					conn, msg,
+					-1, &err);
+	dbus_message_unref(msg);
+
+	if (!reply) {
+		BT_ERR("Can't get managed objects");
+
+		if (dbus_error_is_set(&err)) {
+			BT_ERR("%s", err.message);
+			dbus_error_free(&err);
+		}
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	if (dbus_message_iter_init(reply, &reply_iter) == FALSE) {
+		BT_ERR("Fail to iterate the reply");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	dbus_message_iter_recurse(&reply_iter, &value_iter);
+
+	/* signature of GetManagedObjects:  a{oa{sa{sv}}} */
+	while (dbus_message_iter_get_arg_type(&value_iter) ==
+						DBUS_TYPE_DICT_ENTRY) {
+		DBusMessageIter msg_iter;
+
+		dbus_message_iter_recurse(&value_iter, &msg_iter);
+
+		__bt_extract_remote_devinfo(&msg_iter, dev_list);
+
+		dbus_message_iter_next(&value_iter);
+	}
+
+	return BLUETOOTH_ERROR_NONE;
+}
+
 static int __bt_get_bonded_device_info(gchar *device_path,
 		bluetooth_device_info_t *dev_info)
 {
@@ -215,11 +435,12 @@ static int __bt_get_bonded_device_info(gchar *device_path,
 	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	device_proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
-				device_path, BT_DEVICE_INTERFACE);
+				device_path, BT_PROPERTIES_INTERFACE);
 
 	retv_if(device_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	dbus_g_proxy_call(device_proxy, "GetProperties", &err,
+	dbus_g_proxy_call(device_proxy, "GetAll", &err,
+				G_TYPE_STRING, BT_DEVICE_INTERFACE,
 			  	G_TYPE_INVALID,
 				dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
 				G_TYPE_VALUE), &hash, G_TYPE_INVALID);
@@ -499,14 +720,15 @@ void _bt_handle_adapter_added(void)
 		return;
 	 }
 
-	if (!aul_app_is_running("com.samsung.bluetooth"))
-		__launch_bt_service(0, 0);
-
 	if (_bt_register_media_player() != BLUETOOTH_ERROR_NONE)
 		BT_ERR("Fail to register media player");
 
 	if (_bt_register_obex_server() != BLUETOOTH_ERROR_NONE)
 		BT_ERR("Fail to init obex server");
+/*
+	if (_bt_network_activate() != BLUETOOTH_ERROR_NONE)
+		BT_ERR("Fail to activate network");
+*/
 
 	/* add the vconf noti handler */
 	vconf_notify_key_changed(VCONFKEY_SETAPPL_DEVICE_NAME_STR,
@@ -580,7 +802,7 @@ gboolean __bt_enable_timeout_cb(gpointer user_data)
 	__bt_set_disabled(BLUETOOTH_ERROR_TIMEOUT);
 
 	/* Display notification */
-	notification_status_message_post(BT_STR_NOT_SUPPORT);
+	status_message_post(BT_STR_NOT_SUPPORT);
 
 	_bt_terminate_service(NULL);
 
@@ -629,7 +851,7 @@ int _bt_enable_adapter(void)
 		}
 
 		/* Display notification */
-		notification_status_message_post(BT_STR_NOT_SUPPORT);
+		status_message_post(BT_STR_NOT_SUPPORT);
 
 		/* Terminate myself */
 		g_idle_add((GSourceFunc)_bt_terminate_service, NULL);
@@ -701,22 +923,13 @@ int _bt_reset_adapter(void)
 
 int _bt_check_adapter(int *status)
 {
-	DBusGProxy *proxy;
 	char *adapter_path = NULL;
 
 	BT_CHECK_PARAMETER(status, return);
 
 	*status = 0; /* 0: disabled */
 
-	proxy = _bt_get_manager_proxy();
-	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
-
-	if (!dbus_g_proxy_call(proxy, "DefaultAdapter", NULL,
-			G_TYPE_INVALID, DBUS_TYPE_G_OBJECT_PATH,
-			&adapter_path, G_TYPE_INVALID)) {
-		BT_ERR("Fait to get DefaultAdapter");
-		return BLUETOOTH_ERROR_NONE;
-	}
+	adapter_path = _bt_get_adapter_path();
 
 	if (adapter_path != NULL)
 		*status = 1; /* 1: enabled */
@@ -728,30 +941,32 @@ int _bt_check_adapter(int *status)
 int _bt_get_local_address(bluetooth_device_address_t *local_address)
 {
 	DBusGProxy *proxy;
-	GHashTable *hash = NULL;
-	GValue *value;
-	char *address = NULL;
+	GError *err = NULL;
+	char *address;
+	GValue address_v = { 0 };
 
 	BT_CHECK_PARAMETER(local_address, return);
 
-	proxy = _bt_get_adapter_proxy();
+	proxy = _bt_get_adapter_properties_proxy();
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	dbus_g_proxy_call(proxy, "GetProperties", NULL,
+	if (!dbus_g_proxy_call(proxy, "Get", &err,
+			G_TYPE_STRING, BT_ADAPTER_INTERFACE,
+			G_TYPE_STRING, "Address",
 			G_TYPE_INVALID,
-			dbus_g_type_get_map("GHashTable",
-			G_TYPE_STRING, G_TYPE_VALUE),
-			&hash, G_TYPE_INVALID);
-
-	if (hash != NULL) {
-		value = g_hash_table_lookup(hash, "Address");
-		address = (char *)(value ? g_value_dup_string(value) : NULL);
-		g_hash_table_destroy(hash);
+			G_TYPE_VALUE, &address_v,
+			G_TYPE_INVALID)) {
+		if (err != NULL) {
+			BT_ERR("Getting property failed: [%s]\n", err->message);
+			g_error_free(err);
+		}
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
+
+	address = (char *)g_value_get_string(&address_v);
 
 	if (address) {
 		_bt_convert_addr_string_to_type(local_address->addr, address);
-		g_free(address);
 	} else {
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
@@ -763,26 +978,31 @@ int _bt_get_local_name(bluetooth_device_name_t *local_name)
 {
 	DBusGProxy *proxy;
 	GHashTable *hash = NULL;
-	GValue *value;
+	GError *err = NULL;
+	GValue name_v = { 0 };
 	char *name = NULL;
 	char *ptr = NULL;
 	int ret = BLUETOOTH_ERROR_NONE;
 
 	BT_CHECK_PARAMETER(local_name, return);
 
-	proxy = _bt_get_adapter_proxy();
+	proxy = _bt_get_adapter_properties_proxy();
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	dbus_g_proxy_call(proxy, "GetProperties", NULL,
+	if (!dbus_g_proxy_call(proxy, "Get", &err,
+			G_TYPE_STRING, BT_ADAPTER_INTERFACE,
+			G_TYPE_STRING, "Alias",
 			G_TYPE_INVALID,
-			dbus_g_type_get_map("GHashTable",
-			G_TYPE_STRING, G_TYPE_VALUE),
-			&hash, G_TYPE_INVALID);
-
-	if (hash != NULL) {
-		value = g_hash_table_lookup(hash, "Name");
-		name = (char *)(value ? g_value_get_string(value) : NULL);
+			G_TYPE_VALUE, &name_v,
+			G_TYPE_INVALID)) {
+		if (err != NULL) {
+			BT_ERR("Getting property failed: [%s]\n", err->message);
+			g_error_free(err);
+		}
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
+
+	name = (char *)g_value_get_string(&name_v);
 
 	if (name && (strlen(name) > 0)) {
 		/* Check the utf8 valitation & Fill the NULL in the invalid location*/
@@ -808,7 +1028,7 @@ int _bt_set_local_name(char *local_name)
 
 	BT_CHECK_PARAMETER(local_name, return);
 
-	proxy = _bt_get_adapter_proxy();
+	proxy = _bt_get_adapter_properties_proxy();
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	if (!g_utf8_validate(local_name, -1, (const char **)&ptr))
@@ -817,9 +1037,11 @@ int _bt_set_local_name(char *local_name)
 	g_value_init(&name, G_TYPE_STRING);
 	g_value_set_string(&name, local_name);
 
-	dbus_g_proxy_call(proxy, "SetProperty",
-			&error, G_TYPE_STRING, "Name",
-			G_TYPE_VALUE, &name, G_TYPE_INVALID, G_TYPE_INVALID);
+	dbus_g_proxy_call(proxy, "Set", &error,
+			G_TYPE_STRING, BT_ADAPTER_INTERFACE,
+			G_TYPE_STRING, "Alias",
+			G_TYPE_VALUE, &name,
+			G_TYPE_INVALID, G_TYPE_INVALID);
 
 	g_value_unset(&name);
 
@@ -876,39 +1098,49 @@ done:
 	return ret;
 }
 
-int _bt_get_discoverable_mode(int *mode)
+static gboolean __bt_get_discoverable_property(void)
 {
 	DBusGProxy *proxy;
-	GHashTable *hash = NULL;
-	GValue *value;
-	GValue *timeout_value;
+	GValue discoverable_v = { 0 };
+	GError *err = NULL;
+
+	proxy = _bt_get_adapter_properties_proxy();
+	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	if (!dbus_g_proxy_call(proxy, "Get", &err,
+			G_TYPE_STRING, BT_ADAPTER_INTERFACE,
+			G_TYPE_STRING, "Discoverable",
+			G_TYPE_INVALID,
+			G_TYPE_VALUE, &discoverable_v,
+			G_TYPE_INVALID)) {
+		if (err != NULL) {
+			BT_ERR("Getting property failed: [%s]\n", err->message);
+			g_error_free(err);
+		}
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	return g_value_get_boolean(&discoverable_v);
+}
+
+int _bt_get_discoverable_mode(int *mode)
+{
+	gboolean discoverable;
+	unsigned int timeout;
 
 	BT_CHECK_PARAMETER(mode, return);
 
-	proxy = _bt_get_adapter_proxy();
-	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+	discoverable = __bt_get_discoverable_property();
+	timeout = _bt_get_discoverable_timeout_property();
 
-	dbus_g_proxy_call(proxy, "GetProperties", NULL,
-			  G_TYPE_INVALID,
-			  dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
-			  G_TYPE_VALUE), &hash, G_TYPE_INVALID);
-
-	retv_if(hash == NULL, BLUETOOTH_ERROR_INTERNAL);
-
-	value = g_hash_table_lookup(hash, "Discoverable");
-	timeout_value = g_hash_table_lookup(hash, "DiscoverableTimeout");
-
-	retv_if(value == NULL, BLUETOOTH_ERROR_INTERNAL);
-
-	if (g_value_get_boolean(value)) {
-		if (g_value_get_uint(timeout_value) == 0)
+	if (discoverable == TRUE) {
+		if (timeout == 0)
 			*mode = BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE;
 		else
 			*mode = BLUETOOTH_DISCOVERABLE_MODE_TIME_LIMITED_DISCOVERABLE;
 	} else {
 		*mode = BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE;
 	}
-	g_hash_table_destroy(hash);
 	return BLUETOOTH_ERROR_NONE;
 }
 
@@ -923,7 +1155,7 @@ int _bt_set_discoverable_mode(int discoverable_mode, int timeout)
 	GValue val_timeout = { 0 };
 	DBusGProxy *proxy;
 
-	proxy = _bt_get_adapter_proxy();
+	proxy = _bt_get_adapter_properties_proxy();
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	g_value_init(&connectable, G_TYPE_BOOLEAN);
@@ -953,10 +1185,11 @@ int _bt_set_discoverable_mode(int discoverable_mode, int timeout)
 	g_value_set_boolean(&discoverable, inq_scan);
 	g_value_set_uint(&val_timeout, timeout);
 
-	dbus_g_proxy_call(proxy, "SetProperty", &error,
-				   G_TYPE_STRING, "Powered",
-				   G_TYPE_VALUE, &connectable,
-				   G_TYPE_INVALID, G_TYPE_INVALID);
+	dbus_g_proxy_call(proxy, "Set", &error,
+				G_TYPE_STRING, BT_ADAPTER_INTERFACE,
+				G_TYPE_STRING, "Powered",
+				G_TYPE_VALUE, &connectable,
+				G_TYPE_INVALID, G_TYPE_INVALID);
 
 	if (error != NULL) {
 		BT_ERR("Powered set err:[%s]", error->message);
@@ -965,10 +1198,11 @@ int _bt_set_discoverable_mode(int discoverable_mode, int timeout)
 		goto done;
 	}
 
-	dbus_g_proxy_call(proxy, "SetProperty", &error,
-				   G_TYPE_STRING, "Discoverable",
-				   G_TYPE_VALUE, &discoverable,
-				   G_TYPE_INVALID, G_TYPE_INVALID);
+	dbus_g_proxy_call(proxy, "Set", &error,
+				G_TYPE_STRING, BT_ADAPTER_INTERFACE,
+				G_TYPE_STRING, "Discoverable",
+				G_TYPE_VALUE, &discoverable,
+				G_TYPE_INVALID, G_TYPE_INVALID);
 
 	if (error != NULL) {
 		BT_ERR("Discoverable set err:[%s]", error->message);
@@ -977,10 +1211,11 @@ int _bt_set_discoverable_mode(int discoverable_mode, int timeout)
 		goto done;
 	}
 
-	dbus_g_proxy_call(proxy, "SetProperty", &error,
-				   G_TYPE_STRING, "DiscoverableTimeout",
-				   G_TYPE_VALUE, &val_timeout,
-				   G_TYPE_INVALID, G_TYPE_INVALID);
+	dbus_g_proxy_call(proxy, "Set", &error,
+				G_TYPE_STRING, BT_ADAPTER_INTERFACE,
+				G_TYPE_STRING, "DiscoverableTimeout",
+				G_TYPE_VALUE, &val_timeout,
+				G_TYPE_INVALID, G_TYPE_INVALID);
 
 	if (error != NULL) {
 		BT_ERR("Timeout set err:[%s]", error->message);
@@ -992,7 +1227,7 @@ int _bt_set_discoverable_mode(int discoverable_mode, int timeout)
 	if (discoverable_mode == BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE)
 		timeout = -1;
 
-	ret = __bt_set_visible_time(timeout);
+	__bt_set_visible_time(timeout);
 
 done:
 	g_value_unset(&val_timeout);
@@ -1019,6 +1254,9 @@ int _bt_start_discovery(void)
 		BT_ERR("Discover start failed");
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
+
+	_bt_get_temp_remote_devinfo();
+	_bt_stop_discovery_timeout();
 
 	is_discovering = TRUE;
 	cancel_by_user = FALSE;
@@ -1056,98 +1294,283 @@ gboolean _bt_is_discovering(void)
 	return is_discovering;
 }
 
-gboolean _bt_get_discoverying_property(void)
+gboolean _bt_get_discovering_property(void)
 {
 	DBusGProxy *proxy;
-	GHashTable *hash = NULL;
-	GValue *value;
-	gboolean is_discover = FALSE;
+	GValue discovering_v = { 0 };
+	GError *err = NULL;
 
-	proxy = _bt_get_adapter_proxy();
-	retv_if(proxy == NULL, FALSE);
+	proxy = _bt_get_adapter_properties_proxy();
+	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	dbus_g_proxy_call(proxy, "GetProperties", NULL,
-			  G_TYPE_INVALID,
-			  dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
-			  G_TYPE_VALUE), &hash, G_TYPE_INVALID);
+	if (!dbus_g_proxy_call(proxy, "Get", &err,
+			G_TYPE_STRING, BT_ADAPTER_INTERFACE,
+			G_TYPE_STRING, "Discovering",
+			G_TYPE_INVALID,
+			G_TYPE_VALUE, &discovering_v,
+			G_TYPE_INVALID)) {
+		if (err != NULL) {
+			BT_ERR("Getting property failed: [%s]\n", err->message);
+			g_error_free(err);
+		}
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
 
-	retv_if(hash == NULL, FALSE);
-
-	value = g_hash_table_lookup(hash, "Discovering");
-	is_discover = g_value_get_boolean(value);
-	g_hash_table_destroy(hash);
-	return is_discover;
+	return g_value_get_boolean(&discovering_v);
 }
 
-int _bt_get_discoverable_timeout_property(void)
+unsigned int _bt_get_discoverable_timeout_property(void)
 {
 	DBusGProxy *proxy;
-	GHashTable *hash = NULL;
-	GValue *value;
-	unsigned int disc_to;
+	GValue timeout_v = { 0 };
+	GError *err = NULL;
 
-	proxy = _bt_get_adapter_proxy();
+	proxy = _bt_get_adapter_properties_proxy();
 	retv_if(proxy == NULL, 0);
 
-	dbus_g_proxy_call(proxy, "GetProperties", NULL,
-			  G_TYPE_INVALID,
-			  dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
-			  G_TYPE_VALUE), &hash, G_TYPE_INVALID);
+	if (!dbus_g_proxy_call(proxy, "Get", &err,
+			G_TYPE_STRING, BT_ADAPTER_INTERFACE,
+			G_TYPE_STRING, "DiscoverableTimeout",
+			G_TYPE_INVALID,
+			G_TYPE_VALUE, &timeout_v,
+			G_TYPE_INVALID)) {
+		if (err != NULL) {
+			BT_ERR("Getting property failed: [%s]\n", err->message);
+			g_error_free(err);
+		}
+		return 0;
+	}
 
-	retv_if(hash == NULL, 0);
+	return g_value_get_uint(&timeout_v);
+}
 
-	value = g_hash_table_lookup(hash, "DiscoverableTimeout");
-	disc_to = g_value_get_uint(value);
-	g_hash_table_destroy(hash);
-	return disc_to;
+static bluetooth_device_info_t *__bt_parse_device_info(DBusMessageIter *item_iter)
+{
+	DBusMessageIter value_iter;
+	bluetooth_device_info_t *dev_info;
+
+	dbus_message_iter_recurse(item_iter, &value_iter);
+
+	if (dbus_message_iter_get_arg_type(&value_iter) != DBUS_TYPE_DICT_ENTRY) {
+		BT_DBG("No entry");
+		return NULL;
+	}
+
+	dev_info = g_malloc0(sizeof(bluetooth_device_info_t));
+
+	while (dbus_message_iter_get_arg_type(&value_iter) ==
+						DBUS_TYPE_DICT_ENTRY) {
+		char *value = NULL;
+		char *key;
+		DBusMessageIter dict_entry;
+		DBusMessageIter iter_dict_val;
+
+		dbus_message_iter_recurse(&value_iter, &dict_entry);
+
+		dbus_message_iter_get_basic(&dict_entry, &key);
+
+		if (key == NULL) {
+			dbus_message_iter_next(&value_iter);
+			continue;
+		}
+
+		if (!dbus_message_iter_next(&dict_entry)) {
+			dbus_message_iter_next(&value_iter);
+			continue;
+		}
+		dbus_message_iter_recurse(&dict_entry, &iter_dict_val);
+
+		if (strcasecmp(key, "Address") == 0) {
+			const char *address = NULL;
+			dbus_message_iter_get_basic(&iter_dict_val, &address);
+			_bt_convert_addr_string_to_type(dev_info->device_address.addr,
+							address);
+
+		} else if (strcasecmp(key, "Class") == 0) {
+			unsigned int cod;
+			dbus_message_iter_get_basic(&iter_dict_val, &cod);
+			_bt_divide_device_class(&dev_info->device_class, cod);
+		} else if (strcasecmp(key, "Name") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val, &value);
+
+			/* If there is no Alias */
+			if (strlen(dev_info->device_name.name) == 0) {
+				g_strlcpy(dev_info->device_name.name, value,
+						BLUETOOTH_DEVICE_NAME_LENGTH_MAX+1);
+			}
+		} else if (strcasecmp(key, "Alias") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val, &value);
+
+			/* Overwrite the name */
+			if (value) {
+				memset(dev_info->device_name.name, 0x00,
+						BLUETOOTH_DEVICE_NAME_LENGTH_MAX+1);
+				g_strlcpy(dev_info->device_name.name, value,
+						BLUETOOTH_DEVICE_NAME_LENGTH_MAX+1);
+			}
+		} else if (strcasecmp(key, "Connected") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val,
+						&dev_info->connected);
+		} else if (strcasecmp(key, "paired") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val,
+						&dev_info->paired);
+		} else if (strcasecmp(key, "Trusted") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val,
+						&dev_info->trust);
+		} else if (strcasecmp(key, "RSSI") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val,
+						&dev_info->rssi);
+		} else if (strcasecmp(key, "UUIDs") == 0) {
+			DBusMessageIter uuid_iter;
+			char **parts;
+			int i = 0;
+
+			dbus_message_iter_recurse(&iter_dict_val, &uuid_iter);
+
+			while (dbus_message_iter_get_arg_type(&uuid_iter) != DBUS_TYPE_INVALID) {
+				dbus_message_iter_get_basic(&uuid_iter,
+							&value);
+
+				g_strlcpy(dev_info->uuids[i], value,
+						BLUETOOTH_UUID_STRING_MAX);
+
+				parts = g_strsplit(value, "-", -1);
+
+				if (parts == NULL || parts[0] == NULL)
+					break;
+
+				dev_info->service_list_array[i] = g_ascii_strtoull(parts[0], NULL, 16);
+				g_strfreev(parts);
+
+				i++;
+				if (!dbus_message_iter_next(&uuid_iter)) {
+					break;
+				}
+			}
+
+			dev_info->service_index = i;
+		}
+
+		dbus_message_iter_next(&value_iter);
+	}
+
+	return dev_info;
+}
+
+static void __bt_extract_device_info(DBusMessageIter *msg_iter,
+							GArray **dev_list)
+{
+	bluetooth_device_info_t *dev_info = NULL;
+	char *object_path = NULL;
+	DBusMessageIter value_iter;
+
+	/* Parse the signature:  oa{sa{sv}}} */
+	ret_if(dbus_message_iter_get_arg_type(msg_iter) !=
+				DBUS_TYPE_OBJECT_PATH);
+
+	dbus_message_iter_get_basic(msg_iter, &object_path);
+	ret_if(object_path == NULL);
+
+	/* object array (oa) */
+	ret_if(dbus_message_iter_next(msg_iter) == FALSE);
+	ret_if(dbus_message_iter_get_arg_type(msg_iter) != DBUS_TYPE_ARRAY);
+
+	dbus_message_iter_recurse(msg_iter, &value_iter);
+
+	/* string array (sa) */
+	while (dbus_message_iter_get_arg_type(&value_iter) ==
+					DBUS_TYPE_DICT_ENTRY) {
+		char *interface_name = NULL;
+		DBusMessageIter interface_iter;
+
+		dbus_message_iter_recurse(&value_iter, &interface_iter);
+
+		ret_if(dbus_message_iter_get_arg_type(&interface_iter) !=
+							DBUS_TYPE_STRING);
+
+		dbus_message_iter_get_basic(&interface_iter, &interface_name);
+
+		ret_if(dbus_message_iter_next(&interface_iter) == FALSE);
+
+		ret_if(dbus_message_iter_get_arg_type(&interface_iter) !=
+							DBUS_TYPE_ARRAY);
+
+		if (g_strcmp0(interface_name, "org.bluez.Device1") == 0) {
+			BT_DBG("Found a device: %s", object_path);
+			dev_info = __bt_parse_device_info(&interface_iter);
+
+			if (dev_info) {
+				if (dev_info->paired == TRUE) {
+					g_array_append_vals(*dev_list, dev_info,
+							sizeof(bluetooth_device_info_t));
+				} else {
+					g_free(dev_info);
+				}
+			}
+
+			return;
+		}
+
+		dbus_message_iter_next(&value_iter);
+	}
+
+	BT_DBG("There is no device interface");
 }
 
 int _bt_get_bonded_devices(GArray **dev_list)
 {
-	int i;
-	GPtrArray *gp_array = NULL;
-	GError *error = NULL;
-	DBusGProxy *proxy;
+	DBusMessage *msg;
+	DBusMessage *reply;
+	DBusMessageIter reply_iter;
+	DBusMessageIter value_iter;
+	DBusError err;
+	DBusConnection *conn;
 
-	BT_CHECK_PARAMETER(dev_list, return);
+	conn = _bt_get_system_conn();
+	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	proxy = _bt_get_adapter_proxy();
-	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+	msg = dbus_message_new_method_call(BT_BLUEZ_NAME, BT_MANAGER_PATH,
+						BT_MANAGER_INTERFACE,
+						"GetManagedObjects");
 
-	dbus_g_proxy_call(proxy, "ListDevices", &error,
-			G_TYPE_INVALID, dbus_g_type_get_collection("GPtrArray",
-			DBUS_TYPE_G_OBJECT_PATH), &gp_array, G_TYPE_INVALID);
+	retv_if(msg == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	if (error != NULL) {
-		BT_ERR("ListDevices error: [%s]\n", error->message);
-		g_error_free(error);
+	/* Synchronous call */
+	dbus_error_init(&err);
+	reply = dbus_connection_send_with_reply_and_block(
+					conn, msg,
+					-1, &err);
+	dbus_message_unref(msg);
+
+	if (!reply) {
+		BT_ERR("Can't get managed objects");
+
+		if (dbus_error_is_set(&err)) {
+			BT_ERR("%s", err.message);
+			dbus_error_free(&err);
+		}
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	retv_if(gp_array == NULL, BLUETOOTH_ERROR_NONE);
-	retv_if(gp_array->len == 0, BLUETOOTH_ERROR_NONE);
-
-	for (i = 0; i < gp_array->len; i++) {
-		bluetooth_device_info_t dev_info;
-		gchar *gp_path = g_ptr_array_index(gp_array, i);
-
-		if (gp_path == NULL)
-			continue;
-
-		memset(&dev_info, 0x00, sizeof(bluetooth_device_info_t));
-
-		if (__bt_get_bonded_device_info(gp_path,
-				&dev_info) == BLUETOOTH_ERROR_NONE) {
-
-			g_array_append_vals(*dev_list, &dev_info,
-						sizeof(bluetooth_device_info_t));
-		} else {
-			BT_ERR("Can't get the paired device path \n");
-			break;
-		}
+	if (dbus_message_iter_init(reply, &reply_iter) == FALSE) {
+	    BT_ERR("Fail to iterate the reply");
+	    return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	g_ptr_array_free(gp_array, TRUE);
+	dbus_message_iter_recurse(&reply_iter, &value_iter);
+
+	/* signature of GetManagedObjects:  a{oa{sa{sv}}} */
+	while (dbus_message_iter_get_arg_type(&value_iter) ==
+						DBUS_TYPE_DICT_ENTRY) {
+		DBusMessageIter msg_iter;
+
+		dbus_message_iter_recurse(&value_iter, &msg_iter);
+
+		__bt_extract_device_info(&msg_iter, dev_list);
+
+		dbus_message_iter_next(&value_iter);
+	}
+
 	return BLUETOOTH_ERROR_NONE;
 }
 
@@ -1166,10 +1589,7 @@ int _bt_get_bonded_device_info(bluetooth_device_address_t *device_address,
 
 	_bt_convert_addr_type_to_string(address, device_address->addr);
 
-	dbus_g_proxy_call(adapter_proxy, "FindDevice", NULL,
-			  G_TYPE_STRING, address, G_TYPE_INVALID,
-			  DBUS_TYPE_G_OBJECT_PATH, &object_path,
-			  G_TYPE_INVALID);
+	object_path = _bt_get_device_object_path(address);
 
 	retv_if(object_path == NULL, BLUETOOTH_ERROR_NOT_FOUND);
 

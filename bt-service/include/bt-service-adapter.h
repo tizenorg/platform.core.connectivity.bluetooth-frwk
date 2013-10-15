@@ -80,13 +80,15 @@ gboolean _bt_get_cancel_by_user(void);
 
 void _bt_set_cancel_by_user(gboolean value);
 
-gboolean _bt_get_discoverying_property(void);
+gboolean _bt_get_discovering_property(void);
 
-int _bt_get_discoverable_timeout_property(void);
+unsigned int _bt_get_discoverable_timeout_property(void);
 
 bt_status_t _bt_adapter_get_status(void);
 
 void _bt_handle_flight_mode_noti(void);
+
+int _bt_get_remote_found_devices(GArray **dev_list);
 
 #ifdef __cplusplus
 }

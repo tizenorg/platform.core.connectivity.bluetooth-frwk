@@ -60,7 +60,6 @@
 #define HID_UUID "00001124-0000-1000-8000-00805f9b34fb"
 
 #define BT_AGENT_OBJECT "/org/bluez/agent/frwk_agent"
-#define BT_AGENT_INTERFACE "org.bluez.Agent"
 #define BT_AGENT_SIGNAL_RFCOMM_AUTHORIZE "RfcommAuthorize"
 #define BT_AGENT_SIGNAL_OBEX_AUTHORIZE "ObexAuthorize"
 
@@ -225,13 +224,14 @@ static gboolean __pincode_request(GapAgent *agent, DBusGProxy *device)
 
 	BT_DBG("+\n");
 
-	dbus_g_proxy_call(device, "GetProperties", &error,
+	dbus_g_proxy_call(device, "GetAll", &error,
+				G_TYPE_STRING, BT_DEVICE_INTERFACE,
 				G_TYPE_INVALID,
 				dbus_g_type_get_map("GHashTable",
 						G_TYPE_STRING, G_TYPE_VALUE),
 				&hash, G_TYPE_INVALID);
 	if (error) {
-		BT_DBG("error in GetBasicProperties [%s]\n", error->message);
+		BT_DBG("error in GetAll [%s]\n", error->message);
 		g_error_free(error);
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "",
 					     NULL);
@@ -299,13 +299,14 @@ static gboolean __passkey_request(GapAgent *agent, DBusGProxy *device)
 
 	BT_DBG("+\n");
 
-	dbus_g_proxy_call(device, "GetProperties", &error,
+	dbus_g_proxy_call(device, "GetAll", &error,
+				G_TYPE_STRING, BT_DEVICE_INTERFACE,
 				G_TYPE_INVALID,
 				dbus_g_type_get_map("GHashTable",
 						G_TYPE_STRING, G_TYPE_VALUE),
 				&hash, G_TYPE_INVALID);
 	if (error) {
-		BT_DBG("error in GetBasicProperties [%s]\n", error->message);
+		BT_DBG("error in GetAll [%s]\n", error->message);
 		g_error_free(error);
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "",
 					     NULL);
@@ -350,13 +351,14 @@ static gboolean __display_request(GapAgent *agent, DBusGProxy *device,
 
 	BT_DBG("+\n");
 
-	dbus_g_proxy_call(device, "GetProperties", &error,
+	dbus_g_proxy_call(device, "GetAll", &error,
+				G_TYPE_STRING, BT_DEVICE_INTERFACE,
 				G_TYPE_INVALID,
 				dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
 								 G_TYPE_VALUE),
 				&hash, G_TYPE_INVALID);
 	if (error) {
-		BT_DBG("error in GetBasicProperties [%s]\n", error->message);
+		BT_DBG("error in GetAll [%s]\n", error->message);
 		g_error_free(error);
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "",
 					     NULL);
@@ -404,15 +406,14 @@ static gboolean __confirm_request(GapAgent *agent, DBusGProxy *device,
 
 	BT_DBG("+ passkey[%.6d]\n", passkey);
 
-	snprintf(str_passkey, sizeof(str_passkey), "%.6d", passkey);
-
-	dbus_g_proxy_call(device, "GetProperties", &error,
+	dbus_g_proxy_call(device, "GetAll", &error,
+				G_TYPE_STRING, BT_DEVICE_INTERFACE,
 				G_TYPE_INVALID,
 				dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
-								 G_TYPE_VALUE),
-				&hash, G_TYPE_INVALID);
+				G_TYPE_VALUE), &hash, G_TYPE_INVALID);
+
 	if (error) {
-		BT_DBG("error in GetBasicProperties [%s]\n", error->message);
+		BT_DBG("error in GetAll [%s]\n", error->message);
 		g_error_free(error);
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "",
 					     NULL);
@@ -434,10 +435,11 @@ static gboolean __confirm_request(GapAgent *agent, DBusGProxy *device,
 	if (!name)
 		name = address;
 
+	snprintf(str_passkey, sizeof(str_passkey), "%.6d", passkey);
+
 	__launch_system_popup(BT_AGENT_EVENT_PASSKEY_CONFIRM_REQUEST, name,
 						str_passkey, NULL,
 						_gap_agent_get_path(agent));
-
 done:
 	__bt_agent_release_memory();
 	g_hash_table_destroy(hash);
@@ -483,8 +485,6 @@ static gboolean __authorize_request(GapAgent *agent, DBusGProxy *device,
 	int ret;
 	int result = BLUETOOTH_ERROR_NONE;
 	int request_type = BT_AGENT_EVENT_AUTHORIZE_REQUEST;
-
-	BT_DBG("+\n");
 
 	BT_DBG("+\n");
 
@@ -549,13 +549,14 @@ fail:
 		goto done;
 	}
 
-
-	dbus_g_proxy_call(device, "GetProperties", &error, G_TYPE_INVALID,
+	dbus_g_proxy_call(device, "GetAll", &error,
+				G_TYPE_STRING, BT_DEVICE_INTERFACE,
+				G_TYPE_INVALID,
 				dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
 								 G_TYPE_VALUE),
 				&hash, G_TYPE_INVALID);
 	if (error) {
-		BT_DBG("error in GetBasicProperties [%s]\n", error->message);
+		BT_DBG("error in GetAll [%s]\n", error->message);
 		g_error_free(error);
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "",
 					     NULL);
@@ -676,12 +677,7 @@ void _bt_destroy_agent(void *agent)
 void* _bt_create_agent(const char *path, gboolean adapter)
 {
 	GAP_AGENT_FUNC_CB func_cb;
-	DBusGProxy *adapter_proxy;
 	GapAgent* agent;
-
-	adapter_proxy = _bt_get_adapter_proxy();
-	if (!adapter_proxy)
-		return NULL;
 
 	func_cb.pincode_func = __pincode_request;
 	func_cb.display_func = __display_request;
@@ -693,7 +689,7 @@ void* _bt_create_agent(const char *path, gboolean adapter)
 
 	agent = _gap_agent_new();
 
-	_gap_agent_setup_dbus(agent, &func_cb, path, adapter_proxy);
+	_gap_agent_setup_dbus(agent, &func_cb, path);
 
 	if (adapter) {
 		if (!_gap_agent_register(agent)) {

@@ -43,12 +43,11 @@ INCLUDE(FindPkgConfig)
 
 IF(LIBNOTIFY_SUPPORT)
 pkg_check_modules(packages REQUIRED dlog dbus-glib-1 gobject-2.0 gmodule-2.0 vconf
-libxml-2.0 security-server)
+libxml-2.0)
 ELSE(LIBNOTIFY_SUPPORT)
 pkg_check_modules(packages REQUIRED dlog dbus-glib-1 gobject-2.0 gmodule-2.0 vconf
-libxml-2.0 syspopup-caller security-server)
+ libxml-2.0 syspopup-caller)
 ENDIF(LIBNOTIFY_SUPPORT)
-
 
 FOREACH(flag ${packages_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")
@@ -80,8 +79,8 @@ SET_TARGET_PROPERTIES(bluetooth-api PROPERTIES SOVERSION ${VERSION_MAJOR})
 SET_TARGET_PROPERTIES(bluetooth-api PROPERTIES VERSION ${VERSION})
 TARGET_LINK_LIBRARIES(bluetooth-api ${packages_LDFLAGS})
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-api.pc.in ${CMAKE_CURRENT_BINARY_DIR}/bluetooth-api.pc @ONLY)
-INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/bluetooth-api.pc DESTINATION ${LIB_INSTALL_DIR}/pkgconfig)
-INSTALL(TARGETS bluetooth-api DESTINATION ${LIB_INSTALL_DIR} COMPONENT RuntimeLibraries)
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/bluetooth-api.pc DESTINATION lib/pkgconfig)
+INSTALL(TARGETS bluetooth-api DESTINATION lib COMPONENT RuntimeLibraries)
 
 FOREACH(hfile ${HEADERS})
 	INSTALL(FILES ${CMAKE_SOURCE_DIR}/include/${hfile} DESTINATION include/bt-service)

@@ -293,7 +293,6 @@ int _bt_send_request(int service_type, int service_function,
 			GArray **out_param1)
 {
 	int result = BLUETOOTH_ERROR_NONE;
-	char *cookie;
 	gboolean ret;
 	GError *error = NULL;
 	GArray *in_param5 = NULL;
@@ -307,13 +306,6 @@ int _bt_send_request(int service_type, int service_function,
 		retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 		in_param5 = g_array_new(FALSE, FALSE, sizeof(gchar));
-
-		cookie = _bt_get_cookie();
-
-		if (cookie) {
-			g_array_append_vals(in_param5, cookie,
-					_bt_get_cookie_size());
-		}
 
 		ret = org_projectx_bt_service_request(proxy,
 					service_type, service_function,

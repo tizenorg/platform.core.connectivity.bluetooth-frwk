@@ -39,8 +39,6 @@ int _bt_register_media_player(void);
 
 int _bt_unregister_media_player(void);
 
-int _bt_avrcp_set_track_info(media_metadata_attributes_t *meta_data);
-
 int _bt_avrcp_set_properties(media_player_settings_t *properties);
 
 int _bt_avrcp_set_property(int type, unsigned int value);

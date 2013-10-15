@@ -60,9 +60,7 @@ typedef struct {
 
 G_DEFINE_TYPE(BtObexAgent, bt_obex_agent, G_TYPE_OBJECT)
 
-gboolean bt_obex_agent_authorize(BtObexAgent *agent, const char *path,
-			const char *bdaddress, const char *name,
-			const char *type, gint length, gint time,
+gboolean bt_obex_agent_authorize_push(BtObexAgent *agent, const char *path,
 			     DBusGMethodInvocation *context)
 {
 	bt_obex_agent_info *info;
@@ -76,9 +74,8 @@ gboolean bt_obex_agent_authorize(BtObexAgent *agent, const char *path,
 	if (info->authorize_cb == NULL)
 		goto fail;
 
-	result = info->authorize_cb(context, path, bdaddress,
-				name, type, length,
-				time, info->authorize_data);
+	result = info->authorize_cb(context, path,
+				info->authorize_data);
 
 	return result;
 fail:

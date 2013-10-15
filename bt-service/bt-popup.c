@@ -39,7 +39,7 @@ __bluetooth_create_agent_proxy(DBusGConnection *sys_conn, const char *path)
 	return dbus_g_proxy_new_for_name (	sys_conn,
 						"org.projectx.bt",
 						path,
-						"org.bluez.Agent");
+						"org.bluez.Agent1");
 }
 
 static DBusGProxy*

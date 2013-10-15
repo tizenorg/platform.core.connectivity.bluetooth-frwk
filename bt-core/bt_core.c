@@ -250,27 +250,147 @@ static gboolean bt_core_reset_adapter(BtCore *agent,
 	return TRUE;
 }
 
-static void __name_owner_changed(DBusGProxy *object, const char *name,
-					const char *prev, const char *new,
-							gpointer user_data)
+static int __bt_core_get_object_path(DBusMessage *msg, char **path)
 {
-	if (g_strcmp0(name, "org.bluez") == 0 && *new == '\0') {
-		BT_DBG("BlueZ is terminated");
-		__bt_disable_adapter();
-		__bt_core_terminate();
-	} else if (g_strcmp0(name, "org.projectx.bt") == 0 && *new == '\0') {
-		BT_DBG("bt-service is terminated abnormally");
-		__bt_disable_adapter();
+	DBusMessageIter item_iter;
+
+	dbus_message_iter_init(msg, &item_iter);
+
+	if (dbus_message_iter_get_arg_type(&item_iter)
+					!= DBUS_TYPE_OBJECT_PATH) {
+		BT_ERR("This is bad format dbus\n");
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
+
+	dbus_message_iter_get_basic(&item_iter, path);
+
+	if (*path == NULL)
+		return BLUETOOTH_ERROR_INTERNAL;
+
+	return BLUETOOTH_ERROR_NONE;
 }
 
-static DBusGProxy * __bt_core_register(DBusGConnection *conn, BtCore *bt_core)
+static int __bt_core_get_owner_info(DBusMessage *msg, char **name,
+				char **previous, char **current)
 {
+	DBusMessageIter item_iter;
+
+	dbus_message_iter_init(msg, &item_iter);
+
+	if (dbus_message_iter_get_arg_type(&item_iter)
+					!= DBUS_TYPE_STRING) {
+		BT_ERR("This is bad format dbus\n");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	dbus_message_iter_get_basic(&item_iter, name);
+
+	if (*name == NULL)
+		return BLUETOOTH_ERROR_INTERNAL;
+
+	dbus_message_iter_next(&item_iter);
+
+	if (dbus_message_iter_get_arg_type(&item_iter)
+					!= DBUS_TYPE_STRING) {
+		BT_ERR("This is bad format dbus\n");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	dbus_message_iter_get_basic(&item_iter, previous);
+
+	if (*previous == NULL)
+		return BLUETOOTH_ERROR_INTERNAL;
+
+	dbus_message_iter_next(&item_iter);
+
+	if (dbus_message_iter_get_arg_type(&item_iter)
+					!= DBUS_TYPE_STRING) {
+		BT_ERR("This is bad format dbus\n");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	dbus_message_iter_get_basic(&item_iter, current);
+
+	if (*current == NULL)
+		return BLUETOOTH_ERROR_INTERNAL;
+
+	return BLUETOOTH_ERROR_NONE;
+}
+
+static DBusHandlerResult __bt_core_event_filter(DBusConnection *conn,
+					   DBusMessage *msg, void *data)
+{
+	char *object_path = NULL;
+	const char *member = dbus_message_get_member(msg);
+
+	if (dbus_message_get_type(msg) != DBUS_MESSAGE_TYPE_SIGNAL)
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+	if (member == NULL)
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+	if (strcasecmp(member, "InterfacesAdded") == 0) {
+		if (__bt_core_get_object_path(msg, &object_path)) {
+			BT_ERR("Fail to get the path");
+			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+		}
+
+		if (strcasecmp(object_path, "/org/bluez/hci0") == 0) {
+			__bt_core_set_status(BT_ACTIVATED);
+		}
+	} else if (strcasecmp(member, "InterfacesRemoved") == 0) {
+		if (__bt_core_get_object_path(msg, &object_path)) {
+			BT_ERR("Fail to get the path");
+			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+		}
+
+		if (strcasecmp(object_path, "/org/bluez/hci0") == 0) {
+			__bt_core_set_status(BT_DEACTIVATED);
+			__bt_core_terminate();
+		}
+	} else if (strcasecmp(member, "NameOwnerChanged") == 0) {
+		char *name = NULL;
+		char *previous = NULL;
+		char *current = NULL;
+
+		if (__bt_core_get_owner_info(msg, &name, &previous, &current)) {
+			BT_ERR("Fail to get the owner info");
+			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+		}
+
+		if (*current != '\0')
+			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+		if (strcasecmp(name, "org.bluez") == 0) {
+			BT_DBG("Bluetoothd is terminated");
+			__bt_disable_adapter();
+			__bt_core_terminate();
+		} else if (strcasecmp(name, "org.projectx.bt") == 0) {
+			BT_DBG("bt-service is terminated abnormally");
+			__bt_disable_adapter();
+		}
+	}
+
+	return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+}
+
+static DBusGProxy *__bt_core_register_event_filter(DBusGConnection *g_conn,
+						BtCore *bt_core)
+{
+	DBusError dbus_error;
+	DBusConnection *conn;
 	DBusGProxy *proxy;
 	GError *err = NULL;
 	guint result = 0;
 
-	proxy = dbus_g_proxy_new_for_name(conn, DBUS_SERVICE_DBUS,
+	if (g_conn == NULL)
+		return NULL;
+
+	conn = dbus_g_connection_get_connection(g_conn);
+	if (conn == NULL)
+		return NULL;
+
+	proxy = dbus_g_proxy_new_for_name(g_conn, DBUS_SERVICE_DBUS,
 				DBUS_PATH_DBUS, DBUS_INTERFACE_DBUS);
 	if (proxy == NULL) {
 		BT_ERR("proxy is NULL");
@@ -294,99 +414,78 @@ static DBusGProxy * __bt_core_register(DBusGConnection *conn, BtCore *bt_core)
 		return NULL;
 	}
 
-	dbus_g_proxy_add_signal(proxy, "NameOwnerChanged", G_TYPE_STRING,
-						G_TYPE_STRING, G_TYPE_STRING,
-						G_TYPE_INVALID);
+	if (!dbus_connection_add_filter(conn, __bt_core_event_filter,
+					NULL, NULL)) {
+		BT_ERR("Fail to add filter");
+		g_object_unref(proxy);
+		return NULL;
+	}
 
-	dbus_g_proxy_connect_signal(proxy, "NameOwnerChanged",
-					G_CALLBACK(__name_owner_changed),
-					NULL, NULL);
+	dbus_error_init(&dbus_error);
 
-	dbus_g_connection_register_g_object(conn, BT_CORE_PATH,
+	dbus_bus_add_match(conn,
+			"type='signal',interface='org.freedesktop.DBus'"
+			",member='NameOwnerChanged'",
+			&dbus_error);
+
+	if (dbus_error_is_set(&dbus_error)) {
+		BT_ERR("Fail to add match: %s\n", dbus_error.message);
+		dbus_error_free(&dbus_error);
+		g_object_unref(proxy);
+		return NULL;
+	}
+
+	dbus_bus_add_match(conn,
+			"type='signal',interface='org.freedesktop.DBus.ObjectManager'"
+			",member='InterfacesAdded'",
+			&dbus_error);
+
+	if (dbus_error_is_set(&dbus_error)) {
+		BT_ERR("Fail to add match: %s\n", dbus_error.message);
+		dbus_error_free(&dbus_error);
+		g_object_unref(proxy);
+		return NULL;
+	}
+
+	dbus_bus_add_match(conn,
+			"type='signal',interface='org.freedesktop.DBus.ObjectManager'"
+			",member='InterfacesRemoved'",
+			&dbus_error);
+
+	if (dbus_error_is_set(&dbus_error)) {
+		BT_ERR("Fail to add match: %s\n", dbus_error.message);
+		dbus_error_free(&dbus_error);
+		g_object_unref(proxy);
+		return NULL;
+	}
+
+	dbus_g_connection_register_g_object(g_conn, BT_CORE_PATH,
 					G_OBJECT(bt_core));
 
 	return proxy;
 }
 
-static void __bt_core_unregister(DBusGConnection *conn, BtCore *bt_core,
+static void __bt_unregister_event_filter(DBusGConnection *g_conn,
+					BtCore *bt_core,
 					DBusGProxy *dbus_proxy)
 {
-	if (!bt_core || !dbus_proxy)
+	DBusConnection *conn;
+
+	if (g_conn == NULL ||
+	     bt_core == NULL ||
+	      dbus_proxy == NULL) {
+		BT_ERR("Invalid parameter");
 		return;
+	}
 
-	dbus_g_proxy_disconnect_signal(dbus_proxy, "NameOwnerChanged",
-						G_CALLBACK(__name_owner_changed),
-						NULL);
+	conn = dbus_g_connection_get_connection(g_conn);
 
-	dbus_g_connection_unregister_g_object(conn, G_OBJECT(bt_core));
+	dbus_connection_remove_filter(conn, __bt_core_event_filter, NULL);
+
+	dbus_g_connection_unregister_g_object(g_conn, G_OBJECT(bt_core));
 
 	g_object_unref(bt_core);
 	g_object_unref(dbus_proxy);
-
-}
-
-static void __adapter_added_cb(DBusGProxy *manager_proxy,
-						const char *adapter_path,
-						gpointer user_data)
-{
-	BT_DBG("");
-
-	__bt_core_set_status(BT_ACTIVATED);
-}
-
-static  void __adapter_removed_cb(DBusGProxy *manager_proxy,
-						const char *adapter_path,
-						gpointer user_data)
-{
-	BT_DBG("");
-
-	__bt_core_set_status(BT_DEACTIVATED);
-
-	__bt_core_terminate();
-}
-
-static DBusGProxy *__bt_core_manager_init(DBusGConnection *conn)
-{
-	DBusGProxy *manager_proxy;
-
-	manager_proxy = dbus_g_proxy_new_for_name(conn, "org.bluez", "/",
-							"org.bluez.Manager");
-	if (manager_proxy == NULL) {
-		BT_ERR("ERROR: Can't make manager proxy");
-		return NULL;
-	}
-
-	dbus_g_proxy_add_signal(manager_proxy, "AdapterAdded",
-				DBUS_TYPE_G_OBJECT_PATH, G_TYPE_INVALID);
-	dbus_g_proxy_connect_signal(manager_proxy, "AdapterAdded",
-					G_CALLBACK(__adapter_added_cb),
-					NULL, NULL);
-
-	dbus_g_proxy_add_signal(manager_proxy, "AdapterRemoved",
-				DBUS_TYPE_G_OBJECT_PATH, G_TYPE_INVALID);
-	dbus_g_proxy_connect_signal(manager_proxy, "AdapterRemoved",
-					G_CALLBACK(__adapter_removed_cb),
-					NULL, NULL);
-
-	return manager_proxy;
-
-
-}
-
-static void __bt_core_manager_exit(DBusGProxy *manager_proxy)
-{
-	if (!manager_proxy)
-		return;
-
-	dbus_g_proxy_disconnect_signal(manager_proxy, "AdapterAdded",
-						G_CALLBACK(__adapter_added_cb),
-						NULL);
-
-	dbus_g_proxy_disconnect_signal(manager_proxy, "AdapterRemoved",
-					G_CALLBACK(__adapter_removed_cb),
-					NULL);
-
-	g_object_unref(manager_proxy);
 }
 
 static void __bt_core_sigterm_handler(int signo)
@@ -401,11 +500,10 @@ int main(void)
 	DBusGConnection *conn = NULL;
 	GError *error = NULL;
 	BtCore *bt_core;
-	DBusGProxy *manager_proxy = NULL;
 	DBusGProxy *dbus_proxy = NULL;
 	struct sigaction sa;
 
-	BT_DBG("Starting bt-core daemeon");
+	BT_DBG("+");
 
 	g_type_init();
 
@@ -417,18 +515,16 @@ int main(void)
 	}
 
 	bt_core = g_object_new(BT_CORE_TYPE, NULL);
-
-	dbus_proxy = __bt_core_register(conn, bt_core);
-	if (!dbus_proxy) {
-		BT_ERR("__bt_core_register failed");
-		g_object_unref(bt_core);
-		bt_core = NULL;
+	if (bt_core == NULL) {
+		BT_ERR("bt_service is NULL");
 		goto fail;
 	}
 
-	manager_proxy = __bt_core_manager_init(conn);
-	if (!manager_proxy) {
-		BT_ERR("__bt_core_manager_init failed");
+	dbus_proxy = __bt_core_register_event_filter(conn, bt_core);
+	if (!dbus_proxy) {
+		BT_ERR("__bt_core_register_event_filter failed");
+		g_object_unref(bt_core);
+		bt_core = NULL;
 		goto fail;
 	}
 
@@ -442,15 +538,13 @@ int main(void)
 	g_main_loop_run(main_loop);
 
 fail:
-	__bt_core_unregister(conn, bt_core, dbus_proxy);
-
-	 __bt_core_manager_exit(manager_proxy);
+	__bt_unregister_event_filter(conn, bt_core, dbus_proxy);
 
 	if (main_loop)
 		g_main_loop_unref(main_loop);
 
 	dbus_g_connection_unref(conn);
 
-	BT_DBG("Terminating bt-core daemon");
+	BT_DBG("-");
 	return FALSE;
 }

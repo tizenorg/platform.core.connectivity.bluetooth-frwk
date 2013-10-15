@@ -65,7 +65,6 @@ int _bt_obex_server_is_receiving(gboolean *receiving);
 void _bt_obex_transfer_started(const char *transfer_path);
 
 void _bt_obex_transfer_progress(const char *transfer_path,
-					int total,
 					int transferred);
 
 void _bt_obex_transfer_completed(const char *transfer_path, gboolean success);
