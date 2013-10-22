@@ -736,6 +736,7 @@ void __bt_adapter_property_changed_event(DBusMessageIter *msg_iter, const char *
 				BLUETOOTH_EVENT_DISCOVERY_STARTED,
 				DBUS_TYPE_INT32, &result,
 				DBUS_TYPE_INVALID);
+			_bt_get_temp_remote_devinfo();
 		} else {
 			if (event_id > 0){
 				g_source_remove(event_id);
