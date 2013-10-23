@@ -1255,7 +1255,6 @@ int _bt_start_discovery(void)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	_bt_get_temp_remote_devinfo();
 	_bt_stop_discovery_timeout();
 
 	is_discovering = TRUE;
