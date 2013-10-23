@@ -38,7 +38,6 @@ BuildRequires:  pkgconfig(security-server)
 BuildRequires:  cmake
 
 Requires(post): vconf
-Requires(postun): eglibc
 
 %description
 Bluetooth framework for BlueZ and Obexd.
