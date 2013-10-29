@@ -664,8 +664,8 @@ int _bt_register_media_player(void)
 		"xesam:title",
 		DBUS_TYPE_STRING, &metadata.title, 0);
 
-	metadata.artist = g_malloc0(sizeof(char *));
-	metadata.artist[0] = "";
+	metadata.artists = g_malloc0(sizeof(char *));
+	metadata.artists[0] = "";
 
 	__bt_media_append_metadata_dict_entry(&property_dict,
 		"xesam:artist",
@@ -675,8 +675,8 @@ int _bt_register_media_player(void)
 		"xesam:album",
 		DBUS_TYPE_STRING, &metadata.album, 0);
 
-	metadata.genre = g_malloc0(sizeof(char *));
-	metadata.genre[0] = "";
+	metadata.genres = g_malloc0(sizeof(char *));
+	metadata.genres[0] = "";
 
 	__bt_media_append_metadata_dict_entry(&property_dict,
 		"xesam:genre",

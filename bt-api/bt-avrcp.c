@@ -121,11 +121,11 @@ BT_EXPORT_API int bluetooth_media_player_change_track(
 
 	if (_bt_copy_utf8_string(meta_data.title, metadata->title, BT_NAME_MAX))
 		BT_DBG("Error in copying Title\n");
-	if (_bt_copy_utf8_string(meta_data.artist, metadata->artist[0], BT_NAME_MAX))
+	if (_bt_copy_utf8_string(meta_data.artist, metadata->artists[0], BT_NAME_MAX))
 		BT_DBG("Error in copying Artist\n");
 	if (_bt_copy_utf8_string(meta_data.album, metadata->album, BT_NAME_MAX))
 		BT_DBG("Error in copying Album\n");
-	if (_bt_copy_utf8_string(meta_data.genre, metadata->genre[0], BT_NAME_MAX))
+	if (_bt_copy_utf8_string(meta_data.genre, metadata->genres[0], BT_NAME_MAX))
 		BT_DBG("Error in copying Genre\n");
 
 	meta_data.number = metadata->tracknumber;

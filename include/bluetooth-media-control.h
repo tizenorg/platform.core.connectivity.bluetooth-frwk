@@ -37,20 +37,35 @@ typedef enum {
 	SHUFFLE,
 	LOOPSTATUS,
 	POSITION,
-	METADATA
+	METADATA,
+	EQUALIZER = 0x02,	/* bluez 4.101 */
+	REPEAT,			/* bluez 4.101 */
+	SCAN,			/* bluez 4.101 */
+	STATUS,			/* bluez 4.101 */
 } media_player_property_type;
 
+/* bluez 4.101 */
 typedef enum {
-        REPEAT_MODE_OFF = 0x01,
-        REPEAT_SINGLE_TRACK,
-        REPEAT_ALL_TRACK,
-        REPEAT_INVALID,
+	EQUALIZER_OFF = 0x01,
+	EQUALIZER_ON,
+	EQUALIZER_INVALID,
+} media_player_equalizer_status;
+
+typedef enum {
+	REPEAT_MODE_OFF = 0x01,
+	REPEAT_SINGLE_TRACK,
+	REPEAT_ALL_TRACK,
+	REPEAT_GROUP,		/* bluez 4.101 */
+	REPEAT_INVALID,
 } media_player_repeat_status;
 
 typedef enum {
         STATUS_STOPPED = 0x00,
         STATUS_PLAYING,
         STATUS_PAUSED,
+	STATUS_FORWARD_SEEK,	/* bluez 4.101 */
+	STATUS_REVERSE_SEEK,	/* bluez 4.101 */
+	STATUS_ERROR,		/* bluez 4.101 */
         STATUS_INVALID
 } media_player_status;
 
@@ -61,21 +76,38 @@ typedef enum {
 	SHUFFLE_INVALID,
 } media_player_shuffle_status;
 
+/* bluez 4.101 */
+typedef enum {
+	SCAN_MODE_OFF = 0x01,
+	SCAN_ALL_TRACK,
+	SCAN_GROUP,
+	SCAN_INVALID,
+} media_player_scan_status;
+
 typedef struct {
 	const char *title;
-	const char **artist;
+	const char **artists;
 	const char *album;
-	const char **genre;
+	const char **genres;
 	unsigned int tracknumber;
+	const char *artist;		/* bluez 4.101 */
+	const char *genre;		/* bluez 4.101 */
+	unsigned int total_tracks;	/* bluez 4.101 */
+	unsigned int number;		/* bluez 4.101 */
 	unsigned int duration;
 } media_metadata_attributes_t;
 
 typedef struct {
 	media_player_repeat_status	loopstatus;
 	media_player_status	playbackstatus;
-	gboolean	shuffle;
+	gboolean	shuffle_mode;
 	gint64	position;
 	media_metadata_attributes_t	metadata;
+	media_player_equalizer_status equalizer;	/* bluez 4.101 */
+	media_player_repeat_status  repeat;		/* bluez 4.101 */
+	media_player_shuffle_status  shuffle;		/* bluez 4.101 */
+	media_player_scan_status scan;			/* bluez 4.101 */
+	media_player_status status;			/* bluez 4.101 */
 } media_player_settings_t;
 
 typedef struct {

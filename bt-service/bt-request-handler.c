@@ -465,20 +465,20 @@ static int __bt_bluez_request(int function_name,
 					media_metadata_t, 0);
 
 		properties.metadata.title = g_strdup(data.title);
-		properties.metadata.artist = g_malloc0(sizeof(char *));
-		properties.metadata.artist[0] = g_strdup(data.artist);
+		properties.metadata.artists = g_malloc0(sizeof(char *));
+		properties.metadata.artists[0] = g_strdup(data.artist);
 		properties.metadata.album = g_strdup(data.album);
-		properties.metadata.genre = g_malloc0(sizeof(char *));
-		properties.metadata.genre[0] = g_strdup(data.genre);
+		properties.metadata.genres = g_malloc0(sizeof(char *));
+		properties.metadata.genres[0] = g_strdup(data.genre);
 		properties.metadata.tracknumber = data.number;
 		properties.metadata.duration = data.duration;
 
 		result = _bt_avrcp_set_properties(&properties);
 
 		g_free((gpointer)properties.metadata.title);
-		g_free((gpointer)properties.metadata.artist);
+		g_free((gpointer)properties.metadata.artists);
 		g_free((gpointer)properties.metadata.album);
-		g_free((gpointer)properties.metadata.genre);
+		g_free((gpointer)properties.metadata.genres);
 
 		break;
 	}
