@@ -720,9 +720,10 @@ void _bt_handle_adapter_added(void)
 		return;
 	 }
 
+#ifdef  __TIZEN_MOBILE__
 	if (_bt_register_media_player() != BLUETOOTH_ERROR_NONE)
 		BT_ERR("Fail to register media player");
-
+#endif
 	if (_bt_register_obex_server() != BLUETOOTH_ERROR_NONE)
 		BT_ERR("Fail to init obex server");
 /*
