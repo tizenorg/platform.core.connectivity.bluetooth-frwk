@@ -638,7 +638,8 @@ int _bt_register_media_player(void)
 
 	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
 			DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
-			DBUS_TYPE_STRING_AS_STRING DBUS_TYPE_VARIANT_AS_STRING
+			DBUS_TYPE_STRING_AS_STRING
+			DBUS_TYPE_VARIANT_AS_STRING
 			DBUS_DICT_ENTRY_END_CHAR_AS_STRING, &property_dict);
 
 	__bt_media_append_dict_entry(&property_dict,
@@ -669,7 +670,7 @@ int _bt_register_media_player(void)
 
 	__bt_media_append_metadata_dict_entry(&property_dict,
 		"xesam:artist",
-		DBUS_TYPE_ARRAY, &metadata.artist, 1);
+		DBUS_TYPE_ARRAY, &metadata.artists, 1);
 
 	__bt_media_append_metadata_dict_entry(&property_dict,
 		"xesam:album",
@@ -680,7 +681,7 @@ int _bt_register_media_player(void)
 
 	__bt_media_append_metadata_dict_entry(&property_dict,
 		"xesam:genre",
-		DBUS_TYPE_ARRAY, &metadata.genre, 1);
+		DBUS_TYPE_ARRAY, &metadata.genres, 1);
 
 	__bt_media_append_metadata_dict_entry(&property_dict,
 		"mpris:length",
