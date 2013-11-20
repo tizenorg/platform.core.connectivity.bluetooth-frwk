@@ -62,12 +62,21 @@ static int __bt_fill_device_list(GArray *out_param2, GPtrArray **dev_list)
 
 BT_EXPORT_API int bluetooth_check_adapter(void)
 {
+#ifdef __TIZEN_MOBILE__
 	int ret;
 
 	ret = _bt_get_adapter_path(_bt_get_system_gconn(), NULL);
 
 	return ret == BLUETOOTH_ERROR_NONE ? BLUETOOTH_ADAPTER_ENABLED :
 						BLUETOOTH_ADAPTER_DISABLED;
+#else
+	gboolean powered;
+
+	powered = _bt_get_adapter_power(_bt_get_system_gconn());
+
+	return powered == TRUE ? BLUETOOTH_ADAPTER_ENABLED :
+						BLUETOOTH_ADAPTER_DISABLED;
+#endif
 }
 
 BT_EXPORT_API int bluetooth_enable_adapter(void)

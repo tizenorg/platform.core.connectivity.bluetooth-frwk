@@ -138,6 +138,8 @@ extern "C" {
 #define BT_ADAPTER_INTERFACE "org.bluez.Adapter1"
 #define BT_DEVICE_INTERFACE "org.bluez.Device1"
 
+#define BT_PROPERTIES_INTERFACE "org.freedesktop.DBus.Properties"
+
 #define BT_BLUEZ_NAME "org.bluez"
 #define BT_DBUS_NAME "org.projectx.bt"
 #define BT_SERVICE_PATH "/org/projectx/bt_service"
@@ -215,6 +217,8 @@ void _bt_convert_addr_type_to_string(char *address,
 int _bt_copy_utf8_string(char *dest, const char *src, unsigned int length);
 
 int _bt_get_adapter_path(DBusGConnection *g_conn, char *path);
+
+gboolean _bt_get_adapter_power(DBusGConnection *conn);
 
 DBusGProxy *_bt_get_adapter_proxy(DBusGConnection *conn);
 
