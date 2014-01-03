@@ -141,6 +141,7 @@ static int __bt_disable_adapter(void)
 
 	BT_DBG("");
 
+#ifdef __TIZEN_MOBILE__
 	status = __bt_core_get_status();
 	if (status == BT_ACTIVATING) {
 		/* Forcely terminate */
@@ -153,15 +154,17 @@ static int __bt_disable_adapter(void)
 		BT_DBG("Invalid state %d", status);
 		return -1;
 	}
-
+#endif
 	__bt_core_set_status(BT_DEACTIVATING);
 
 	if (system("/usr/etc/bluetooth/bt-stack-down.sh &") < 0) {
 			BT_DBG("running script failed");
-			__bt_core_set_status( BT_ACTIVATED);
+			__bt_core_set_status(BT_ACTIVATED);
 			return -1;
 	}
-
+#ifndef __TIZEN_MOBILE__
+	__bt_core_terminate();
+#endif
 	return 0;
 }
 
