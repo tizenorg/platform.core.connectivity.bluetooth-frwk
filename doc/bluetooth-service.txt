@@ -1,0 +1,131 @@
+Bluetooth-Service D-Bus API description
+***************************************
+
+
+Bluetooth Manager Hierarchy
+===========================
+
+Service		org.tizen.comms
+Interface 	org.tizen.comms.manager
+Object path	/org/tizen/comms/manager
+
+		void EnableBluetoothService()
+
+			Starts bluetooth service daemons like Bluetoothd and Obexd
+			Power on the default adapter. Loads the service objects of
+			bluetooth-servcie. After property InService changes to ture,
+			bluetooth service will be ready for use.
+
+		void DisableBluetoothService()
+
+			Powers off the default adapter, and stops bluetooth service
+			daemon like Bluetoothd and obexd. Unload the service objects
+			of bluetooth-service. And changes the property InService to
+			false. So only bluetooth manager object still keep active,
+			all the other objects in bluetooth-service, and bluetooth deamons
+			like Bluetoothd and Obexd, as well as apps/ui will be stopped
+			to save power and memory consumption.
+
+
+		void SetDefaultAdapter(string adapter)
+
+			Sets the default adapter to operate on.
+
+Properties	boolean BluetoothInService [readonly]
+
+			Indicates bluetooth service is ready for use.
+
+		boolean BluetoothActivating [readonly]
+
+			Indicates blueotooth service is in activating state
+
+		string DefaultAdapter [readonly]
+
+			Indicates the default bluetooth adapter name.
+
+Pairing Manager hierarchy
+=========================
+
+Service		org.tizen.comms
+Interface	org.tizen.comms.pairing
+Object path	/org/tizen/comms/bluetooth
+
+Methods		void RegisterParingAgent(object agent)
+
+			Registers an paring agent handler.
+			Refer to BlueZ/doc/agent-api.txt for detail on agent handler.  
+
+			Object path agent defines the path of the agent
+			that will be called when user input is needed.
+
+			Tizen system only support to register single paring
+			agent.
+
+			An application can only register one agent. Multiple
+			agents per application is not supported.
+
+			Possible errors: org.bluez.Error.InvalidArguments
+					 org.bluez.Error.AlreadyExists
+
+		void UnregisterPairingAgent(object agent)
+
+			Unregisters the registiered pairing agent.
+
+			Possible errors: org.bluez.Error.DoesNotExist
+
+		void Pair(string address)
+
+			Tizen Bluetooth-UG may exit anytime in pairing process,
+			consequently, Bluetoothd will terminate the pairing process,
+			if Bluetooth-UG call Bluetoothd directly.
+
+			Bluetooth-service deamon here works as proxy to Bluetoothd
+			for Bluetotoh-UG to handle paring process.
+
+			ParingAgent needs to be registered for Tizen apps/ui to handle
+			any input.
+
+			For detail, please refer BlueZ/doc/device-api.txt
+
+			Possible errors: org.bluez.Error.DoesNotExist
+					 org.bluez.Error.Failed
+					 org.bluez.Error.AuthenticationCanceled
+					 org.bluez.Error.AuthenticationFailed
+					 org.bluez.Error.AuthenticationRejected
+					 org.bluez.Error.AuthenticationTimeout
+					 org.bluez.Error.ConnectionAttemptFailed
+
+Object Push Manager hierarchy
+=========================
+
+Service		org.tizen.comms
+Interface	org.tizen.comms.opp
+Object path	/org/tizen/comms/bluetooth
+
+Methods		void RegisterObexAgent(object agent)
+
+			Registers an Obex agent handler.
+			Refer BlueZ/doc/obex-agent-api.txt for detail on agent handler.  
+
+			Object path agent defines the path of the agent
+			that will be called when authorize each received object
+
+			Possible errors: org.bluez.obex.Error.AlreadyExists
+
+		void UnregisterObexAgent(object agent)
+
+			Unregisters the registiered OPP agent.
+
+			Possible errors: org.bluez.Error.DoesNotExist
+
+		unit32 SendFile(string remote_address, string sourcefile)
+
+			Send local sourcefile to the remote_address device.
+			return transfer_id if transfer queued or actived.
+
+			Possible errors: org.bluez.obex.Error.InvalidArguments
+					 org.bluez.obex.Error.Failed
+
+		void CancelTransfer(unit32 transfer_id)
+
+			Cancels the transfer process

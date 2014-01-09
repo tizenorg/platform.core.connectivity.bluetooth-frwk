@@ -1,0 +1,38 @@
+ver 0.2:
+	Add copyright and license
+	Implemented HID disconnection
+	Handle device connected property changed
+	Implemented get bonded device_info/free device_info
+	Add DBus config files
+	Fix emit Bleutooth-Service state signal twice
+	Fix don't enable bluetooth-service
+	Implemented audio connect and audio disconnect
+	Add parse 'org.bluez.ProfileManager1' interface
+	Add profile register/unregister functions
+	Fix Service Name can be requested more than once
+	Using bt_req_t to indicate the BlueZ agent requestion
+	Add register/unregister profile sync function
+	Add function for spp create
+	Add function for spp destory
+	Add function for spp connection
+	Add function for spp disconnection
+	Add function for spp acception
+	Add function for spp rejection
+	Add function for spp set/unset connection callback
+	Using authorize_service function that be set for spp
+	Add function for spp send data
+	Add function for set/unset spp data received
+	Add the spp related test functions
+	Add the profile related test functions
+	Add hid disconnect test function
+	Add get device info test function
+	Add set/unset device connection test functions
+
+ver 0.1:
+	Implemented Bluez lib arch
+	Implemented Bluetooth service arch
+	Implemented GAP (scan/pair/power on/off)
+	Implemented OPP client
+	Implemented OPP server
+	Implemented HID connection
+	Implemented GAP/OPP CAPIs

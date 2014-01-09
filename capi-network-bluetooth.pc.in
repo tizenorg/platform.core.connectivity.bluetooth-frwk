@@ -1,0 +1,14 @@
+# Package Information for pkg-config
+
+prefix=@PREFIX@
+exec_prefix=/usr
+libdir=@LIB_INSTALL_DIR@
+includedir=@INCLUDE_INSTALL_DIR@/network
+
+Name: Blutooth-CAPI
+Description: @PACKAGE_DESCRIPTION@
+Version: @VERSION@
+Requires: glib-2.0
+Libs: -L${libdir} -lcapi-network-bluetooth 
+Cflags: -I${includedir}
+
