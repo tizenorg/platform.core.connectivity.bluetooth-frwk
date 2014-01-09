@@ -1,0 +1,37 @@
+Bluetooth-Frwk-NG - BlueZ framework new generation
+**************************************************
+
+
+Copyright (C) 2013-2014 Intel Corporation
+
+Compilation and installation
+============================
+
+In order to compile Bluetooth-Frwk-NG you need following software packages:
+	- CMake tool
+	- GCC compiler
+	- D-Bus library
+	- glib-2.0 library
+	- gio-2.0 library
+	- gio-unix-2.0 library
+
+To compile:
+	cmake . && make
+
+To run:
+	sudo cp packaging/bluetooth-service.conf packaging/bluezlib.conf packaging/bluez-lib-test.conf packaging/bluezobex.conf /etc/dbus-1/system.d/
+	./src/bluetooth-service
+
+To test API (select one to test the corresponding API):
+	./test/bluez-capi-test
+	./test/bluez-lib-test
+	./test/obex-lib-test
+	./test/bt-serivce-lib-test
+
+Information
+===========
+
+For additional information, contact:
+	martin.xu@intel.com
+	wu.zheng@intel.com
+	jiangbox.wu@intel.com
