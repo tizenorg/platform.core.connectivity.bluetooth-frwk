@@ -4,6 +4,53 @@ Bluetooth-Frwk-NG - BlueZ framework new generation
 
 Copyright (C) 2013-2014 Intel Corporation
 
+Overreview
+===========
+
+The overall goal of the Bluetooth-Frwm-NG project is to provide a bluetooth
+framework for embedded/mobile and desktop systems based on Linux.
+
+Within Bluetooth-Frwk-NG there is clear abstraction between the application
+interfaces based on CAPI, the lower level (via D-Bus) and the integration with
+other system components (plugins). The whole architecture is modular and
+flexible.
+
+Architecture:
+
+	Application 		   System-Message-Dialog
+	    +				  +
+	    | 				  |
+	    | 				  |
+	    + 				  +
+	CAPI-Bluetooth +---------+ Bluetooth-Service
+	    + 				  +
+	    | 				  |
+	    | 				  |
+	    +-----bluez-lib/obex-lib------+
+			    +
+			    |
+			    |
+			    +
+			BlueZ 5.x
+
+CAPI-Bluetooth provide a series of API based on BlueZ's features, and it's
+easy to use through bluez-lib/obex-lib that encapsulate D-Bus interfaces about
+BlueZ. All applications use CAPI-Bluetooth to call BlueZ's function. Mostly
+APIs directly use bluez-lib/obex-lib to call BlueZ, but others call
+Bluetooth-Service that also using bluez-lib/obex-lib to access BlueZ, because
+some features should be keeping during the calling procedure, such as send
+file through Obex. System-Message-Dialog show the extern message, such as
+input-pincode, using plugin to walk up it.
+
+Develop Mode (on PC) and Runing Mode (on target):
+
+Bluetooth-Frwk-NG can be developed on PC and running on other system (such as
+mobile). Develop, run and test it on PC. Once the feature's development is
+finished, porting it to other system is easy using cross-compile, that means
+compile it on the target (such as mobile) environment. Package it to RPM,
+then push the RPM package to target machine, install the RPM on target
+machine, run binary.
+
 Compilation and installation
 ============================
 
@@ -15,18 +62,145 @@ In order to compile Bluetooth-Frwk-NG you need following software packages:
 	- gio-2.0 library
 	- gio-unix-2.0 library
 
-To compile:
-	cmake . && make
+Develop Mode (on PC):
 
-To run:
-	sudo cp packaging/bluetooth-service.conf packaging/bluezlib.conf packaging/bluez-lib-test.conf packaging/bluezobex.conf /etc/dbus-1/system.d/
-	./src/bluetooth-service
+	To compile and install:
+		cmake . && make && make install
 
-To test API (select one to test the corresponding API):
-	./test/bluez-capi-test
-	./test/bluez-lib-test
-	./test/obex-lib-test
-	./test/bt-serivce-lib-test
+	The files are installed to right position. Goto 'Running and Test'
+	section to test the development feature.
+
+Running Mode (on Target):
+
+	After test feature on PC, it can be ported to target. Pakaging RPM
+	with target.
+
+	Firstly build the target environment. Build cap-network-bluetooth
+	project that download from source code repo, using building tool
+	(such as gbs) with local that will create a local-target-environment.
+	With gbs it like this:
+		~/GBS-ROOT/local/BUILD-ROOTS/scratch.i586.0/home/abuild/
+	named ${TARGET_ENVIRONMENT_DIR}
+
+	Secondly package cap-network-bluetooth-${version}.tar.gz from source
+	code, then push the tarball and .spec file in packaing dir in source
+	code to $(TARGET_ENVIRONMENT_DIR)/rpmbuild/SOURCES/
+
+	${version}: project version, for example 0.1.39
+
+	To switch to target environment:
+		cd ${TARGET_ENVIRONMENT_DIR}
+		gbs chroot .
+
+	Now, in the target environment, compile and package RPM are all with
+	target (such as mobile).
+
+	To package RPM:
+		rpmbuild -ba packaging/capi-network-bluetooth.spec
+
+	The step will create capi-network-bluetooth-0.1.39-1.i586.rpm in
+	$(TARGET_ENVIRONMENT_DIR)/rpmbuild/RPM/i586/
+
+	Push it to target and login target machine.
+
+	To install on target (such as mobile):
+		rpm -ivh capi-network-bluetooth-0.1.39-1.i586.rpm
+
+Running and Test
+================
+
+In order to run and test you should compile the whole project and install them.
+	To run:
+		bluetooth-service
+
+	To test API (select one to test the corresponding API):
+
+	+-----------------------+---------------------------------------------------------------+
+	| test case 		| API & Interface 		| File name			|
+	+-----------------------+-------------------------------+-------------------------------+
+	| bluez-capi-test 	| CAPI-Bluetooth API 		| include/bluetooth.h 		|
+	+-----------------------+-------------------------------+-------------------------------+
+	| bluez-lib-test 	| bluez-lib Interface 		| include/bluez.h 		|
+	+-----------------------+-------------------------------+-------------------------------+
+	| obex-lib-test 	| obex-lib Interface 		| include/obex.h 		|
+	+-----------------------+-------------------------------+-------------------------------+
+	| bt-serivce-lib-test 	| Bluetooth-Service Interface 	| include/bluetooth-service.h 	|
+	+-----------------------+-------------------------------+-------------------------------+
+
+
+Development for Bluetooth-Frwk-NG
+=================================
+
+Develop Bluetooth-Frwk-NG on Linux and test it. See:
+	Compilation and installation==>Develop Mode (on PC)
+
+Finally port it to target (such as mobile). See:
+	Compilation and installation==>Running Mode (on Target):
+
+	- Develop feature on PC
+	- Compile project on PC
+	- Run binary and Test on PC
+	- Port it to target and test.
+
+Once those are finished, you can submit the patch to project owner:
+	- git add [modified files]
+	- git commit
+	- git format-patch <util>..<since>
+	- checkpatch.pl [patch] --no-tree
+	- git send-email [patch] --to=martin.xu@linux.intel.com
+				 --cc=<cc name> --from=your_email_addres
+
+checkpatch.pl: download from kernel souce code checking patch.
+
+Development apps basing on Bluetooth-Frwk-NG
+============================================
+
+All APIs are contained in include/bluetooth.h. Applications must use those API
+to finish the application's function. Most APIs have the returned value with
+bt_error_e, so all the API that has returned value, should be checked.
+
+bt_initialize() should be invoked before all other APIs to initialize Bluetooth
+Framework, and bt_deinitialize() should be invoked after all other APIs to free
+resouce with Bluetooth Framework.
+
+Flowing is a simple application example:
+
+#include <stdio.h>
+#include <glib.h>
+
+#include "bluetooth.h"
+
+GMainLoop *loop;
+GIOChannel *channel;
+
+int main(int argc, char **argv)
+{
+	int ret;
+
+#if (GLIB_MAJOR_VERSION <= 2 && GLIB_MINOR_VERSION < 36)
+	g_type_init();
+#endif
+
+	loop = g_main_loop_new(NULL, FALSE);
+
+	ret = bt_initialize();
+	if (ret != BT_SUCCESS) {
+		printf("initialize bluetooth framework failed %d", ret);
+		return -1;
+	}
+
+	ret = bt_adapter_enable();
+	if (ret != BT_SUCCESS) {
+		printf("enable bluetooth adapter failed %d", ret);
+		return -1;
+	}
+
+	printf("enable bluetooth adapter success");
+
+	g_main_loop_run(loop);
+
+	return 0;
+}
 
 Information
 ===========
