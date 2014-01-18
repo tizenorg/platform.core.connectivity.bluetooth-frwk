@@ -634,6 +634,58 @@ static int device_unset_auth_changed_cb(const char *p1, const char *p2)
 	return 0;
 }
 
+static int set_device_authorization(const char *p1, const char *p2)
+{
+	bt_device_authorization_e authorization;
+	int err;
+
+	if (p1 == NULL) {
+		ERROR("set alias must give the device address");
+		return 0;
+	}
+
+	if (p2 == NULL) {
+		ERROR("set alias must give the alias");
+		return 0;
+	}
+
+	if (!g_strcmp0(p2, "1"))
+		authorization = BT_DEVICE_UNAUTHORIZED;
+	else
+		authorization = BT_DEVICE_AUTHORIZED;
+
+	err = bt_device_set_authorization(p1, authorization);
+	if (err != BT_SUCCESS) {
+		ERROR("set_device_alias error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
+static int set_device_alias(const char *p1, const char *p2)
+{
+	int err;
+
+	if (p1 == NULL) {
+		ERROR("set alias must give the device address");
+		return 0;
+	}
+
+	if (p2 == NULL) {
+		ERROR("set alias must give the alias");
+		return 0;
+	}
+
+	err = bt_device_set_alias(p1, p2);
+	if (err != BT_SUCCESS) {
+		ERROR("set_device_alias error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int hid_connect(const char *p1, const char *p2)
 {
 	int err;
@@ -1023,6 +1075,12 @@ struct {
 
 	{"device_unset_auth_changed_cb", device_unset_auth_changed_cb,
 		"Usage: device_unset_auth_changed_cb\n\tUnset Device auth state changed callback"},
+
+	{"set_device_alias", set_device_alias,
+		"Usage: set_device_alias 70:F9:27:64:DF:65 tizen\n\tSet device alias"},
+
+	{"set_device_authorization", set_device_authorization,
+		"Usage: set_device_authorization 70:F9:27:64:DF:65 1/0\n\tSet device authorization"},
 
 	{"hid_connect", hid_connect,
 		"Usage: hid_connect 70:F9:27:64:DF:65\n\tConnect HID profile"},
