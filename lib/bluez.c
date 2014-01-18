@@ -1394,6 +1394,18 @@ void bluez_device_set_trusted(struct _bluez_device *device,
 					-1, NULL, NULL, NULL);
 }
 
+void bluez_device_set_alias(struct _bluez_device *device,
+					const gchar *alias)
+{
+	GVariant *val = g_variant_new("s", alias);
+	GVariant *parameter = g_variant_new("(ssv)",
+				DEVICE_INTERFACE, "Alias", val);
+
+	g_dbus_proxy_call(device->parent->properties_proxy,
+					"Set", parameter, 0,
+					-1, NULL, NULL, NULL);
+}
+
 char **bluez_device_get_property_uuids(struct _bluez_device *device)
 {
 	return property_get_string_list(device->proxy, "UUIDs");
