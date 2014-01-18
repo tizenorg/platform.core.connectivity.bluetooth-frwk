@@ -80,6 +80,8 @@ struct _bluez_device {
 	gpointer device_paired_cb_data;
 	bluez_device_connected_cb_t device_connected_cb;
 	gpointer device_connected_cb_data;
+	bluez_device_trusted_cb_t device_trusted_cb;
+	gpointer device_trusted_cb_data;
 };
 
 struct _bluez_agent {
@@ -422,6 +424,16 @@ static inline void handle_device_connected(GVariant *changed_properties,
 					device->device_connected_cb_data);
 }
 
+static inline void handle_device_trusted(GVariant *changed_properties,
+						struct _bluez_device *device)
+{
+	gboolean trusted;
+
+	if (g_variant_lookup(changed_properties, "Trusted", "b", &trusted))
+		device->device_trusted_cb(device, trusted,
+					device->device_trusted_cb_data);
+}
+
 static void device_properties_changed(GDBusProxy *proxy,
 					GVariant *changed_properties,
 					GStrv *invalidated_properties,
@@ -436,6 +448,8 @@ static void device_properties_changed(GDBusProxy *proxy,
 		handle_device_paired(changed_properties, user_data);
 	else if (device->device_connected_cb)
 		handle_device_connected(changed_properties, user_data);
+	else if (device->device_trusted_cb)
+		handle_device_trusted(changed_properties, user_data);
 
 	g_free(properties);
 }
@@ -1342,6 +1356,14 @@ void bluez_device_set_connected_changed_cb(struct _bluez_device *device,
 	device->device_connected_cb_data = user_data;
 }
 
+void bluez_device_set_trusted_changed_cb(struct _bluez_device *device,
+					bluez_device_trusted_cb_t cb,
+					gpointer user_data)
+{
+	device->device_trusted_cb = cb;
+	device->device_trusted_cb_data = user_data;
+}
+
 void bluez_device_unset_paired_changed_cb(struct _bluez_device *device)
 {
 	device->device_paired_cb = NULL;
@@ -1352,6 +1374,12 @@ void bluez_device_unset_connected_changed_cb(struct _bluez_device *device)
 {
 	device->device_connected_cb = NULL;
 	device->device_connected_cb_data = NULL;
+}
+
+void bluez_device_unset_trusted_changed_cb(struct _bluez_device *device)
+{
+	device->device_trusted_cb = NULL;
+	device->device_trusted_cb_data = NULL;
 }
 
 void bluez_device_set_trusted(struct _bluez_device *device,
