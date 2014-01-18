@@ -586,6 +586,19 @@ static int device_set_bond_created_cb(const char *p1, const char *p2)
 	return 0;
 }
 
+static int device_unset_bond_created_cb(const char *p1, const char *p2)
+{
+	int err;
+
+	err = bt_device_unset_bond_created_cb();
+	if (err != BT_SUCCESS) {
+		ERROR("unset_device_connected_callback error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int hid_connect(const char *p1, const char *p2)
 {
 	int err;
@@ -966,6 +979,9 @@ struct {
 
 	{"device_set_bond_created_cb", device_set_bond_created_cb,
 		"Usage: device_set_bond_created_cb\n\tSet Device bond state changed callback"},
+
+	{"device_unset_bond_created_cb", device_unset_bond_created_cb,
+		"Usage: device_unset_bond_created_cb\n\tUnset Device bond state changed callback"},
 
 	{"hid_connect", hid_connect,
 		"Usage: hid_connect 70:F9:27:64:DF:65\n\tConnect HID profile"},
