@@ -369,6 +369,32 @@ static void device_connected_changed(bluez_device_t *device,
 	g_free(device_address);
 }
 
+static unsigned int dev_property_callback_flags;
+
+enum bluez_device_property_callback_flag {
+	DEV_PROP_FLAG_PAIR = 0x01,
+	DEV_PROP_FLAG_CONNECT = 0x02
+};
+
+static void set_device_property_changed_callback(bluez_device_t *device)
+{
+	if (dev_property_callback_flags & DEV_PROP_FLAG_PAIR)
+		bluez_device_set_paired_changed_cb(device,
+					device_paired_changed,
+					device_bond_node);
+
+	if (dev_property_callback_flags & DEV_PROP_FLAG_CONNECT)
+		bluez_device_set_connected_changed_cb(device,
+					device_connected_changed,
+					device_connected_state_node);
+}
+
+static void unset_device_property_changed_callback(bluez_device_t *device)
+{
+	if (dev_property_callback_flags ^ DEV_PROP_FLAG_CONNECT)
+		bluez_device_unset_connected_changed_cb(device);
+}
+
 static void bluez_device_created(bluez_device_t *device, void *user_data)
 {
 	bt_adapter_device_discovery_info_s *discovery_device_info;
@@ -383,6 +409,8 @@ static void bluez_device_created(bluez_device_t *device, void *user_data)
 
 	node->cb(BT_SUCCESS, BT_ADAPTER_DEVICE_DISCOVERY_FOUND,
 				discovery_device_info, node->user_data);
+
+	set_device_property_changed_callback(device);
 
 	free_discovery_device_info(discovery_device_info);
 }
@@ -435,11 +463,6 @@ static void _bt_update_bluetooth_callbacks(void)
 					adapter_name_changed,
 					adapter_name_node);
 
-	if (device_bond_node)
-		bluez_set_device_paired_changed_cb(
-					device_paired_changed,
-					device_bond_node);
-
 	if (device_created_node)
 		bluez_adapter_set_device_created_cb(default_adapter,
 					bluez_device_created,
@@ -448,11 +471,6 @@ static void _bt_update_bluetooth_callbacks(void)
 		bluez_adapter_set_device_discovering_cb(default_adapter,
 					bluez_adapter_discovering_changed,
 					adapter_discovering_node);
-
-	if (device_connected_state_node)
-		bluez_set_device_connected_changed_cb(
-					device_connected_changed,
-					device_connected_state_node);
 
 	if (generic_device_removed_set == FALSE)
 		set_device_removed_generic_callback(default_adapter);
@@ -1203,10 +1221,29 @@ int bt_device_set_authorization(const char *remote_address,
 	return BT_SUCCESS;
 }
 
+static void foreach_device_property_callback(GList *list, unsigned int flag)
+{
+	bluez_device_t *device;
+	GList *iter, *next;
+
+	for (iter = g_list_first(list); iter; iter = next) {
+		next = g_list_next(iter);
+
+		device = iter->data;
+
+		if (dev_property_callback_flags & flag)
+			set_device_property_changed_callback(device);
+		else
+			unset_device_property_changed_callback(device);
+	}
+
+}
+
 int bt_device_set_bond_created_cb(bt_device_bond_created_cb callback,
 							void *user_data)
 {
 	struct device_bond_cb_node *node;
+	GList *list;
 
 	DBG("");
 
@@ -1229,7 +1266,13 @@ int bt_device_set_bond_created_cb(bt_device_bond_created_cb callback,
 
 	device_bond_node = node;
 
-	_bt_update_bluetooth_callbacks();
+	dev_property_callback_flags |= DEV_PROP_FLAG_PAIR;
+
+	if (!default_adapter)
+		return BT_SUCCESS;
+
+	list = bluez_adapter_get_devices(default_adapter);
+	foreach_device_property_callback(list, DEV_PROP_FLAG_PAIR);
 
 	return BT_SUCCESS;
 }
@@ -1342,6 +1385,7 @@ int bt_device_set_connection_state_changed_cb(
 				void *user_data)
 {
 	struct device_connected_state_cb_node *node_data;
+	GList *list;
 
 	DBG("");
 
@@ -1364,13 +1408,20 @@ int bt_device_set_connection_state_changed_cb(
 
 	device_connected_state_node = node_data;
 
-	_bt_update_bluetooth_callbacks();
+	dev_property_callback_flags |= DEV_PROP_FLAG_CONNECT;
+
+	if (!default_adapter)
+		return BT_SUCCESS;
+
+	list = bluez_adapter_get_devices(default_adapter);
+	foreach_device_property_callback(list, DEV_PROP_FLAG_CONNECT);
 
 	return BT_SUCCESS;
 }
 
 int bt_device_unset_connection_state_changed_cb(void)
 {
+	GList *list;
 	DBG("");
 
 	if (initialized == false)
@@ -1382,7 +1433,10 @@ int bt_device_unset_connection_state_changed_cb(void)
 	if (!device_connected_state_node)
 		return BT_SUCCESS;
 
-	bluez_unset_device_connected_changed_cb();
+	dev_property_callback_flags &= ~DEV_PROP_FLAG_CONNECT;
+
+	list = bluez_adapter_get_devices(default_adapter);
+	foreach_device_property_callback(list, DEV_PROP_FLAG_CONNECT);
 
 	g_free(device_connected_state_node);
 	device_connected_state_node = NULL;
