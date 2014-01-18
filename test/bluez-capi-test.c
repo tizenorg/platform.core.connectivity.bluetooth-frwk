@@ -599,6 +599,41 @@ static int device_unset_bond_created_cb(const char *p1, const char *p2)
 	return 0;
 }
 
+static void device_authorization_changed_cb(
+				bt_device_authorization_e authorization,
+				char *remote_address, void *user_data)
+{
+	printf("Device %s authorization state changed: %d\n",
+					remote_address, authorization);
+}
+
+static int device_set_auth_changed_cb(const char *p1, const char *p2)
+{
+	int err;
+
+	err = bt_device_set_authorization_changed_cb(
+				device_authorization_changed_cb, NULL);
+	if (err != BT_SUCCESS) {
+		ERROR("device_set_auth_changed_cb error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
+static int device_unset_auth_changed_cb(const char *p1, const char *p2)
+{
+	int err;
+
+	err = bt_device_unset_authorization_changed_cb();
+	if (err != BT_SUCCESS) {
+		ERROR("bt_device_unset_authorization_changed_cb error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int hid_connect(const char *p1, const char *p2)
 {
 	int err;
@@ -982,6 +1017,12 @@ struct {
 
 	{"device_unset_bond_created_cb", device_unset_bond_created_cb,
 		"Usage: device_unset_bond_created_cb\n\tUnset Device bond state changed callback"},
+
+	{"device_set_auth_changed_cb", device_set_auth_changed_cb,
+		"Usage: device_set_auth_changed_cb\n\tSet Device auth state changed callback"},
+
+	{"device_unset_auth_changed_cb", device_unset_auth_changed_cb,
+		"Usage: device_unset_auth_changed_cb\n\tUnset Device auth state changed callback"},
 
 	{"hid_connect", hid_connect,
 		"Usage: hid_connect 70:F9:27:64:DF:65\n\tConnect HID profile"},
