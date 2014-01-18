@@ -1245,6 +1245,31 @@ int bt_device_destroy_bond(const char *remote_address)
 	return BT_SUCCESS;
 }
 
+int bt_device_set_alias(const char *remote_address, const char *alias)
+{
+	bluez_device_t *device;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!remote_address || !alias)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	device = bluez_adapter_get_device_by_address(default_adapter,
+							remote_address);
+	if (device == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	bluez_device_set_alias(device, alias);
+
+	return BT_SUCCESS;
+}
+
 int bt_device_set_authorization(const char *remote_address,
 				bt_device_authorization_e authorization_state)
 {
@@ -1259,14 +1284,16 @@ int bt_device_set_authorization(const char *remote_address,
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
+	if (!remote_address)
+		return BT_ERROR_INVALID_PARAMETER;
+
 	device = bluez_adapter_get_device_by_address(default_adapter,
 							remote_address);
 	if (device == NULL)
 		return BT_ERROR_OPERATION_FAILED;
 
-	trusted = false;
-	if (authorization_state == BT_DEVICE_AUTHORIZED)
-		trusted = true;
+	trusted = (authorization_state == BT_DEVICE_AUTHORIZED) ?
+						false : true;
 
 	bluez_device_set_trusted(device, trusted);
 
