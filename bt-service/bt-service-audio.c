@@ -424,7 +424,7 @@ int _bt_audio_connect(int request_id, int type,
 		uuid = HFP_HS_UUID;
 		break;
 	case BT_AUDIO_A2DP:
-		uuid = A2DP_SOURCE_UUID;
+		uuid = A2DP_SINK_UUID;
 		break;
 	case BT_AUDIO_ALL:
 		uuid = GENERIC_AUDIO_UUID;
@@ -534,7 +534,7 @@ int _bt_audio_disconnect(int request_id, int type,
 		uuid = HFP_HS_UUID;
 		break;
 	case BT_AUDIO_A2DP:
-		uuid = A2DP_SOURCE_UUID;
+		uuid = A2DP_SINK_UUID;
 		break;
 	case BT_AUDIO_ALL:
 		uuid = GENERIC_AUDIO_UUID;
