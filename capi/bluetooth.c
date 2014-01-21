@@ -32,13 +32,14 @@
 #define ERROR_INTERFACE "org.tizen.comms.Error"
 #define SPP_PROFILE_PATH "/bluetooth/profile/spp"
 
-#define GENERIC_AUDIO_UUID      "00001203-0000-1000-8000-00805f9b34fb"
+#define BT_GENERIC_AUDIO_UUID      "00001203-0000-1000-8000-00805f9b34fb"
 
-#define HFP_HS_UUID             "0000111e-0000-1000-8000-00805f9b34fb"
-#define ADVANCED_AUDIO_UUID     "0000110d-0000-1000-8000-00805f9b34fb"
-#define A2DP_SOURCE_UUID        "0000110a-0000-1000-8000-00805f9b34fb"
+#define BT_HFP_HS_UUID             "0000111e-0000-1000-8000-00805f9b34fb"
+#define BT_ADVANCED_AUDIO_UUID     "0000110d-0000-1000-8000-00805f9b34fb"
+#define BT_A2DP_SOURCE_UUID        "0000110a-0000-1000-8000-00805f9b34fb"
+#define BT_A2DP_SINK_UUID          "0000110b-0000-1000-8000-00805f9b34fb"
 
-#define HID_UUID                "00001124-0000-1000-8000-00805f9b34fb"
+#define BT_HID_UUID                "00001124-0000-1000-8000-00805f9b34fb"
 #define DEVICE_SERVICE_CLASS_DISCOVERABLE_MODE	0x002000
 
 #define BT_SPP_BUFFER_MAX 1024
@@ -1422,13 +1423,13 @@ int bt_audio_connect(const char *remote_address,
 
 	switch (type) {
 	case BT_AUDIO_PROFILE_TYPE_HSP_HFP:
-		uuid = HFP_HS_UUID;
+		uuid = BT_HFP_HS_UUID;
 		break;
 	case BT_AUDIO_PROFILE_TYPE_A2DP:
-		uuid = A2DP_SOURCE_UUID;
+		uuid = BT_A2DP_SINK_UUID;
 		break;
 	case BT_AUDIO_PROFILE_TYPE_ALL:
-		uuid = GENERIC_AUDIO_UUID;
+		uuid = BT_GENERIC_AUDIO_UUID;
 		break;
 	default:
 		DBG("Unknown role");
@@ -1462,13 +1463,13 @@ int bt_audio_disconnect(const char *remote_address,
 
 	switch (type) {
 	case BT_AUDIO_PROFILE_TYPE_HSP_HFP:
-		uuid = HFP_HS_UUID;
+		uuid = BT_HFP_HS_UUID;
 		break;
 	case BT_AUDIO_PROFILE_TYPE_A2DP:
-		uuid = A2DP_SOURCE_UUID;
+		uuid = BT_A2DP_SINK_UUID;
 		break;
 	case BT_AUDIO_PROFILE_TYPE_ALL:
-		uuid = GENERIC_AUDIO_UUID;
+		uuid = BT_GENERIC_AUDIO_UUID;
 		break;
 	default:
 		DBG("Unknown role");
@@ -1558,7 +1559,7 @@ int bt_hid_host_connect(const char *remote_address)
 	if (device == NULL)
 		return BT_ERROR_OPERATION_FAILED;
 
-	bluez_device_connect_profile(device, HID_UUID,
+	bluez_device_connect_profile(device, BT_HID_UUID,
 				profile_connect_callback);
 
 	return BT_SUCCESS;
@@ -1606,7 +1607,7 @@ int bt_hid_host_disconnect(const char *remote_address)
 	if (device == NULL)
 		return BT_ERROR_OPERATION_FAILED;
 
-	bluez_device_disconnect_profile(device, HID_UUID,
+	bluez_device_disconnect_profile(device, BT_HID_UUID,
 				profile_disconnect_callback);
 
 	return BT_SUCCESS;
