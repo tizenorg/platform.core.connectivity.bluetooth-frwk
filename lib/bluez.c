@@ -1342,6 +1342,12 @@ void bluez_device_set_connected_changed_cb(struct _bluez_device *device,
 	device->device_connected_cb_data = user_data;
 }
 
+void bluez_device_unset_paired_changed_cb(struct _bluez_device *device)
+{
+	device->device_paired_cb = NULL;
+	device->device_paired_cb_data = NULL;
+}
+
 void bluez_device_unset_connected_changed_cb(struct _bluez_device *device)
 {
 	device->device_connected_cb = NULL;
