@@ -85,6 +85,11 @@ struct device_destroy_paired_cb_node {
 	void *user_data;
 };
 
+struct device_auth_cb_node {
+	bt_device_authorization_changed_cb cb;
+	void *user_data;
+};
+
 struct adapter_name_cb_node {
 	bt_adapter_name_changed_cb cb;
 	void *user_data;
@@ -111,6 +116,7 @@ static struct adapter_state_cb_node *adapter_state_node;
 static struct adapter_discovering_cb_node *adapter_discovering_node;
 static struct device_destroy_unpaired_cb_node *unpaired_device_removed_node;
 static struct device_bond_cb_node *device_bond_node;
+static struct device_auth_cb_node *device_auth_node;
 static struct device_destroy_paired_cb_node *paired_device_removed_node;
 static struct device_connected_state_cb_node *device_connected_state_node;
 static struct spp_connection_requested_cb_node *spp_connection_requested_node;
@@ -354,18 +360,35 @@ static void device_paired_changed(bluez_device_t *device,
 }
 
 static void device_connected_changed(bluez_device_t *device,
-					int paired, void *user_data)
+					int connected, void *user_data)
 {
 	struct device_connected_state_cb_node *node = user_data;
 	char *device_address;
-	int connected;
 
 	DBG("");
 
 	device_address = bluez_device_get_property_address(device);
-	bluez_device_get_property_connected(device, &connected);
 
 	node->cb(connected, device_address, node->user_data);
+
+	g_free(device_address);
+}
+
+static void device_auth_changed(bluez_device_t *device,
+					int trusted, void *user_data)
+{
+	struct device_auth_cb_node *node = user_data;
+	bt_device_authorization_e authorization;
+	char *device_address;
+
+	DBG("");
+
+	authorization = trusted ? BT_DEVICE_UNAUTHORIZED:
+				BT_DEVICE_AUTHORIZED;
+
+	device_address = bluez_device_get_property_address(device);
+
+	node->cb(authorization, device_address, node->user_data);
 
 	g_free(device_address);
 }
@@ -374,7 +397,8 @@ static unsigned int dev_property_callback_flags;
 
 enum bluez_device_property_callback_flag {
 	DEV_PROP_FLAG_PAIR = 0x01,
-	DEV_PROP_FLAG_CONNECT = 0x02
+	DEV_PROP_FLAG_CONNECT = 0x02,
+	DEV_PROP_FLAG_AUTH = 0x04
 };
 
 static void set_device_property_changed_callback(bluez_device_t *device)
@@ -388,6 +412,11 @@ static void set_device_property_changed_callback(bluez_device_t *device)
 		bluez_device_set_connected_changed_cb(device,
 					device_connected_changed,
 					device_connected_state_node);
+
+	if (dev_property_callback_flags & DEV_PROP_FLAG_AUTH)
+		bluez_device_set_trusted_changed_cb(device,
+					device_auth_changed,
+					device_auth_node);
 }
 
 static void unset_device_property_changed_callback(bluez_device_t *device)
@@ -397,6 +426,9 @@ static void unset_device_property_changed_callback(bluez_device_t *device)
 
 	if (dev_property_callback_flags ^ DEV_PROP_FLAG_CONNECT)
 		bluez_device_unset_connected_changed_cb(device);
+
+	if (dev_property_callback_flags ^ DEV_PROP_FLAG_AUTH)
+		bluez_device_unset_trusted_changed_cb(device);
 }
 
 static void foreach_device_property_callback(GList *list, unsigned int flag)
@@ -414,7 +446,6 @@ static void foreach_device_property_callback(GList *list, unsigned int flag)
 		else
 			unset_device_property_changed_callback(device);
 	}
-
 }
 
 static void bluez_device_created(bluez_device_t *device, void *user_data)
@@ -1215,6 +1246,31 @@ int bt_device_destroy_bond(const char *remote_address)
 	return BT_SUCCESS;
 }
 
+int bt_device_set_alias(const char *remote_address, const char *alias)
+{
+	bluez_device_t *device;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!remote_address || !alias)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	device = bluez_adapter_get_device_by_address(default_adapter,
+							remote_address);
+	if (device == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	bluez_device_set_alias(device, alias);
+
+	return BT_SUCCESS;
+}
+
 int bt_device_set_authorization(const char *remote_address,
 				bt_device_authorization_e authorization_state)
 {
@@ -1229,14 +1285,16 @@ int bt_device_set_authorization(const char *remote_address,
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
+	if (!remote_address)
+		return BT_ERROR_INVALID_PARAMETER;
+
 	device = bluez_adapter_get_device_by_address(default_adapter,
 							remote_address);
 	if (device == NULL)
 		return BT_ERROR_OPERATION_FAILED;
 
-	trusted = false;
-	if (authorization_state == BT_DEVICE_AUTHORIZED)
-		trusted = true;
+	trusted = (authorization_state == BT_DEVICE_AUTHORIZED) ?
+						false : true;
 
 	bluez_device_set_trusted(device, trusted);
 
@@ -1364,14 +1422,62 @@ int bt_device_set_authorization_changed_cb(
 			bt_device_authorization_changed_cb callback,
 						void *user_data)
 {
-	DBG("Not implement");
+	struct device_auth_cb_node *node;
+	GList *list;
+
+	DBG("");
+
+	if (callback == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (device_auth_node) {
+		DBG("Device bond callback already set.");
+		return BT_SUCCESS;
+	}
+
+	node = g_new0(struct device_auth_cb_node, 1);
+	if (node == NULL) {
+		ERROR("no memeroy");
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	node->cb = callback;
+	node->user_data = user_data;
+
+	device_auth_node = node;
+
+	dev_property_callback_flags |= DEV_PROP_FLAG_AUTH;
+
+	if (!default_adapter)
+		return BT_SUCCESS;
+
+	list = bluez_adapter_get_devices(default_adapter);
+	foreach_device_property_callback(list, DEV_PROP_FLAG_AUTH);
 
 	return BT_SUCCESS;
 }
 
 int bt_device_unset_authorization_changed_cb(void)
 {
-	DBG("Not implement");
+	GList *list;
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!device_auth_node)
+		return BT_SUCCESS;
+
+	dev_property_callback_flags &= ~DEV_PROP_FLAG_AUTH;
+
+	list = bluez_adapter_get_devices(default_adapter);
+	foreach_device_property_callback(list, DEV_PROP_FLAG_AUTH);
+
+	g_free(device_auth_node);
+	device_auth_node = NULL;
 
 	return BT_SUCCESS;
 }
