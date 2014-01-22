@@ -75,6 +75,11 @@ struct _bluez_device {
 	GDBusProxy *proxy;
 	struct _bluez_object *parent;
 	struct _device_head *head;
+
+	bluez_device_paired_cb_t device_paired_cb;
+	gpointer device_paired_cb_data;
+	bluez_device_connected_cb_t device_connected_cb;
+	gpointer device_connected_cb_data;
 };
 
 struct _bluez_agent {
@@ -101,10 +106,6 @@ static GHashTable *bluez_adapter_hash;
 
 static GHashTable *bluez_device_hash;
 
-static bluez_device_paired_cb_t device_paired_cb;
-static gpointer device_paired_cb_data;
-static bluez_device_connected_cb_t device_connected_cb;
-static gpointer device_connected_cb_data;
 static bluez_adapter_added_cb_t adapter_added_cb;
 static gpointer adapter_added_cb_data;
 static bluez_agent_added_cb_t agent_added_cb;
@@ -407,7 +408,8 @@ static inline void handle_device_paired(GVariant *changed_properties,
 	gboolean paired;
 
 	if (g_variant_lookup(changed_properties, "Paired", "b", &paired))
-		device_paired_cb(device, paired, device_paired_cb_data);
+		device->device_paired_cb(device, paired,
+					device->device_paired_cb_data);
 }
 
 static inline void handle_device_connected(GVariant *changed_properties,
@@ -416,8 +418,8 @@ static inline void handle_device_connected(GVariant *changed_properties,
 	gboolean connected;
 
 	if (g_variant_lookup(changed_properties, "Connected", "b", &connected))
-		device_connected_cb(device, connected,
-					device_connected_cb_data);
+		device->device_connected_cb(device, connected,
+					device->device_connected_cb_data);
 }
 
 static void device_properties_changed(GDBusProxy *proxy,
@@ -425,13 +427,14 @@ static void device_properties_changed(GDBusProxy *proxy,
 					GStrv *invalidated_properties,
 					gpointer user_data)
 {
+	struct _bluez_device *device = user_data;
 	gchar *properties = g_variant_print(changed_properties, TRUE);
 
 	DBG("properties %s", properties);
 
-	if (device_paired_cb)
+	if (device->device_paired_cb)
 		handle_device_paired(changed_properties, user_data);
-	else if (device_connected_cb)
+	else if (device->device_connected_cb)
 		handle_device_connected(changed_properties, user_data);
 
 	g_free(properties);
@@ -1323,24 +1326,26 @@ GList *bluez_adapter_get_devices(struct _bluez_adapter *adapter)
 
 /* Device Functions */
 
-void bluez_set_device_paired_changed_cb(bluez_device_paired_cb_t cb,
-						gpointer user_data)
+void bluez_device_set_paired_changed_cb(struct _bluez_device *device,
+					bluez_device_paired_cb_t cb,
+					gpointer user_data)
 {
-	device_paired_cb = cb;
-	device_paired_cb_data = user_data;
+	device->device_paired_cb = cb;
+	device->device_paired_cb_data = user_data;
 }
 
-void bluez_set_device_connected_changed_cb(bluez_device_connected_cb_t cb,
-							gpointer user_data)
+void bluez_device_set_connected_changed_cb(struct _bluez_device *device,
+					bluez_device_connected_cb_t cb,
+					gpointer user_data)
 {
-	device_connected_cb = cb;
-	device_connected_cb_data = user_data;
+	device->device_connected_cb = cb;
+	device->device_connected_cb_data = user_data;
 }
 
-void bluez_unset_device_connected_changed_cb(void)
+void bluez_device_unset_connected_changed_cb(struct _bluez_device *device)
 {
-	device_connected_cb = NULL;
-	device_connected_cb_data = NULL;
+	device->device_connected_cb = NULL;
+	device->device_connected_cb_data = NULL;
 }
 
 void bluez_device_set_trusted(struct _bluez_device *device,

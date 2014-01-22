@@ -170,13 +170,16 @@ typedef void (*bluez_device_connected_cb_t)(
 				gboolean connected,
 				gpointer user_data);
 
-void bluez_set_device_paired_changed_cb(
+void bluez_device_set_paired_changed_cb(
+				struct _bluez_device *device,
 				bluez_device_paired_cb_t cb,
 				gpointer user_data);
-void bluez_set_device_connected_changed_cb(
+void bluez_device_set_connected_changed_cb(
+				struct _bluez_device *device,
 				bluez_device_connected_cb_t cb,
 				gpointer user_data);
-void bluez_unset_device_connected_changed_cb(void);
+void bluez_device_unset_connected_changed_cb(
+				struct _bluez_device *device);
 
 void bluez_device_set_trusted(
 				struct _bluez_device *device,
