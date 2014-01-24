@@ -699,6 +699,32 @@ static int hid_connect(const char *p1, const char *p2)
 	return 0;
 }
 
+static int audio_connect(const char *p1, const char *p2)
+{
+	int err;
+
+	DBG("+");
+	if (g_strcmp0(p2, "a2dp") == 0){
+		DBG("a2dp");
+		err = bt_audio_connect(p1, BT_AUDIO_PROFILE_TYPE_A2DP);
+	} else if (g_strcmp0(p2, "all") == 0) {
+		DBG("all");
+		err = bt_audio_connect(p1, BT_AUDIO_PROFILE_TYPE_ALL);
+	} else {
+		DBG("please enter type");
+		err = BT_ERROR_INVALID_PARAMETER;
+		return 0;
+	}
+
+	if (err != BT_SUCCESS) {
+		ERROR("bt_audio_connect error: %d", err);
+		return 0;
+	}
+	DBG("-");
+
+	return 0;
+}
+
 static int get_bonded_device_info(const char *p1, const char *p2)
 {
 	bt_device_info_s *device_info;
@@ -726,6 +752,30 @@ static int hid_disconnect(const char *p1, const char *p2)
 	err = bt_hid_host_disconnect(p1);
 	if (err != BT_SUCCESS) {
 		ERROR("bt_hid_host_connect error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
+static int audio_disconnect(const char *p1, const char *p2)
+{
+	int err;
+
+	if (g_strcmp0(p2, "a2dp") == 0){
+		DBG("a2dp");
+		err = bt_audio_disconnect(p1, BT_AUDIO_PROFILE_TYPE_A2DP);
+	} else if (g_strcmp0(p2, "all") == 0) {
+		DBG("all");
+		err = bt_audio_disconnect(p1, BT_AUDIO_PROFILE_TYPE_ALL);
+	} else {
+		DBG("please enter type");
+		err = BT_ERROR_INVALID_PARAMETER;
+		return 0;
+	}
+
+	if (err != BT_SUCCESS) {
+		ERROR("bt_audio_disconnect error: %d", err);
 		return 0;
 	}
 
@@ -1171,6 +1221,12 @@ struct {
 
 	{"hid_disconnect", hid_disconnect,
 		"Usage: hid_disconnect 70:F9:27:64:DF:65\n\tDisconnect HID profile"},
+
+	{"audio_connect", audio_connect,
+		"Usage: audio_connect address type(a2dp/all)\n\tConnect audio profile"},
+
+	{"audio_disconnect", audio_disconnect,
+		"Usage: audio_disconnect address type(a2dp/all)\n\tDisconnect audio profile"},
 
 	{"audio_set_connection_state_changed", audio_set_connection_state_changed,
 		"Usage: audio_set_connection_state_changed\n\tset connection state callback"},
