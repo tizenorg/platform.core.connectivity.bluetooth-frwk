@@ -23,6 +23,16 @@
 #include <glib.h>
 
 #include "common.h"
+#include "bluetooth.h"
+
+#define BT_GENERIC_AUDIO_UUID      "00001203-0000-1000-8000-00805f9b34fb"
+
+#define BT_HFP_HS_UUID             "0000111e-0000-1000-8000-00805f9b34fb"
+#define BT_ADVANCED_AUDIO_UUID     "0000110d-0000-1000-8000-00805f9b34fb"
+#define BT_A2DP_SOURCE_UUID        "0000110a-0000-1000-8000-00805f9b34fb"
+#define BT_A2DP_SINK_UUID          "0000110b-0000-1000-8000-00805f9b34fb"
+
+#define BT_HID_UUID                "00001124-0000-1000-8000-00805f9b34fb"
 
 struct _bluez_adapter;
 typedef struct _bluez_adapter bluez_adapter_t;
