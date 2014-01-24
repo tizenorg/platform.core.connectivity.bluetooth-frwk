@@ -102,6 +102,11 @@ struct spp_data_received_cb_node {
 	void *user_data;
 };
 
+struct audio_connection_state_changed_cb_node {
+	bt_audio_connection_state_changed_cb cb;
+	void *user_data;
+};
+
 static struct adapter_name_cb_node *adapter_name_node;
 static struct device_created_cb_node *device_created_node;
 static struct adapter_state_cb_node *adapter_state_node;
@@ -113,6 +118,7 @@ static struct device_destroy_paired_cb_node *paired_device_removed_node;
 static struct device_connected_state_cb_node *device_connected_state_node;
 static struct spp_connection_requested_cb_node *spp_connection_requested_node;
 static struct spp_data_received_cb_node *spp_data_received_node;
+static struct audio_connection_state_changed_cb_node *audio_state_node;
 
 static gboolean generic_device_removed_set;
 
@@ -335,6 +341,22 @@ static void set_device_removed_generic_callback(bluez_adapter_t *adapter)
 	generic_device_removed_set = TRUE;
 }
 
+static void bluez_audio_state_changed(int result,
+					gboolean connected,
+					const char *remote_address,
+					bt_audio_profile_type_e type,
+					void *user_data)
+{
+	struct audio_connection_state_changed_cb_node *data =
+							user_data;
+
+	DBG("");
+
+	if (data->cb)
+		(data->cb)(result, connected, remote_address, type,
+						data->user_data);
+}
+
 static void device_paired_changed(bluez_device_t *device,
 					int paired,
 					void *user_data)
@@ -519,6 +541,11 @@ static void _bt_update_bluetooth_callbacks(void)
 
 	if (generic_device_removed_set == FALSE)
 		set_device_removed_generic_callback(default_adapter);
+
+	if (audio_state_node)
+		bluez_set_audio_state_cb(
+					bluez_audio_state_changed,
+					audio_state_node);
 }
 
 static void setup_bluez_lib(void)
@@ -1653,14 +1680,46 @@ int bt_audio_set_connection_state_changed_cb(
 			bt_audio_connection_state_changed_cb callback,
 			void *user_data)
 {
-	DBG("Not implement");
+	struct audio_connection_state_changed_cb_node *node_data = NULL;
+
+	if (callback == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (audio_state_node) {
+		DBG("audio state callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
+
+	node_data = g_new0(struct audio_connection_state_changed_cb_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->cb = callback;
+	node_data->user_data = user_data;
+
+	audio_state_node = node_data;
+
+	_bt_update_bluetooth_callbacks();
 
 	return BT_SUCCESS;
 }
 
 int bt_audio_unset_connection_state_changed_cb(void)
 {
-	DBG("Not implement");
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (!audio_state_node)
+		return BT_SUCCESS;
+
+	bluez_unset_audio_state_cb();
+
+	g_free(audio_state_node);
+	audio_state_node = NULL;
 
 	return BT_SUCCESS;
 }

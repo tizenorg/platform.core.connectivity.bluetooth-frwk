@@ -121,6 +121,8 @@ static bluez_adapter_added_cb_t adapter_added_cb;
 static gpointer adapter_added_cb_data;
 static bluez_agent_added_cb_t agent_added_cb;
 static gpointer agent_added_cb_data;
+static bluez_audio_state_cb_t audio_state_cb;
+static gpointer audio_state_cb_data;
 
 static struct _bluez_object *get_object_from_path(const char *path)
 {
@@ -575,6 +577,11 @@ static void parse_bluez_control_interfaces(gpointer data, gpointer user_data)
 			object->media_type = type;
 		}
 
+		if (audio_state_cb){
+				audio_state_cb(0, TRUE, device_address,
+					type, audio_state_cb_data);
+		}
+
 		g_free(device_path);
 		g_free(uuid);
 	}
@@ -806,6 +813,19 @@ static struct _bluez_profile *this_profile;
 struct _bluez_agent *bluez_agent_get_agent(void)
 {
 	return this_agent;
+}
+
+void bluez_set_audio_state_cb(bluez_audio_state_cb_t cb,
+					gpointer user_data)
+{
+	audio_state_cb = cb;
+	audio_state_cb_data = user_data;
+}
+
+void bluez_unset_audio_state_cb()
+{
+	audio_state_cb = NULL;
+	audio_state_cb_data = NULL;
 }
 
 void bluez_agent_set_agent_added(bluez_agent_added_cb_t cb,
@@ -1088,6 +1108,11 @@ static void parse_bluez_object_removed(gpointer data, gpointer user_data)
 
 		convert_device_path_to_address(bluez_object->path_name,
 							device_address);
+
+		if (audio_state_cb){
+			audio_state_cb(0, FALSE, device_address,
+				bluez_object->media_type, audio_state_cb_data);
+		}
 	}
 }
 
