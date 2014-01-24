@@ -374,4 +374,8 @@ enum bluez_error_type bluez_profile_register_profile_sync(
 enum bluez_error_type  bluez_profile_unregister_profile_sync(
 				const gchar *path);
 
+void bt_register_media_player(struct _bluez_adapter * adapter);
+
+void bt_unregister_media_player(struct _bluez_adapter * adapter);
+
 #endif
