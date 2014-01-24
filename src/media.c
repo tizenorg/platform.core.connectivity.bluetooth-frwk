@@ -67,6 +67,36 @@ static void bt_media_unregister_dbus_interface()
 						media_interface);
 }
 
+static void handle_change_track(GVariant *parameters)
+{
+	GVariantIter *valueIter;
+	GVariant *value;
+	gchar *key, *val;
+	gint32 track_num;
+	gint64 duration;
+
+	DBG("");
+
+	g_variant_get(parameters, "(a{sv})", &valueIter);
+	while (g_variant_iter_next(valueIter, "{sv}", &key, &value)){
+		if (g_strcmp0(key, "xesam:title") == 0){
+			g_variant_get(value, "s", &val);
+		}else if (g_strcmp0(key, "xesam:artist") == 0){
+			g_variant_get(value, "s", &val);
+		}else if (g_strcmp0(key, "xesam:genre") == 0){
+			g_variant_get(value, "s", &val);
+		}else if (g_strcmp0(key, "xesam:album") == 0){
+			g_variant_get(value, "s", &val);
+		}else if (g_strcmp0(key, "xesam:trackNumber") == 0){
+			g_variant_get(value, "i", &track_num);
+		}else if (g_strcmp0(key, "mpris:length") == 0){
+                        g_variant_get(value, "x", &duration);
+		}
+		g_variant_unref(value);
+		g_free(key);
+	}
+}
+
 static void media_skeleton_handle_method_call(GDBusConnection *connection,
 					const gchar *sender,
 					const gchar *object_path,
@@ -82,6 +112,18 @@ static void media_skeleton_handle_method_call(GDBusConnection *connection,
 		DBG("no adapter");
 		return;
 	}
+
+	if (g_strcmp0(method_name, "MediaPlayerChangeProperty") == 0){
+		guint32 type, value;
+
+		g_variant_get(parameters, "(uu)", &type, &value);
+		DBG("type =%d, value = %d", type, value);
+	} else if (g_strcmp0(method_name, "MediaPlayerChangeProperties") == 0){
+	} else if (g_strcmp0(method_name, "MediaPlayerChangeTrack") == 0){
+		handle_change_track(parameters);
+	}
+	else
+		WARN("Unknown method");
 }
 
 static const GDBusInterfaceVTable media_skeleton_vtable =
@@ -150,9 +192,28 @@ void bt_service_media_init(GDBusObjectSkeleton *gdbus_object_skeleton,
 						bluez_adapter_t *adapter)
 {
 	DBG("");
+
+	if (bt_media)
+		return;
+
+	bt_object_skeleton = gdbus_object_skeleton;
+
+	default_adapter = adapter;
+
+	bt_media = bt_service_media_new();
+
+	bt_media_register_dbus_interface(bt_media, connection);
 }
 
 void bt_service_media_deinit(void)
 {
 	DBG("");
+
+	if (bt_media == NULL)
+		return;
+
+	bt_media_unregister_dbus_interface();
+
+	g_object_unref(bt_media);
+	bt_media = NULL;
 }
