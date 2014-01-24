@@ -151,6 +151,10 @@ static bluez_adapter_added_cb_t adapter_added_cb;
 static gpointer adapter_added_cb_data;
 static bluez_agent_added_cb_t agent_added_cb;
 static gpointer agent_added_cb_data;
+static bluez_avrcp_repeat_changed_cb_t avrcp_repeat_changed_cb;
+static gpointer avrcp_repeat_changed_data;
+static bluez_avrcp_shuffle_changed_cb_t avrcp_shuffle_changed_cb;
+static gpointer avrcp_shuffle_changed_data;
 static bluez_avrcp_target_cb_t avrcp_target_cb;
 static gpointer avrcp_target_cb_data;
 static bluez_audio_state_cb_t audio_state_cb;
@@ -864,6 +868,32 @@ static struct _bluez_profile *this_profile;
 struct _bluez_agent *bluez_agent_get_agent(void)
 {
 	return this_agent;
+}
+
+void bluez_set_avrcp_repeat_changed_cb(bluez_avrcp_repeat_changed_cb_t cb,
+						gpointer user_data)
+{
+	avrcp_repeat_changed_cb = cb;
+	avrcp_repeat_changed_data = user_data;
+}
+
+void bluez_unset_avrcp_repeat_changed_cb()
+{
+	avrcp_repeat_changed_cb = NULL;
+	avrcp_repeat_changed_data = NULL;
+}
+
+void bluez_set_avrcp_shuffle_changed_cb(bluez_avrcp_shuffle_changed_cb_t cb,
+						gpointer user_data)
+{
+	avrcp_shuffle_changed_cb = cb;
+	avrcp_shuffle_changed_data = user_data;
+}
+
+void bluez_unset_avrcp_shuffle_changed_cb()
+{
+	avrcp_shuffle_changed_cb = NULL;
+	avrcp_shuffle_changed_data = NULL;
 }
 
 void bluez_set_avrcp_target_cb(bluez_avrcp_target_cb_t cb,
@@ -2448,12 +2478,20 @@ static gboolean handle_set_property(GDBusConnection *connection,
 		const gchar *loopstatus = g_variant_get_string(value, NULL);
 		DBG("loopstatus = %s", loopstatus);
 
+		if (avrcp_repeat_changed_cb)
+			avrcp_repeat_changed_cb(loopstatus,
+					avrcp_repeat_changed_data);
+
 	}else if (g_strcmp0(property_name, "Shuffle") == 0) {
 		gboolean shuffle_mode = g_variant_get_boolean(value);
 		if (shuffle_mode == TRUE)
 			DBG("shuffle_mode TRUE");
 		else
 			DBG("shuffle_mode FALSE");
+
+		if (avrcp_shuffle_changed_cb)
+			avrcp_shuffle_changed_cb(shuffle_mode,
+					avrcp_shuffle_changed_data);
 	}
 
 	return *error == NULL;
