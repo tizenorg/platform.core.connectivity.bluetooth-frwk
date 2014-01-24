@@ -627,11 +627,6 @@ static void parse_bluez_control_interfaces(gpointer data, gpointer user_data)
 			object->media_type = type;
 		}
 
-		if (g_strcmp0(uuid, BT_A2DP_SINK_UUID) == 0){
-			type = BT_AUDIO_PROFILE_TYPE_A2DP;
-			object->media_type = type;
-		}
-
 		if (audio_state_cb){
 				audio_state_cb(0, TRUE, device_address,
 					type, audio_state_cb_data);
