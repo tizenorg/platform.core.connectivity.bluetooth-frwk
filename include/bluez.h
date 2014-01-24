@@ -214,6 +214,16 @@ typedef void (*simple_reply_cb_t) (
 				enum bluez_error_type type,
 				void *user_data);
 
+typedef void (*bluez_avrcp_target_cb_t)(
+				struct _bluez_device *device,
+				gboolean connected,
+				gpointer user_data);
+
+void bluez_set_avrcp_target_cb(
+				bluez_avrcp_target_cb_t cb,
+				gpointer user_data);
+void bluez_unset_avrcp_target_cb();
+
 typedef void (*bluez_audio_state_cb_t)(int result,
 				gboolean connected,
 				const char *remote_address,

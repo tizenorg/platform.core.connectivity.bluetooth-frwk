@@ -121,6 +121,8 @@ static bluez_adapter_added_cb_t adapter_added_cb;
 static gpointer adapter_added_cb_data;
 static bluez_agent_added_cb_t agent_added_cb;
 static gpointer agent_added_cb_data;
+static bluez_avrcp_target_cb_t avrcp_target_cb;
+static gpointer avrcp_target_cb_data;
 static bluez_audio_state_cb_t audio_state_cb;
 static gpointer audio_state_cb_data;
 
@@ -439,6 +441,19 @@ static inline void handle_device_connected(GVariant *changed_properties,
 					device->device_connected_cb_data);
 }
 
+static inline void handle_control_connected(GVariant *changed_properties,
+						struct _bluez_device *device)
+{
+	gboolean connected;
+
+	DBG("");
+	if (g_variant_lookup(changed_properties, "Connected",
+						"b", &connected)){
+		avrcp_target_cb(device, connected,
+				avrcp_target_cb_data);
+	}
+}
+
 static inline void handle_device_trusted(GVariant *changed_properties,
 						struct _bluez_device *device)
 {
@@ -498,6 +513,9 @@ static void control_properties_changed(GDBusProxy *proxy,
 	gchar *properties = g_variant_print(changed_properties, TRUE);
 
 	DBG("properties %s", properties);
+
+	if (avrcp_target_cb)
+		handle_control_connected(changed_properties, user_data);
 
 	g_free(properties);
 }
@@ -813,6 +831,19 @@ static struct _bluez_profile *this_profile;
 struct _bluez_agent *bluez_agent_get_agent(void)
 {
 	return this_agent;
+}
+
+void bluez_set_avrcp_target_cb(bluez_avrcp_target_cb_t cb,
+						gpointer user_data)
+{
+	avrcp_target_cb = cb;
+	avrcp_target_cb_data = user_data;
+}
+
+void bluez_unset_avrcp_target_cb()
+{
+	avrcp_target_cb= NULL;
+	avrcp_target_cb_data = NULL;
 }
 
 void bluez_set_audio_state_cb(bluez_audio_state_cb_t cb,

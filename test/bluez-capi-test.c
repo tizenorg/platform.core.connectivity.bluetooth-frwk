@@ -776,6 +776,46 @@ static int audio_unset_connection_state_changed()
 	return err;
 }
 
+void avrcp_target_connection_state_changed_cb(bool connected,
+					const char *remote_address,
+					void *user_data)
+{
+	int connection;
+
+	if (connected == TRUE)
+		connection = 1;
+	else
+		connection = 0;
+
+	DBG("connected = %d", connection);
+	DBG("remote_address = %s", remote_address);
+}
+
+static int avrcp_target_initialize()
+{
+	int err;
+
+	DBG("");
+
+	err = bt_avrcp_target_initialize(
+		avrcp_target_connection_state_changed_cb, NULL);
+
+	DBG("err = %d", err);
+	return err;
+}
+
+static int avrcp_target_deinitialize()
+{
+	int err;
+
+	DBG("");
+
+	err = bt_avrcp_target_deinitialize();
+
+	DBG("err = %d", err);
+	return err;
+}
+
 static int list_devices(const char *p1, const char *p2)
 {
 	int len;
@@ -1137,6 +1177,12 @@ struct {
 
 	{"audio_unset_connection_state_changed", audio_unset_connection_state_changed,
 		"Usage: audio_unset_connection_state_changed\n\tunset connection state callback"},
+
+	{"avrcp_target_initialize", avrcp_target_initialize,
+		"Usage: avrcp_target_initialize\n\tset avrcp target callback"},
+
+	{"avrcp_target_deinitialize", avrcp_target_deinitialize,
+		"Usage: avrcp_target_deinitialize\n\tunset avrcp target callback"},
 
 	{"register_agent", register_agent,
 		"Usage: register_agent\n\tRegister agent"},
