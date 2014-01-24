@@ -1070,11 +1070,33 @@ static void object_added(GDBusObjectManager *manger, GDBusObject *object,
 	parse_object(object, user_data);
 }
 
+static void parse_bluez_object_removed(gpointer data, gpointer user_data)
+{
+	struct _bluez_object *bluez_object = user_data;
+	GDBusInterface *interfaces = data;
+	GDBusProxy *proxy = G_DBUS_PROXY(interfaces);
+	const gchar *iface_name;
+
+	iface_name = g_dbus_proxy_get_interface_name(proxy);
+	DBG("%s, %s", iface_name, bluez_object->path_name);
+
+	if (g_strcmp0(iface_name, MEDIATRANSPORT_INTERFACE) == 0){
+		gchar *device_address;
+		device_address = g_malloc0(BT_ADDRESS_STRING_SIZE);
+		if (device_address == NULL)
+			return;
+
+		convert_device_path_to_address(bluez_object->path_name,
+							device_address);
+	}
+}
+
 static void object_removed(GDBusObjectManager *manger, GDBusObject *object,
 				gpointer user_data)
 {
 	struct _bluez_object *bluez_object;
 	const gchar *object_path;
+	GList *ifaces;
 
 	object_path = g_dbus_object_get_object_path(object);
 	DBG("object path: %s", object_path);
@@ -1082,6 +1104,10 @@ static void object_removed(GDBusObjectManager *manger, GDBusObject *object,
 	bluez_object = get_object_from_path(object_path);
 	if (object == NULL)
 		return;
+
+	ifaces = g_dbus_object_get_interfaces(object);
+
+	g_list_foreach(ifaces, parse_bluez_object_removed, bluez_object);
 
 	g_hash_table_remove(bluez_object_hash,
 				(gconstpointer) bluez_object->path_name);
