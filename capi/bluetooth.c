@@ -1802,6 +1802,105 @@ int bt_avrcp_target_deinitialize(void)
 	return BT_SUCCESS;
 }
 
+int bt_avrcp_target_notify_repeat_mode(bt_avrcp_repeat_mode_e mode)
+{
+	DBG("");
+
+	if (default_adapter == NULL){
+		DBG("no adapter");
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+	}
+
+	comms_bluetooth_avrcp_change_property(LOOPSTATUS, mode,
+					NULL, NULL);
+
+	return BT_SUCCESS;
+}
+
+int bt_avrcp_target_notify_shuffle_mode(bt_avrcp_shuffle_mode_e mode)
+{
+	DBG("");
+
+	if (default_adapter == NULL){
+		DBG("no adapter");
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+	}
+
+	comms_bluetooth_avrcp_change_property(SHUFFLE, mode,
+					NULL, NULL);
+
+	return BT_SUCCESS;
+}
+
+int bt_avrcp_target_notify_player_state(bt_avrcp_player_state_e state)
+{
+	DBG("");
+
+	if (default_adapter == NULL){
+		DBG("no adapter");
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+	}
+
+	comms_bluetooth_avrcp_change_property(PLAYBACKSTATUS, state,
+					NULL, NULL);
+
+        return BT_SUCCESS;
+}
+
+int bt_avrcp_target_notify_position(unsigned int position)
+{
+	DBG("");
+
+	if (default_adapter == NULL){
+		DBG("no adapter");
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+	}
+
+	comms_bluetooth_avrcp_change_property(POSITION, position,
+					NULL, NULL);
+
+	return BT_SUCCESS;
+}
+
+int bt_avrcp_target_notify_track(const char *title, const char *artist,
+		const char *album, const char *genre, unsigned int track_num,
+		unsigned int total_tracks, unsigned int duration)
+{
+	GVariantBuilder *builder;
+	GVariant *val;
+
+	DBG("");
+
+	if (default_adapter == NULL){
+		DBG("no adapter");
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+	}
+
+	builder = g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
+
+	val = g_variant_new("s", title);
+	g_variant_builder_add(builder, "{sv}", "xesam:title", val);
+
+	val = g_variant_new("s", artist);
+	g_variant_builder_add(builder, "{sv}", "xesam:artist", val);
+
+	val = g_variant_new("s", genre);
+	g_variant_builder_add(builder, "{sv}", "xesam:genre", val);
+
+	val = g_variant_new("s", album);
+	g_variant_builder_add(builder, "{sv}", "xesam:album", val);
+
+	val = g_variant_new("i", track_num);
+	g_variant_builder_add(builder, "{sv}", "xesam:trackNumber", val);
+
+	val = g_variant_new("x", duration);
+	g_variant_builder_add(builder, "{sv}", "mpris:length", val);
+
+	comms_bluetooth_avrcp_change_track((void *)builder, NULL, NULL);
+
+	return BT_SUCCESS;
+}
+
 /* Hid function */
 int bt_hid_host_initialize(
 		bt_hid_host_connection_state_changed_cb connection_cb,

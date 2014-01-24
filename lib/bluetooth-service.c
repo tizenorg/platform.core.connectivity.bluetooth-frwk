@@ -34,6 +34,7 @@
 #define COMMS_MANAGER_INTERFACE "org.tizen.comms.manager"
 #define COMMS_BLUETOOTH_PARING_INTERFACE "org.tizen.comms.pairing"
 #define COMMS_BLUETOOTH_OPP_INTERFACE "org.tizen.comms.opp"
+#define COMMS_BLUETOOTH_MEDIAPLAYER_INTERFACE "org.tizen.comms.mediaplayer"
 
 static GDBusObjectManager *object_manager;
 
@@ -63,6 +64,7 @@ struct _comms_bluetooth {
 	struct _comms_object *parent;
 	struct _proxy pairing;
 	struct _proxy opp;
+	struct _proxy mediaplayer;
 };
 
 static GHashTable *comms_object_hash;
@@ -231,6 +233,8 @@ void free_comms_bluetooth(struct _comms_bluetooth *bluetooth)
 	free_proxy(&bluetooth->pairing);
 
 	free_proxy(&bluetooth->opp);
+
+	free_proxy(&bluetooth->mediaplayer);
 };
 
 static struct _comms_bluetooth *this_bluetooth;
@@ -351,6 +355,9 @@ static void parse_comms_bluetooth(gpointer data, gpointer user_data)
 		proxy_node = &bluetooth->pairing;
 	else if (g_strcmp0(iface_name, COMMS_BLUETOOTH_OPP_INTERFACE) == 0)
 		proxy_node = &bluetooth->opp;
+	else if (g_strcmp0(iface_name,
+				COMMS_BLUETOOTH_MEDIAPLAYER_INTERFACE) == 0)
+		proxy_node = &bluetooth->mediaplayer;
 	else
 		return;
 
@@ -807,6 +814,101 @@ void comms_bluetooth_opp_send_file(const char *address,
 	g_dbus_proxy_call(this_bluetooth->opp.proxy,
 				"SendFile",
 				g_variant_new("(ss)", address, file_name),
+				0, -1, NULL,
+				bluetooth_simple_async_cb,
+				async_result_node);
+}
+
+void comms_bluetooth_avrcp_change_property(
+					unsigned int type,
+					unsigned int value,
+					bluetooth_simple_callback cb,
+					void *user_data)
+{
+	struct _bluetooth_simple_async_result *async_result_node;
+
+	DBG("");
+
+	if (this_bluetooth == NULL) {
+		ERROR("bluetooth not register");
+		return;
+	}
+
+	async_result_node =
+		g_new0(struct _bluetooth_simple_async_result, 1);
+	if (async_result_node == NULL) {
+		ERROR("no memory");
+		return;
+	}
+
+	async_result_node->callback = cb;
+	async_result_node->user_data = user_data;
+
+	g_dbus_proxy_call(this_bluetooth->mediaplayer.proxy,
+				"MediaPlayerChangeProperty",
+				g_variant_new("(uu)", type, value),
+				0, -1, NULL,
+				bluetooth_simple_async_cb,
+				async_result_node);
+}
+
+void comms_bluetooth_avrcp_change_properties(void *properties_data,
+					bluetooth_simple_callback cb,
+					void *user_data)
+{
+	struct _bluetooth_simple_async_result *async_result_node;
+	GVariantBuilder *builder = (GVariantBuilder *)properties_data;
+
+	if (this_bluetooth == NULL) {
+		ERROR("bluetooth not register");
+		return;
+	}
+
+	async_result_node =
+		g_new0(struct _bluetooth_simple_async_result, 1);
+	if (async_result_node == NULL) {
+		ERROR("no memory");
+		return;
+	}
+
+	async_result_node->callback = cb;
+	async_result_node->user_data = user_data;
+
+	g_dbus_proxy_call(this_bluetooth->mediaplayer.proxy,
+				"MediaPlayerChangeProperties",
+				g_variant_new("(a{sv})", builder),
+				0, -1, NULL,
+				bluetooth_simple_async_cb,
+				async_result_node);
+}
+
+void comms_bluetooth_avrcp_change_track(void * track_data,
+					bluetooth_simple_callback cb,
+					void *user_data)
+{
+	struct _bluetooth_simple_async_result *async_result_node;
+	GVariantBuilder *builder = (GVariantBuilder *)track_data;
+
+	DBG("");
+
+	if (this_bluetooth == NULL) {
+		ERROR("bluetooth not register");
+		return;
+	}
+
+	async_result_node =
+		g_new0(struct _bluetooth_simple_async_result, 1);
+	if (async_result_node == NULL) {
+		ERROR("no memory");
+		return;
+	}
+
+	async_result_node->callback = cb;
+	async_result_node->user_data = user_data;
+
+	g_dbus_proxy_call(this_bluetooth->mediaplayer.proxy,
+				"MediaPlayerChangeTrack",
+				g_variant_new("(a{sv})", builder),
 				0, -1, NULL,
 				bluetooth_simple_async_cb,
 				async_result_node);

@@ -77,4 +77,20 @@ void comms_bluetooth_opp_send_file(
 			const char *file_name,
 			bluetooth_simple_callback cb,
 			void *user_data);
+
+void comms_bluetooth_avrcp_change_property(
+			unsigned int type,
+			unsigned int value,
+			bluetooth_simple_callback cb,
+			void *user_data);
+
+void comms_bluetooth_avrcp_change_properties(
+			void *properties_data,
+			bluetooth_simple_callback cb,
+			void *user_data);
+
+void comms_bluetooth_avrcp_change_track(
+			void * track_data,
+			bluetooth_simple_callback cb,
+			void *user_data);
 #endif

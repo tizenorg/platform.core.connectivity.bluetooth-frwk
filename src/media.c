@@ -71,6 +71,7 @@ static void handle_change_track(GVariant *parameters)
 {
 	GVariantIter *valueIter;
 	GVariant *value;
+	media_metadata_attributes_t metadata;
 	gchar *key, *val;
 	gint32 track_num;
 	gint64 duration;
@@ -81,20 +82,39 @@ static void handle_change_track(GVariant *parameters)
 	while (g_variant_iter_next(valueIter, "{sv}", &key, &value)){
 		if (g_strcmp0(key, "xesam:title") == 0){
 			g_variant_get(value, "s", &val);
+			metadata.title = g_strdup(val);
+			DBG("metadata.title = %s", metadata.title);
 		}else if (g_strcmp0(key, "xesam:artist") == 0){
 			g_variant_get(value, "s", &val);
+			metadata.artist = g_malloc0(sizeof(char *));
+			if (metadata.artist != NULL)
+				metadata.artist[0] = g_strdup(val);
+			DBG("metadata.artist = %s", metadata.artist[0]);
 		}else if (g_strcmp0(key, "xesam:genre") == 0){
 			g_variant_get(value, "s", &val);
+			metadata.genre = g_malloc0(sizeof(char *));
+			if (metadata.genre != NULL)
+				metadata.genre[0] = g_strdup(val);
+			DBG("metadata.genre = %s", metadata.genre[0]);
 		}else if (g_strcmp0(key, "xesam:album") == 0){
 			g_variant_get(value, "s", &val);
+			metadata.album = g_strdup(val);
+			DBG("metadata.album = %s", metadata.album);
 		}else if (g_strcmp0(key, "xesam:trackNumber") == 0){
 			g_variant_get(value, "i", &track_num);
+			metadata.tracknumber = track_num;
+			DBG("metadata.tracknumber = %d",
+						metadata.tracknumber);
 		}else if (g_strcmp0(key, "mpris:length") == 0){
                         g_variant_get(value, "x", &duration);
+			metadata.duration = duration;
+			DBG("metadata.duration = %d", metadata.duration);
 		}
 		g_variant_unref(value);
 		g_free(key);
 	}
+
+	bluez_media_player_set_track_info(default_adapter, &metadata);
 }
 
 static void media_skeleton_handle_method_call(GDBusConnection *connection,
@@ -118,6 +138,8 @@ static void media_skeleton_handle_method_call(GDBusConnection *connection,
 
 		g_variant_get(parameters, "(uu)", &type, &value);
 		DBG("type =%d, value = %d", type, value);
+		bluez_media_player_change_property(default_adapter,
+							type, value);
 	} else if (g_strcmp0(method_name, "MediaPlayerChangeProperties") == 0){
 	} else if (g_strcmp0(method_name, "MediaPlayerChangeTrack") == 0){
 		handle_change_track(parameters);
