@@ -46,6 +46,7 @@ SET(SOURCES_BLUETOOTH_SERVICE
 	src/vertical.c
 	src/pairing.c
 	src/opp.c
+	src/media.c
 	lib/bluez.c
 	lib/common.c
 	lib/obex.c
