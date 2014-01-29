@@ -725,6 +725,82 @@ static int audio_connect(const char *p1, const char *p2)
 	return 0;
 }
 
+static int avrcp_target_notify_repeat_mode()
+{
+	int err;
+
+	DBG("");
+
+	DBG("repeat mode = %d", BT_AVRCP_REPEAT_MODE_SINGLE_TRACK);
+
+	err = bt_avrcp_target_notify_repeat_mode
+				(BT_AVRCP_REPEAT_MODE_SINGLE_TRACK);
+	if (err != BT_SUCCESS) {
+		ERROR("notify_repeat_mode error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
+static int avrcp_target_notify_shuffle_mode()
+{
+	int err;
+
+	err = bt_avrcp_target_notify_shuffle_mode
+				(BT_AVRCP_SHUFFLE_MODE_ALL_TRACK);
+	if (err != BT_SUCCESS) {
+		ERROR("notify_shuffle_mode error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
+static int avrcp_target_notify_player_state()
+{
+	int err;
+
+	err = bt_avrcp_target_notify_player_state
+				(BT_AVRCP_PLAYER_STATE_PAUSED);
+
+	if (err != BT_SUCCESS) {
+		ERROR("notify_player_state error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
+static int avrcp_target_notify_position()
+{
+	int err;
+
+	err = bt_avrcp_target_notify_position(50);
+
+	if (err != BT_SUCCESS) {
+		ERROR("notify_position error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
+static int avrcp_target_notify_track()
+{
+	int err;
+
+	err = bt_avrcp_target_notify_track("title", "artist",
+			"album", "genre", 10, 100, 1);
+
+	if (err != BT_SUCCESS) {
+		ERROR("notify_track error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int get_bonded_device_info(const char *p1, const char *p2)
 {
 	bt_device_info_s *device_info;
@@ -1322,6 +1398,21 @@ struct {
 
 	{"avrcp_target_deinitialize", avrcp_target_deinitialize,
 		"Usage: avrcp_target_deinitialize\n\tunset avrcp target callback"},
+
+	{"avrcp_target_notify_repeat_mode", avrcp_target_notify_repeat_mode,
+		"Usage: avrcp_target_notify_repeat_mode\n\tnotify repeat mode"},
+
+	{"avrcp_target_notify_shuffle_mode", avrcp_target_notify_shuffle_mode,
+		"Usage: avrcp_target_notify_shuffle_mode\n\tnotify shuffle mode"},
+
+	{"avrcp_target_notify_player_state", avrcp_target_notify_player_state,
+		"Usage: avrcp_target_notify_player_state\n\tnotify player state"},
+
+	{"avrcp_target_notify_position", avrcp_target_notify_position,
+		"Usage: avrcp_target_notify_position\n\tnotify position"},
+
+	{"avrcp_target_notify_track", avrcp_target_notify_track,
+		"Usage: avrcp_target_notify_track\n\tnotify track"},
 
 	{"register_agent", register_agent,
 		"Usage: register_agent\n\tRegister agent"},
