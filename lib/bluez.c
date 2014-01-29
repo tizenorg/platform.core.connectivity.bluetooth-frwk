@@ -27,6 +27,7 @@
 #define OBJECT_MANAGE_PATH "/"
 #define ADAPTER_INTERFACE "org.bluez.Adapter1"
 #define MEDIA_INTERFACE "org.bluez.Media1"
+#define MEDIATRANSPORT_INTERFACE "org.bluez.MediaTransport1"
 #define MEDIACONTROL_INTERFACE "org.bluez.MediaControl1"
 #define DEVICE_INTERFACE "org.bluez.Device1"
 #define AGENT_INTERFACE "org.bluez.AgentManager1"
@@ -38,6 +39,7 @@ GDBusObjectManager *object_manager = NULL;
 
 struct _bluez_object {
 	char *path_name;
+	bt_audio_profile_type_e media_type;
 	GDBusObject *obj;
 	GList *interfaces;
 	GDBusProxy *properties_proxy;
@@ -526,6 +528,53 @@ static void parse_bluez_device_interfaces(gpointer data, gpointer user_data)
 	}
 }
 
+static void parse_bluez_control_interfaces(gpointer data, gpointer user_data)
+{
+	struct _bluez_object *object = user_data;
+	GDBusInterface *interface = data;
+	GDBusProxy *proxy = G_DBUS_PROXY(interface);
+	const gchar *iface_name;
+
+	iface_name = g_dbus_proxy_get_interface_name(proxy);
+	DBG("%s", iface_name);
+
+	if (g_strcmp0(iface_name, MEDIATRANSPORT_INTERFACE) == 0) {
+		gchar *uuid, *device_address;
+		gchar *device_path;
+		bt_audio_profile_type_e type;
+
+		device_address = g_malloc0(BT_ADDRESS_STRING_SIZE);
+		if (device_address == NULL)
+			return;
+
+		device_path = property_get_string(proxy, "Device");
+		if (device_path == NULL) {
+			DBG("device_path == NULL");
+			g_free(device_address);
+			return;
+		}
+
+		convert_device_path_to_address((const gchar *)device_path,
+							device_address);
+
+		uuid = property_get_string(proxy, "UUID");
+		if (uuid == NULL) {
+			g_free(device_address);
+			g_free(device_path);
+		}
+
+		DBG("uuid = %s", uuid);
+
+		if (g_strcmp0(uuid, BT_A2DP_SINK_UUID) == 0) {
+			type = BT_AUDIO_PROFILE_TYPE_A2DP;
+			object->media_type = type;
+		}
+
+		g_free(device_path);
+		g_free(uuid);
+	}
+}
+
 char *bluez_device_property_get_adapter(struct _bluez_device *device)
 {
 	return property_get_string(device->proxy, "Adapter");
@@ -651,6 +700,13 @@ static void bluez_device_added(struct _bluez_object *object,
 	g_list_foreach(ifaces, parse_bluez_device_interfaces, device);
 
 	register_bluez_device(device);
+}
+
+static void bluez_control_added(struct _bluez_object *object,
+					GList *ifaces)
+{
+	DBG("");
+	g_list_foreach(ifaces, parse_bluez_control_interfaces, object);
 }
 
 static struct _bluez_agent *create_agent(struct _bluez_object *object)
@@ -838,6 +894,9 @@ static void parse_object(gpointer data, gpointer user_data)
 		bluez_adapter_added(object, ifaces);
 	else if (g_dbus_object_get_interface(obj, DEVICE_INTERFACE))
 		bluez_device_added(object, ifaces);
+	else if (g_dbus_object_get_interface(obj,
+						MEDIATRANSPORT_INTERFACE))
+		bluez_control_added(object, ifaces);
 	else
 		parse_root_object(object, ifaces);
 
