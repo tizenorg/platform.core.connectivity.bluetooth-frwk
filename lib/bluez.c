@@ -40,6 +40,33 @@
 
 GDBusObjectManager *object_manager = NULL;
 
+struct player_settinngs_t {
+	int key;
+	const char *property;
+};
+
+static struct player_settinngs_t loopstatus_settings[] = {
+	{ REPEAT_INVALID, "" },
+	{ REPEAT_MODE_OFF, "None" },
+	{ REPEAT_SINGLE_TRACK, "Track" },
+	{ REPEAT_ALL_TRACK, "Playlist" },
+	{ REPEAT_INVALID, "" }
+};
+
+static struct player_settinngs_t playback_status[] = {
+	{ STATUS_STOPPED, "Stopped" },
+	{ STATUS_PLAYING, "Playing" },
+	{ STATUS_PAUSED, "Paused" },
+	{ STATUS_INVALID, "" }
+};
+
+static struct player_settinngs_t shuffle_settings[] = {
+	{ SHUFFLE_INVALID, "" },
+	{ SHUFFLE_MODE_OFF, "off" },
+	{ SHUFFLE_ALL_TRACK, "alltracks" },
+	{ SHUFFLE_INVALID, "" }
+};
+
 struct _bluez_object {
 	char *path_name;
 	bt_audio_profile_type_e media_type;
@@ -1989,6 +2016,255 @@ enum bluez_error_type  bluez_profile_unregister_profile_sync(const gchar *path)
 	}
 
 	return err_type;
+}
+
+static gboolean bluez_set_property(struct _bluez_adapter *adapter,
+				const char *key, GVariant *val)
+{
+	GDBusConnection  *conn;
+	GError *error;
+	GVariantBuilder *builder =
+			g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
+
+	DBG("");
+
+	error = NULL;
+
+	DBG("key = %s", key);
+
+	g_variant_builder_add(builder, "{sv}", key, val);
+	conn = g_dbus_proxy_get_connection(adapter->media_proxy);
+
+	g_dbus_connection_emit_signal(conn, NULL,
+			BT_MEDIA_OBJECT_PATH, PROPERTIES_INTERFACE,
+			"PropertiesChanged",
+			g_variant_new("(sa{sv})",
+			MEDIA_PLAYER_INTERFACE, builder),
+			&error);
+
+	return error == NULL;
+}
+
+static gboolean bluez_set_metadata(struct _bluez_adapter *adapter,
+				const char *key, GVariant *val)
+{
+	GDBusConnection  *conn;
+	GError *error;
+	GVariant *val_metadata;
+	GVariantBuilder *builder =
+				g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
+	GVariantBuilder *builder_array =
+				g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
+
+	DBG("");
+
+	error = NULL;
+
+	g_variant_builder_add(builder_array, "{sv}", key, val);
+
+	val_metadata = g_variant_new("a{sv}", builder_array);
+	g_variant_builder_add(builder, "{sv}", "Metadata", val_metadata);
+
+	conn = g_dbus_proxy_get_connection(adapter->media_proxy);
+
+	g_dbus_connection_emit_signal(conn, NULL,
+			BT_MEDIA_OBJECT_PATH, PROPERTIES_INTERFACE,
+			"PropertiesChanged",
+			g_variant_new("(sa{sv})",
+			MEDIA_PLAYER_INTERFACE, builder),
+			&error);
+
+	return error == NULL;
+}
+
+static int bluez_avrcp_set_interal_property(struct _bluez_adapter *adapter,
+			int type,
+			media_player_settings_t *properties)
+{
+	int value;
+	gboolean shuffle;
+	GVariant *val;
+
+	DBG("");
+
+	switch (type) {
+	case LOOPSTATUS:
+		value = properties->loopstatus;
+		DBG("LOOPSTATUS loop = %s",
+					loopstatus_settings[value].property);
+		val = g_variant_new("s", loopstatus_settings[value].property);
+		if (!bluez_set_property(adapter, "LoopStatus", val)) {
+			DBG("Error sending the PropertyChanged signal\n");
+			return BT_ERROR_OPERATION_FAILED;
+		}
+		break;
+	case SHUFFLE:
+		value = properties->shuffle;
+		if (g_strcmp0(shuffle_settings[value].property, "off") == 0)
+			shuffle = FALSE;
+		else
+			shuffle = TRUE;
+		val = g_variant_new("b", shuffle);
+		if (!bluez_set_property(adapter, "Shuffle", val)) {
+			DBG("Error sending the PropertyChanged signal\n");
+			return BT_ERROR_OPERATION_FAILED;
+		}
+		break;
+	case PLAYBACKSTATUS:
+		value = properties->playbackstatus;
+		val = g_variant_new("s", playback_status[value].property);
+		if (!bluez_set_property(adapter, "PlaybackStatus", val)) {
+			DBG("Error sending the PropertyChanged signal\n");
+			return BT_ERROR_OPERATION_FAILED;
+		}
+		break;
+	case POSITION:
+		value = properties->position;
+		val = g_variant_new("x", value);
+		if (!bluez_set_property(adapter, "Position", val)) {
+			DBG("Error sending the PropertyChanged signal\n");
+			return BT_ERROR_OPERATION_FAILED;
+		}
+		break;
+	default:
+		DBG("Invalid Type\n");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	return BT_SUCCESS;
+}
+
+int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
+			media_metadata_attributes_t *meta_data)
+{
+	GVariant *val;
+	GVariant *str_array[1];
+	GVariant *val_array;
+
+	DBG("");
+
+	if (meta_data->title) {
+		val = g_variant_new("s", meta_data->title);
+		if (!bluez_set_metadata(adapter, "xesam:title", val)) {
+			DBG("Error sending the PropertyChanged signal\n");
+			return BT_ERROR_OPERATION_FAILED;
+		}
+	}
+
+	if (meta_data->artist) {
+		const char *artist = meta_data->artist[0];
+		val = g_variant_new_string(artist);
+		str_array[0] = val;
+		val_array = g_variant_new_array(G_VARIANT_TYPE_STRING,
+							str_array, 1);
+		if (!bluez_set_metadata(adapter, "xesam:artist",
+							val_array)) {
+			DBG("Error sending the PropertyChanged signal\n");
+			return BT_ERROR_OPERATION_FAILED;
+		}
+	}
+
+	if (meta_data->album) {
+		val = g_variant_new("s", meta_data->album);
+		if (!bluez_set_metadata(adapter, "xesam:album", val)) {
+			DBG("Error sending the PropertyChanged signal\n");
+			return BT_ERROR_OPERATION_FAILED;
+		}
+	}
+
+	if (meta_data->genre) {
+		const char *genre = meta_data->genre[0];
+		val = g_variant_new_string(genre);
+		str_array[0] = val;
+		val_array = g_variant_new_array(G_VARIANT_TYPE_STRING,
+							str_array, 1);
+		if (!bluez_set_metadata(adapter, "xesam:genre",
+							val_array)) {
+			DBG("Error sending the PropertyChanged signal\n");
+			return BT_ERROR_OPERATION_FAILED;
+		}
+	}
+
+	if (0 != meta_data->tracknumber) {
+		val = g_variant_new("i", meta_data->tracknumber);
+		if (!bluez_set_metadata(adapter, "xesam:trackNumber",
+								val)) {
+			DBG("Error sending the PropertyChanged signal\n");
+			return BT_ERROR_OPERATION_FAILED;
+		}
+	}
+
+	if (0 != meta_data->duration) {
+		val = g_variant_new("x", meta_data->duration);
+		if (!bluez_set_metadata(adapter, "mpris:length", val)) {
+			DBG("Error sending the PropertyChanged signal\n");
+			return BT_ERROR_OPERATION_FAILED;
+		}
+	}
+
+	return BT_SUCCESS;
+}
+
+int bluez_media_player_change_property(struct _bluez_adapter *adapter,
+				media_player_property_type type,
+				unsigned int value)
+{
+	media_player_settings_t properties;
+	int ret;
+
+	DBG("+");
+
+	switch (type) {
+	case LOOPSTATUS:
+		properties.loopstatus = value;
+		break;
+	case SHUFFLE:
+		properties.shuffle = value;
+		break;
+	case PLAYBACKSTATUS:
+		properties.playbackstatus = value;
+		break;
+	case POSITION:
+		properties.position = value;
+		break;
+	default:
+		DBG("Invalid Type\n");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	ret = bluez_avrcp_set_interal_property(adapter,
+						type, &properties);
+
+	DBG("-");
+	return ret;
+}
+
+int bluez_media_player_set_properties(struct _bluez_adapter *adapter,
+				media_player_settings_t *properties)
+{
+
+	if (bluez_avrcp_set_interal_property(adapter,
+		LOOPSTATUS, properties) != 1) {
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	if (bluez_avrcp_set_interal_property(adapter,
+		SHUFFLE, properties) != 1) {
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	if (bluez_avrcp_set_interal_property(adapter,
+		PLAYBACKSTATUS,
+			properties) != 1) {
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	if (bluez_avrcp_set_interal_property(adapter,
+		POSITION, properties) != 1) {
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	return BT_SUCCESS;
 }
 
 static void handle_media_proxy_cb(GObject *source_object,
