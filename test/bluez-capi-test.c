@@ -826,6 +826,81 @@ static int audio_unset_connection_state_changed()
 	return err;
 }
 
+void avrcp_set_shuffle_mode_changed_cb(bt_avrcp_shuffle_mode_e shuffle,
+				void *user_data)
+{
+	if (shuffle == BT_AVRCP_SHUFFLE_MODE_OFF)
+		DBG("shuffle mode off");
+	else if (shuffle == BT_AVRCP_SHUFFLE_MODE_ALL_TRACK)
+		DBG("All tracks shuffle");
+	else if (shuffle == BT_AVRCP_SHUFFLE_MODE_GROUP)
+		DBG("Group shuffle");
+}
+
+
+static int avrcp_set_shuffle_changed()
+{
+	int err;
+
+	DBG("");
+
+	err = bt_avrcp_set_shuffle_mode_changed_cb(
+		avrcp_set_shuffle_mode_changed_cb, NULL);
+
+	DBG("err = %d", err);
+	return err;
+}
+
+static int avrcp_unset_shuffle_changed()
+{
+	int err;
+
+	DBG("");
+
+	err = bt_avrcp_unset_shuffle_mode_changed_cb();
+
+	DBG("err = %d", err);
+	return err;
+}
+
+void avrcp_set_repeat_mode_changed_cb(bt_avrcp_repeat_mode_e repeat,
+					void *user_data)
+{
+	if (repeat == BT_AVRCP_REPEAT_MODE_OFF)
+		DBG(" Repeat Off");
+	else if (repeat == BT_AVRCP_REPEAT_MODE_SINGLE_TRACK)
+		DBG("Single track repeat");
+	else if (repeat == BT_AVRCP_REPEAT_MODE_ALL_TRACK)
+		DBG("All track repeat");
+	else if (repeat == BT_AVRCP_REPEAT_MODE_GROUP)
+		DBG("Group repeat");
+}
+
+static int avrcp_set_repeat_changed()
+{
+	int err;
+
+	DBG("");
+
+	err = bt_avrcp_set_repeat_mode_changed_cb(
+		avrcp_set_repeat_mode_changed_cb, NULL);
+
+	DBG("err = %d", err);
+	return err;
+}
+
+static int avrcp_unset_repeat_changed()
+{
+	int err;
+
+	DBG("");
+
+	err = bt_avrcp_unset_repeat_mode_changed_cb();
+
+	DBG("err = %d", err);
+	return err;
+}
+
 void avrcp_target_connection_state_changed_cb(bool connected,
 					const char *remote_address,
 					void *user_data)
@@ -1229,6 +1304,18 @@ struct {
 
 	{"audio_unset_connection_state_changed", audio_unset_connection_state_changed,
 		"Usage: audio_unset_connection_state_changed\n\tunset connection state callback"},
+
+	{"avrcp_set_shuffle_changed", avrcp_set_shuffle_changed,
+		"Usage: avrcp_set_shuffle_changed\n\tset avrcp shuffle changed callback"},
+
+	{"avrcp_unset_shuffle_changed", avrcp_unset_shuffle_changed,
+		"Usage: avrcp_unset_shuffle_changed\n\tunset avrcp shuffle changed callback"},
+
+	{"avrcp_set_repeat_changed", avrcp_set_repeat_changed,
+		"Usage: avrcp_set_repeat_changed\n\tset avrcp repeat changed callback"},
+
+	{"avrcp_unset_repeat_changed", avrcp_unset_repeat_changed,
+		"Usage: avrcp_unset_repeat_changed\n\tunset avrcp repeat changed callback"},
 
 	{"avrcp_target_initialize", avrcp_target_initialize,
 		"Usage: avrcp_target_initialize\n\tset avrcp target callback"},
