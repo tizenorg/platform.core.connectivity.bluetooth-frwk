@@ -203,6 +203,8 @@ void bt_service_media_init(GDBusObjectSkeleton *gdbus_object_skeleton,
 	bt_media = bt_service_media_new();
 
 	bt_media_register_dbus_interface(bt_media, connection);
+
+	bt_media_register_player(default_adapter);
 }
 
 void bt_service_media_deinit(void)
@@ -211,6 +213,8 @@ void bt_service_media_deinit(void)
 
 	if (bt_media == NULL)
 		return;
+
+	bt_media_unregister_player(default_adapter);
 
 	bt_media_unregister_dbus_interface();
 
