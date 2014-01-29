@@ -39,6 +39,7 @@
 #endif
 
 #define DEFAULT_ADAPTER_NAME "hci0"
+#define BT_ADDRESS_STRING_SIZE 18
 
 enum bluez_error_type {
 	ERROR_NONE,
@@ -75,4 +76,7 @@ char **property_get_string_list(GDBusProxy *proxy,
 
 int comms_service_plugin_init(void);
 void comms_service_plugin_cleanup(void);
+
+void convert_device_path_to_address(const gchar *device_path,
+					gchar *device_address);
 #endif
