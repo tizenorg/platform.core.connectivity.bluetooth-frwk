@@ -17,6 +17,8 @@
 *
 */
 
+#include <string.h>
+#include <stdio.h>
 #include "common.h"
 
 struct error_map_t {
@@ -176,4 +178,26 @@ void property_set_uint64(GDBusProxy *proxy,
 {
 	g_dbus_proxy_set_cached_property(proxy, property,
 				g_variant_new("t", u64));
+}
+
+void convert_device_path_to_address(const gchar *device_path,
+					gchar *device_address)
+{
+	gchar address[BT_ADDRESS_STRING_SIZE] = { 0 };
+	gchar *dev_addr;
+
+	if (device_path == NULL || device_address == NULL)
+		return;
+
+	dev_addr = strstr(device_path, "dev_");
+	if (dev_addr != NULL) {
+		gchar *pos = NULL;
+		dev_addr += 4;
+		g_strlcpy(address, dev_addr, sizeof(address));
+
+		while ((pos = strchr(address, '_')) != NULL)
+			*pos = ':';
+
+		g_strlcpy(device_address, address, BT_ADDRESS_STRING_SIZE);
+	}
 }
