@@ -1,6 +1,7 @@
 %bcond_with bluetooth_frwk_libnotify
 %bcond_with bluetooth_frwk_libnotification
 %bcond_with multi_user
+%bcond_with x
 
 Name:       bluetooth-frwk
 Summary:    Bluetooth framework for BlueZ and Obexd
@@ -29,7 +30,9 @@ BuildRequires:  pkgconfig(syspopup-caller)
 BuildRequires:  pkgconfig(vconf)
 BuildRequires:  pkgconfig(libxml-2.0)
 BuildRequires:  pkgconfig(dbus-1)
+%if %{with x}
 BuildRequires:  pkgconfig(utilX)
+%endif
 BuildRequires:  pkgconfig(capi-network-tethering)
 BuildRequires:  pkgconfig(libprivilege-control)
 BuildRequires:  pkgconfig(status)
@@ -81,7 +84,7 @@ cp %{SOURCE1001} .
 
 %ifarch x86_64
 export CFLAGS+="   -Wall -g -fvisibility=hidden -fPIC"
-export LDFLAGS+=" -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs" 
+export LDFLAGS+=" -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs"
 %else
 export CFLAGS+=" -fpie"
 export LDFLAGS+=" -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs -pie"
