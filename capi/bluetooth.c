@@ -102,6 +102,11 @@ struct spp_data_received_cb_node {
 	void *user_data;
 };
 
+struct avrcp_target_connection_state_changed_node {
+	bt_avrcp_target_connection_state_changed_cb cb;
+	void *user_data;
+};
+
 struct audio_connection_state_changed_cb_node {
 	bt_audio_connection_state_changed_cb cb;
 	void *user_data;
@@ -118,6 +123,8 @@ static struct device_destroy_paired_cb_node *paired_device_removed_node;
 static struct device_connected_state_cb_node *device_connected_state_node;
 static struct spp_connection_requested_cb_node *spp_connection_requested_node;
 static struct spp_data_received_cb_node *spp_data_received_node;
+static struct avrcp_target_connection_state_changed_node
+					*avrcp_target_state_node;
 static struct audio_connection_state_changed_cb_node *audio_state_node;
 
 static gboolean generic_device_removed_set;
@@ -341,6 +348,25 @@ static void set_device_removed_generic_callback(bluez_adapter_t *adapter)
 	generic_device_removed_set = TRUE;
 }
 
+static void bluez_avrcp_target_state_changed(struct _bluez_device *device,
+					gboolean connected,
+					void *user_data)
+{
+	bt_device_info_s *device_info;
+	struct avrcp_target_connection_state_changed_node *data =
+							user_data;
+
+	DBG("");
+
+	device_info = get_device_info(device);
+
+	if (data->cb)
+		(data->cb)(connected, device_info->remote_address,
+							data->user_data);
+
+	free_device_info(device_info);
+}
+
 static void bluez_audio_state_changed(int result,
 					gboolean connected,
 					const char *remote_address,
@@ -546,6 +572,11 @@ static void _bt_update_bluetooth_callbacks(void)
 		bluez_set_audio_state_cb(
 					bluez_audio_state_changed,
 					audio_state_node);
+
+	if (avrcp_target_state_node)
+		bluez_set_avrcp_target_cb(
+					bluez_avrcp_target_state_changed,
+					avrcp_target_state_node);
 }
 
 static void setup_bluez_lib(void)
@@ -1720,6 +1751,60 @@ int bt_audio_unset_connection_state_changed_cb(void)
 
 	g_free(audio_state_node);
 	audio_state_node = NULL;
+
+	return BT_SUCCESS;
+}
+
+int bt_avrcp_target_initialize(
+			bt_avrcp_target_connection_state_changed_cb callback,
+			void *user_data)
+{
+	struct avrcp_target_connection_state_changed_node *node_data = NULL;
+
+	DBG("default_adpater: %p", default_adapter);
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (callback == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (avrcp_target_state_node) {
+		DBG("avrcp target callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
+
+	node_data =
+		g_new0(struct avrcp_target_connection_state_changed_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->cb = callback;
+	node_data->user_data = user_data;
+
+	avrcp_target_state_node = node_data;
+
+	_bt_update_bluetooth_callbacks();
+
+	return BT_SUCCESS;
+}
+
+int bt_avrcp_target_deinitialize(void)
+{
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (!avrcp_target_state_node)
+		return BT_SUCCESS;
+
+	bluez_unset_avrcp_target_cb();
+
+	g_free(avrcp_target_state_node);
+	avrcp_target_state_node = NULL;
 
 	return BT_SUCCESS;
 }

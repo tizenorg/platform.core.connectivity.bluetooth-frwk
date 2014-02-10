@@ -51,6 +51,52 @@ enum bluez_agent_cap {
 	KEYBOARD_DISPLAY
 };
 
+typedef enum {
+	PLAYBACKSTATUS = 0x1,
+	SHUFFLE,
+	LOOPSTATUS,
+	POSITION,
+	METADATA
+} media_player_property_type;
+
+typedef enum {
+	REPEAT_MODE_OFF = 0x01,
+	REPEAT_SINGLE_TRACK,
+	REPEAT_ALL_TRACK,
+	REPEAT_INVALID
+} media_player_repeat_status;
+
+typedef enum {
+	STATUS_STOPPED = 0x00,
+	STATUS_PLAYING,
+	STATUS_PAUSED,
+	STATUS_INVALID
+} media_player_status;
+
+typedef enum {
+	SHUFFLE_MODE_OFF = 0x01,
+	SHUFFLE_ALL_TRACK,
+	SHUFFLE_GROUP,
+	SHUFFLE_INVALID
+} media_player_shuffle_status;
+
+typedef struct {
+	const char *title;
+	const char **artist;
+	const char *album;
+	const char **genre;
+	unsigned int tracknumber;
+	unsigned int duration;
+} media_metadata_attributes_t;
+
+typedef struct {
+	media_player_repeat_status loopstatus;
+	media_player_status playbackstatus;
+	media_player_shuffle_status shuffle;
+	gint64 position;
+	media_metadata_attributes_t metadata;
+} media_player_settings_t;
+
 void bluez_lib_deinit(void);
 int bluez_lib_init(void);
 
@@ -214,6 +260,16 @@ typedef void (*simple_reply_cb_t) (
 				enum bluez_error_type type,
 				void *user_data);
 
+typedef void (*bluez_avrcp_target_cb_t)(
+				struct _bluez_device *device,
+				gboolean connected,
+				gpointer user_data);
+
+void bluez_set_avrcp_target_cb(
+				bluez_avrcp_target_cb_t cb,
+				gpointer user_data);
+void bluez_unset_avrcp_target_cb();
+
 typedef void (*bluez_audio_state_cb_t)(int result,
 				gboolean connected,
 				const char *remote_address,
@@ -367,5 +423,15 @@ enum bluez_error_type  bluez_profile_unregister_profile_sync(
 void bt_media_register_player(struct _bluez_adapter *adapter);
 
 void bt_media_unregister_player(struct _bluez_adapter *adapter);
+
+int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
+				media_metadata_attributes_t *meta_data);
+
+int bluez_media_player_change_property(struct _bluez_adapter *adapter,
+				media_player_property_type type,
+				unsigned int value);
+
+int bluez_media_player_set_properties(struct _bluez_adapter *adapter,
+				media_player_settings_t *properties);
 
 #endif
