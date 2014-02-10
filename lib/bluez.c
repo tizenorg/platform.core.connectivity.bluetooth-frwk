@@ -35,6 +35,9 @@
 #define PROPERTIES_INTERFACE "org.freedesktop.DBus.Properties"
 #define MANAGER_INTERFACE "org.freedesktop.DBus.ObjectManager"
 
+#define BT_MEDIA_OBJECT_PATH "/Musicplayer"
+#define MEDIA_PLAYER_INTERFACE  "org.mpris.MediaPlayer2.Player"
+
 GDBusObjectManager *object_manager = NULL;
 
 struct _bluez_object {
@@ -123,6 +126,9 @@ static bluez_agent_added_cb_t agent_added_cb;
 static gpointer agent_added_cb_data;
 static bluez_audio_state_cb_t audio_state_cb;
 static gpointer audio_state_cb_data;
+
+static GDBusNodeInfo *introspection_data;
+static guint bt_register_avrcp_property(struct _bluez_adapter *adapter);
 
 static struct _bluez_object *get_object_from_path(const char *path)
 {
@@ -1983,4 +1989,192 @@ enum bluez_error_type  bluez_profile_unregister_profile_sync(const gchar *path)
 	}
 
 	return err_type;
+}
+
+static void handle_media_proxy_cb(GObject *source_object,
+					GAsyncResult *res,
+					gpointer user_data)
+{
+	GVariant *ret;
+	GError *error = NULL;
+	enum bluez_error_type error_type = ERROR_NONE;
+	struct _bluez_adapter *adapter = user_data;
+
+	DBG("");
+
+	ret = g_dbus_proxy_call_finish(adapter->media_proxy, res,
+							&error);
+	if (ret == NULL) {
+		error_type = get_error_type(error);
+		DBG("error_type = %d", error_type);
+		g_error_free(error);
+	} else
+		g_variant_unref(ret);
+}
+
+void bt_media_register_player(struct _bluez_adapter *adapter)
+{
+	GVariant *str_array[1];
+	GVariant *val_array;
+	GVariant *val_metadata;
+
+	GVariantBuilder *builder = g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
+	GVariantBuilder *builder_array =
+				g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
+
+	GVariant *val = g_variant_new("s", "None");
+	g_variant_builder_add(builder, "{sv}", "LoopStatus", val);
+
+	val = g_variant_new("b", FALSE);
+	g_variant_builder_add(builder, "{sv}", "Shuffle", val);
+
+	val = g_variant_new("s", "Stopped");
+	g_variant_builder_add(builder, "{sv}", "PlaybackStatus", val);
+
+	val = g_variant_new("x", 0);
+	g_variant_builder_add(builder, "{sv}", "Position", val);
+
+	val = g_variant_new_string("\0");
+	str_array[0] = val;
+	val_array = g_variant_new_array(G_VARIANT_TYPE_STRING, str_array, 1);
+	g_variant_builder_add(builder_array, "{sv}", "xesam:artist", val_array);
+
+	val = g_variant_new_string("\0");
+	str_array[0] = val;
+	val_array = g_variant_new_array(G_VARIANT_TYPE_STRING, str_array, 1);
+	g_variant_builder_add(builder_array, "{sv}", "xesam:genre", val_array);
+
+	val = g_variant_new("s", "\0");
+	g_variant_builder_add(builder_array, "{sv}", "xesam:title", val);
+
+	val = g_variant_new("i", 0);
+	g_variant_builder_add(builder_array, "{sv}", "xesam:trackNumber", val);
+
+	val = g_variant_new("s", "\0");
+	g_variant_builder_add(builder_array, "{sv}", "xesam:album", val);
+
+	val = g_variant_new("x", 0);
+	g_variant_builder_add(builder_array, "{sv}", "mpris:length", val);
+
+	val_metadata = g_variant_new("a{sv}", builder_array);
+	g_variant_builder_add(builder, "{sv}", "Metadata", val_metadata);
+
+	DBG("+");
+
+	if (adapter == NULL) {
+		ERROR("adapter is NULL");
+		return;
+	}
+
+	if (adapter->media_proxy == NULL) {
+		ERROR("adapter->mediaprooxy is NULL");
+		return;
+	}
+
+	if (adapter->avrcp_registration_id == 0)
+		adapter->avrcp_registration_id =
+				bt_register_avrcp_property(adapter);
+
+	g_dbus_proxy_call(adapter->media_proxy,
+			"RegisterPlayer",
+			g_variant_new("(oa{sv})",
+				BT_MEDIA_OBJECT_PATH, builder),
+			0, -1, NULL,
+			handle_media_proxy_cb, adapter);
+
+	DBG("-");
+	return;
+}
+
+void bt_media_unregister_player(struct _bluez_adapter *adapter)
+{
+	GDBusConnection  *conn;
+
+	DBG("+");
+
+	if (adapter == NULL) {
+		ERROR("adapter is NULL");
+		return;
+	}
+
+	if (adapter->media_proxy == NULL) {
+		ERROR("adapter->mediaprooxy is NULL");
+		return;
+	}
+
+	g_dbus_proxy_call(adapter->media_proxy,
+			"UnregisterPlayer",
+			g_variant_new("(o)", BT_MEDIA_OBJECT_PATH),
+			0, -1, NULL,
+			handle_media_proxy_cb, adapter);
+
+	conn = g_dbus_proxy_get_connection(adapter->media_proxy);
+
+	g_dbus_connection_unregister_object(conn,
+			adapter->avrcp_registration_id);
+
+	adapter->avrcp_registration_id = 0;
+
+	DBG("-");
+	return;
+}
+
+static const gchar introspection_xml[] =
+"<node>"
+"  <interface name='org.mpris.MediaPlayer2.Player'>"
+"    <property type='b' name='Shuffle' access='readwrite'/>"
+"    <property type='s' name='LoopStatus' access='readwrite'/>"
+"  </interface>"
+"</node>";
+
+static gboolean handle_set_property(GDBusConnection *connection,
+				const gchar *sender,
+				const gchar *object_path,
+				const gchar *interface_name,
+				const gchar *property_name,
+				GVariant *value,
+				GError **error,
+				gpointer user_data)
+{
+	DBG("property_name = %s", property_name);
+
+	if (g_strcmp0(property_name, "LoopStatus") == 0) {
+		const gchar *loopstatus = g_variant_get_string(value, NULL);
+		DBG("loopstatus = %s", loopstatus);
+
+	} else if (g_strcmp0(property_name, "Shuffle") == 0) {
+		gboolean shuffle_mode = g_variant_get_boolean(value);
+		if (shuffle_mode == TRUE)
+			DBG("shuffle_mode TRUE");
+		else
+			DBG("shuffle_mode FALSE");
+	}
+
+	return *error == NULL;
+}
+
+static const GDBusInterfaceVTable interface_vtable = {
+	NULL,
+	NULL,
+	handle_set_property
+};
+
+static guint bt_register_avrcp_property(struct _bluez_adapter *adapter)
+{
+	guint rid;
+	GDBusConnection  *conn;
+
+	conn = g_dbus_proxy_get_connection(adapter->media_proxy);
+
+	introspection_data = g_dbus_node_info_new_for_xml(introspection_xml,
+								NULL);
+
+	rid = g_dbus_connection_register_object(conn, BT_MEDIA_OBJECT_PATH,
+					introspection_data->interfaces[0],
+					&interface_vtable,
+					NULL,
+					NULL,
+					NULL);
+
+	return rid;
 }
