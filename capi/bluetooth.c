@@ -102,6 +102,16 @@ struct spp_data_received_cb_node {
 	void *user_data;
 };
 
+struct avrcp_repeat_mode_changed_node {
+	bt_avrcp_repeat_mode_changed_cb cb;
+	void *user_data;
+};
+
+struct avrcp_set_shuffle_mode_changed_node {
+	bt_avrcp_shuffle_mode_changed_cb cb;
+	void *user_data;
+};
+
 struct avrcp_target_connection_state_changed_node {
 	bt_avrcp_target_connection_state_changed_cb cb;
 	void *user_data;
@@ -112,6 +122,8 @@ struct audio_connection_state_changed_cb_node {
 	void *user_data;
 };
 
+static struct avrcp_repeat_mode_changed_node *avrcp_repeat_node;
+static struct avrcp_set_shuffle_mode_changed_node *avrcp_shuffle_node;
 static struct adapter_name_cb_node *adapter_name_node;
 static struct device_created_cb_node *device_created_node;
 static struct adapter_state_cb_node *adapter_state_node;
@@ -348,6 +360,55 @@ static void set_device_removed_generic_callback(bluez_adapter_t *adapter)
 	generic_device_removed_set = TRUE;
 }
 
+static bt_avrcp_repeat_mode_e loopstatus_to_enum(const gchar *repeat)
+{
+	DBG("repeat = %s", repeat);
+
+	if (g_strcmp0(repeat, "None") == 0)
+		return BT_AVRCP_REPEAT_MODE_OFF;
+	else if (g_strcmp0(repeat, "Track") == 0)
+		return BT_AVRCP_REPEAT_MODE_SINGLE_TRACK;
+	else if (g_strcmp0(repeat, "Playlist") == 0)
+		return BT_AVRCP_REPEAT_MODE_ALL_TRACK;
+	return 0x00;
+}
+
+static void bluez_avrcp_repeat_changed(const gchar *repeat,
+					void *user_data)
+{
+	bt_avrcp_repeat_mode_e repeat_mode;
+	struct avrcp_repeat_mode_changed_node *data = user_data;
+
+	repeat_mode = loopstatus_to_enum(repeat);
+
+	if (data->cb)
+		data->cb(repeat_mode, data->user_data);
+}
+
+static bt_avrcp_repeat_mode_e shuffle_to_enum(gboolean shuffle)
+{
+	if (shuffle) {
+		DBG("shuffle is true");
+		return BT_AVRCP_SHUFFLE_MODE_ALL_TRACK;
+	} else {
+		DBG("shuffle is false");
+		return BT_AVRCP_SHUFFLE_MODE_OFF;
+	}
+}
+
+static void bluez_avrcp_shuffle_changed(gboolean shuffle,
+					void *user_data)
+{
+	bt_avrcp_shuffle_mode_e shuffle_mode;
+	struct avrcp_set_shuffle_mode_changed_node *data =
+						user_data;
+
+	shuffle_mode = shuffle_to_enum(shuffle);
+
+	if (data->cb)
+		data->cb(shuffle_mode, data->user_data);
+}
+
 static void bluez_avrcp_target_state_changed(struct _bluez_device *device,
 					gboolean connected,
 					void *user_data)
@@ -577,6 +638,16 @@ static void _bt_update_bluetooth_callbacks(void)
 		bluez_set_avrcp_target_cb(
 					bluez_avrcp_target_state_changed,
 					avrcp_target_state_node);
+
+	if (avrcp_repeat_node)
+		bluez_set_avrcp_repeat_changed_cb(
+					bluez_avrcp_repeat_changed,
+					avrcp_repeat_node);
+
+	if (avrcp_shuffle_node)
+		bluez_set_avrcp_shuffle_changed_cb(
+					bluez_avrcp_shuffle_changed,
+					avrcp_shuffle_node);
 }
 
 static void setup_bluez_lib(void)
@@ -1807,6 +1878,202 @@ int bt_avrcp_target_deinitialize(void)
 	avrcp_target_state_node = NULL;
 
 	return BT_SUCCESS;
+}
+
+int bt_avrcp_set_repeat_mode_changed_cb(
+		bt_avrcp_repeat_mode_changed_cb callback,
+		void *user_data)
+{
+	static struct avrcp_repeat_mode_changed_node *node_data;
+
+	DBG("default_adpater: %p", default_adapter);
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (callback == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (avrcp_repeat_node) {
+		DBG("repeat mode callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
+
+	node_data = g_new0(struct avrcp_repeat_mode_changed_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->cb = callback;
+	node_data->user_data = user_data;
+
+	avrcp_repeat_node = node_data;
+
+	_bt_update_bluetooth_callbacks();
+
+	return BT_SUCCESS;
+}
+
+int bt_avrcp_unset_repeat_mode_changed_cb(void)
+{
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (!avrcp_repeat_node)
+		return BT_SUCCESS;
+
+	bluez_unset_avrcp_repeat_changed_cb();
+
+	g_free(avrcp_repeat_node);
+	avrcp_repeat_node = NULL;
+
+	return BT_SUCCESS;
+}
+
+int bt_avrcp_set_shuffle_mode_changed_cb(
+		bt_avrcp_shuffle_mode_changed_cb callback,
+		void *user_data)
+{
+	struct avrcp_set_shuffle_mode_changed_node *node_data = NULL;
+
+	DBG("default_adpater: %p", default_adapter);
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (callback == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (avrcp_shuffle_node) {
+		DBG("repeat mode callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
+
+	node_data = g_new0(struct avrcp_set_shuffle_mode_changed_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->cb = callback;
+	node_data->user_data = user_data;
+
+	avrcp_shuffle_node = node_data;
+
+	_bt_update_bluetooth_callbacks();
+
+	return BT_SUCCESS;
+}
+
+int bt_avrcp_unset_shuffle_mode_changed_cb(void)
+{
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (!avrcp_shuffle_node)
+		return BT_SUCCESS;
+
+	bluez_unset_avrcp_shuffle_changed_cb();
+
+	g_free(avrcp_shuffle_node);
+	avrcp_shuffle_node = NULL;
+
+	return BT_SUCCESS;
+}
+
+int bt_avrcp_target_notify_repeat_mode(bt_avrcp_repeat_mode_e mode)
+{
+	DBG("");
+
+	if (default_adapter == NULL) {
+		DBG("no adapter");
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+	}
+
+	return comms_bluetooth_avrcp_change_property(LOOPSTATUS,
+					mode, NULL, NULL);
+}
+
+int bt_avrcp_target_notify_shuffle_mode(bt_avrcp_shuffle_mode_e mode)
+{
+	DBG("");
+
+	if (default_adapter == NULL) {
+		DBG("no adapter");
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+	}
+
+	return comms_bluetooth_avrcp_change_property(SHUFFLE, mode,
+					NULL, NULL);
+}
+
+int bt_avrcp_target_notify_player_state(bt_avrcp_player_state_e state)
+{
+	DBG("");
+
+	if (default_adapter == NULL) {
+		DBG("no adapter");
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+	}
+
+	return comms_bluetooth_avrcp_change_property(PLAYBACKSTATUS,
+					state, NULL, NULL);
+}
+
+int bt_avrcp_target_notify_position(unsigned int position)
+{
+	DBG("");
+
+	if (default_adapter == NULL) {
+		DBG("no adapter");
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+	}
+
+	return comms_bluetooth_avrcp_change_property(POSITION,
+				position, NULL, NULL);
+}
+
+int bt_avrcp_target_notify_track(const char *title, const char *artist,
+		const char *album, const char *genre, unsigned int track_num,
+		unsigned int total_tracks, unsigned int duration)
+{
+	GVariantBuilder *builder;
+	GVariant *val;
+
+	DBG("");
+
+	if (default_adapter == NULL) {
+		DBG("no adapter");
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+	}
+
+	builder = g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
+
+	val = g_variant_new("s", title);
+	g_variant_builder_add(builder, "{sv}", "xesam:title", val);
+
+	val = g_variant_new("s", artist);
+	g_variant_builder_add(builder, "{sv}", "xesam:artist", val);
+
+	val = g_variant_new("s", genre);
+	g_variant_builder_add(builder, "{sv}", "xesam:genre", val);
+
+	val = g_variant_new("s", album);
+	g_variant_builder_add(builder, "{sv}", "xesam:album", val);
+
+	val = g_variant_new("i", track_num);
+	g_variant_builder_add(builder, "{sv}", "xesam:trackNumber", val);
+
+	val = g_variant_new("x", duration);
+	g_variant_builder_add(builder, "{sv}", "mpris:length", val);
+
+	return comms_bluetooth_avrcp_change_track((void *)builder,
+							NULL, NULL);
 }
 
 /* Hid function */

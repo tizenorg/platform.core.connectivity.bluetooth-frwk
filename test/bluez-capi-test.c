@@ -725,6 +725,82 @@ static int audio_connect(const char *p1, const char *p2)
 	return 0;
 }
 
+static int avrcp_target_notify_repeat_mode()
+{
+	int err;
+
+	DBG("");
+
+	DBG("repeat mode = %d", BT_AVRCP_REPEAT_MODE_SINGLE_TRACK);
+
+	err = bt_avrcp_target_notify_repeat_mode
+				(BT_AVRCP_REPEAT_MODE_SINGLE_TRACK);
+	if (err != BT_SUCCESS) {
+		ERROR("notify_repeat_mode error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
+static int avrcp_target_notify_shuffle_mode()
+{
+	int err;
+
+	err = bt_avrcp_target_notify_shuffle_mode
+				(BT_AVRCP_SHUFFLE_MODE_ALL_TRACK);
+	if (err != BT_SUCCESS) {
+		ERROR("notify_shuffle_mode error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
+static int avrcp_target_notify_player_state()
+{
+	int err;
+
+	err = bt_avrcp_target_notify_player_state
+				(BT_AVRCP_PLAYER_STATE_PAUSED);
+
+	if (err != BT_SUCCESS) {
+		ERROR("notify_player_state error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
+static int avrcp_target_notify_position()
+{
+	int err;
+
+	err = bt_avrcp_target_notify_position(50);
+
+	if (err != BT_SUCCESS) {
+		ERROR("notify_position error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
+static int avrcp_target_notify_track()
+{
+	int err;
+
+	err = bt_avrcp_target_notify_track("title", "artist",
+			"album", "genre", 10, 100, 1);
+
+	if (err != BT_SUCCESS) {
+		ERROR("notify_track error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int get_bonded_device_info(const char *p1, const char *p2)
 {
 	bt_device_info_s *device_info;
@@ -821,6 +897,81 @@ static int audio_unset_connection_state_changed()
 	DBG("");
 
 	err = bt_audio_unset_connection_state_changed_cb();
+
+	DBG("err = %d", err);
+	return err;
+}
+
+void avrcp_set_shuffle_mode_changed_cb(bt_avrcp_shuffle_mode_e shuffle,
+				void *user_data)
+{
+	if (shuffle == BT_AVRCP_SHUFFLE_MODE_OFF)
+		DBG("shuffle mode off");
+	else if (shuffle == BT_AVRCP_SHUFFLE_MODE_ALL_TRACK)
+		DBG("All tracks shuffle");
+	else if (shuffle == BT_AVRCP_SHUFFLE_MODE_GROUP)
+		DBG("Group shuffle");
+}
+
+
+static int avrcp_set_shuffle_changed()
+{
+	int err;
+
+	DBG("");
+
+	err = bt_avrcp_set_shuffle_mode_changed_cb(
+		avrcp_set_shuffle_mode_changed_cb, NULL);
+
+	DBG("err = %d", err);
+	return err;
+}
+
+static int avrcp_unset_shuffle_changed()
+{
+	int err;
+
+	DBG("");
+
+	err = bt_avrcp_unset_shuffle_mode_changed_cb();
+
+	DBG("err = %d", err);
+	return err;
+}
+
+void avrcp_set_repeat_mode_changed_cb(bt_avrcp_repeat_mode_e repeat,
+					void *user_data)
+{
+	if (repeat == BT_AVRCP_REPEAT_MODE_OFF)
+		DBG(" Repeat Off");
+	else if (repeat == BT_AVRCP_REPEAT_MODE_SINGLE_TRACK)
+		DBG("Single track repeat");
+	else if (repeat == BT_AVRCP_REPEAT_MODE_ALL_TRACK)
+		DBG("All track repeat");
+	else if (repeat == BT_AVRCP_REPEAT_MODE_GROUP)
+		DBG("Group repeat");
+}
+
+static int avrcp_set_repeat_changed()
+{
+	int err;
+
+	DBG("");
+
+	err = bt_avrcp_set_repeat_mode_changed_cb(
+		avrcp_set_repeat_mode_changed_cb, NULL);
+
+	DBG("err = %d", err);
+	return err;
+}
+
+static int avrcp_unset_repeat_changed()
+{
+	int err;
+
+	DBG("");
+
+	err = bt_avrcp_unset_repeat_mode_changed_cb();
 
 	DBG("err = %d", err);
 	return err;
@@ -1230,11 +1381,38 @@ struct {
 	{"audio_unset_connection_state_changed", audio_unset_connection_state_changed,
 		"Usage: audio_unset_connection_state_changed\n\tunset connection state callback"},
 
+	{"avrcp_set_shuffle_changed", avrcp_set_shuffle_changed,
+		"Usage: avrcp_set_shuffle_changed\n\tset avrcp shuffle changed callback"},
+
+	{"avrcp_unset_shuffle_changed", avrcp_unset_shuffle_changed,
+		"Usage: avrcp_unset_shuffle_changed\n\tunset avrcp shuffle changed callback"},
+
+	{"avrcp_set_repeat_changed", avrcp_set_repeat_changed,
+		"Usage: avrcp_set_repeat_changed\n\tset avrcp repeat changed callback"},
+
+	{"avrcp_unset_repeat_changed", avrcp_unset_repeat_changed,
+		"Usage: avrcp_unset_repeat_changed\n\tunset avrcp repeat changed callback"},
+
 	{"avrcp_target_initialize", avrcp_target_initialize,
 		"Usage: avrcp_target_initialize\n\tset avrcp target callback"},
 
 	{"avrcp_target_deinitialize", avrcp_target_deinitialize,
 		"Usage: avrcp_target_deinitialize\n\tunset avrcp target callback"},
+
+	{"avrcp_target_notify_repeat_mode", avrcp_target_notify_repeat_mode,
+		"Usage: avrcp_target_notify_repeat_mode\n\tnotify repeat mode"},
+
+	{"avrcp_target_notify_shuffle_mode", avrcp_target_notify_shuffle_mode,
+		"Usage: avrcp_target_notify_shuffle_mode\n\tnotify shuffle mode"},
+
+	{"avrcp_target_notify_player_state", avrcp_target_notify_player_state,
+		"Usage: avrcp_target_notify_player_state\n\tnotify player state"},
+
+	{"avrcp_target_notify_position", avrcp_target_notify_position,
+		"Usage: avrcp_target_notify_position\n\tnotify position"},
+
+	{"avrcp_target_notify_track", avrcp_target_notify_track,
+		"Usage: avrcp_target_notify_track\n\tnotify track"},
 
 	{"register_agent", register_agent,
 		"Usage: register_agent\n\tRegister agent"},
