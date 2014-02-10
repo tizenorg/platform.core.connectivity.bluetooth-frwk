@@ -27,6 +27,7 @@
 #define OBJECT_MANAGE_PATH "/"
 #define ADAPTER_INTERFACE "org.bluez.Adapter1"
 #define MEDIA_INTERFACE "org.bluez.Media1"
+#define MEDIACONTROL_INTERFACE "org.bluez.MediaControl1"
 #define DEVICE_INTERFACE "org.bluez.Device1"
 #define AGENT_INTERFACE "org.bluez.AgentManager1"
 #define PROFILE_INTERFACE "org.bluez.ProfileManager1"
@@ -76,7 +77,9 @@ struct _bluez_device {
 	char *interface_name;
 	char *object_path;
 	GDBusInterface *interface;
+	GDBusInterface *control_interface;
 	GDBusProxy *proxy;
+	GDBusProxy *control_proxy;
 	struct _bluez_object *parent;
 	struct _device_head *head;
 
@@ -483,6 +486,18 @@ static struct _bluez_device *create_device(struct _bluez_object *object)
 	return device;
 }
 
+static void control_properties_changed(GDBusProxy *proxy,
+					GVariant *changed_properties,
+					GStrv *invalidated_properties,
+					gpointer user_data)
+{
+	gchar *properties = g_variant_print(changed_properties, TRUE);
+
+	DBG("properties %s", properties);
+
+	g_free(properties);
+}
+
 static void parse_bluez_device_interfaces(gpointer data, gpointer user_data)
 {
 	struct _bluez_device *device = user_data;
@@ -498,14 +513,17 @@ static void parse_bluez_device_interfaces(gpointer data, gpointer user_data)
 	iface_name = g_dbus_proxy_get_interface_name(proxy);
 	DBG("%s", iface_name);
 
-	if (g_strcmp0(iface_name, DEVICE_INTERFACE))
-		return;
-
-	device->interface = interface;
-	device->proxy = proxy;
-
-	g_signal_connect(proxy, "g-properties-changed",
+	if (g_strcmp0(iface_name, DEVICE_INTERFACE) == 0) {
+		device->interface = interface;
+		device->proxy = proxy;
+		g_signal_connect(proxy, "g-properties-changed",
 			G_CALLBACK(device_properties_changed), device);
+	} else if (g_strcmp0(iface_name, MEDIACONTROL_INTERFACE) == 0) {
+		device->control_interface = interface;
+		device->control_proxy = proxy;
+		g_signal_connect(proxy, "g-properties-changed",
+			G_CALLBACK(control_properties_changed), device);
+	}
 }
 
 char *bluez_device_property_get_adapter(struct _bluez_device *device)
