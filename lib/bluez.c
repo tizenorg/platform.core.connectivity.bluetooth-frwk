@@ -26,6 +26,7 @@
 #define BLUEZ_NAME "org.bluez"
 #define OBJECT_MANAGE_PATH "/"
 #define ADAPTER_INTERFACE "org.bluez.Adapter1"
+#define MEDIA_INTERFACE "org.bluez.Media1"
 #define DEVICE_INTERFACE "org.bluez.Device1"
 #define AGENT_INTERFACE "org.bluez.AgentManager1"
 #define PROFILE_INTERFACE "org.bluez.ProfileManager1"
@@ -53,7 +54,10 @@ struct _bluez_adapter {
 	char *interface_name;
 	char *object_path;
 	GDBusInterface *interface;
+	GDBusInterface *media_interface;
+	guint avrcp_registration_id;
 	GDBusProxy *proxy;
+	GDBusProxy *media_proxy;
 	struct _bluez_object *parent;
 	struct _device_head *device_head;
 	bluez_adapter_powered_cb_t powered_cb;
@@ -256,14 +260,18 @@ static void parse_bluez_adapter_interfaces(gpointer data, gpointer user_data)
 	iface_name = g_dbus_proxy_get_interface_name(proxy);
 	DBG("%s", iface_name);
 
-	if (g_strcmp0(iface_name, ADAPTER_INTERFACE))
-		return;
+	if (g_strcmp0(iface_name, ADAPTER_INTERFACE) == 0) {
+		DBG("adapter->proxy = proxy");
+		adapter->interface = interface;
+		adapter->proxy = proxy;
 
-	adapter->interface = interface;
-	adapter->proxy = proxy;
-
-	g_signal_connect(proxy, "g-properties-changed",
+		g_signal_connect(proxy, "g-properties-changed",
 			G_CALLBACK(adapter_properties_changed), adapter);
+	} else if (g_strcmp0(iface_name, MEDIA_INTERFACE) == 0) {
+		DBG("adapter->media_proxy = proxy");
+		adapter->media_interface = interface;
+		adapter->media_proxy = proxy;
+	}
 }
 
 static GList *bluez_object_list;
@@ -856,6 +864,7 @@ static void destruct_bluez_adapter(gpointer data)
 	g_free(adapter->interface_name);
 	g_free(adapter->object_path);
 	g_object_unref(adapter->interface);
+	g_object_unref(adapter->media_proxy);
 	g_object_unref(adapter->proxy);
 
 	g_free(adapter);
