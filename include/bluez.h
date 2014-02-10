@@ -214,6 +214,18 @@ typedef void (*simple_reply_cb_t) (
 				enum bluez_error_type type,
 				void *user_data);
 
+typedef void (*bluez_audio_state_cb_t)(int result,
+				gboolean connected,
+				const char *remote_address,
+				bt_audio_profile_type_e type,
+				void *user_data);
+
+void bluez_set_audio_state_cb(
+				bluez_audio_state_cb_t cb,
+				gpointer user_data);
+
+void bluez_unset_audio_state_cb();
+
 enum device_pair_state {
 	PAIRING_SUCCESS,
 	AUTHENTICATION_CANCELED,

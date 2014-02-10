@@ -732,6 +732,50 @@ static int hid_disconnect(const char *p1, const char *p2)
 	return 0;
 }
 
+void audio_connection_state_changed_cb(int result,
+				bool connected,
+				const char *remote_address,
+				bt_audio_profile_type_e type,
+				void *user_data)
+{
+	int connection;
+
+	if (connected == TRUE)
+		connection = 1;
+	else
+		connection = 0;
+
+	DBG("result = %d", result);
+	DBG("connected = %d", connection);
+	DBG("remote_address = %s", remote_address);
+	DBG("type = %d", type);
+}
+
+static int audio_set_connection_state_changed()
+{
+	int err;
+
+	DBG("");
+
+	err = bt_audio_set_connection_state_changed_cb(
+		audio_connection_state_changed_cb, NULL);
+
+	DBG("err = %d", err);
+	return err;
+}
+
+static int audio_unset_connection_state_changed()
+{
+	int err;
+
+	DBG("");
+
+	err = bt_audio_unset_connection_state_changed_cb();
+
+	DBG("err = %d", err);
+	return err;
+}
+
 static int list_devices(const char *p1, const char *p2)
 {
 	int len;
@@ -1087,6 +1131,12 @@ struct {
 
 	{"hid_disconnect", hid_disconnect,
 		"Usage: hid_disconnect 70:F9:27:64:DF:65\n\tDisconnect HID profile"},
+
+	{"audio_set_connection_state_changed", audio_set_connection_state_changed,
+		"Usage: audio_set_connection_state_changed\n\tset connection state callback"},
+
+	{"audio_unset_connection_state_changed", audio_unset_connection_state_changed,
+		"Usage: audio_unset_connection_state_changed\n\tunset connection state callback"},
 
 	{"register_agent", register_agent,
 		"Usage: register_agent\n\tRegister agent"},
