@@ -141,10 +141,15 @@ static void media_skeleton_handle_method_call(GDBusConnection *connection,
 		DBG("type =%d, value = %d", type, value);
 		bluez_media_player_change_property(default_adapter,
 							type, value);
-	} else if (g_strcmp0(method_name, "MediaPlayerChangeTrack") == 0)
+	} else if (g_strcmp0(method_name,
+				"MediaPlayerChangeTrack") == 0) {
 		handle_change_track(parameters);
-	else
+	} else {
 		WARN("Unknown method");
+		return;
+	}
+
+	g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
 static const GDBusInterfaceVTable media_skeleton_vtable =
