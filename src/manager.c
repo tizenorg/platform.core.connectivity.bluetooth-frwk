@@ -294,6 +294,11 @@ static void adapter_powered_changed(bluez_adapter_t *adapter,
 	if (powered == FALSE) {
 		adapter_powered_off(adapter_activate_data->skeleton);
 
+		vertical_notify_bt_disabled();
+
+		set_bluetooth_in_service(adapter_activate_data->skeleton,
+						FALSE);
+
 		g_free(adapter_activate_data);
 	} else
 		adapter_powered_on(adapter_activate_data->skeleton);
@@ -467,10 +472,6 @@ static void handle_disable_bluetooth_service(GDBusConnection *connection,
 	}
 
 	bluez_adapter_set_powered(default_adapter, FALSE);
-
-	vertical_notify_bt_disabled();
-
-	set_bluetooth_in_service(skeleton, FALSE);
 
 	default_adapter = NULL;
 
