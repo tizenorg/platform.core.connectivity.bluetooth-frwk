@@ -17,9 +17,71 @@
 *
 */
 
+#include <stdint.h>
+#include <fcntl.h>
+#include <string.h>
+
 #include "common.h"
 #include "plugin.h"
 #include "vertical.h"
+
+enum rfkill_type {
+	RFKILL_TYPE_ALL = 0,
+	RFKILL_TYPE_WLAN,
+	RFKILL_TYPE_BLUETOOTH,
+	RFKILL_TYPE_UWB,
+	RFKILL_TYPE_WIMAX,
+	RFKILL_TYPE_WWAN,
+	RFKILL_TYPE_GPS,
+	RFKILL_TYPE_FM,
+	RFKILL_TYPE_NFC,
+	NUM_RFKILL_TYPES,
+};
+
+enum rfkill_operation {
+	RFKILL_OP_ADD = 0,
+	RFKILL_OP_DEL,
+	RFKILL_OP_CHANGE,
+	RFKILL_OP_CHANGE_ALL,
+};
+
+struct rfkill_event {
+	uint32_t idx;
+	uint8_t  type;
+	uint8_t  op;
+	uint8_t  soft, hard;
+};
+
+static int set_bt_rfkill_block(int block)
+{
+	struct rfkill_event event;
+	int rfkill_fd;
+	ssize_t len;
+
+	DBG("");
+
+	rfkill_fd = open("/dev/rfkill", O_RDWR | O_CLOEXEC);
+	if (rfkill_fd < 0) {
+		ERROR("open rfkill failed");
+		return -1;
+	}
+
+	memset(&event, 0, sizeof(struct rfkill_event));
+	event.op = RFKILL_OP_CHANGE_ALL;
+	event.type = RFKILL_TYPE_BLUETOOTH;
+	event.soft = block;
+
+	len = write(rfkill_fd, &event, sizeof(event));
+	if (len < 0) {
+		ERROR("failed to change rfkill state");
+
+		return -1;
+	}
+
+	close(rfkill_fd);
+
+	return 0;
+}
 
 static int bt_probe(void)
 {
@@ -30,12 +92,24 @@ static int bt_probe(void)
 
 static int bt_enabled(void)
 {
+	int ret;
+
+	ret = set_bt_rfkill_block(0);
+	if (ret != 0)
+		return -1;
+
 	return 0;
 }
 
 static int bt_disabled(void)
 {
+	int ret;
+
 	DBG("");
+
+	ret = set_bt_rfkill_block(1);
+	if (ret != 0)
+		return -1;
 
 	return 0;
 }
