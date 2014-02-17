@@ -1734,6 +1734,9 @@ static void simple_reply_callback(GObject *source_object, GAsyncResult *res,
 	GError *error = NULL;
 	GVariant *ret;
 
+	if (!reply_data->proxy)
+		goto done;
+
 	ret = g_dbus_proxy_call_finish(reply_data->proxy, res, &error);
 	if (ret == NULL) {
 		DBG("%s", error->message);
@@ -1749,6 +1752,7 @@ static void simple_reply_callback(GObject *source_object, GAsyncResult *res,
 	if (reply_data->reply_cb)
 		reply_data->reply_cb(error_type, reply_data->user_data);
 
+done:
 	g_free(reply_data);
 }
 
@@ -2335,9 +2339,19 @@ static void handle_media_proxy_cb(GObject *source_object,
 	GVariant *ret;
 	GError *error = NULL;
 	enum bluez_error_type error_type = ERROR_NONE;
-	struct _bluez_adapter *adapter = user_data;
+	gchar *adapter_object_path = user_data;
+	struct _bluez_adapter *adapter;
 
 	DBG("");
+
+	if (!adapter_object_path)
+		return;
+
+	adapter = g_hash_table_lookup(bluez_adapter_hash,
+					adapter_object_path);
+
+	if (adapter == NULL)
+		goto done;
 
 	ret = g_dbus_proxy_call_finish(adapter->media_proxy, res,
 							&error);
@@ -2347,6 +2361,9 @@ static void handle_media_proxy_cb(GObject *source_object,
 		g_error_free(error);
 	} else
 		g_variant_unref(ret);
+
+done:
+	g_free(adapter_object_path);
 }
 
 void bt_media_register_player(struct _bluez_adapter *adapter)
@@ -2417,7 +2434,8 @@ void bt_media_register_player(struct _bluez_adapter *adapter)
 			g_variant_new("(oa{sv})",
 				BT_MEDIA_OBJECT_PATH, builder),
 			0, -1, NULL,
-			handle_media_proxy_cb, adapter);
+			handle_media_proxy_cb,
+			g_strdup(adapter->object_path));
 
 	DBG("-");
 	return;
@@ -2443,7 +2461,8 @@ void bt_media_unregister_player(struct _bluez_adapter *adapter)
 			"UnregisterPlayer",
 			g_variant_new("(o)", BT_MEDIA_OBJECT_PATH),
 			0, -1, NULL,
-			handle_media_proxy_cb, adapter);
+			handle_media_proxy_cb,
+			g_strdup(adapter->object_path));
 
 	conn = g_dbus_proxy_get_connection(adapter->media_proxy);
 
