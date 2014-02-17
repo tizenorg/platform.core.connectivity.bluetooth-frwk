@@ -169,6 +169,7 @@ IF(platform STREQUAL "GEEK")
 
 	SET(SOURCE_PLUGIN_BLUETOOTH_MOBILE
 		plugins/bluetooth-geek.c
+		plugins/brcm_patchram_plus.c
 	   )
 
 	ADD_LIBRARY(${PLUGIN_BLUETOOTH_MOBILE} SHARED ${SOURCE_PLUGIN_BLUETOOTH_MOBILE})
