@@ -1278,6 +1278,8 @@ static struct _obex_session *create_session(struct _obex_object *object)
 
 	DBG("session id %s", session->identity);
 
+	session->ref_count = 1;
+
 	session->role = get_session_role(object);
 	if (session->role == OBEX_SERVER)
 		return session;
@@ -1289,8 +1291,6 @@ static struct _obex_session *create_session(struct _obex_object *object)
 		free_session(session);
 		return NULL;
 	}
-
-	session->ref_count = 1;
 
 	return session;
 }
