@@ -2107,11 +2107,11 @@ typedef void (*bt_opp_client_push_responded_cb)(
 
 int bt_opp_client_push_file(
 			const char *name,
-			const char *remote_address,
-			bt_opp_client_push_responded_cb responded_cb,
-			void *responded_data,
-			bt_opp_transfer_state_cb transfer_state_cb,
-			void *transfer_data);
+			const char *remote_address);
+
+int bt_opp_client_push_files(
+			const char **file_list,
+			const char *remote_address);
 
 int bt_opp_set_transfers_state_cb(
 			bt_opp_transfer_state_cb cb,

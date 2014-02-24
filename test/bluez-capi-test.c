@@ -452,19 +452,26 @@ static int opp_watch(const char *p1, const char *p2)
 	return 0;
 }
 
-static void push_responded_cb(
-			const char *remote_address,
-			push_state_e state,
-			void *user_data)
-{
-	printf("\n\t %s connection state %d\n", remote_address, state);
-}
-
-
 static int opp_send(const char *p1, const char *p2)
 {
-	bt_opp_client_push_file(p1, p2, push_responded_cb, NULL,
-					transfer_state_cb, NULL);
+	bt_opp_client_push_file(p1, p2);
+	return 0;
+}
+
+static int opp_sends(const char *p1, const char *p2)
+{
+	const char *files[] = { "/tmp/test1.png",
+			"/tmp/test2.png",
+			"/tmp/test3.png",
+			"/tmp/test4.png",
+			"/tmp/test5.png",
+			"/tmp/test6.png",
+			"/tmp/test7.png",
+			"/tmp/test8.png",
+			NULL };
+
+	bt_opp_client_push_files(files, p1);
+
 	return 0;
 }
 
@@ -1436,7 +1443,10 @@ struct {
 		"Usage: register_opp_server\n\tregister opp server"},
 
 	{"opp_send", opp_send,
-		"Usage: opp_server file_name destination\n\tpush file"},
+		"Usage: opp_send file_name destination\n\tpush file"},
+
+	{"opp_sends", opp_sends,
+		"Usage: opp_sends destination\n\tpush files that in /tmp/test(1-8).png"},
 
 	{"opp_watch", opp_watch,
 		"Usage: opp_watch on/off\n\ton/off opp_watch"},

@@ -428,13 +428,7 @@ struct opp_push_data{
 	void *transfer_data;
 };
 
-int bt_opp_client_push_file(
-			const char *file_name,
-			const char *remote_address,
-			bt_opp_client_push_responded_cb responded_cb,
-			void *responded_data,
-			bt_opp_transfer_state_cb transfer_state_cb,
-			void *transfer_data)
+int bt_opp_client_push_file(const char *file_name, const char *remote_address)
 {
 	if (file_name == NULL || remote_address == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
@@ -442,6 +436,24 @@ int bt_opp_client_push_file(
 	comms_bluetooth_opp_send_file(remote_address, file_name, NULL, NULL);
 
 	return 0;
+}
+
+int bt_opp_client_push_files(const char **file_list, const char *remote_address)
+{
+	int index = 0;
+
+	if (file_list == NULL || remote_address == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	while (file_list[index]) {
+		comms_bluetooth_opp_send_file(remote_address,
+						file_list[index],
+						NULL, NULL);
+
+		++index;
+	}
+
+	return BT_SUCCESS;
 }
 
 int bt_opp_init(void)
