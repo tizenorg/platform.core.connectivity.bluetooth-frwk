@@ -646,6 +646,7 @@ static void transfer_state_cb(const gchar *transfer_path,
 {
 	GVariant *ret;
 	guint transfer_id;
+	GList *transfer_list;
 	struct opp_push_data *push_data = data;
 
 	DBG("transfer path %s", transfer_path);
@@ -690,13 +691,18 @@ static void transfer_state_cb(const gchar *transfer_path,
 		goto done;
 	}
 
-	if (error_msg)
+	if (error_msg) {
 		handle_error_message(push_data->invocation, error_msg);
+		goto done;
+	}
 
 	comms_error_failed(push_data->invocation, "Failed");
 
 done:
-	obex_session_remove_session(push_data->session);
+
+	transfer_list = (GList *)obex_transfer_get_pathes();
+	if (g_list_length(transfer_list) == 1)
+		obex_session_remove_session(push_data->session);
 
 	g_free(push_data);
 }
