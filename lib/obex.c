@@ -695,6 +695,29 @@ struct _session_state_notify {
 	void *data;
 };
 
+static void free_session(struct _obex_session *session)
+{
+	DBG("");
+	g_free(session->identity);
+	g_free(session->object_path);
+	free_proxy(&session->session_proxy);
+	free_proxy(&session->obex_proxy);
+	g_free(session);
+}
+
+static GHashTable *id_session_hash;
+static GHashTable *path_session_hash;
+static GList *adopted_transfer_list;
+
+static void unregister_obex_session(struct _obex_session *session)
+{
+	g_hash_table_remove(id_session_hash,
+				(gconstpointer) session->identity);
+
+	g_hash_table_remove(path_session_hash,
+				(gconstpointer) session->object_path);
+}
+
 static int obex_session_unref(struct _obex_session *session)
 {
 	int ref = __sync_sub_and_fetch(&session->ref_count, 1);
@@ -704,10 +727,9 @@ static int obex_session_unref(struct _obex_session *session)
 	if (ref > 0)
 		return ref;
 
-	g_dbus_proxy_call(this_client->proxy,
-				"RemoveSession",
-				g_variant_new("(o)", session->object_path),
-				0, -1, NULL, NULL, NULL);
+	unregister_obex_session(session);
+	free_session(session);
+
 	return ref;
 }
 
@@ -778,20 +800,6 @@ static void session_add_notify(struct _session_state_notify *notify)
 {
 	session_notify_list = g_list_prepend(session_notify_list, notify);
 }
-
-static void free_session(struct _obex_session *session)
-{
-	DBG("");
-	g_free(session->identity);
-	g_free(session->object_path);
-	free_proxy(&session->session_proxy);
-	free_proxy(&session->obex_proxy);
-	g_free(session);
-}
-
-static GHashTable *id_session_hash;
-static GHashTable *path_session_hash;
-static GList *adopted_transfer_list;
 
 struct _obex_session *obex_session_get_session_from_path(const char *path)
 {
@@ -1176,15 +1184,6 @@ static struct _obex_transfer *create_transfer(struct _obex_object *object)
 	return transfer;
 }
 
-static void unregister_obex_session(struct _obex_session *session)
-{
-	g_hash_table_remove(id_session_hash,
-				(gconstpointer) session->identity);
-
-	g_hash_table_remove(path_session_hash,
-				(gconstpointer) session->object_path);
-}
-
 static void match_transfer(struct _obex_session *session)
 {
 	struct _obex_transfer *transfer;
@@ -1398,9 +1397,8 @@ static void destruct_obex_object_interfaces(struct _obex_object *object)
 					OBEX_SESSION_INTERFACE)) {
 			struct _obex_session *session = list->data;
 			DBG("free session %s", session->object_path);
-			unregister_obex_session(session);
-			free_session(session);
-			list->data = NULL;
+			if (obex_session_unref(session) == 0)
+				list->data = NULL;
 			continue;
 		}
 
@@ -1717,7 +1715,9 @@ void obex_session_remove_session(struct _obex_session *session)
 	if (session == NULL)
 		return;
 
-	obex_session_unref(session);
+	g_dbus_proxy_call(this_client->proxy, "RemoveSession",
+				g_variant_new("(o)", session->object_path),
+				0, -1, NULL, NULL, NULL);
 }
 
 struct _obex_session *obex_session_get_session(const char *id)
