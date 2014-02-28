@@ -309,26 +309,8 @@ static void bt_adapter_set_enable(bluez_adapter_t *adapter, void *user_data)
 						adapter_activate_data);
 
 	bluez_adapter_get_property_powered(default_adapter, &powered);
-	if (powered == FALSE) {
-		if (vertical_notify_bt_enabled() < 0) {
-			/*
-			 * If vertiacal failed, it should reply the
-			 * dbus request, then set the activating state
-			 * to FALSE, meaning activating is end.
-			 */
-			comms_error_failed(adapter_activate_data->invocation,
-							"Can't load vertical");
-
-			set_bluetooth_activating(
-					adapter_activate_data->skeleton,
-					FALSE);
-
-			 g_free(adapter_activate_data);
-
-			return;
-		} else
-			bluez_adapter_set_powered(default_adapter, TRUE);
-	}
+	if (powered == FALSE)
+		bluez_adapter_set_powered(default_adapter, TRUE);
 
 	g_dbus_method_invocation_return_value(
 			adapter_activate_data->invocation, NULL);
@@ -407,6 +389,12 @@ static void handle_enable_bluetooth_service(GDBusConnection *connection,
 	state = get_bluetooth_in_service(skeleton);
 	if (state == TRUE) {
 		comms_error_already_done(invocation);
+
+		return;
+	}
+
+	if (vertical_notify_bt_enabled() != 0) {
+		comms_error_failed(invocation, "Can't load vertical");
 
 		return;
 	}
