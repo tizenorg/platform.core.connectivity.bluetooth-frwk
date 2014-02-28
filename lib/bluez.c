@@ -792,6 +792,19 @@ static struct _bluez_agent *create_agent(struct _bluez_object *object)
 	return agent;
 }
 
+static void free_agent(struct _bluez_agent *agent)
+{
+	if (agent == NULL)
+		return;
+
+	g_free(agent->object_path);
+	g_free(agent->interface_name);
+
+	g_object_unref(agent->proxy);
+
+	g_free(agent);
+}
+
 static void parse_bluez_agent_interfaces(gpointer data, gpointer user_data)
 {
 	struct _bluez_agent *agent = user_data;
@@ -833,6 +846,19 @@ static struct _bluez_profile *create_profile(struct _bluez_object *object)
 	profile->interface_name = g_strdup(PROFILE_INTERFACE);
 
 	return profile;
+}
+
+static void free_profile(struct _bluez_profile *profile)
+{
+	if (profile == NULL)
+		return;
+
+	g_free(profile->object_path);
+	g_free(profile->interface_name);
+
+	g_object_unref(profile->proxy);
+
+	g_free(profile);
 }
 
 static void parse_bluez_profile_interfaces(gpointer data, gpointer user_data)
@@ -1281,6 +1307,16 @@ static void destruct_bluez_objects(void)
 	g_hash_table_destroy(bluez_object_hash);
 
 	bluez_object_hash = NULL;
+
+	if (this_agent) {
+		free_agent(this_agent);
+		this_agent = NULL;
+	}
+
+	if (this_profile) {
+		free_profile(this_profile);
+		this_profile = NULL;
+	}
 }
 
 static void destruct_bluez_object_manager(void)
