@@ -701,6 +701,47 @@ done:
 	g_free(push_data);
 }
 
+static GList *pending_push_data;
+
+static void send_pending_push_data(struct _obex_session *session)
+{
+	struct opp_push_data *push_data;
+	GList *list, *next;
+
+	for (list = g_list_first(pending_push_data); list; list = next) {
+		next = g_list_next(list);
+
+		push_data = list->data;
+
+		push_data->session = session;
+
+		obex_session_opp_send_file(session, push_data->file_name,
+						transfer_state_cb, push_data);
+	}
+
+	g_list_free(pending_push_data);
+	pending_push_data = NULL;
+}
+
+static void reply_pending_push_data(char *error_msg)
+{
+	struct opp_push_data *push_data;
+	GList *list, *next;
+
+	for (list = g_list_first(pending_push_data); list; list = next) {
+		next = g_list_next(list);
+
+		push_data = list->data;
+
+		handle_error_message(push_data->invocation, error_msg);
+
+		g_free(push_data);
+	}
+
+	g_list_free(pending_push_data);
+	pending_push_data = NULL;
+}
+
 static void session_state_cb(const gchar *session_id,
 				struct _obex_session *session,
 				enum session_state state,
@@ -713,6 +754,15 @@ static void session_state_cb(const gchar *session_id,
 	if (error_msg) {
 		handle_error_message(push_data->invocation, error_msg);
 
+		reply_pending_push_data(error_msg);
+
+		return;
+	}
+
+	if (state == OBEX_SESSION_RETRY) {
+		pending_push_data = g_list_append(pending_push_data,
+							push_data);
+
 		return;
 	}
 
@@ -720,6 +770,9 @@ static void session_state_cb(const gchar *session_id,
 
 	obex_session_opp_send_file(session, push_data->file_name,
 					transfer_state_cb, push_data);
+
+	if (g_list_length(pending_push_data) > 0)
+		send_pending_push_data(session);
 }
 
 static void send_file_handler(GDBusConnection *connection,
