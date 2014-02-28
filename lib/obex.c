@@ -862,6 +862,7 @@ static gboolean remove_transfer_notify(gpointer user_data)
 
 static inline void free_transfer(struct _obex_transfer *transfer)
 {
+	obex_session_unref(transfer->session);
 
 	g_free(transfer->interface_name);
 	g_free(transfer->object_path);
@@ -1125,6 +1126,7 @@ static struct _obex_transfer *create_transfer(struct _obex_object *object)
 	int err;
 	char *session_path;
 	struct _obex_transfer *transfer;
+	struct _obex_session *session;
 
 	DBG("");
 
@@ -1149,7 +1151,8 @@ static struct _obex_transfer *create_transfer(struct _obex_object *object)
 
 	session_path = obex_transfer_property_get_session_path(transfer);
 
-	transfer->session = obex_session_get_session_from_path(session_path);
+	session = obex_session_get_session_from_path(session_path);
+	transfer->session = obex_session_ref(session);
 
 	g_free(session_path);
 
@@ -1650,7 +1653,7 @@ static struct _obex_session *get_session(const char *id)
 	if (session == NULL)
 		return NULL;
 
-	return obex_session_ref(session);
+	return session;
 }
 
 int obex_create_session(const char *destination,
