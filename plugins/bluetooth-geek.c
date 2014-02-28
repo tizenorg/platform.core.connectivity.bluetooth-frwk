@@ -24,6 +24,7 @@
 #include "common.h"
 #include "plugin.h"
 #include "vertical.h"
+#include "brcm_patchram_plus.h"
 
 enum rfkill_type {
 	RFKILL_TYPE_ALL = 0,
@@ -92,11 +93,17 @@ static int bt_probe(void)
 
 static int bt_enabled(void)
 {
-	int ret;
+	char *brcm_args[] = { NULL, "--enable_lpm", "--enable_hci",
+			"--patchram", "/lib/firmware/BCM43341B0_0008_ZTE.hcd",
+			"--baudrate", "3000000", "/dev/ttyMFD0", "--no2bytes"};
+	int ret, arg_count;
 
 	ret = set_bt_rfkill_block(0);
 	if (ret != 0)
 		return -1;
+
+	arg_count = sizeof(brcm_args) / sizeof(char *);
+	init_brcm_bluetooth(arg_count, brcm_args);
 
 	return 0;
 }
@@ -106,6 +113,8 @@ static int bt_disabled(void)
 	int ret;
 
 	DBG("");
+
+	deinit_brcm_patchram();
 
 	ret = set_bt_rfkill_block(1);
 	if (ret != 0)
@@ -123,11 +132,23 @@ static int bt_transfer(double progress)
 
 static int bt_pairing_agent_on(void)
 {
+	/*TODO:
+	 * In Geek, it should startup Application that using
+	 * CAPI bt_agent_register to register agent handler
+	 */
+	DBG("Please startup bluetooth-agent to register agent");
+
 	return 0;
 }
 
 static int bt_opp_agent_on(void)
 {
+	/*TODO:
+	 * In Geek, it should startup Application that using
+	 * CAPI bt_agent_register to register agent handler
+	 */
+	DBG("Please startup bluetooth-agent to register agent");
+
 	return 0;
 }
 
