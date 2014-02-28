@@ -640,7 +640,7 @@ static void handle_pairing_agent_method_call(GDBusConnection *connection,
 		return;
 	}
 
-	vertical_notify_bt_register_pairing_agent();
+	vertical_notify_bt_pairing_agent_on();
 
 	relay_agent_timeout_id = g_timeout_add(5000,
 					relay_agent_timeout_cb, NULL);

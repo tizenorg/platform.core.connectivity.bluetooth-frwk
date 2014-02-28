@@ -276,7 +276,7 @@ static int bt_transfer(double progress)
 	return 0;
 }
 
-static int bt_register_pairing_agent(void)
+static int bt_pairing_agent_on(void)
 {
 	bundle *b;
 	int ret;
@@ -300,7 +300,7 @@ static int bt_register_pairing_agent(void)
 	return 0;
 }
 
-static int bt_register_opp_agent(void)
+static int bt_opp_agent_on(void)
 {
 	bundle *b;
 	int ret;
@@ -330,8 +330,8 @@ static struct bluetooth_vertical_driver bt_driver = {
 	.enabled = bt_enabled,
 	.disabled = bt_disabled,
 	.transfer = bt_transfer,
-	.register_pairing_agent = bt_register_pairing_agent,
-	.register_opp_agent = bt_register_opp_agent,
+	.pairing_agent_on = bt_pairing_agent_on,
+	.opp_agent_on = bt_opp_agent_on,
 };
 
 static int bt_init(void)

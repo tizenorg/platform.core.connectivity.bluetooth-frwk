@@ -79,22 +79,22 @@ void vertical_notify_bt_disabled(void)
 		bluetooth_driver->disabled();
 }
 
-void vertical_notify_bt_register_pairing_agent(void)
+void vertical_notify_bt_pairing_agent_on(void)
 {
 	if (!bluetooth_driver)
 		return;
 
-	if (bluetooth_driver->register_pairing_agent)
-		bluetooth_driver->register_pairing_agent();
+	if (bluetooth_driver->pairing_agent_on)
+		bluetooth_driver->pairing_agent_on();
 }
 
-void vertical_notify_bt_register_opp_agent(void)
+void vertical_notify_bt_opp_agent_on(void)
 {
 	if (!bluetooth_driver)
 		return;
 
-	if (bluetooth_driver->register_opp_agent)
-		bluetooth_driver->register_opp_agent();
+	if (bluetooth_driver->opp_agent_on)
+		bluetooth_driver->opp_agent_on();
 }
 
 void vertical_notify_bt_transfer(double progress)
