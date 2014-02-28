@@ -972,6 +972,27 @@ void obex_transfer_set_property_size(struct _obex_transfer *transfer,
 	property_set_uint64(transfer->proxy.proxy, "Size", size);
 }
 
+static struct _transfer_notify *create_transfer_notify(
+					obex_transfer_state_cb cb,
+					gboolean is_watch, void *data)
+{
+	struct _transfer_notify *notify;
+
+	notify = g_try_new0(struct _transfer_notify, 1);
+	if (notify == NULL)
+		return NULL;
+
+	notify->ref_count = 1;
+	notify->is_watch = is_watch;
+	notify->transfer_path = NULL;
+	notify->cb = cb;
+	notify->transfer = NULL;
+	notify->state = OBEX_TRANSFER_UNKNOWN;
+	notify->transferred = 0;
+	notify->data = data;
+	return notify;
+}
+
 static void _transfer_notify_state(struct _transfer_notify *notify,
 						enum transfer_state state)
 {
@@ -1015,7 +1036,7 @@ static void transfer_notify_state(struct _obex_transfer *transfer,
 
 		next = g_list_next(list);
 
-		if (!g_strcmp0(notify->transfer_path, transfer->object_path) || notify->is_watch) {
+		if (!g_strcmp0(notify->transfer_path, transfer->object_path)) {
 			notify->transfer = obex_transfer_ref(transfer);
 			_transfer_notify_state(obex_transfer_notify_ref(notify),
 									state);
@@ -1031,6 +1052,7 @@ static void transfer_add_notify(struct _transfer_notify *notify)
 static void _register_obex_transfer(struct _obex_transfer *transfer)
 {
 	GList **interface_list = &transfer->parent->interfaces;
+	struct _transfer_notify *watched_notify;
 
 	DBG("%p", transfer);
 
@@ -1042,6 +1064,14 @@ static void _register_obex_transfer(struct _obex_transfer *transfer)
 
 	g_hash_table_insert(id_transfer_hash, &transfer->id,
 					(gpointer) transfer);
+
+	if (transfer_watch) {
+		watched_notify = create_transfer_notify(transfer_watch->cb,
+						FALSE, transfer_watch->data);
+		watched_notify->transfer_path =
+					g_strdup(transfer->object_path);
+		transfer_add_notify(watched_notify);
+	}
 
 	transfer_notify_state(transfer, OBEX_TRANSFER_UNKNOWN);
 }
@@ -1724,27 +1754,6 @@ static void create_transfer_cb(GObject *object,
 
 		g_variant_unref(transfer_v);
 	}
-}
-
-static struct _transfer_notify *create_transfer_notify(
-					obex_transfer_state_cb cb,
-					gboolean is_watch, void *data)
-{
-	struct _transfer_notify *notify;
-
-	notify = g_try_new0(struct _transfer_notify, 1);
-	if (notify == NULL)
-		return NULL;
-
-	notify->ref_count = 1;
-	notify->is_watch = is_watch;
-	notify->transfer_path = NULL;
-	notify->cb = cb;
-	notify->transfer = NULL;
-	notify->state = OBEX_TRANSFER_UNKNOWN;
-	notify->transferred = 0;
-	notify->data = data;
-	return notify;
 }
 
 void obex_session_opp_send_file(struct _obex_session *session,
