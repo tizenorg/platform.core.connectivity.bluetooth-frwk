@@ -162,7 +162,7 @@ static bt_adapter_device_discovery_info_s *get_discovery_device_info(
 	guint len;
 	signed short rssi;
 	int paired;
-	char *alias, *address, *icon;
+	char *alias, *address;
 	char **uuids;
 	unsigned int class;
 	bt_adapter_device_discovery_info_s *device_info;
@@ -179,7 +179,6 @@ static bt_adapter_device_discovery_info_s *get_discovery_device_info(
 	address = bluez_device_get_property_address(device);
 	alias = bluez_device_get_property_alias(device);
 	uuids = bluez_device_get_property_uuids(device);
-	icon = bluez_device_get_property_icon(device);
 	bluez_device_get_property_class(device, &class);
 	bluez_device_get_property_rssi(device, &rssi);
 	bluez_device_get_property_paired(device, &paired);
@@ -189,7 +188,6 @@ static bt_adapter_device_discovery_info_s *get_discovery_device_info(
 	device_info->service_count = len;
 	device_info->remote_address = address;
 	device_info->remote_name = alias;
-	device_info->icon = icon;
 	device_info->rssi = rssi;
 	device_info->is_bonded = paired;
 	device_info->service_uuid = uuids;
@@ -209,7 +207,6 @@ static void free_discovery_device_info(
 
 	g_free(discovery_device_info->remote_address);
 	g_free(discovery_device_info->remote_name);
-	g_free(discovery_device_info->icon);
 
 	for (i = 0; i < discovery_device_info->service_count; ++i)
 		g_free(discovery_device_info->service_uuid[i]);
@@ -222,7 +219,7 @@ static bt_device_info_s *get_device_info(bluez_device_t *device)
 {
 	guint len;
 	int paired, connected, trusted;
-	char *alias, *address, *icon;
+	char *alias, *address;
 	char **uuids;
 	unsigned int class;
 	bt_device_info_s *device_info;
@@ -241,7 +238,6 @@ static bt_device_info_s *get_device_info(bluez_device_t *device)
 	address = bluez_device_get_property_address(device);
 	alias = bluez_device_get_property_alias(device);
 	uuids = bluez_device_get_property_uuids(device);
-	icon = bluez_device_get_property_icon(device);
 	bluez_device_get_property_class(device, &class);
 	bluez_device_get_property_paired(device, &paired);
 	bluez_device_get_property_connected(device, &connected);
@@ -252,7 +248,6 @@ static bt_device_info_s *get_device_info(bluez_device_t *device)
 	device_info->service_count = len;
 	device_info->remote_address = address;
 	device_info->remote_name = alias;
-	device_info->icon = icon;
 	device_info->is_bonded = paired;
 	device_info->is_connected = connected;
 	device_info->is_authorized = trusted;
@@ -561,7 +556,8 @@ static void bluez_device_created(bluez_device_t *device, void *user_data)
 						discovery_device_info->service_uuid,
 						discovery_device_info->service_count);
 
-	node->cb(BT_SUCCESS, BT_ADAPTER_DEVICE_DISCOVERY_FOUND,
+	if (node && node->cb)
+		node->cb(BT_SUCCESS, BT_ADAPTER_DEVICE_DISCOVERY_FOUND,
 				discovery_device_info, node->user_data);
 
 	set_device_property_changed_callback(device);
@@ -621,6 +617,7 @@ static void _bt_update_bluetooth_callbacks(void)
 		bluez_adapter_set_device_created_cb(default_adapter,
 					bluez_device_created,
 					device_created_node);
+
 	if (adapter_discovering_node)
 		bluez_adapter_set_device_discovering_cb(default_adapter,
 					bluez_adapter_discovering_changed,
@@ -696,6 +693,7 @@ static void destroy_bluez_lib(void)
 
 void _bt_service_bt_in_service_watch(uint in_service, void *user_data)
 {
+	DBG("");
 	if (in_service)
 		setup_bluez_lib();
 }
@@ -3306,6 +3304,38 @@ int bt_spp_unset_data_received_cb(void)
 
 	g_free(spp_data_received_node);
 	spp_data_received_node = NULL;
+
+	return BT_SUCCESS;
+}
+
+int bt_adapter_set_visibility_mode_changed_cb(
+			bt_adapter_visibility_mode_changed_cb callback,
+			void *user_data)
+{
+	DBG("Not implement");
+
+	return BT_SUCCESS;
+}
+
+int bt_socket_set_connection_state_changed_cb(
+			bt_socket_connection_state_changed_cb callback,
+			void *user_data)
+{
+	DBG("Not implement");
+
+	return BT_SUCCESS;
+}
+
+int bt_socket_unset_data_received_cb(void)
+{
+	DBG("Not implement");
+
+	return BT_SUCCESS;
+}
+
+int bt_socket_unset_connection_state_changed_cb(void)
+{
+	DBG("Not implement");
 
 	return BT_SUCCESS;
 }

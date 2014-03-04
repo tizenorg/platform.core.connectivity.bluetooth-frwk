@@ -243,7 +243,6 @@ static void device_discovery_cb(int result,
 		DBG("Device %s has found, follow is info:",
 					discovery_info->remote_name);
 		DBG("\tAddress: %s", discovery_info->remote_address);
-		DBG("\tIcon: %s", discovery_info->icon);
 		DBG("\tRSSI: %d", discovery_info->rssi);
 		DBG("\tIs bonded: %d", discovery_info->is_bonded);
 		DBG("\tservice_count: %d", discovery_info->service_count);
@@ -269,7 +268,6 @@ static void device_discovery_cb(int result,
 				g_strdup(discovery_info->remote_name);
 		device_info->remote_address =
 				g_strdup(discovery_info->remote_address);
-		device_info->icon = g_strdup(discovery_info->icon);
 		device_info->rssi = discovery_info->rssi;
 		device_info->is_bonded = discovery_info->is_bonded;
 		device_info->service_count = discovery_info->service_count;
@@ -293,7 +291,6 @@ static void device_discovery_cb(int result,
 				device_list = g_list_remove(device_list, info);
 				g_free(info->remote_name);
 				g_free(info->remote_address);
-				g_free(info->icon);
 				g_strfreev(info->service_uuid);
 				g_free(info);
 			}
@@ -371,7 +368,6 @@ static int unset_discovery_callback(const char *p1, const char *p2)
 
 		g_free(device_info->remote_name);
 		g_free(device_info->remote_address);
-		g_free(device_info->icon);
 
 		g_strfreev(device_info->service_uuid);
 		g_free(device_info);
@@ -491,7 +487,6 @@ static void print_bonded_device_info(bt_device_info_s *device_info)
 
 	printf("\n\tName: %s", device_info->remote_name);
 	printf("\n\t\tAddress: %s", device_info->remote_address);
-	printf("\n\t\tIcon: %s", device_info->icon);
 	printf("\n\t\tConnected: %d", device_info->is_connected);
 	printf("\n\t\tBonded: %d", device_info->is_bonded);
 	printf("\n\t\tAuthorized: %d", device_info->is_authorized);
@@ -812,9 +807,8 @@ static int get_bonded_device_info(const char *p1, const char *p2)
 		return 0;
 	}
 
-	DBG("Address %s Name %s Icon %s", device_info->remote_address,
-						device_info->remote_name,
-						device_info->icon);
+	DBG("Address %s Name %s", device_info->remote_address,
+						device_info->remote_name);
 
 	bt_adapter_free_device_info(device_info);
 
@@ -1029,7 +1023,6 @@ static int list_devices(const char *p1, const char *p2)
 
 		printf("\n\tName: %s", discovery_info->remote_name);
 		printf("\n\t\tAddress: %s", discovery_info->remote_address);
-		printf("\n\t\tIcon: %s", discovery_info->icon);
 		printf("\n\t\tRSSI: %d", discovery_info->rssi);
 		printf("\n\t\tBonded: %d", discovery_info->is_bonded);
 		printf("\n\t\tservice_count: %d", discovery_info->service_count);

@@ -474,7 +474,6 @@ typedef struct
 	char *remote_address;	/**< The address of remote device */
 	char *remote_name;	/**< The name of remote device */
 	bt_class_s bt_class;    /**< The Bluetooth classes */
-	char *icon;	/**< The Bluetooth icon */
 	int rssi;	/**< The strength indicator of received signal  */
 	bool is_bonded;	/**< The bonding state */
 	char **service_uuid;  /**< The UUID list of service */
@@ -493,7 +492,6 @@ typedef struct
 	char *remote_address;	/**< The address of remote device */
 	char *remote_name;	/**< The name of remote device */
 	bt_class_s bt_class;    /**< The Bluetooth classes */
-	char *icon;	/**< The Bluetooth icon */
 	char **service_uuid;  /**< The UUID list of service */
 	int service_count;	/**< The number of services */
 	bool is_bonded;	/**< The bonding state */
