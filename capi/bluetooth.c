@@ -571,14 +571,43 @@ static void bluez_adapter_discovering_changed(bluez_adapter_t *adapter,
 {
 	bt_adapter_device_discovery_state_e state;
 	struct adapter_discovering_cb_node *node = user_data;
+	bt_adapter_device_discovery_info_s *discovery_device_info;
+	GList *device_list, *list, *next;
+	bluez_device_t *device;
 
 	DBG("");
 
 	state = discovering ? BT_ADAPTER_DEVICE_DISCOVERY_STARTED :
 				BT_ADAPTER_DEVICE_DISCOVERY_FINISHED;
 
-	if (node->cb)
-		node->cb(BT_SUCCESS, state, NULL, node->user_data);
+	if (!node || !node->cb)
+		return;
+
+	node->cb(BT_SUCCESS, state, NULL, node->user_data);
+
+	/*
+	 * BlueZ 5.x may contain some discovering device a short time.
+	 * When UI start discovery, the last discovering device may
+	 * not dispear, also notify tham.
+	 */
+	if (state != BT_ADAPTER_DEVICE_DISCOVERY_STARTED)
+		return;
+
+	device_list = bluez_adapter_get_devices(default_adapter);
+	for (list = g_list_first(device_list); list; list = next) {
+		next = g_list_next(list);
+
+		device = list->data;
+
+		discovery_device_info = get_discovery_device_info(device);
+
+		node->cb(BT_SUCCESS, BT_ADAPTER_DEVICE_DISCOVERY_FOUND,
+				discovery_device_info, node->user_data);
+
+		set_device_property_changed_callback(device);
+
+		free_discovery_device_info(discovery_device_info);
+	}
 }
 
 void adapter_name_changed(bluez_adapter_t *adapter,
