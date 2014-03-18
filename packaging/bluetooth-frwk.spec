@@ -64,6 +64,7 @@ make %{?jobs:-j%jobs}
 %config %{_sysconfdir}/dbus-1/system.d/bluezlib.conf
 %config %{_sysconfdir}/dbus-1/system.d/bluezobex.conf
 %config %{_sysconfdir}/dbus-1/system.d/bluetooth-service.conf
+%{_datadir}/dbus-1/system-services/org.tizen.comms.service
 
 %files test
 %manifest %{name}.manifest
