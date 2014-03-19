@@ -722,15 +722,11 @@ static void destroy_bluez_lib(void)
 
 void _bt_service_bt_in_service_watch(uint in_service, void *user_data)
 {
-	DBG("");
-	if (in_service)
-		setup_bluez_lib();
+	DBG("%d", in_service);
 }
 
 int bt_initialize(void)
 {
-	int in_service;
-
 	if (bt_service_init)
 		return BT_SUCCESS;
 
@@ -739,12 +735,9 @@ int bt_initialize(void)
 	comms_manager_set_bt_in_service_watch(
 				_bt_service_bt_in_service_watch, NULL);
 
-
-	comms_manager_get_property_bt_in_service(&in_service);
-	if (in_service)
-		setup_bluez_lib();
-
 	bt_service_init = TRUE;
+
+	setup_bluez_lib();
 
 	return BT_SUCCESS;
 }
