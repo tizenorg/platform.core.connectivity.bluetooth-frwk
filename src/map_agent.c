@@ -23,6 +23,7 @@
 #include "bluez.h"
 #include "vertical.h"
 #include "map_agent.h"
+#include "bluetooth_map_agent.h"
 
 #define BT_MAP_AGENT_NAME "org.bluez.map_agent"
 #define BT_MAP_AGENT_INTERFACE "org.bluez.MapAgent"
@@ -104,7 +105,67 @@ static void handle_method_call(GDBusConnection *connection,
 				GDBusMethodInvocation *invocation,
 				gpointer user_data)
 {
-	DBG("");
+	DBG("method: %s", method_name);
+
+	if (g_strcmp0(method_name, "GetFolderTree") == 0)
+		bluetooth_map_get_folder_tree(invocation);
+	else if (g_strcmp0(method_name, "GetMessageList") == 0) {
+		gchar *folder_name;
+		guint16 max;
+
+		g_variant_get(parameters, "(sq)",
+					&folder_name, &max);
+		bluetooth_map_get_message_list(folder_name,
+					max, invocation);
+	} else if (g_strcmp0(method_name, "GetMessage") == 0) {
+		gchar *message_name;
+		gboolean attach, transcode, first_request;
+
+		g_variant_get(parameters, "(sbbb)", &message_name,
+			&attach, &transcode, &first_request);
+		bluetooth_map_get_message(message_name, attach,
+			transcode, first_request, invocation);
+	} else if (g_strcmp0(method_name, "PushMessage") == 0) {
+		gboolean save_copy, retry_send, native;
+		gchar *folder_name;
+
+		g_variant_get(parameters, "(bbbs)", &save_copy,
+			&retry_send, &native, &folder_name);
+		bluetooth_map_push_message(save_copy, retry_send,
+			native, folder_name, invocation);
+	} else if (g_strcmp0(method_name, "PushMessageData") == 0) {
+		gchar *bmsg;
+
+		g_variant_get(parameters, "(s)", &bmsg);
+		bluetooth_map_push_message_data(bmsg, invocation);
+	} else if (g_strcmp0(method_name, "UpdateMessage") == 0) {
+		bluetooth_map_update_message(invocation);
+	} else if (g_strcmp0(method_name, "SetReadStatus") == 0) {
+		gchar *handle;
+		gboolean read_status;
+
+		g_variant_get(parameters, "(sb)", &handle,
+						&read_status);
+		bluetooth_map_set_read_status(handle, read_status,
+							invocation);
+	} else if (g_strcmp0(method_name, "SetDeleteStatus") == 0) {
+		gchar *handle;
+		gboolean delete_status;
+
+		g_variant_get(parameters, "(sb)", &handle,
+						&delete_status);
+		bluetooth_map_set_delete_status(handle, delete_status,
+							invocation);
+	} else if (g_strcmp0(method_name, "NotiRegistration") == 0) {
+		gchar *remote_addr;
+		gboolean status;
+
+		g_variant_get(parameters, "(sb)", &remote_addr,
+							&status);
+		bluetooth_map_noti_registration(remote_addr, status,
+							invocation);
+	} else
+		WARN("Unknown method");
 }
 
 static const GDBusInterfaceVTable interface_handle = {
@@ -153,6 +214,13 @@ static void name_lost(GDBusConnection *connection,
 {
 	DBG("Name Lost");
 
+	if (agent_registration_id > 0) {
+		g_dbus_connection_unregister_object(
+			connection,
+			agent_registration_id);
+		agent_registration_id = 0;
+	}
+
 	bus_id = 0;
 }
 
@@ -177,4 +245,16 @@ void bt_map_agent_init(void)
 void bt_map_agent_deinit(void)
 {
 	DBG("");
+
+	if (agent_registration_id > 0) {
+		g_dbus_connection_unregister_object(
+			conn,
+			agent_registration_id);
+		agent_registration_id = 0;
+	}
+
+	g_bus_unown_name(bus_id);
+
+	g_dbus_node_info_unref(introspection_data);
+	bus_id = 0;
 }
