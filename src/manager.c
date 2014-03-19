@@ -23,6 +23,7 @@
 
 #include "pairing.h"
 #include "opp.h"
+#include "map_agent.h"
 #include "media.h"
 #include "bluez.h"
 #include "gdbus.h"
@@ -250,6 +251,8 @@ static void adapter_powered_on(CommsManagerSkeleton *skeleton)
 	bt_service_opp_init(bt_object, connection);
 	bt_service_media_init(bt_object, connection, default_adapter);
 
+	bt_map_agent_init();
+
 	g_dbus_object_manager_server_export(manager_server, bt_object);
 }
 
@@ -270,6 +273,8 @@ static void adapter_powered_off(CommsManagerSkeleton *skeleton)
 	bt_service_pairing_deinit();
 	bt_service_opp_deinit();
 	bt_service_media_deinit();
+
+	bt_map_agent_deinit();
 
 	g_dbus_object_manager_server_unexport(manager_server,
 						BLUETOOTH_PATH);
