@@ -12,6 +12,9 @@ pkg_check_modules(${TEST} REQUIRED
 			glib-2.0
 			dbus-1
 			gio-2.0
+			msg-service
+			email-service
+			vconf
 			gio-unix-2.0)
 
 FOREACH(flag ${${TEST}_CFLAGS})
@@ -53,6 +56,9 @@ SET(SOURCES_BLUETOOTH_SERVICE
 	src/pairing.c
 	src/opp.c
 	src/media.c
+	src/map_agent.c
+	src/map_bmessage.c
+	src/bluetooth_map_agent.c
 	lib/bluez.c
 	lib/common.c
 	lib/obex.c
