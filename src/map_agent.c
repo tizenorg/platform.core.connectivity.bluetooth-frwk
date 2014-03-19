@@ -22,6 +22,7 @@
 #include "comms_error.h"
 #include "bluez.h"
 #include "vertical.h"
+#include "map_agent.h"
 
 #define BT_MAP_AGENT_NAME "org.bluez.map_agent"
 #define BT_MAP_AGENT_INTERFACE "org.bluez.MapAgent"
@@ -29,18 +30,112 @@
 
 GDBusConnection *conn;
 guint bus_id;
+guint agent_registration_id;
 
 static GDBusNodeInfo *introspection_data;
 
 static const gchar introspection_xml[] =
-	"<node>"
-	"</node>";
+"<node name='/'>"
+" <interface name='org.bluez.MapAgent'>"
+"  <method name='GetFolderTree'>"
+"    <annotation name='org.freedesktop.DBus.GLib.Async' value=''/>"
+"    <arg type='a(s)' name='folder_list' direction='out'/>"
+"  </method>"
+"  <method name='GetMessageList'>"
+"   <annotation name='org.freedesktop.DBus.GLib.Async' value=''/>"
+"    <arg type='s' name='folder_name'/>"
+"    <arg type='q' name='max'/>"
+"    <arg type='b' name='newmessage' direction='out'/>"
+"    <arg type='t' name='count' direction='out'/>"
+"    <arg type='a(ssssssssssbsbbbbs)' name='msg_list' direction='out'/>"
+"  </method>"
+"  <method name='GetMessage'>"
+"   <annotation name='org.freedesktop.DBus.GLib.Async' value=''/>"
+"    <arg type='s' name='messgae_name'/>"
+"    <arg type='b' name='attach'/>"
+"    <arg type='b' name='transcode'/>"
+"    <arg type='b' name='first_request'/>"
+"    <arg type='b' name='fraction_deliver' direction='out'/>"
+"    <arg type='s' name='msg_body' direction='out'/>"
+"  </method>"
+"  <method name='PushMessage'>"
+"   <annotation name='org.freedesktop.DBus.GLib.Async' value=''/>"
+"    <arg type='b' name='save_copy'/>"
+"    <arg type='b' name='retry_send'/>"
+"    <arg type='b' name='native'/>"
+"    <arg type='s' name='folder_name'/>"
+"    <arg type='t' name='handle' direction='out'/>"
+"  </method>"
+"  <method name='PushMessageData'>"
+"   <annotation name='org.freedesktop.DBus.GLib.Async' value=''/>"
+"    <arg type='s' name='bmsg'/>"
+"  </method>"
+"  <method name='UpdateMessage'>"
+"   <annotation name='org.freedesktop.DBus.GLib.Async' value=''/>"
+"    <arg type='u' name='update_err' direction='out'/>"
+"  </method>"
+"  <method name='SetReadStatus'>"
+"  <annotation name='org.freedesktop.DBus.GLib.Async' value=''/>"
+"   <arg type='s' name='handle'/>"
+"   <arg type='b' name='read_status'/>"
+"   <arg type='u' name='update_err' direction='out'/>"
+"  </method>"
+"  <method name='SetDeleteStatus'>"
+"   <annotation name='org.freedesktop.DBus.GLib.Async' value=''/>"
+"    <arg type='s' name='handle'/>"
+"    <arg type='b' name='delete_status'/>"
+"    <arg type='u' name='update_err' direction='out'/>"
+"  </method>"
+"  <method name='NotiRegistration'>"
+"   <annotation name='org.freedesktop.DBus.GLib.Async' value=''/>"
+"    <arg type='s' name='remote_addr'/>"
+"    <arg type='b' name='status'/>"
+"    <arg type='u' name='update_err' direction='out'/>"
+"  </method>"
+" </interface>"
+"</node>";
+
+static void handle_method_call(GDBusConnection *connection,
+				const gchar *sender,
+				const gchar *object_path,
+				const gchar *interface_name,
+				const gchar *method_name,
+				GVariant *parameters,
+				GDBusMethodInvocation *invocation,
+				gpointer user_data)
+{
+	DBG("");
+}
+
+static const GDBusInterfaceVTable interface_handle = {
+	handle_method_call,
+	NULL,
+	NULL
+};
+
+static void register_agent_object(GDBusConnection *connection)
+{
+
+	agent_registration_id = g_dbus_connection_register_object(
+				connection,
+				BT_MAP_AGENT_OBJECT_PATH,
+				introspection_data->
+					interfaces[0],
+				&interface_handle,
+				NULL,
+				NULL,
+				NULL);
+
+	g_assert(agent_registration_id > 0);
+}
 
 static void bus_acquired(GDBusConnection *connection,
 				const gchar *name,
 				gpointer user_data)
 {
 	DBG("");
+
+	register_agent_object(connection);
 
 	conn = connection;
 }
