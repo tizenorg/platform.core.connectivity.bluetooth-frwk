@@ -3,10 +3,11 @@
 #
 # Script for running BT Service during booting time
 #
+source /etc/tizen-platform.conf
 
 if [ -x /usr/bin/bt-service ]; then
 	if [ -d /sys/fs/cgroup/systemd ]; then
-		export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/app/dbus/user_bus_socket;
+		export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${TZ_USER_NAME}/dbus/user_bus_socket;
 	fi
 
 	/usr/bin/bt-service &

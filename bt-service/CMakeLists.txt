@@ -104,23 +104,15 @@ ELSE(LIBNOTIFY_SUPPORT)
 ENDIF(LIBNOTIFY_SUPPORT)
 
 
-IF(NOT MULTI_USER_SUPPORT)
-	INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service DESTINATION share/dbus-1/system-services)
-ENDIF(NOT MULTI_USER_SUPPORT)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service DESTINATION share/dbus-1/system-services)
 INSTALL(TARGETS ${PROJECT_NAME} DESTINATION bin)
 
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/auto-pair-blacklist DESTINATION /opt/var/lib/bluetooth)
 
 # install booting script
-IF(NOT MULTI_USER_SUPPORT)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service.conf.in ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service.conf)
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service DESTINATION /etc/rc.d/init.d)
-ENDIF(NOT MULTI_USER_SUPPORT)
-
-IF(MULTI_USER_SUPPORT)
-	install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service_user.conf DESTINATION /etc/dbus-1/system.d)
-ELSE(MULTI_USER_SUPPORT)
-	install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service.conf DESTINATION /etc/dbus-1/system.d)
-ENDIF(MULTI_USER_SUPPORT)
+install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service.conf DESTINATION /etc/dbus-1/system.d)
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 
