@@ -187,6 +187,39 @@ static int set_adapter_name(const char *p1, const char *p2)
 	return 0;
 }
 
+static int set_adapter_visibility(const char *p1, const char *p2)
+{
+	bt_adapter_visibility_mode_e mode;
+	unsigned int mode_num, timeout;
+	int err;
+
+	mode_num = atoi(p1);
+	timeout = atoi(p2);
+
+	switch(mode_num) {
+	case 1:
+		mode = BT_ADAPTER_VISIBILITY_MODE_NON_DISCOVERABLE;
+		break;
+	case 2:
+		mode = BT_ADAPTER_VISIBILITY_MODE_LIMITED_DISCOVERABLE;
+		break;
+	case 3:
+		mode = BT_ADAPTER_VISIBILITY_MODE_GENERAL_DISCOVERABLE;
+		break;
+	default:
+		DBG("Unknown mode");
+		return 0;
+	}
+
+	err = bt_adapter_set_visibility(mode, timeout);
+	if (err != BT_SUCCESS) {
+		ERROR("bt_adapter_set_visibility error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int get_adapter_visibility(const char *p1, const char *p2)
 {
 	int err, duration;
@@ -211,6 +244,8 @@ static int get_adapter_visibility(const char *p1, const char *p2)
 	default:
 		DBG("Unknown mode");
 	}
+
+	DBG("duration %d", duration);
 
 	return 0;
 }
@@ -1310,6 +1345,9 @@ struct {
 
 	{"set_adapter_name", set_adapter_name,
 		"Usage: set_adapter_name\n\tSet local adapter name"},
+
+	{"set_adapter_visibility", set_adapter_visibility,
+		"Usage: set_adapter_visibility 1 <1-3, No, Limit, Discoverable> duration\n\tSet adapter visibility"},
 
 	{"get_adapter_visibility", get_adapter_visibility,
 		"Usage: get_adapter_visibility\n\tGet local adapter visibility"},

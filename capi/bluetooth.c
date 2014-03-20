@@ -918,14 +918,16 @@ int bt_adapter_get_visibility(bt_adapter_visibility_mode_e *mode,
 		return BT_ERROR_INVALID_PARAMETER;
 
 	err = bluez_adapter_get_property_discoverable(default_adapter,
-								&discoverable);
+							&discoverable);
 	if (err)
 		return BT_ERROR_OPERATION_FAILED;
 
-	err = bluez_adapter_get_property_discoverable_timeout(default_adapter,
-								&timeout);
-	if (err)
+	timeout = comms_manager_get_bt_adapter_visibale_time();
+	if (timeout == -1)
 		return BT_ERROR_OPERATION_FAILED;
+
+	if (duration)
+		*duration = 0;
 
 	if (!discoverable){
 		*mode = BT_ADAPTER_VISIBILITY_MODE_NON_DISCOVERABLE;
@@ -933,8 +935,11 @@ int bt_adapter_get_visibility(bt_adapter_visibility_mode_e *mode,
 	}
 
 	*mode = (timeout == 0) ?
-			BT_ADAPTER_VISIBILITY_MODE_LIMITED_DISCOVERABLE :
-			BT_ADAPTER_VISIBILITY_MODE_GENERAL_DISCOVERABLE;
+			BT_ADAPTER_VISIBILITY_MODE_GENERAL_DISCOVERABLE :
+			BT_ADAPTER_VISIBILITY_MODE_LIMITED_DISCOVERABLE;
+
+	if (*mode == BT_ADAPTER_VISIBILITY_MODE_LIMITED_DISCOVERABLE)
+		*duration = timeout;
 
 	return BT_SUCCESS;
 }
@@ -955,10 +960,14 @@ int bt_adapter_set_visibility(bt_adapter_visibility_mode_e discoverable_mode,
 	switch (discoverable_mode) {
 	case BT_ADAPTER_VISIBILITY_MODE_NON_DISCOVERABLE:
 		discoverable = false;
+		duration = 0;
 		break;
 	case BT_ADAPTER_VISIBILITY_MODE_LIMITED_DISCOVERABLE:
+		discoverable = true;
+		break;
 	case BT_ADAPTER_VISIBILITY_MODE_GENERAL_DISCOVERABLE:
 		discoverable = true;
+		duration = 0;
 		break;
 	default:
 		return BT_ERROR_INVALID_PARAMETER;
@@ -966,7 +975,7 @@ int bt_adapter_set_visibility(bt_adapter_visibility_mode_e discoverable_mode,
 
 	bluez_adapter_set_discoverable(default_adapter, discoverable);
 
-	/* TODO: Set start timer */
+	bluez_adapter_set_discoverable_timeout(default_adapter, duration);
 
 	return BT_SUCCESS;
 }
