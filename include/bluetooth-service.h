@@ -32,7 +32,7 @@ int comms_lib_init(void);
 void comms_lib_deinit(void);
 void comms_manager_enable_bluetooth(void);
 void comms_manager_disable_bluetooth(void);
-
+int comms_manager_get_bt_adapter_visibale_time(void);
 
 typedef void (*comms_manager_bt_in_service_watch_t)(
 			uint in_service,

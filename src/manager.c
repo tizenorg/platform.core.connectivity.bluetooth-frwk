@@ -113,6 +113,8 @@ static const GDBusMethodInfo * const _method_info_pointers[] =
 	GDBUS_METHOD("DisableBluetoothService", NULL, NULL),
 	GDBUS_METHOD("SetDefaultAdapter",
 			GDBUS_ARGS(_ARG("adapter", "s")), NULL),
+	GDBUS_METHOD("GetAdapterVisibleTime",
+			NULL, GDBUS_ARGS(_ARG("time", "u"))),
 	NULL
 };
 
@@ -234,6 +236,13 @@ struct bt_activate_data {
 	GDBusMethodInvocation *invocation;
 };
 
+struct visible_time_t {
+	GTimeVal start_time;
+	guint32 timeout;
+};
+
+struct visible_time_t visible_time;
+
 static void adapter_powered_on(CommsManagerSkeleton *skeleton)
 {
 	GDBusConnection *connection;
@@ -325,6 +334,56 @@ static void bt_adapter_set_enable(bluez_adapter_t *adapter, void *user_data)
 		adapter_powered_on(adapter_activate_data->skeleton);
 }
 
+static void discoverable_changed(bluez_adapter_t *adapter,
+				gboolean discoverable, void *user_data)
+{
+	guint32 timeout;
+
+	bluez_adapter_get_property_discoverable_timeout(adapter, &timeout);
+	if (timeout == 0)
+		return;
+
+	if (discoverable == FALSE)
+		return;
+
+	g_get_current_time(&visible_time.start_time);
+	visible_time.timeout = timeout;
+}
+
+static void discoverable_timeout_changed(bluez_adapter_t *adapter,
+					guint32 timeout, void *user_data)
+{
+	gboolean discoverable;
+
+	bluez_adapter_get_property_discoverable(adapter, &discoverable);
+	if (discoverable == FALSE)
+		return;
+
+	g_get_current_time(&visible_time.start_time);
+	visible_time.timeout = timeout;
+}
+
+static void set_discoverable_timer(void)
+{
+	guint32 discoverable_timeout;
+	gboolean discoverable;
+
+	bluez_adapter_get_property_discoverable(default_adapter,
+						&discoverable);
+	bluez_adapter_get_property_discoverable_timeout(default_adapter,
+						&discoverable_timeout);
+
+	if (discoverable && discoverable_timeout > 0) {
+		g_get_current_time(&visible_time.start_time);
+		visible_time.timeout = discoverable_timeout;
+	}
+
+	bluez_adapter_set_discoverable_changed_cb(default_adapter,
+					discoverable_changed, NULL);
+	bluez_adapter_set_discoverable_timeout_changed_cb(default_adapter,
+					discoverable_timeout_changed, NULL);
+}
+
 static void adapter_added_cb(bluez_adapter_t *adapter, void *user_data)
 {
 	struct bt_activate_data *data = user_data;
@@ -340,6 +399,8 @@ static void adapter_added_cb(bluez_adapter_t *adapter, void *user_data)
 
 	if (default_adapter == NULL)
 		return;
+
+	set_discoverable_timer();
 
 	bt_adapter_set_enable(default_adapter, data);
 
@@ -444,6 +505,8 @@ static void handle_enable_bluetooth_service(GDBusConnection *connection,
 		return;
 	}
 
+	set_discoverable_timer();
+
 	bt_adapter_set_enable(default_adapter, adapter_activate_data);
 
 	return;
@@ -500,6 +563,54 @@ static void handle_set_default_adapter(GDBusConnection *connection,
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
+static void handle_get_adapter_visible_time(GDBusConnection *connection,
+					GVariant *parameters,
+					GDBusMethodInvocation *invocation,
+					gpointer user_data)
+{
+	CommsManagerSkeleton *skeleton = COMMS_MANAGER_SKELETON(user_data);
+	guint32 remain_time, during, timeout;
+	gboolean discoverable;
+	GTimeVal current_time;
+
+	if (get_bluetooth_activating(skeleton)) {
+		comms_error_busy(invocation);
+		return;
+	}
+
+	if (default_adapter == NULL) {
+		comms_error_no_such_adapter(invocation);
+		return;
+	}
+
+	if (!get_bluetooth_in_service(skeleton)) {
+		comms_error_not_available(invocation);
+		return;
+	}
+
+	bluez_adapter_get_property_discoverable(default_adapter,
+						&discoverable);
+	bluez_adapter_get_property_discoverable_timeout(default_adapter,
+						&timeout);
+
+	if (discoverable == FALSE || timeout == 0) {
+		remain_time = 0;
+		goto done;
+	}
+
+	g_get_current_time(&current_time);
+
+	during = current_time.tv_sec - visible_time.start_time.tv_sec;
+	remain_time = visible_time.timeout - during;
+
+	if (remain_time < 0)
+		remain_time = 0;
+
+done:
+	g_dbus_method_invocation_return_value(invocation,
+					g_variant_new("(u)", remain_time));
+}
+
 static void _manager_skeleton_handle_method_call(
 				GDBusConnection *connection,
 				const gchar *sender,
@@ -510,6 +621,7 @@ static void _manager_skeleton_handle_method_call(
 				GDBusMethodInvocation *invocation,
 				gpointer user_data)
 {
+	DBG("Method name %s", method_name);
 	if (g_strcmp0(method_name, "EnableBluetoothService") == 0)
 		handle_enable_bluetooth_service(connection, parameters,
 						invocation, user_data);
@@ -518,6 +630,9 @@ static void _manager_skeleton_handle_method_call(
 						invocation, user_data);
 	else if (g_strcmp0(method_name, "SetDefaultAdapter") == 0)
 		handle_set_default_adapter(connection, parameters,
+						invocation, user_data);
+	else if (g_strcmp0(method_name, "GetAdapterVisibleTime") == 0)
+		handle_get_adapter_visible_time(connection, parameters,
 						invocation, user_data);
 	else
 		WARN("Unknown method");
