@@ -103,6 +103,10 @@ struct _bluez_adapter {
 	gpointer alias_cb_data;
 	bluez_adapter_discovering_cb_t discovering_cb;
 	gpointer discovering_cb_data;
+	bluez_adapter_discoverable_cb_t discoverable_cb;
+	gpointer discoverable_cb_data;
+	bluez_adapter_discoverable_tm_cb_t discoverable_timeout_cb;
+	gpointer discoverable_timeout_cb_data;
 };
 
 struct _bluez_device {
@@ -248,6 +252,36 @@ static void handle_adapter_discovering_changed(GVariant *changed_properties,
 			adapter->discovering_cb_data);
 }
 
+static void handle_adapter_discoverable_changed(GVariant *changed_properties,
+						struct _bluez_adapter *adapter)
+{
+	gboolean discoverable;
+	gboolean variant_found = g_variant_lookup(changed_properties,
+					"Discoverable", "b", &discoverable);
+	if (!variant_found)
+		return;
+
+	adapter->discoverable_cb(adapter,
+			discoverable,
+			adapter->discoverable_cb_data);
+}
+
+static void handle_adapter_discoverable_timeout_changed(
+					GVariant *changed_properties,
+					struct _bluez_adapter *adapter)
+{
+	guint32 timeout;
+	gboolean variant_found;
+
+	variant_found = g_variant_lookup(changed_properties,
+					"DiscoverableTimeout", "u", &timeout);
+	if (!variant_found)
+		return;
+
+	adapter->discoverable_timeout_cb(adapter, timeout,
+				adapter->discoverable_timeout_cb_data);
+}
+
 static void adapter_properties_changed(GDBusProxy *proxy,
 					GVariant *changed_properties,
 					GStrv *invalidated_properties,
@@ -266,6 +300,14 @@ static void adapter_properties_changed(GDBusProxy *proxy,
 	if (adapter->discovering_cb)
 		handle_adapter_discovering_changed(changed_properties,
 								user_data);
+
+	if (adapter->discoverable_cb)
+		handle_adapter_discoverable_changed(changed_properties,
+								user_data);
+
+	if (adapter->discoverable_timeout_cb)
+		handle_adapter_discoverable_timeout_changed(
+					changed_properties, user_data);
 
 	g_free(properties);
 }
@@ -1377,6 +1419,20 @@ void bluez_adapter_set_discoverable(struct _bluez_adapter *adapter,
 					-1, NULL, NULL, NULL);
 }
 
+void bluez_adapter_set_discoverable_timeout(struct _bluez_adapter *adapter,
+							guint32 timeout)
+{
+	GVariant *val = g_variant_new("u", timeout);
+	GVariant *parameters = g_variant_new("(ssv)",
+			ADAPTER_INTERFACE, "DiscoverableTimeout", val);
+
+	DBG("discoverable timeout %d", timeout);
+
+	g_dbus_proxy_call(adapter->parent->properties_proxy,
+					"Set", parameters, 0,
+					-1, NULL, NULL, NULL);
+}
+
 void bluez_adapter_start_discovery(struct _bluez_adapter *adapter)
 {
 	DBG("proxy 0x%p", adapter->proxy);
@@ -1412,6 +1468,37 @@ void bluez_adapter_unset_powered_changed_cb(struct _bluez_adapter *adapter)
 {
 	adapter->powered_cb = NULL;
 	adapter->powered_cb_data = NULL;
+}
+
+void bluez_adapter_set_discoverable_changed_cb(struct _bluez_adapter *adapter,
+					bluez_adapter_discoverable_cb_t cb,
+					gpointer user_data)
+{
+	adapter->discoverable_cb = cb;
+	adapter->discoverable_cb_data = user_data;
+}
+
+void bluez_adapter_unset_discoverable_changed_cb(
+					struct _bluez_adapter *adapter)
+{
+	adapter->discoverable_cb = NULL;
+	adapter->discoverable_cb_data = NULL;
+}
+
+void bluez_adapter_set_discoverable_timeout_changed_cb(
+					struct _bluez_adapter *adapter,
+					bluez_adapter_discoverable_tm_cb_t cb,
+					gpointer user_data)
+{
+	adapter->discoverable_timeout_cb = cb;
+	adapter->discoverable_timeout_cb_data = user_data;
+}
+
+void bluez_adapter_unset_discoverable_timeout_changed_cb(
+					struct _bluez_adapter *adapter)
+{
+	adapter->discoverable_timeout_cb = NULL;
+	adapter->discoverable_timeout_cb_data = NULL;
 }
 
 static void new_devices(gpointer key, gpointer value, gpointer user_data)
