@@ -1418,7 +1418,7 @@ struct {
 		"Usage: get_adapter_name\n\tGet local adapter name"},
 
 	{"set_adapter_name", set_adapter_name,
-		"Usage: set_adapter_name\n\tSet local adapter name"},
+		"Usage: set_adapter_name BlueZ5.x\n\tSet local adapter name"},
 
 	{"set_adapter_name_callback", set_adapter_name_callback,
 		"Usage: set_adapter_name_callback\n\tSet adapter changed callback"},

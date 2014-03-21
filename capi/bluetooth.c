@@ -1337,50 +1337,54 @@ int bt_adapter_free_device_info(bt_device_info_s *device_info)
 static void bt_device_paired_cb(enum bluez_error_type error,
                                        void *user_data)
 {
-       bt_error_e capi_error = BT_SUCCESS;
-       char *remote_address = user_data;
-       bt_device_info_s *device_info;
-       bluez_device_t *device;
+	bt_error_e capi_error = BT_SUCCESS;
+	char *remote_address = user_data;
+	bt_device_info_s *device_info;
+	bluez_device_t *device;
 
-       device = bluez_adapter_get_device_by_address(default_adapter,
+	device = bluez_adapter_get_device_by_address(default_adapter,
                                                        remote_address);
-       if (!device) {
-               ERROR("no %s device", remote_address);
-               return;
-       }
+	if (!device) {
+		ERROR("no %s device", remote_address);
+		return;
+	}
 
-       if (!device_bond_node)
-               return;
+	if (!device_bond_node)
+		return;
 
-       switch (error) {
-       case ERROR_INVALID_ARGUMENTS:
-               capi_error = BT_ERROR_INVALID_PARAMETER;
-               break;
-       case ERROR_FAILED:
-               capi_error = BT_ERROR_OPERATION_FAILED;
-               break;
-       case ERROR_AUTH_CANCELED:
-               break;
-       case ERROR_AUTH_FAILED:
-               capi_error = BT_ERROR_AUTH_FAILED;
-               break;
-       case ERROR_AUTH_REJECT:
-               capi_error = BT_ERROR_AUTH_REJECTED;
-               break;
-       case ERROR_AUTH_TIMEOUT:
-               capi_error = BT_ERROR_TIMED_OUT;
-               break;
-       case ERROR_AUTH_ATTEMPT_FAILED:
-               capi_error = BT_ERROR_AUTH_FAILED;
-               break;
-       default:
-               WARN("Unknown error type with device pair");
-       }
+	/* Pair a device success, will report through DISCOVERY EVENT */
+	if (error == ERROR_NONE)
+		return;
 
-       device_info = get_device_info(device);
+	switch (error) {
+	case ERROR_INVALID_ARGUMENTS:
+		capi_error = BT_ERROR_INVALID_PARAMETER;
+		break;
+	case ERROR_FAILED:
+		capi_error = BT_ERROR_OPERATION_FAILED;
+		break;
+	case ERROR_AUTH_CANCELED:
+		break;
+	case ERROR_AUTH_FAILED:
+		capi_error = BT_ERROR_AUTH_FAILED;
+		break;
+	case ERROR_AUTH_REJECT:
+		capi_error = BT_ERROR_AUTH_REJECTED;
+		break;
+	case ERROR_AUTH_TIMEOUT:
+		capi_error = BT_ERROR_TIMED_OUT;
+		break;
+	case ERROR_AUTH_ATTEMPT_FAILED:
+		capi_error = BT_ERROR_AUTH_FAILED;
+		break;
+	default:
+		WARN("Unknown error type with device pair");
+	}
 
-       device_bond_node->cb(capi_error, device_info,
-                               device_bond_node->user_data);
+	device_info = get_device_info(device);
+
+	device_bond_node->cb(capi_error, device_info,
+				device_bond_node->user_data);
 
 	free_device_info(device_info);
 }
