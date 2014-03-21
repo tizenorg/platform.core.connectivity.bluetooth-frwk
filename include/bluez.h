@@ -305,7 +305,7 @@ void bluez_set_avrcp_shuffle_changed_cb(
 void bluez_unset_avrcp_shuffle_changed_cb();
 
 typedef void (*bluez_avrcp_target_cb_t)(
-				struct _bluez_device *device,
+				const char *remote_address,
 				gboolean connected,
 				gpointer user_data);
 

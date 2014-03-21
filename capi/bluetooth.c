@@ -404,23 +404,18 @@ static void bluez_avrcp_shuffle_changed(gboolean shuffle,
 		data->cb(shuffle_mode, data->user_data);
 }
 
-static void bluez_avrcp_target_state_changed(struct _bluez_device *device,
+static void bluez_avrcp_target_state_changed(const char *remote_address,
 					gboolean connected,
 					void *user_data)
 {
-	bt_device_info_s *device_info;
 	struct avrcp_target_connection_state_changed_node *data =
 							user_data;
 
 	DBG("");
 
-	device_info = get_device_info(device);
-
 	if (data->cb)
-		(data->cb)(connected, device_info->remote_address,
-							data->user_data);
-
-	free_device_info(device_info);
+		(data->cb)(connected, remote_address,
+						data->user_data);
 }
 
 static void bluez_audio_state_changed(int result,

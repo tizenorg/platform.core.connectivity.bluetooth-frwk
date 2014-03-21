@@ -520,19 +520,6 @@ static inline void handle_device_connected(GVariant *changed_properties,
 					device->device_connected_cb_data);
 }
 
-static inline void handle_control_connected(GVariant *changed_properties,
-						struct _bluez_device *device)
-{
-	gboolean connected;
-
-	DBG("");
-	if (g_variant_lookup(changed_properties, "Connected",
-						"b", &connected)) {
-		avrcp_target_cb(device, connected,
-				avrcp_target_cb_data);
-	}
-}
-
 static inline void handle_device_trusted(GVariant *changed_properties,
 						struct _bluez_device *device)
 {
@@ -592,9 +579,6 @@ static void control_properties_changed(GDBusProxy *proxy,
 	gchar *properties = g_variant_print(changed_properties, TRUE);
 
 	DBG("properties %s", properties);
-
-	if (avrcp_target_cb)
-		handle_control_connected(changed_properties, user_data);
 
 	g_free(properties);
 }
@@ -673,6 +657,10 @@ static void parse_bluez_control_interfaces(gpointer data, gpointer user_data)
 				audio_state_cb(0, TRUE, device_address,
 					type, audio_state_cb_data);
 		}
+
+		if (avrcp_target_cb)
+				avrcp_target_cb(device_address, TRUE,
+					avrcp_target_cb_data);
 
 		g_free(device_path);
 		g_free(uuid);
@@ -1270,6 +1258,10 @@ static void parse_bluez_object_removed(gpointer data, gpointer user_data)
 			audio_state_cb(0, FALSE, device_address,
 				bluez_object->media_type, audio_state_cb_data);
 		}
+
+		if (avrcp_target_cb)
+			avrcp_target_cb(device_address, FALSE,
+							avrcp_target_cb_data);
 	}
 }
 
