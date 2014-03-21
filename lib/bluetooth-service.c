@@ -578,6 +578,37 @@ void comms_lib_deinit(void)
 	destruct_comms_object_manager();
 }
 
+struct _bluetooth_simple_async_result {
+	bluetooth_simple_callback callback;
+	void *user_data;
+};
+
+static void bluetooth_simple_async_cb(GObject *object, GAsyncResult *res,
+						gpointer user_data)
+{
+	struct _bluetooth_simple_async_result *async_result_node = user_data;
+	enum bluez_error_type error_type = ERROR_NONE;
+	GDBusProxy *proxy = G_DBUS_PROXY(object);
+	GError *error = NULL;
+	GVariant *ret;
+
+	ret = g_dbus_proxy_call_finish(proxy, res, &error);
+	if (ret == NULL) {
+		DBG("%s", error->message);
+
+		error_type = get_error_type(error);
+
+		g_error_free(error);
+	} else
+		g_variant_unref(ret);
+
+	if (async_result_node && async_result_node->callback)
+		async_result_node->callback(error_type,
+					async_result_node->user_data);
+
+	g_free(async_result_node);
+}
+
 void comms_manager_enable_bluetooth(void)
 {
 	if (this_manager == NULL) {
@@ -586,7 +617,8 @@ void comms_manager_enable_bluetooth(void)
 	}
 
 	g_dbus_proxy_call(this_manager->proxy, "EnableBluetoothService",
-					NULL, 0, -1, NULL, NULL, NULL);
+					NULL, 0, -1, NULL,
+					bluetooth_simple_async_cb, NULL);
 }
 
 void comms_manager_disable_bluetooth(void)
@@ -597,7 +629,8 @@ void comms_manager_disable_bluetooth(void)
 	}
 
 	g_dbus_proxy_call(this_manager->proxy, "DisableBluetoothService",
-					NULL, 0, -1, NULL, NULL, NULL);
+					NULL, 0, -1, NULL,
+					bluetooth_simple_async_cb, NULL);
 }
 
 int comms_manager_get_bt_adapter_visibale_time(void)
@@ -648,37 +681,6 @@ int comms_manager_get_property_bt_in_service(gboolean *in_service)
 
 	return property_get_boolean(this_manager->proxy,
 				"BluetoothInService", in_service);
-}
-
-struct _bluetooth_simple_async_result {
-	bluetooth_simple_callback callback;
-	void *user_data;
-};
-
-static void bluetooth_simple_async_cb(GObject *object, GAsyncResult *res,
-						gpointer user_data)
-{
-	struct _bluetooth_simple_async_result *async_result_node = user_data;
-	enum bluez_error_type error_type = ERROR_NONE;
-	GDBusProxy *proxy = G_DBUS_PROXY(object);
-	GError *error = NULL;
-	GVariant *ret;
-
-	ret = g_dbus_proxy_call_finish(proxy, res, &error);
-	if (ret == NULL) {
-		DBG("%s", error->message);
-
-		error_type = get_error_type(error);
-
-		g_error_free(error);
-	} else
-		g_variant_unref(ret);
-
-	if (async_result_node->callback)
-		async_result_node->callback(error_type,
-					async_result_node->user_data);
-
-	g_free(async_result_node);
 }
 
 void comms_bluetooth_device_pair(const char *address,

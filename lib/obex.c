@@ -1717,7 +1717,7 @@ void obex_session_remove_session(struct _obex_session *session)
 
 	g_dbus_proxy_call(this_client->proxy, "RemoveSession",
 				g_variant_new("(o)", session->object_path),
-				0, -1, NULL, NULL, NULL);
+				0, -1, NULL, simple_reply_callback, NULL);
 }
 
 struct _obex_session *obex_session_get_session(const char *id)
@@ -1846,7 +1846,8 @@ void obex_transfer_cancel(struct _obex_transfer *transfer)
 
 	g_dbus_proxy_call(transfer->proxy.proxy,
 				"Cancel", NULL, 0,
-				-1, NULL, NULL, NULL);
+				-1, NULL,
+				simple_reply_callback, NULL);
 }
 
 char *obex_transfer_get_property_source(struct _obex_transfer *transfer)
