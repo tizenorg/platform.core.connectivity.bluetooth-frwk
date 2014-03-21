@@ -647,6 +647,49 @@ static int device_set_bond_created_cb(const char *p1, const char *p2)
 	return 0;
 }
 
+static void device_bond_destroyed_cb(int result, char *remote_address,
+							void *user_data)
+{
+	GList *iter, *next;
+
+	if (result != BT_SUCCESS) {
+		DBG("bonded device destroyed faild: %d", result);
+		return;
+	}
+
+	printf("Device %s has destroyed, follow is info:",
+						remote_address);
+
+	for (iter = g_list_first(device_list); iter; iter = next) {
+		bt_adapter_device_discovery_info_s *info;
+
+		info = iter->data;
+
+		next = g_list_next(iter);
+
+		if (g_strcmp0(info->remote_address, remote_address) == 0) {
+			device_list = g_list_remove(device_list, info);
+			g_free(info->remote_name);
+			g_free(info->remote_address);
+			g_strfreev(info->service_uuid);
+			g_free(info);
+		}
+	}
+}
+
+static int device_set_bond_destroyed_cb(const char *p1, const char *p2)
+{
+	int err;
+
+	err = bt_device_set_bond_destroyed_cb(device_bond_destroyed_cb, NULL);
+	if (err != BT_SUCCESS) {
+		ERROR("bt_device_set_bond_destroyed_cb error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int device_unset_bond_created_cb(const char *p1, const char *p2)
 {
 	int err;
@@ -1416,6 +1459,9 @@ struct {
 	{"device_set_bond_created_cb", device_set_bond_created_cb,
 		"Usage: device_set_bond_created_cb\n\tSet Device bond state changed callback"},
 
+	{"device_set_bond_destroyed_cb", device_set_bond_destroyed_cb,
+		"Usage: device_set_bond_destroyed_cb\n\tSet Device bond state changed callback"},
+
 	{"device_unset_bond_created_cb", device_unset_bond_created_cb,
 		"Usage: device_unset_bond_created_cb\n\tUnset Device bond state changed callback"},
 
@@ -1504,7 +1550,7 @@ struct {
 		"Usage: register_opp_server\n\tregister opp server"},
 
 	{"opp_send", opp_send,
-		"Usage: opp_server file_name destination\n\tpush file"},
+		"Usage: opp_send file_name destination\n\tpush file"},
 
 	{"opp_watch", opp_watch,
 		"Usage: opp_watch on/off\n\ton/off opp_watch"},
