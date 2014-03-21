@@ -187,6 +187,37 @@ static int set_adapter_name(const char *p1, const char *p2)
 	return 0;
 }
 
+static void adapter_name_changed(char *device_name, void *user_data)
+{
+	DBG("device name changed: %s", device_name);
+}
+
+static int set_adapter_name_callback(const char *p1, const char *p2)
+{
+	int err;
+
+	err = bt_adapter_set_name_changed_cb(adapter_name_changed, NULL);
+	if (err != BT_SUCCESS) {
+		ERROR("bt_adapter_set_name_changed_cb error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
+static int unset_adapter_name_callback(const char *p1, const char *p2)
+{
+	int err;
+
+	err = bt_adapter_unset_name_changed_cb();
+	if (err != BT_SUCCESS) {
+		ERROR("bt_adapter_unset_name_changed_cb error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int set_adapter_visibility(const char *p1, const char *p2)
 {
 	bt_adapter_visibility_mode_e mode;
@@ -1345,6 +1376,12 @@ struct {
 
 	{"set_adapter_name", set_adapter_name,
 		"Usage: set_adapter_name\n\tSet local adapter name"},
+
+	{"set_adapter_name_callback", set_adapter_name_callback,
+		"Usage: set_adapter_name_callback\n\tSet adapter changed callback"},
+
+	{"unset_adapter_name_callback", unset_adapter_name_callback,
+		"Usage: unset_adapter_name_callback\n\tUnset adapter changed callback"},
 
 	{"set_adapter_visibility", set_adapter_visibility,
 		"Usage: set_adapter_visibility 1 <1-3, No, Limit, Discoverable> duration\n\tSet adapter visibility"},

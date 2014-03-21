@@ -618,8 +618,6 @@ void adapter_name_changed(bluez_adapter_t *adapter,
 			(struct adapter_name_cb_node *)user_data;
 	gchar *adapter_name = g_strdup(name);
 
-	DBG("Name: %s", name);
-
 	data->cb(adapter_name, data->user_data);
 
 	g_free(adapter_name);
@@ -895,6 +893,27 @@ int bt_adapter_set_name_changed_cb(bt_adapter_name_changed_cb callback,
 	adapter_name_node = node_data;
 
 	_bt_update_bluetooth_callbacks();
+
+	return BT_SUCCESS;
+}
+
+int bt_adapter_unset_name_changed_cb(void)
+{
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!adapter_name_node)
+		return BT_SUCCESS;
+
+	bluez_adapter_unset_alias_changed_cb(default_adapter);
+
+	g_free(adapter_name_node);
+	adapter_name_node = NULL;
 
 	return BT_SUCCESS;
 }

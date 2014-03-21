@@ -227,15 +227,17 @@ static void handle_adapter_powered_changed(GVariant *changed_properties,
 static void handle_adapter_alias_changed(GVariant *changed_properties,
 						struct _bluez_adapter *adapter)
 {
-	const gchar *alias = NULL;
+	gchar *alias = NULL;
 	gboolean variant_found = g_variant_lookup(changed_properties,
-							"Alias", "s", alias);
+							"Alias", "s", &alias);
 	if (!variant_found)
 		return;
 
 	adapter->alias_cb(adapter,
 			alias,
 			adapter->alias_cb_data);
+
+	g_free(alias);
 }
 
 static void handle_adapter_discovering_changed(GVariant *changed_properties,
