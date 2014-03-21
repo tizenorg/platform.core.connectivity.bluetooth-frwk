@@ -2238,6 +2238,82 @@ int bt_hid_host_disconnect(const char *remote_address)
 	return BT_SUCCESS;
 }
 
+struct spp_context {
+	gchar *uuid;
+	gchar *spp_path;
+	GIOChannel *channel;
+	bt_spp_new_connection_cb new_connection;
+	void *new_connection_data;
+};
+
+GList *spp_ctx_list;
+
+static GDBusNodeInfo *profile_xml_data;
+
+static struct spp_context *create_spp_context(void)
+{
+	struct spp_context *spp_ctx;
+
+	spp_ctx = g_try_new0(struct spp_context, 1);
+	if (spp_ctx == NULL) {
+		DBG("no memroy");
+		return NULL;
+	}
+
+	return spp_ctx;
+}
+
+static void free_spp_context(struct spp_context *spp_ctx)
+{
+	if (spp_ctx == NULL)
+		return;
+
+	if (spp_ctx->uuid)
+		g_free(spp_ctx->uuid);
+
+	if (spp_ctx->spp_path)
+		g_free(spp_ctx->spp_path);
+
+	g_free(spp_ctx);
+}
+
+static struct spp_context *find_spp_context_from_uuid(const char *uuid)
+{
+	struct spp_context *spp_ctx;
+	GList *list, *next;
+
+	for (list = g_list_first(spp_ctx_list); list; list = next) {
+		next = g_list_next(list);
+
+		spp_ctx = list->data;
+
+		if (spp_ctx && !g_strcmp0(spp_ctx->uuid, uuid))
+			return spp_ctx;
+	}
+
+	return NULL;
+}
+
+static struct spp_context *find_spp_context_from_fd(int fd)
+{
+	struct spp_context *spp_ctx;
+	GList *list, *next;
+	int spp_fd;
+
+	for (list = g_list_first(spp_ctx_list); list; list = next) {
+		next = g_list_next(list);
+
+		spp_ctx = list->data;
+
+		spp_fd = g_io_channel_unix_get_fd(spp_ctx->channel);
+
+		if (spp_ctx && spp_fd == fd)
+			return spp_ctx;
+	}
+
+	return NULL;
+}
+
 /* Agent Function */
 
 #define BLUEZ_AGENT_SERVICE "org.bluezlib.agent"
@@ -2420,8 +2496,20 @@ static void request_authorize_service_handler(const gchar *device_path,
 
 	device_name = bluez_device_get_property_alias(device);
 
+	/* Don't match the local spp UUID, it means other profile UUID */
+	if (!find_spp_context_from_uuid(uuid)) {
+		if (!this_agent || !this_agent->authorize_service)
+			return;
+
+		this_agent->authorize_service(device_name, uuid, invocation);
+
+		g_free(device_name);
+
+		return;
+	}
+
 	node_data = spp_connection_requested_node;
-	if (node_data)
+	if (node_data && node_data->cb)
 		node_data->cb(uuid, device_name, invocation,
 				node_data->user_data);
 
@@ -2779,82 +2867,6 @@ void bt_agent_pincode_cancel(bt_req_t *requestion)
 	g_dbus_method_invocation_return_dbus_error(invocation,
 			ERROR_INTERFACE ".Canceled",
 			"CanceledByUser");
-}
-
-struct spp_context {
-	gchar *uuid;
-	gchar *spp_path;
-	GIOChannel *channel;
-	bt_spp_new_connection_cb new_connection;
-	void *new_connection_data;
-};
-
-GList *spp_ctx_list;
-
-static GDBusNodeInfo *profile_xml_data;
-
-static struct spp_context *create_spp_context(void)
-{
-	struct spp_context *spp_ctx;
-
-	spp_ctx = g_try_new0(struct spp_context, 1);
-	if (spp_ctx == NULL) {
-		DBG("no memroy");
-		return NULL;
-	}
-
-	return spp_ctx;
-}
-
-static void free_spp_context(struct spp_context *spp_ctx)
-{
-	if (spp_ctx == NULL)
-		return;
-
-	if (spp_ctx->uuid)
-		g_free(spp_ctx->uuid);
-
-	if (spp_ctx->spp_path)
-		g_free(spp_ctx->spp_path);
-
-	g_free(spp_ctx);
-}
-
-static struct spp_context *find_spp_context_from_uuid(const char *uuid)
-{
-	struct spp_context *spp_ctx;
-	GList *list, *next;
-
-	for (list = g_list_first(spp_ctx_list); list; list = next) {
-		next = g_list_next(list);
-
-		spp_ctx = list->data;
-
-		if (spp_ctx && !g_strcmp0(spp_ctx->uuid, uuid))
-			return spp_ctx;
-	}
-
-	return NULL;
-}
-
-static struct spp_context *find_spp_context_from_fd(int fd)
-{
-	struct spp_context *spp_ctx;
-	GList *list, *next;
-	int spp_fd;
-
-	for (list = g_list_first(spp_ctx_list); list; list = next) {
-		next = g_list_next(list);
-
-		spp_ctx = list->data;
-
-		spp_fd = g_io_channel_unix_get_fd(spp_ctx->channel);
-
-		if (spp_ctx && spp_fd == fd)
-			return spp_ctx;
-	}
-
-	return NULL;
 }
 
 static const gchar profile_xml[] =

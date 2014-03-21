@@ -1208,7 +1208,23 @@ void request_confirm(const char *device_name,
 void authorize_service(const char *device,
 			const char *uuid, void *user_data)
 {
-	DBG("");
+	const gchar *confirm_info, *p1, *p2;
+	gchar input_value[32] = { 0 };
+
+	DBG("\n\t%s UUID %s requset authorize service, Please input(Y/N):",
+							device, uuid);
+
+	if (fgets(input_value, 32, stdin) == NULL) {
+		ERROR("fgets error.");
+		return;
+	}
+
+	split_input(input_value, &confirm_info, &p1, &p2);
+
+	if (!g_ascii_strncasecmp(confirm_info, "y", 1))
+		bt_agent_confirm_accept(user_data);
+	else
+		bt_agent_confirm_reject(user_data);
 }
 
 /* Should free in unregister_agent */
