@@ -45,7 +45,7 @@ cp %{SOURCE1001} .
 
 %build
 MAJORVER=`echo %{version} | awk 'BEGIN {FS="."}{print $1}'`
-%cmake . -DFULLVER=%{version} -DMAJORVER=${MAJORVER}
+%cmake . -DFULLVER=%{version} -DMAJORVER=${MAJORVER} -Dplatform=IVI
 
 make %{?jobs:-j%jobs}
 
@@ -60,6 +60,7 @@ make %{?jobs:-j%jobs}
 %manifest %{name}.manifest
 %defattr(-, root, root)
 %{_bindir}/bluetooth-service
+/usr/lib/bluetooth-service/plugins/bluetooth-mobile.so
 %{_libdir}/libcapi-network-bluetooth.so.*
 %config %{_sysconfdir}/dbus-1/system.d/bluezlib.conf
 %config %{_sysconfdir}/dbus-1/system.d/bluezobex.conf

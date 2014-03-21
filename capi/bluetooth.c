@@ -850,6 +850,7 @@ static void bluez_device_disconnect_changed(bluez_device_t *device,
 static void _bt_update_bluetooth_callbacks(void)
 {
 	DBG("default_adpater: %p", default_adapter);
+	// DBG("powered_cb: %p / alias_cb: %p / discovering_cb: %p", default_adapter->powered_cb, default_adapter->alias_cb,default_adapter->discovering_cb);
 
 	if (default_adapter == NULL)
 		return;
@@ -859,7 +860,7 @@ static void _bt_update_bluetooth_callbacks(void)
 					adapter_powered_changed,
 					adapter_state_node);
 
-	if (adapter_name_node)
+	if (adapter_name_node) 
 		bluez_adapter_set_alias_changed_cb(default_adapter,
 					adapter_name_changed,
 					adapter_name_node);
@@ -1077,18 +1078,27 @@ int bt_adapter_get_name(char **local_name)
 	DBG("");
 
 	if (initialized == false)
+	{
+		DBG("BT_ERROR_NOT_INITIALIZED");
+
 		return BT_ERROR_NOT_INITIALIZED;
-
+    }
 	if (default_adapter == NULL)
+	{
+		DBG("BT_ERROR_ADAPTER_NOT_FOUND");
 		return BT_ERROR_ADAPTER_NOT_FOUND;
-
+}
 	if (local_name == NULL)
+	{
+		DBG("BT_ERROR_INVALID_PARAMETER");
 		return BT_ERROR_INVALID_PARAMETER;
-
+}
 	name = bluez_adapter_get_property_alias(default_adapter);
 	if (name == NULL)
+	{
+		DBG("BT_ERROR_OPERATION_FAILED");
 		return BT_ERROR_OPERATION_FAILED;
-
+}
 	*local_name = name;
 
 	return BT_SUCCESS;
@@ -1121,7 +1131,7 @@ int bt_adapter_set_name_changed_cb(bt_adapter_name_changed_cb callback,
 		return BT_ERROR_INVALID_PARAMETER;
 
 	if (adapter_name_node) {
-		DBG("Powered state changed callback already set.");
+		DBG("name changed callback already set.");
 		return BT_ERROR_ALREADY_DONE;
 	}
 
@@ -1131,6 +1141,7 @@ int bt_adapter_set_name_changed_cb(bt_adapter_name_changed_cb callback,
 		return BT_ERROR_OUT_OF_MEMORY;
 	}
 
+	DBG("[CLE] callback %p",callback );
 	node_data->cb = callback;
 	node_data->user_data = user_data;
 

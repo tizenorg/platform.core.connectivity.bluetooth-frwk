@@ -219,6 +219,9 @@ static void handle_adapter_alias_changed(GVariant *changed_properties,
 	if (!variant_found)
 		return;
 
+	DBG("[CLE] retrieve bluez new alias ");
+	DBG("[CLE] call alias_cb");
+
 	adapter->alias_cb(adapter,
 			alias,
 			adapter->alias_cb_data);
@@ -279,12 +282,14 @@ static void adapter_properties_changed(GDBusProxy *proxy,
 	gchar *properties = g_variant_print(changed_properties, TRUE);
 
 	DBG("properties %s", properties);
+	DBG("[CLE] adapter->interface_name = '%s' / adapter->object_path = '%s'", adapter->interface_name, adapter->object_path);
+	DBG("[CLE] powered_cb: %p / alias_cb: %p / discovering_cb: %p", adapter->powered_cb, adapter->alias_cb,adapter->discovering_cb);
 	if (adapter->powered_cb)
 		handle_adapter_powered_changed(changed_properties, user_data);
 
-	if (adapter->alias_cb)
+	if (adapter->alias_cb) {
 		handle_adapter_alias_changed(changed_properties, user_data);
-
+	}
 	if (adapter->discovering_cb)
 		handle_adapter_discovering_changed(changed_properties,
 								user_data);
@@ -340,7 +345,9 @@ static void parse_bluez_adapter_interfaces(gpointer data, gpointer user_data)
 		DBG("adapter->proxy = proxy");
 		adapter->interface = interface;
 		adapter->proxy = proxy;
-
+		DBG("[CLE] set adapter_properties_changed() callback / adapter : %p",adapter);
+		DBG("[CLE] adapter->interface_name = '%s' / adapter->object_path = '%s'", adapter->interface_name, adapter->object_path);
+		DBG("powered_cb: %p / alias_cb: %p / discovering_cb: %p", adapter->powered_cb, adapter->alias_cb,adapter->discovering_cb);
 		g_signal_connect(proxy, "g-properties-changed",
 			G_CALLBACK(adapter_properties_changed), adapter);
 	} else if (g_strcmp0(iface_name, MEDIA_INTERFACE) == 0) {
@@ -469,6 +476,7 @@ static void bluez_adapter_added(struct _bluez_object *object,
 	DBG("");
 
 	adapter = create_adapter(object);
+	DBG("[CLE] adapter created: %p", adapter);
 
 	g_list_foreach(ifaces, parse_bluez_adapter_interfaces, adapter);
 
@@ -478,6 +486,7 @@ static void bluez_adapter_added(struct _bluez_object *object,
 void bluez_adapter_set_adapter_added(bluez_adapter_added_cb_t cb,
 							void *user_data)
 {
+		DBG("");
 	adapter_added_cb = cb;
 	adapter_added_cb_data = user_data;
 }
@@ -1656,12 +1665,14 @@ void bluez_adapter_set_alias_changed_cb(struct _bluez_adapter *adapter,
 {
 	adapter->alias_cb = cb;
 	adapter->alias_cb_data = user_data;
+	DBG("[CLE] set alias_cb callback (adapter %p / alias_cb: %p / alias_cb_data: %p) ", adapter, adapter->alias_cb, adapter->alias_cb_data);
 }
 
 void bluez_adapter_unset_alias_changed_cb(struct _bluez_adapter *adapter)
 {
 	adapter->alias_cb = NULL;
 	adapter->alias_cb_data = NULL;
+	DBG("[CLE] set alias_cb callback (adapter %p / alias_cb: %p / alias_cb_data: %p) ", adapter, adapter->alias_cb, adapter->alias_cb_data);
 }
 
 char *bluez_adapter_get_property_address(struct _bluez_adapter *adapter)

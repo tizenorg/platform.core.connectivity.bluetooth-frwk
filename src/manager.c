@@ -328,6 +328,7 @@ static void bt_adapter_set_enable(bluez_adapter_t *adapter, void *user_data)
 {
 	struct bt_activate_data *adapter_activate_data = user_data;
 	gboolean powered;
+	DBG("");
 
 	bluez_adapter_set_powered_changed_cb(default_adapter,
 						adapter_powered_changed,
