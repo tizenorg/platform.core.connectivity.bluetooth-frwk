@@ -1,0 +1,7 @@
+Code-Review+2: Pyun DoHyun <dh79.pyun@samsung.com>
+Verified+1: wu jiangbo <jiangbox.wu@intel.com>
+Submitted-by: wu zheng <wu.zheng@intel.com>
+Submitted-at: Fri, 21 Mar 2014 00:56:55 -0700
+Reviewed-on: https://review.tizen.org/gerrit/18288
+Project: platform/core/connectivity/bluetooth-frwk
+Branch: refs/heads/devel
