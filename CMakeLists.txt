@@ -75,6 +75,8 @@ INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/packaging/bluezobex.conf
 					DESTINATION /etc/dbus-1/system.d)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/packaging/bluetooth-service.conf
 					DESTINATION /etc/dbus-1/system.d)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/packaging/org.tizen.comms.service
+					DESTINATION share/dbus-1/system-services)
 
 # BLUEZ-TEST
 SET(BLUEZ-TEST "bluez-lib-test")

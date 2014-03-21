@@ -597,6 +597,33 @@ void comms_manager_disable_bluetooth(void)
 					NULL, 0, -1, NULL, NULL, NULL);
 }
 
+int comms_manager_get_bt_adapter_visibale_time(void)
+{
+	GError *error = NULL;
+	unsigned int val;
+	GVariant *ret;
+
+	if (this_manager == NULL) {
+		ERROR("manager not reigster");
+		return -1;
+	}
+
+	ret = g_dbus_proxy_call_sync(this_manager->proxy,
+					"GetAdapterVisibleTime",
+					NULL, 0, -1, NULL, &error);
+	if (ret == NULL) {
+		ERROR("%s", error->message);
+		g_error_free(error);
+
+		return -1;
+	}
+
+	g_variant_get(ret, "(u)", &val);
+	g_variant_unref(ret);
+
+	return val;
+}
+
 void comms_manager_set_bt_in_service_watch(
 				comms_manager_bt_in_service_watch_t cb,
 				void *user_data)

@@ -31,6 +31,10 @@ Object path	/org/tizen/comms/manager
 
 			Sets the default adapter to operate on.
 
+		void GetDiscoverableRemainTime(uint32 time)
+
+			Get discoverable remain time.
+
 Properties	boolean BluetoothInService [readonly]
 
 			Indicates bluetooth service is ready for use.

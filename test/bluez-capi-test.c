@@ -187,6 +187,39 @@ static int set_adapter_name(const char *p1, const char *p2)
 	return 0;
 }
 
+static int set_adapter_visibility(const char *p1, const char *p2)
+{
+	bt_adapter_visibility_mode_e mode;
+	unsigned int mode_num, timeout;
+	int err;
+
+	mode_num = atoi(p1);
+	timeout = atoi(p2);
+
+	switch(mode_num) {
+	case 1:
+		mode = BT_ADAPTER_VISIBILITY_MODE_NON_DISCOVERABLE;
+		break;
+	case 2:
+		mode = BT_ADAPTER_VISIBILITY_MODE_LIMITED_DISCOVERABLE;
+		break;
+	case 3:
+		mode = BT_ADAPTER_VISIBILITY_MODE_GENERAL_DISCOVERABLE;
+		break;
+	default:
+		DBG("Unknown mode");
+		return 0;
+	}
+
+	err = bt_adapter_set_visibility(mode, timeout);
+	if (err != BT_SUCCESS) {
+		ERROR("bt_adapter_set_visibility error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int get_adapter_visibility(const char *p1, const char *p2)
 {
 	int err, duration;
@@ -211,6 +244,8 @@ static int get_adapter_visibility(const char *p1, const char *p2)
 	default:
 		DBG("Unknown mode");
 	}
+
+	DBG("duration %d", duration);
 
 	return 0;
 }
@@ -243,7 +278,6 @@ static void device_discovery_cb(int result,
 		DBG("Device %s has found, follow is info:",
 					discovery_info->remote_name);
 		DBG("\tAddress: %s", discovery_info->remote_address);
-		DBG("\tIcon: %s", discovery_info->icon);
 		DBG("\tRSSI: %d", discovery_info->rssi);
 		DBG("\tIs bonded: %d", discovery_info->is_bonded);
 		DBG("\tservice_count: %d", discovery_info->service_count);
@@ -269,7 +303,6 @@ static void device_discovery_cb(int result,
 				g_strdup(discovery_info->remote_name);
 		device_info->remote_address =
 				g_strdup(discovery_info->remote_address);
-		device_info->icon = g_strdup(discovery_info->icon);
 		device_info->rssi = discovery_info->rssi;
 		device_info->is_bonded = discovery_info->is_bonded;
 		device_info->service_count = discovery_info->service_count;
@@ -293,7 +326,6 @@ static void device_discovery_cb(int result,
 				device_list = g_list_remove(device_list, info);
 				g_free(info->remote_name);
 				g_free(info->remote_address);
-				g_free(info->icon);
 				g_strfreev(info->service_uuid);
 				g_free(info);
 			}
@@ -371,7 +403,6 @@ static int unset_discovery_callback(const char *p1, const char *p2)
 
 		g_free(device_info->remote_name);
 		g_free(device_info->remote_address);
-		g_free(device_info->icon);
 
 		g_strfreev(device_info->service_uuid);
 		g_free(device_info);
@@ -491,7 +522,6 @@ static void print_bonded_device_info(bt_device_info_s *device_info)
 
 	printf("\n\tName: %s", device_info->remote_name);
 	printf("\n\t\tAddress: %s", device_info->remote_address);
-	printf("\n\t\tIcon: %s", device_info->icon);
 	printf("\n\t\tConnected: %d", device_info->is_connected);
 	printf("\n\t\tBonded: %d", device_info->is_bonded);
 	printf("\n\t\tAuthorized: %d", device_info->is_authorized);
@@ -812,9 +842,8 @@ static int get_bonded_device_info(const char *p1, const char *p2)
 		return 0;
 	}
 
-	DBG("Address %s Name %s Icon %s", device_info->remote_address,
-						device_info->remote_name,
-						device_info->icon);
+	DBG("Address %s Name %s", device_info->remote_address,
+						device_info->remote_name);
 
 	bt_adapter_free_device_info(device_info);
 
@@ -1029,7 +1058,6 @@ static int list_devices(const char *p1, const char *p2)
 
 		printf("\n\tName: %s", discovery_info->remote_name);
 		printf("\n\t\tAddress: %s", discovery_info->remote_address);
-		printf("\n\t\tIcon: %s", discovery_info->icon);
 		printf("\n\t\tRSSI: %d", discovery_info->rssi);
 		printf("\n\t\tBonded: %d", discovery_info->is_bonded);
 		printf("\n\t\tservice_count: %d", discovery_info->service_count);
@@ -1317,6 +1345,9 @@ struct {
 
 	{"set_adapter_name", set_adapter_name,
 		"Usage: set_adapter_name\n\tSet local adapter name"},
+
+	{"set_adapter_visibility", set_adapter_visibility,
+		"Usage: set_adapter_visibility 1 <1-3, No, Limit, Discoverable> duration\n\tSet adapter visibility"},
 
 	{"get_adapter_visibility", get_adapter_visibility,
 		"Usage: get_adapter_visibility\n\tGet local adapter visibility"},

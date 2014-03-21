@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.tizen.comms
+Exec=/bin/sh -c 'export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$UID/dbus/user_bus_socket; exec /bin/bluetooth-service'
+User=app

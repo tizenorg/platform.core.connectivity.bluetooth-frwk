@@ -146,6 +146,28 @@ void bluez_adapter_set_powered_changed_cb(
 void bluez_adapter_unset_powered_changed_cb(
 				struct _bluez_adapter *adapter);
 
+typedef void (*bluez_adapter_discoverable_cb_t)(
+				struct _bluez_adapter *adapter,
+				gboolean discoverable,
+				gpointer user_data);
+void bluez_adapter_set_discoverable_changed_cb(
+				struct _bluez_adapter *adapter,
+				bluez_adapter_discoverable_cb_t cb,
+				gpointer user_data);
+void bluez_adapter_unset_discoverable_changed_cb(
+				struct _bluez_adapter *adapter);
+
+typedef void (*bluez_adapter_discoverable_tm_cb_t)(
+				struct _bluez_adapter *adapter,
+				guint32 timeout,
+				gpointer user_data);
+void bluez_adapter_set_discoverable_timeout_changed_cb(
+				struct _bluez_adapter *adapter,
+				bluez_adapter_discoverable_tm_cb_t cb,
+				gpointer user_data);
+void bluez_adapter_unset_discoverable_timeout_changed_cb(
+				struct _bluez_adapter *adapter);
+
 typedef void (*bluez_adapter_device_cb_t)(
 				struct _bluez_device *device,
 				gpointer user_data);
@@ -199,6 +221,9 @@ int bluez_adapter_get_property_discoverable(
 				struct _bluez_adapter *adapter,
 				gboolean *discoverable);
 
+void bluez_adapter_set_discoverable_timeout(
+				struct _bluez_adapter *adapter,
+				guint32 timeout);
 int bluez_adapter_get_property_discoverable_timeout(
 				struct _bluez_adapter *adapter,
 				guint32 *time);

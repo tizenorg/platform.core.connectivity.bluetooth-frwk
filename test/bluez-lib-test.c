@@ -811,7 +811,7 @@ static int connect_spp(void *parameter)
 
 	return 0;
 }
-
+/*
 static int icon(void *parameter)
 {
 	gchar *icon;
@@ -838,7 +838,7 @@ static int icon(void *parameter)
 
 	return 0;
 }
-
+*/
 struct {
 	const char *command;
 	int (*function)(void *parameter);
@@ -880,8 +880,8 @@ struct {
 	{"remove", remove_device,
 		"Usage: remove F0_DC_E2_7F_41_3D\n\tRemove device"},
 
-	{"icon", icon,
-		"Usage: icon F0_DC_E2_7F_41_3D\n\tGet device Icon"},
+//	{"icon", icon,
+//		"Usage: icon F0_DC_E2_7F_41_3D\n\tGet device Icon"},
 
 	{"l_a_uuid", list_uuid,
 		"Usage: list_uuid\n\tList adapter UUIDs"},
