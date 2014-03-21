@@ -3367,6 +3367,29 @@ int bt_adapter_set_visibility_mode_changed_cb(
 	return BT_SUCCESS;
 }
 
+int bt_adapter_set_visibility_duration_changed_cb(
+			bt_adapter_visibility_duration_changed_cb callback,
+			void *user_data)
+{
+	DBG("Not implement");
+
+	return BT_SUCCESS;
+}
+
+int bt_adapter_unset_visibility_mode_changed_cb(void)
+{
+	DBG("Not implement");
+
+	return BT_SUCCESS;
+}
+
+int bt_adapter_unset_visibility_duration_changed_cb(void)
+{
+	DBG("Not implement");
+
+	return BT_SUCCESS;
+}
+
 int bt_socket_set_connection_state_changed_cb(
 			bt_socket_connection_state_changed_cb callback,
 			void *user_data)
