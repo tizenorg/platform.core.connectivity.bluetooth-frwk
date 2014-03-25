@@ -613,8 +613,6 @@ void adapter_name_changed(bluez_adapter_t *adapter,
 			(struct adapter_name_cb_node *)user_data;
 	gchar *adapter_name = g_strdup(name);
 
-	DBG("Name: %s", name);
-
 	data->cb(adapter_name, data->user_data);
 
 	g_free(adapter_name);
@@ -890,6 +888,27 @@ int bt_adapter_set_name_changed_cb(bt_adapter_name_changed_cb callback,
 	adapter_name_node = node_data;
 
 	_bt_update_bluetooth_callbacks();
+
+	return BT_SUCCESS;
+}
+
+int bt_adapter_unset_name_changed_cb(void)
+{
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!adapter_name_node)
+		return BT_SUCCESS;
+
+	bluez_adapter_unset_alias_changed_cb(default_adapter);
+
+	g_free(adapter_name_node);
+	adapter_name_node = NULL;
 
 	return BT_SUCCESS;
 }
@@ -1313,50 +1332,54 @@ int bt_adapter_free_device_info(bt_device_info_s *device_info)
 static void bt_device_paired_cb(enum bluez_error_type error,
                                        void *user_data)
 {
-       bt_error_e capi_error = BT_SUCCESS;
-       char *remote_address = user_data;
-       bt_device_info_s *device_info;
-       bluez_device_t *device;
+	bt_error_e capi_error = BT_SUCCESS;
+	char *remote_address = user_data;
+	bt_device_info_s *device_info;
+	bluez_device_t *device;
 
-       device = bluez_adapter_get_device_by_address(default_adapter,
+	device = bluez_adapter_get_device_by_address(default_adapter,
                                                        remote_address);
-       if (!device) {
-               ERROR("no %s device", remote_address);
-               return;
-       }
+	if (!device) {
+		ERROR("no %s device", remote_address);
+		return;
+	}
 
-       if (!device_bond_node)
-               return;
+	if (!device_bond_node)
+		return;
 
-       switch (error) {
-       case ERROR_INVALID_ARGUMENTS:
-               capi_error = BT_ERROR_INVALID_PARAMETER;
-               break;
-       case ERROR_FAILED:
-               capi_error = BT_ERROR_OPERATION_FAILED;
-               break;
-       case ERROR_AUTH_CANCELED:
-               break;
-       case ERROR_AUTH_FAILED:
-               capi_error = BT_ERROR_AUTH_FAILED;
-               break;
-       case ERROR_AUTH_REJECT:
-               capi_error = BT_ERROR_AUTH_REJECTED;
-               break;
-       case ERROR_AUTH_TIMEOUT:
-               capi_error = BT_ERROR_TIMED_OUT;
-               break;
-       case ERROR_AUTH_ATTEMPT_FAILED:
-               capi_error = BT_ERROR_AUTH_FAILED;
-               break;
-       default:
-               WARN("Unknown error type with device pair");
-       }
+	/* Pair a device success, will report through DISCOVERY EVENT */
+	if (error == ERROR_NONE)
+		return;
 
-       device_info = get_device_info(device);
+	switch (error) {
+	case ERROR_INVALID_ARGUMENTS:
+		capi_error = BT_ERROR_INVALID_PARAMETER;
+		break;
+	case ERROR_FAILED:
+		capi_error = BT_ERROR_OPERATION_FAILED;
+		break;
+	case ERROR_AUTH_CANCELED:
+		break;
+	case ERROR_AUTH_FAILED:
+		capi_error = BT_ERROR_AUTH_FAILED;
+		break;
+	case ERROR_AUTH_REJECT:
+		capi_error = BT_ERROR_AUTH_REJECTED;
+		break;
+	case ERROR_AUTH_TIMEOUT:
+		capi_error = BT_ERROR_TIMED_OUT;
+		break;
+	case ERROR_AUTH_ATTEMPT_FAILED:
+		capi_error = BT_ERROR_AUTH_FAILED;
+		break;
+	default:
+		WARN("Unknown error type with device pair");
+	}
 
-       device_bond_node->cb(capi_error, device_info,
-                               device_bond_node->user_data);
+	device_info = get_device_info(device);
+
+	device_bond_node->cb(capi_error, device_info,
+				device_bond_node->user_data);
 
 	free_device_info(device_info);
 }
@@ -2210,6 +2233,82 @@ int bt_hid_host_disconnect(const char *remote_address)
 	return BT_SUCCESS;
 }
 
+struct spp_context {
+	gchar *uuid;
+	gchar *spp_path;
+	GIOChannel *channel;
+	bt_spp_new_connection_cb new_connection;
+	void *new_connection_data;
+};
+
+GList *spp_ctx_list;
+
+static GDBusNodeInfo *profile_xml_data;
+
+static struct spp_context *create_spp_context(void)
+{
+	struct spp_context *spp_ctx;
+
+	spp_ctx = g_try_new0(struct spp_context, 1);
+	if (spp_ctx == NULL) {
+		DBG("no memroy");
+		return NULL;
+	}
+
+	return spp_ctx;
+}
+
+static void free_spp_context(struct spp_context *spp_ctx)
+{
+	if (spp_ctx == NULL)
+		return;
+
+	if (spp_ctx->uuid)
+		g_free(spp_ctx->uuid);
+
+	if (spp_ctx->spp_path)
+		g_free(spp_ctx->spp_path);
+
+	g_free(spp_ctx);
+}
+
+static struct spp_context *find_spp_context_from_uuid(const char *uuid)
+{
+	struct spp_context *spp_ctx;
+	GList *list, *next;
+
+	for (list = g_list_first(spp_ctx_list); list; list = next) {
+		next = g_list_next(list);
+
+		spp_ctx = list->data;
+
+		if (spp_ctx && !g_strcmp0(spp_ctx->uuid, uuid))
+			return spp_ctx;
+	}
+
+	return NULL;
+}
+
+static struct spp_context *find_spp_context_from_fd(int fd)
+{
+	struct spp_context *spp_ctx;
+	GList *list, *next;
+	int spp_fd;
+
+	for (list = g_list_first(spp_ctx_list); list; list = next) {
+		next = g_list_next(list);
+
+		spp_ctx = list->data;
+
+		spp_fd = g_io_channel_unix_get_fd(spp_ctx->channel);
+
+		if (spp_ctx && spp_fd == fd)
+			return spp_ctx;
+	}
+
+	return NULL;
+}
+
 /* Agent Function */
 
 #define BLUEZ_AGENT_SERVICE "org.bluezlib.agent"
@@ -2392,8 +2491,20 @@ static void request_authorize_service_handler(const gchar *device_path,
 
 	device_name = bluez_device_get_property_alias(device);
 
+	/* Don't match the local spp UUID, it means other profile UUID */
+	if (!find_spp_context_from_uuid(uuid)) {
+		if (!this_agent || !this_agent->authorize_service)
+			return;
+
+		this_agent->authorize_service(device_name, uuid, invocation);
+
+		g_free(device_name);
+
+		return;
+	}
+
 	node_data = spp_connection_requested_node;
-	if (node_data)
+	if (node_data && node_data->cb)
 		node_data->cb(uuid, device_name, invocation,
 				node_data->user_data);
 
@@ -2751,82 +2862,6 @@ void bt_agent_pincode_cancel(bt_req_t *requestion)
 	g_dbus_method_invocation_return_dbus_error(invocation,
 			ERROR_INTERFACE ".Canceled",
 			"CanceledByUser");
-}
-
-struct spp_context {
-	gchar *uuid;
-	gchar *spp_path;
-	GIOChannel *channel;
-	bt_spp_new_connection_cb new_connection;
-	void *new_connection_data;
-};
-
-GList *spp_ctx_list;
-
-static GDBusNodeInfo *profile_xml_data;
-
-static struct spp_context *create_spp_context(void)
-{
-	struct spp_context *spp_ctx;
-
-	spp_ctx = g_try_new0(struct spp_context, 1);
-	if (spp_ctx == NULL) {
-		DBG("no memroy");
-		return NULL;
-	}
-
-	return spp_ctx;
-}
-
-static void free_spp_context(struct spp_context *spp_ctx)
-{
-	if (spp_ctx == NULL)
-		return;
-
-	if (spp_ctx->uuid)
-		g_free(spp_ctx->uuid);
-
-	if (spp_ctx->spp_path)
-		g_free(spp_ctx->spp_path);
-
-	g_free(spp_ctx);
-}
-
-static struct spp_context *find_spp_context_from_uuid(const char *uuid)
-{
-	struct spp_context *spp_ctx;
-	GList *list, *next;
-
-	for (list = g_list_first(spp_ctx_list); list; list = next) {
-		next = g_list_next(list);
-
-		spp_ctx = list->data;
-
-		if (spp_ctx && !g_strcmp0(spp_ctx->uuid, uuid))
-			return spp_ctx;
-	}
-
-	return NULL;
-}
-
-static struct spp_context *find_spp_context_from_fd(int fd)
-{
-	struct spp_context *spp_ctx;
-	GList *list, *next;
-	int spp_fd;
-
-	for (list = g_list_first(spp_ctx_list); list; list = next) {
-		next = g_list_next(list);
-
-		spp_ctx = list->data;
-
-		spp_fd = g_io_channel_unix_get_fd(spp_ctx->channel);
-
-		if (spp_ctx && spp_fd == fd)
-			return spp_ctx;
-	}
-
-	return NULL;
 }
 
 static const gchar profile_xml[] =
@@ -3337,6 +3372,29 @@ int bt_spp_unset_data_received_cb(void)
 int bt_adapter_set_visibility_mode_changed_cb(
 			bt_adapter_visibility_mode_changed_cb callback,
 			void *user_data)
+{
+	DBG("Not implement");
+
+	return BT_SUCCESS;
+}
+
+int bt_adapter_set_visibility_duration_changed_cb(
+			bt_adapter_visibility_duration_changed_cb callback,
+			void *user_data)
+{
+	DBG("Not implement");
+
+	return BT_SUCCESS;
+}
+
+int bt_adapter_unset_visibility_mode_changed_cb(void)
+{
+	DBG("Not implement");
+
+	return BT_SUCCESS;
+}
+
+int bt_adapter_unset_visibility_duration_changed_cb(void)
 {
 	DBG("Not implement");
 

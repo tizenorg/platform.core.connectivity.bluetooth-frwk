@@ -54,6 +54,16 @@ enum bluez_error_type {
 	ERROR_AUTH_FAILED
 };
 
+typedef void (*simple_reply_cb_t) (
+				enum bluez_error_type type,
+				void *user_data);
+
+struct simple_reply_data {
+	GDBusProxy *proxy;
+	simple_reply_cb_t reply_cb;
+	void *user_data;
+};
+
 enum bluez_error_type get_error_type(GError *error);
 
 int property_get_boolean(GDBusProxy *proxy,
@@ -73,6 +83,10 @@ int property_get_uint64(GDBusProxy *proxy,
 
 char **property_get_string_list(GDBusProxy *proxy,
 				const char *property);
+
+void simple_reply_callback(GObject *source_object,
+				GAsyncResult *res,
+				gpointer user_data);
 
 int comms_service_plugin_init(void);
 void comms_service_plugin_cleanup(void);

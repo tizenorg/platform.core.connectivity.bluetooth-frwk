@@ -187,6 +187,37 @@ static int set_adapter_name(const char *p1, const char *p2)
 	return 0;
 }
 
+static void adapter_name_changed(char *device_name, void *user_data)
+{
+	DBG("device name changed: %s", device_name);
+}
+
+static int set_adapter_name_callback(const char *p1, const char *p2)
+{
+	int err;
+
+	err = bt_adapter_set_name_changed_cb(adapter_name_changed, NULL);
+	if (err != BT_SUCCESS) {
+		ERROR("bt_adapter_set_name_changed_cb error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
+static int unset_adapter_name_callback(const char *p1, const char *p2)
+{
+	int err;
+
+	err = bt_adapter_unset_name_changed_cb();
+	if (err != BT_SUCCESS) {
+		ERROR("bt_adapter_unset_name_changed_cb error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int set_adapter_visibility(const char *p1, const char *p2)
 {
 	bt_adapter_visibility_mode_e mode;
@@ -610,6 +641,49 @@ static int device_set_bond_created_cb(const char *p1, const char *p2)
 	err = bt_device_set_bond_created_cb(device_bond_created_cb, NULL);
 	if (err != BT_SUCCESS) {
 		ERROR("bt_device_set_bond_created_cb error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
+static void device_bond_destroyed_cb(int result, char *remote_address,
+							void *user_data)
+{
+	GList *iter, *next;
+
+	if (result != BT_SUCCESS) {
+		DBG("bonded device destroyed faild: %d", result);
+		return;
+	}
+
+	printf("Device %s has destroyed, follow is info:",
+						remote_address);
+
+	for (iter = g_list_first(device_list); iter; iter = next) {
+		bt_adapter_device_discovery_info_s *info;
+
+		info = iter->data;
+
+		next = g_list_next(iter);
+
+		if (g_strcmp0(info->remote_address, remote_address) == 0) {
+			device_list = g_list_remove(device_list, info);
+			g_free(info->remote_name);
+			g_free(info->remote_address);
+			g_strfreev(info->service_uuid);
+			g_free(info);
+		}
+	}
+}
+
+static int device_set_bond_destroyed_cb(const char *p1, const char *p2)
+{
+	int err;
+
+	err = bt_device_set_bond_destroyed_cb(device_bond_destroyed_cb, NULL);
+	if (err != BT_SUCCESS) {
+		ERROR("bt_device_set_bond_destroyed_cb error: %d", err);
 		return 0;
 	}
 
@@ -1134,7 +1208,23 @@ void request_confirm(const char *device_name,
 void authorize_service(const char *device,
 			const char *uuid, void *user_data)
 {
-	DBG("");
+	const gchar *confirm_info, *p1, *p2;
+	gchar input_value[32] = { 0 };
+
+	DBG("\n\t%s UUID %s requset authorize service, Please input(Y/N):",
+							device, uuid);
+
+	if (fgets(input_value, 32, stdin) == NULL) {
+		ERROR("fgets error.");
+		return;
+	}
+
+	split_input(input_value, &confirm_info, &p1, &p2);
+
+	if (!g_ascii_strncasecmp(confirm_info, "y", 1))
+		bt_agent_confirm_accept(user_data);
+	else
+		bt_agent_confirm_reject(user_data);
 }
 
 /* Should free in unregister_agent */
@@ -1344,7 +1434,13 @@ struct {
 		"Usage: get_adapter_name\n\tGet local adapter name"},
 
 	{"set_adapter_name", set_adapter_name,
-		"Usage: set_adapter_name\n\tSet local adapter name"},
+		"Usage: set_adapter_name BlueZ5.x\n\tSet local adapter name"},
+
+	{"set_adapter_name_callback", set_adapter_name_callback,
+		"Usage: set_adapter_name_callback\n\tSet adapter changed callback"},
+
+	{"unset_adapter_name_callback", unset_adapter_name_callback,
+		"Usage: unset_adapter_name_callback\n\tUnset adapter changed callback"},
 
 	{"set_adapter_visibility", set_adapter_visibility,
 		"Usage: set_adapter_visibility 1 <1-3, No, Limit, Discoverable> duration\n\tSet adapter visibility"},
@@ -1378,6 +1474,9 @@ struct {
 
 	{"device_set_bond_created_cb", device_set_bond_created_cb,
 		"Usage: device_set_bond_created_cb\n\tSet Device bond state changed callback"},
+
+	{"device_set_bond_destroyed_cb", device_set_bond_destroyed_cb,
+		"Usage: device_set_bond_destroyed_cb\n\tSet Device bond state changed callback"},
 
 	{"device_unset_bond_created_cb", device_unset_bond_created_cb,
 		"Usage: device_unset_bond_created_cb\n\tUnset Device bond state changed callback"},
@@ -1467,7 +1566,7 @@ struct {
 		"Usage: register_opp_server\n\tregister opp server"},
 
 	{"opp_send", opp_send,
-		"Usage: opp_server file_name destination\n\tpush file"},
+		"Usage: opp_send file_name destination\n\tpush file"},
 
 	{"opp_watch", opp_watch,
 		"Usage: opp_watch on/off\n\ton/off opp_watch"},

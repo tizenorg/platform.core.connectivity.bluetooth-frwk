@@ -281,10 +281,6 @@ void bluez_device_set_alias(
 				struct _bluez_device *device,
 				const gchar *alias);
 
-typedef void (*simple_reply_cb_t) (
-				enum bluez_error_type type,
-				void *user_data);
-
 typedef void (*bluez_avrcp_repeat_changed_cb_t)(
 				const gchar *repeat,
 				gpointer user_data);

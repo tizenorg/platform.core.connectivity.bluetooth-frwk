@@ -106,7 +106,7 @@ static struct _comms_object *create_object(GDBusObject *obj)
 	if (properties_proxy == NULL)
 		WARN("create properties proxy error");
 
-	object->properties_proxy = properties_proxy;
+	object->properties_proxy = g_object_ref(properties_proxy);
 	object->path_name = g_strdup(path);
 
 	return object;
@@ -363,8 +363,8 @@ static void parse_comms_bluetooth(gpointer data, gpointer user_data)
 		return;
 
 	proxy_node->interface_name = iface_name;
-	proxy_node->interface = interface;
-	proxy_node->proxy = proxy;
+	proxy_node->interface = g_object_ref(interface);
+	proxy_node->proxy = g_object_ref(proxy);
 }
 
 static void comms_service_bluetooth_added(struct _comms_object *object,
@@ -399,8 +399,8 @@ static void parse_comms_manager(gpointer data, gpointer user_data)
 	if (g_strcmp0(iface_name, COMMS_MANAGER_INTERFACE))
 		return;
 
-	manager->interface = interface;
-	manager->proxy = proxy;
+	manager->interface = g_object_ref(interface);
+	manager->proxy = g_object_ref(proxy);
 
 	g_signal_connect(proxy, "g-properties-changed",
 			G_CALLBACK(manager_properties_changed), NULL);
@@ -485,8 +485,6 @@ static void parse_object(gpointer data, gpointer user_data)
 		WARN("Unkonw object type");
 		return;
 	}
-
-	g_object_unref(object);
 }
 
 static void object_added(GDBusObjectManager *manger, GDBusObject *object,
@@ -516,6 +514,7 @@ static void object_removed(GDBusObjectManager *manger, GDBusObject *object,
 
 int comms_lib_init(void)
 {
+	GDBusObjectManager *manager;
 	GList *obj_list;
 
 	DBG("");
@@ -523,17 +522,19 @@ int comms_lib_init(void)
 	if (object_manager != NULL)
 		return 0;
 
-	object_manager = g_dbus_object_manager_client_new_for_bus_sync(
+	manager = g_dbus_object_manager_client_new_for_bus_sync(
 							G_BUS_TYPE_SYSTEM,
 							0, COMMS_SERVICE_NAME,
 							OBJECT_MANAGER_OBJ_PATH,
 							NULL, NULL, NULL,
 							NULL, NULL);
-	if (object_manager == NULL) {
+	if (manager == NULL) {
 		ERROR("create object manager error");
 		/* TODO: define error type */
 		return -1;
 	}
+
+	object_manager = g_object_ref(manager);
 
 	g_signal_connect(object_manager, "object-added",
 				G_CALLBACK(object_added), NULL);
@@ -546,6 +547,8 @@ int comms_lib_init(void)
 	obj_list = g_dbus_object_manager_get_objects(object_manager);
 
 	g_list_foreach(obj_list, parse_object, NULL);
+
+	g_list_free(obj_list);
 
 	return 0;
 }
@@ -575,6 +578,37 @@ void comms_lib_deinit(void)
 	destruct_comms_object_manager();
 }
 
+struct _bluetooth_simple_async_result {
+	bluetooth_simple_callback callback;
+	void *user_data;
+};
+
+static void bluetooth_simple_async_cb(GObject *object, GAsyncResult *res,
+						gpointer user_data)
+{
+	struct _bluetooth_simple_async_result *async_result_node = user_data;
+	enum bluez_error_type error_type = ERROR_NONE;
+	GDBusProxy *proxy = G_DBUS_PROXY(object);
+	GError *error = NULL;
+	GVariant *ret;
+
+	ret = g_dbus_proxy_call_finish(proxy, res, &error);
+	if (ret == NULL) {
+		DBG("%s", error->message);
+
+		error_type = get_error_type(error);
+
+		g_error_free(error);
+	} else
+		g_variant_unref(ret);
+
+	if (async_result_node && async_result_node->callback)
+		async_result_node->callback(error_type,
+					async_result_node->user_data);
+
+	g_free(async_result_node);
+}
+
 void comms_manager_enable_bluetooth(void)
 {
 	if (this_manager == NULL) {
@@ -583,7 +617,8 @@ void comms_manager_enable_bluetooth(void)
 	}
 
 	g_dbus_proxy_call(this_manager->proxy, "EnableBluetoothService",
-					NULL, 0, -1, NULL, NULL, NULL);
+					NULL, 0, -1, NULL,
+					bluetooth_simple_async_cb, NULL);
 }
 
 void comms_manager_disable_bluetooth(void)
@@ -594,7 +629,8 @@ void comms_manager_disable_bluetooth(void)
 	}
 
 	g_dbus_proxy_call(this_manager->proxy, "DisableBluetoothService",
-					NULL, 0, -1, NULL, NULL, NULL);
+					NULL, 0, -1, NULL,
+					bluetooth_simple_async_cb, NULL);
 }
 
 int comms_manager_get_bt_adapter_visibale_time(void)
@@ -645,37 +681,6 @@ int comms_manager_get_property_bt_in_service(gboolean *in_service)
 
 	return property_get_boolean(this_manager->proxy,
 				"BluetoothInService", in_service);
-}
-
-struct _bluetooth_simple_async_result {
-	bluetooth_simple_callback callback;
-	void *user_data;
-};
-
-static void bluetooth_simple_async_cb(GObject *object, GAsyncResult *res,
-						gpointer user_data)
-{
-	struct _bluetooth_simple_async_result *async_result_node = user_data;
-	enum bluez_error_type error_type = ERROR_NONE;
-	GDBusProxy *proxy = G_DBUS_PROXY(object);
-	GError *error = NULL;
-	GVariant *ret;
-
-	ret = g_dbus_proxy_call_finish(proxy, res, &error);
-	if (ret == NULL) {
-		DBG("%s", error->message);
-
-		error_type = get_error_type(error);
-
-		g_error_free(error);
-	} else
-		g_variant_unref(ret);
-
-	if (async_result_node->callback)
-		async_result_node->callback(error_type,
-					async_result_node->user_data);
-
-	g_free(async_result_node);
 }
 
 void comms_bluetooth_device_pair(const char *address,

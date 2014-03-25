@@ -227,15 +227,17 @@ static void handle_adapter_powered_changed(GVariant *changed_properties,
 static void handle_adapter_alias_changed(GVariant *changed_properties,
 						struct _bluez_adapter *adapter)
 {
-	const gchar *alias = NULL;
+	gchar *alias = NULL;
 	gboolean variant_found = g_variant_lookup(changed_properties,
-							"Alias", "s", alias);
+							"Alias", "s", &alias);
 	if (!variant_found)
 		return;
 
 	adapter->alias_cb(adapter,
 			alias,
 			adapter->alias_cb_data);
+
+	g_free(alias);
 }
 
 static void handle_adapter_discovering_changed(GVariant *changed_properties,
@@ -1378,7 +1380,8 @@ void bluez_adapter_set_alias(struct _bluez_adapter *adapter,
 
 	g_dbus_proxy_call(adapter->parent->properties_proxy,
 					"Set", parameters, 0,
-					-1, NULL, NULL, NULL);
+					-1, NULL,
+					simple_reply_callback, NULL);
 }
 
 void bluez_adapter_set_powered(struct _bluez_adapter *adapter,
@@ -1393,7 +1396,7 @@ void bluez_adapter_set_powered(struct _bluez_adapter *adapter,
 
 	g_dbus_proxy_call(adapter->parent->properties_proxy,
 					"Set", parameters, 0,
-					-1, NULL, NULL, NULL);
+					-1, NULL, simple_reply_callback, NULL);
 }
 
 void bluez_adapter_set_discoverable(struct _bluez_adapter *adapter,
@@ -1408,7 +1411,8 @@ void bluez_adapter_set_discoverable(struct _bluez_adapter *adapter,
 
 	g_dbus_proxy_call(adapter->parent->properties_proxy,
 					"Set", parameters, 0,
-					-1, NULL, NULL, NULL);
+					-1, NULL,
+					simple_reply_callback, NULL);
 }
 
 void bluez_adapter_set_discoverable_timeout(struct _bluez_adapter *adapter,
@@ -1422,7 +1426,8 @@ void bluez_adapter_set_discoverable_timeout(struct _bluez_adapter *adapter,
 
 	g_dbus_proxy_call(adapter->parent->properties_proxy,
 					"Set", parameters, 0,
-					-1, NULL, NULL, NULL);
+					-1, NULL,
+					simple_reply_callback, NULL);
 }
 
 void bluez_adapter_start_discovery(struct _bluez_adapter *adapter)
@@ -1431,7 +1436,8 @@ void bluez_adapter_start_discovery(struct _bluez_adapter *adapter)
 
 	g_dbus_proxy_call(adapter->proxy,
 			"StartDiscovery", NULL,
-			0, -1, NULL, NULL, NULL);
+			0, -1, NULL,
+			simple_reply_callback, NULL);
 
 }
 
@@ -1439,7 +1445,8 @@ void bluez_adapter_stop_discovery(struct _bluez_adapter *adapter)
 {
 	g_dbus_proxy_call(adapter->proxy,
 			"StopDiscovery", NULL,
-			0, -1, NULL, NULL, NULL);
+			0, -1, NULL,
+			simple_reply_callback, NULL);
 }
 
 int bluez_adapter_get_property_powered(struct _bluez_adapter *adapter,
@@ -1665,7 +1672,8 @@ void bluez_adapter_remove_device(struct _bluez_adapter *adapter,
 {
 	g_dbus_proxy_call(adapter->proxy, "RemoveDevice",
 			g_variant_new("(o)", device->object_path),
- 			0, -1, NULL, NULL, NULL);
+ 			0, -1, NULL,
+			simple_reply_callback, NULL);
 }
 
 const GList *bluez_adapter_get_devices_path(struct _bluez_adapter *adapter)
@@ -1737,7 +1745,8 @@ void bluez_device_set_trusted(struct _bluez_device *device,
 
 	g_dbus_proxy_call(device->parent->properties_proxy,
 					"Set", parameter, 0,
-					-1, NULL, NULL, NULL);
+					-1, NULL,
+					simple_reply_callback, NULL);
 }
 
 void bluez_device_set_alias(struct _bluez_device *device,
@@ -1749,7 +1758,8 @@ void bluez_device_set_alias(struct _bluez_device *device,
 
 	g_dbus_proxy_call(device->parent->properties_proxy,
 					"Set", parameter, 0,
-					-1, NULL, NULL, NULL);
+					-1, NULL,
+					simple_reply_callback, NULL);
 }
 
 char **bluez_device_get_property_uuids(struct _bluez_device *device)
@@ -1802,12 +1812,6 @@ char *bluez_device_get_property_icon(struct _bluez_device *device)
 	return property_get_string(device->proxy, "Icon");
 }
 
-struct simple_reply_data {
-	GDBusProxy *proxy;
-	simple_reply_cb_t reply_cb;
-	void *user_data;
-};
-
 struct profile_connect_state_notify {
 	struct _bluez_device *device;
 	profile_connect_cb_t cb;
@@ -1839,36 +1843,6 @@ static inline enum device_pair_state get_pairing_error_state(GError *error)
 		WARN("Unknown error state");
 
 	return UNKNOWN_PAIRING_ERROR;
-}
-
-static void simple_reply_callback(GObject *source_object, GAsyncResult *res,
-							gpointer user_data)
-{
-	struct simple_reply_data *reply_data = user_data;
-	enum bluez_error_type error_type = ERROR_NONE;
-	GError *error = NULL;
-	GVariant *ret;
-
-	if (!reply_data->proxy)
-		goto done;
-
-	ret = g_dbus_proxy_call_finish(reply_data->proxy, res, &error);
-	if (ret == NULL) {
-		DBG("%s", error->message);
-		error_type = get_error_type(error);
-
-		g_error_free(error);
-	} else
-		g_variant_unref(ret);
-
-	if (!reply_data)
-		return;
-
-	if (reply_data->reply_cb)
-		reply_data->reply_cb(error_type, reply_data->user_data);
-
-done:
-	g_free(reply_data);
 }
 
 void bluez_device_pair(struct _bluez_device *device,
@@ -2113,7 +2087,8 @@ void bluez_agent_request_default_agent(const gchar *path)
 	g_dbus_proxy_call(this_agent->proxy,
 				"RequestDefaultAgent",
 				g_variant_new("(o)", path),
-				0, -1, NULL, NULL, NULL);
+				0, -1, NULL,
+				simple_reply_callback, NULL);
 }
 
 void bluez_profile_register_profile(const gchar *path, const gchar *uuid,

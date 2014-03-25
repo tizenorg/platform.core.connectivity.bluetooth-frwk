@@ -201,3 +201,33 @@ void convert_device_path_to_address(const gchar *device_path,
 		g_strlcpy(device_address, address, BT_ADDRESS_STRING_SIZE);
 	}
 }
+
+void simple_reply_callback(GObject *source_object, GAsyncResult *res,
+							gpointer user_data)
+{
+	struct simple_reply_data *reply_data = user_data;
+	enum bluez_error_type error_type = ERROR_NONE;
+	GError *error = NULL;
+	GVariant *ret;
+
+	if (!reply_data || !reply_data->proxy)
+		goto done;
+
+	ret = g_dbus_proxy_call_finish(reply_data->proxy, res, &error);
+	if (ret == NULL) {
+		DBG("%s", error->message);
+		error_type = get_error_type(error);
+
+		g_error_free(error);
+	} else
+		g_variant_unref(ret);
+
+	if (!reply_data)
+		return;
+
+	if (reply_data->reply_cb)
+		reply_data->reply_cb(error_type, reply_data->user_data);
+
+done:
+	g_free(reply_data);
+}
