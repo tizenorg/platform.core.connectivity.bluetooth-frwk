@@ -12,9 +12,6 @@ pkg_check_modules(${TEST} REQUIRED
 			glib-2.0
 			dbus-1
 			gio-2.0
-			msg-service
-			email-service
-			vconf
 			gio-unix-2.0)
 
 FOREACH(flag ${${TEST}_CFLAGS})
@@ -24,6 +21,23 @@ ENDFOREACH(flag)
 SET(LIB_INSTALL_DIR "/usr/lib/")
 SET(TEST_INSTALL_DIR "${LIB_INSTALL_DIR}bluetooth-frwk-test/")
 SET(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}bluetooth-service/plugins/")
+
+IF(platform STREQUAL "Mobile")
+SET(MOBILE_FLAGS "mobile-flags")
+pkg_check_modules(${MOBILE_FLAGS} REQUIRED
+			msg-service
+			email-service
+			vconf)
+FOREACH(flag ${${MOBILE_FLAGS}_CFLAGS})
+	SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${flag}")
+ENDFOREACH(flag)
+
+FOREACH(flag ${${MOBILE_FLAGS}_LDFLAGS})
+	SET(${TEST}_LDFLAGS "${${TEST}_LDFLAGS} ${flag}")
+ENDFOREACH(flag)
+
+ADD_DEFINITIONS(-DMOBILE)
+ENDIF()
 
 IF(platform STREQUAL "GEEK" OR platform STREQUAL "IVI")
 SET(TIZEN_FLAGS "tizen-flags")
@@ -48,6 +62,7 @@ ENDIF()
 # BLUETOOTH-SERVICE
 SET(BLUETOOTH-SERVICE "bluetooth-service")
 
+IF(platform STREQUAL "Mobile")
 SET(SOURCES_BLUETOOTH_SERVICE
 	src/main.c
 	src/manager.c
@@ -63,6 +78,20 @@ SET(SOURCES_BLUETOOTH_SERVICE
 	lib/common.c
 	lib/obex.c
    )
+ELSE()
+SET(SOURCES_BLUETOOTH_SERVICE
+	src/main.c
+	src/manager.c
+	src/plugin.c
+	src/vertical.c
+	src/pairing.c
+	src/opp.c
+	src/media.c
+	lib/bluez.c
+	lib/common.c
+	lib/obex.c
+   )
+ENDIF()
 
 ADD_EXECUTABLE(${BLUETOOTH-SERVICE} ${SOURCES_BLUETOOTH_SERVICE})
 TARGET_LINK_LIBRARIES(${BLUETOOTH-SERVICE} ${${TEST}_LDFLAGS} -ldl)
