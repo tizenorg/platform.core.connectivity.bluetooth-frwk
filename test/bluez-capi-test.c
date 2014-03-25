@@ -224,6 +224,16 @@ static int set_adapter_visibility(const char *p1, const char *p2)
 	unsigned int mode_num, timeout;
 	int err;
 
+	if (p1 == NULL) {
+		DBG("no visibility mode");
+		return 0;
+	}
+
+	if (p2 == NULL) {
+		DBG("no duration");
+		return 0;
+	}
+
 	mode_num = atoi(p1);
 	timeout = atoi(p2);
 
@@ -1280,7 +1290,7 @@ static int spp_create(const char *p1, const char *p2)
 	return 0;
 }
 
-static int spp_destory(const char *p1, const char *p2)
+static int spp_destroy(const char *p1, const char *p2)
 {
 	int ret;
 
@@ -1574,8 +1584,8 @@ struct {
 	{"spp_create", spp_create,
 		"Usage: spp_create 00001101-0000-1000-8000-00805f9b34fb\n\tcreate spp with uuid"},
 
-	{"spp_destroy", spp_destory,
-		"Usage: spp_destory\n\tdestory spp"},
+	{"spp_destroy", spp_destroy,
+		"Usage: spp_destroy\n\tdestory spp"},
 
 	{"spp_set_authorize_cb", spp_set_authorize_cb,
 		"Usage: spp_set_authorize_cb\n\tset spp authorize callback, accept/reject"},
