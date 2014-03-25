@@ -16,9 +16,6 @@ BuildRequires:  pkgconfig(capi-base-common)
 BuildRequires:  pkgconfig(aul)
 BuildRequires:  pkgconfig(syspopup-caller)
 BuildRequires:  pkgconfig(notification)
-BuildRequires:  pkgconfig(msg-service)
-BuildRequires:  pkgconfig(email-service)
-BuildRequires:  pkgconfig(vconf)
 
 BuildRequires:  cmake
 
