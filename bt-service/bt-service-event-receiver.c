@@ -875,100 +875,102 @@ void __bt_device_property_changed_event(DBusMessageIter *msg_iter, const char *p
 
 	dbus_message_iter_recurse(msg_iter, &item_iter);
 
-	if (dbus_message_iter_get_arg_type(&item_iter)
-					!= DBUS_TYPE_DICT_ENTRY) {
-		BT_ERR("This is bad format dbus\n");
-		return;
-	}
-
-	dbus_message_iter_recurse(&item_iter, &dict_iter);
-
-	dbus_message_iter_get_basic(&dict_iter, &property);
-	ret_if(property == NULL);
-
-	ret_if(!dbus_message_iter_next(&dict_iter));
-
-	if (strcasecmp(property, "Connected") == 0) {
-		gboolean connected = FALSE;
-
-		dbus_message_iter_recurse(&dict_iter, &value_iter);
-		dbus_message_iter_get_basic(&value_iter, &connected);
-
-		event = connected ? BLUETOOTH_EVENT_DEVICE_CONNECTED :
-				BLUETOOTH_EVENT_DEVICE_DISCONNECTED;
-
-		address = g_malloc0(BT_ADDRESS_STRING_SIZE);
-
-		_bt_convert_device_path_to_address(path, address);
-
-		BT_DBG("connected: %d", connected);
-		BT_DBG("address: %s", address);
-
-		remote_dev_info = _bt_get_remote_device_info(address);
-
-		if (remote_dev_info != NULL) {
-			__bt_device_remote_connected_properties(
-			remote_dev_info, address, connected);
+	do {
+		if (dbus_message_iter_get_arg_type(&item_iter)
+						!= DBUS_TYPE_DICT_ENTRY) {
+			BT_ERR("This is bad format dbus\n");
+			return;
 		}
 
-		/* Send event to application */
-		_bt_send_event(BT_DEVICE_EVENT,
-				event,
+		dbus_message_iter_recurse(&item_iter, &dict_iter);
+
+		dbus_message_iter_get_basic(&dict_iter, &property);
+		ret_if(property == NULL);
+
+		ret_if(!dbus_message_iter_next(&dict_iter));
+
+		if (strcasecmp(property, "Connected") == 0) {
+			gboolean connected = FALSE;
+
+			dbus_message_iter_recurse(&dict_iter, &value_iter);
+			dbus_message_iter_get_basic(&value_iter, &connected);
+
+			event = connected ? BLUETOOTH_EVENT_DEVICE_CONNECTED :
+					BLUETOOTH_EVENT_DEVICE_DISCONNECTED;
+
+			address = g_malloc0(BT_ADDRESS_STRING_SIZE);
+
+			_bt_convert_device_path_to_address(path, address);
+
+			BT_DBG("connected: %d", connected);
+			BT_DBG("address: %s", address);
+
+			remote_dev_info = _bt_get_remote_device_info(address);
+
+			if (remote_dev_info != NULL) {
+				__bt_device_remote_connected_properties(
+				remote_dev_info, address, connected);
+			}
+
+			/* Send event to application */
+			_bt_send_event(BT_DEVICE_EVENT,
+					event,
+					DBUS_TYPE_INT32, &result,
+					DBUS_TYPE_STRING, &address,
+					DBUS_TYPE_INVALID);
+
+			g_free(address);
+
+		} else if (strcasecmp(property, "Paired") == 0) {
+			gboolean paired = FALSE;
+			bt_remote_dev_info_t *remote_dev_info;
+
+			dbus_message_iter_recurse(&dict_iter, &value_iter);
+			dbus_message_iter_get_basic(&value_iter, &paired);
+
+			ret_if(paired == FALSE);
+
+			/* BlueZ sends paired signal for each paired device */
+			/* during activation, We should ignore this, otherwise*/
+			/* application thinks that a new device got paired */
+			if (_bt_adapter_get_status() != BT_ACTIVATED) {
+				BT_DBG("BT is not activated, so ignore this");
+				return;
+			}
+
+			if (_bt_is_device_creating() == TRUE) {
+				BT_DBG("Try to Pair by me");
+				return;
+			}
+
+			address = g_malloc0(BT_ADDRESS_STRING_SIZE);
+
+			_bt_convert_device_path_to_address(path, address);
+
+			remote_dev_info = _bt_get_remote_device_info(address);
+			if (remote_dev_info == NULL) {
+				g_free(address);
+				return;
+			}
+
+			_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_BONDING_FINISHED,
 				DBUS_TYPE_INT32, &result,
 				DBUS_TYPE_STRING, &address,
+				DBUS_TYPE_UINT32, &remote_dev_info->class,
+				DBUS_TYPE_INT16, &remote_dev_info->rssi,
+				DBUS_TYPE_STRING, &remote_dev_info->name,
+				DBUS_TYPE_BOOLEAN, &remote_dev_info->paired,
+				DBUS_TYPE_BOOLEAN, &remote_dev_info->connected,
+				DBUS_TYPE_BOOLEAN, &remote_dev_info->trust,
+				DBUS_TYPE_ARRAY, DBUS_TYPE_STRING,
+				&remote_dev_info->uuids, remote_dev_info->uuid_count,
 				DBUS_TYPE_INVALID);
 
-		g_free(address);
-
-	} else if (strcasecmp(property, "Paired") == 0) {
-		gboolean paired = FALSE;
-		bt_remote_dev_info_t *remote_dev_info;
-
-		dbus_message_iter_recurse(&dict_iter, &value_iter);
-		dbus_message_iter_get_basic(&value_iter, &paired);
-
-		ret_if(paired == FALSE);
-
-		/* BlueZ sends paired signal for each paired device */
-		/* during activation, We should ignore this, otherwise*/
-		/* application thinks that a new device got paired */
-		if (_bt_adapter_get_status() != BT_ACTIVATED) {
-			BT_DBG("BT is not activated, so ignore this");
-			return;
-		}
-
-		if (_bt_is_device_creating() == TRUE) {
-			BT_DBG("Try to Pair by me");
-			return;
-		}
-
-		address = g_malloc0(BT_ADDRESS_STRING_SIZE);
-
-		_bt_convert_device_path_to_address(path, address);
-
-		remote_dev_info = _bt_get_remote_device_info(address);
-		if (remote_dev_info == NULL) {
+			_bt_free_device_info(remote_dev_info);
 			g_free(address);
-			return;
 		}
-
-		_bt_send_event(BT_ADAPTER_EVENT,
-			BLUETOOTH_EVENT_BONDING_FINISHED,
-			DBUS_TYPE_INT32, &result,
-			DBUS_TYPE_STRING, &address,
-			DBUS_TYPE_UINT32, &remote_dev_info->class,
-			DBUS_TYPE_INT16, &remote_dev_info->rssi,
-			DBUS_TYPE_STRING, &remote_dev_info->name,
-			DBUS_TYPE_BOOLEAN, &remote_dev_info->paired,
-			DBUS_TYPE_BOOLEAN, &remote_dev_info->connected,
-			DBUS_TYPE_BOOLEAN, &remote_dev_info->trust,
-			DBUS_TYPE_ARRAY, DBUS_TYPE_STRING,
-			&remote_dev_info->uuids, remote_dev_info->uuid_count,
-			DBUS_TYPE_INVALID);
-
-		_bt_free_device_info(remote_dev_info);
-		g_free(address);
-	}
+	} while (dbus_message_iter_next(&item_iter));
 }
 
 void __bt_obex_property_changed_event(DBusMessageIter *msg_iter, const char *path)

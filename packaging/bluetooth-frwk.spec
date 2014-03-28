@@ -133,7 +133,7 @@ vconftool set -tf int memory/bluetooth/btsco "0" -g 6520 -i
 %postun -p /sbin/ldconfig
 
 %files
-%manifest %{name}.manifest
+#%manifest %{name}.manifest
 %defattr(-, root, root)
 %{_libdir}/libbluetooth-api.so.*
 
@@ -166,7 +166,7 @@ vconftool set -tf int memory/bluetooth/btsco "0" -g 6520 -i
 %endif
 
 %files core
-%manifest %{name}.manifest
+#%manifest %{name}.manifest
 %defattr(-, root, root)
 %{_datadir}/dbus-1/system-services/org.projectx.bt_core.service
 %{_bindir}/bt-core
