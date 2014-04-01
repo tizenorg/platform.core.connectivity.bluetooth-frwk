@@ -35,6 +35,9 @@
 #define DEVICE_SERVICE_CLASS_DISCOVERABLE_MODE	0x002000
 
 #define BT_SPP_BUFFER_MAX 1024
+#define BLUETOOTH_IDENT_LEN 6
+#define CONNMAN_DBUS_NAME "net.connman"
+#define CONNMAN_BLUETOOTH_SERVICE_PREFIX "/net/connman/service/bluetooth_"
 
 static bool initialized;
 static bool bt_service_init;
@@ -2680,6 +2683,23 @@ static void release_name_on_dbus(const char *name)
 	return;
 }
 
+static GDBusConnection *get_system_dbus_connect(void)
+{
+	GError *error = NULL;
+
+	if (conn)
+		return conn;
+
+	conn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
+	if (conn == NULL) {
+		DBG("%s", error->message);
+
+		g_error_free(error);
+	}
+
+	return conn;
+}
+
 static int request_name_on_dbus(const char *name)
 {
 	GDBusConnection *connection;
@@ -2687,14 +2707,9 @@ static int request_name_on_dbus(const char *name)
 	guint32 request_name_reply;
 	GError *error = NULL;
 
-	if (conn)
-		return 0;
-
-	connection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
-	if (connection == NULL) {
-		DBG("%s", error->message);
+	connection = get_system_dbus_connect();
+	if (connection == NULL)
 		return -1;
-	}
 
 	ret = g_dbus_connection_call_sync(connection,
 					"org.freedesktop.DBus",
@@ -2709,6 +2724,8 @@ static int request_name_on_dbus(const char *name)
 					-1, NULL, &error);
 	if (ret == NULL) {
 		WARN("%s", error->message);
+		g_error_free(error);
+
 		goto failed;
 	}
 
@@ -2729,8 +2746,6 @@ static int request_name_on_dbus(const char *name)
 
 		goto failed;
 	}
-
-	conn = connection;
 
 	return 0;
 
@@ -3422,4 +3437,113 @@ int bt_socket_unset_connection_state_changed_cb(void)
 	DBG("Not implement");
 
 	return BT_SUCCESS;
+}
+
+static void address2ident(const char *name, char *ident)
+{
+	unsigned int index;
+
+	for (index = 0; index < BLUETOOTH_IDENT_LEN; ++index) {
+		ident[index * 2] = name[index * 3];
+		ident[index * 2 + 1] = name[index * 3 + 1];
+	}
+
+	ident[BLUETOOTH_IDENT_LEN * 2] = '\0';
+}
+
+char *get_connman_service_path(const char *adapter_name,
+				const char *remote_name)
+{
+	char adapter_ident[BLUETOOTH_IDENT_LEN * 2 + 1] = { 0 };
+	char remote_ident[BLUETOOTH_IDENT_LEN * 2 + 1] = { 0 };
+	unsigned int len;
+	char *path;
+
+	len = strlen(CONNMAN_BLUETOOTH_SERVICE_PREFIX) +
+			BLUETOOTH_IDENT_LEN * 4 + 2;
+
+	path = calloc(len, sizeof(char));
+	if (path == NULL)
+		return NULL;
+
+	address2ident(adapter_name, adapter_ident);
+	address2ident(remote_name, remote_ident);
+
+	sprintf(path, "%s%s%s%s", CONNMAN_BLUETOOTH_SERVICE_PREFIX,
+				adapter_ident, "_", remote_ident);
+
+	return path;
+}
+
+int bt_panu_connect(const char *remote_address, bt_panu_service_type_e type)
+{
+	GDBusConnection *connection;
+	bt_device_info_s *device_bond_info;
+	char *path, *adapter_address;
+	bluez_device_t *device;
+	bool is_bonded;
+	GError *error = NULL;
+	int ret;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!remote_address)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	device = bluez_adapter_get_device_by_address(default_adapter,
+							remote_address);
+
+	if (device == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	device_bond_info = get_device_info(device);
+	is_bonded = device_bond_info->is_bonded;
+	free_device_info(device_bond_info);
+
+	if (is_bonded == FALSE)
+		return BT_ERROR_REMOTE_DEVICE_NOT_BONDED;
+
+	adapter_address = bluez_adapter_get_property_address(default_adapter);
+	if (adapter_address == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	path = get_connman_service_path(adapter_address, remote_address);
+	if (path == NULL) {
+		free(adapter_address);
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	DBG("path %s", path);
+
+	connection = get_system_dbus_connect();
+	if (connection == NULL) {
+		ret = BT_ERROR_OPERATION_FAILED;
+		goto done;
+	}
+
+	g_dbus_connection_call_sync(connection, CONNMAN_DBUS_NAME, path,
+					"net.connman.Service", "Connect",
+					NULL, NULL, 0, -1, NULL, &error);
+
+	if (error) {
+		DBG("error %s", error->message);
+		g_error_free(error);
+		ret = BT_ERROR_OPERATION_FAILED;
+
+		goto done;
+	}
+
+	ret = BT_SUCCESS;
+
+done:
+	free(path);
+	free(adapter_address);
+
+	return ret;
 }

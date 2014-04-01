@@ -1151,6 +1151,8 @@ static int list_devices(const char *p1, const char *p2)
 					discovery_info->service_uuid[len]);
 	}
 
+	printf("\n");
+
 	return 0;
 }
 
@@ -1414,6 +1416,22 @@ static int spp_send(const char *p1, const char *p2)
 	return 0;
 }
 
+static int panu_connect(const char *p1, const char *p2)
+{
+	int ret;
+
+	if (p1 == NULL) {
+		ERROR("panu_connect need remote address");
+		return 0;
+	}
+
+	ret = bt_panu_connect(p1, BT_PANU_SERVICE_TYPE_NAP);
+	if (ret != BT_SUCCESS)
+		DBG("bt_panu_connect failed %d", ret);
+
+	return 0;
+}
+
 struct {
 	const char *command;
 	int (*function)(const char *p1, const char *p2);
@@ -1601,6 +1619,9 @@ struct {
 
 	{"spp_send", spp_send,
 		"Usage: spp_send fd 'data'\n\tsend spp data to fd"},
+
+	{"panu_connect", panu_connect,
+		"Usage: panu_connect 70:F9:27:64:DF:65\n\tconnect address for panu"},
 
 	{"q", quit,
 		"Usage: q\n\tQuit"},
