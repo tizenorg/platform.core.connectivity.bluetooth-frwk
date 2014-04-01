@@ -242,6 +242,10 @@ GList *bluez_adapter_get_devices(
 				struct _bluez_adapter *adapter);
 
 /* device functions */
+int bluez_device_network_connect(
+				struct _bluez_device *device,
+				const gchar *role);
+
 typedef void (*bluez_device_paired_cb_t)(
 				struct _bluez_device *device,
 				gboolean paired,
