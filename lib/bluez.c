@@ -809,6 +809,13 @@ static void register_bluez_device(struct _bluez_device *device)
 				adapter->device_created_data);
 }
 
+static void bluez_device_interface_added(GDBusObject *object,
+					GDBusInterface *interface,
+					gpointer user_data)
+{
+	parse_bluez_device_interfaces(interface, user_data);
+}
+
 static void bluez_device_added(struct _bluez_object *object,
 					GList *ifaces)
 {
@@ -817,6 +824,9 @@ static void bluez_device_added(struct _bluez_object *object,
 	DBG("");
 
 	device = create_device(object);
+
+	g_signal_connect(object->obj, "interface-added",
+			G_CALLBACK(bluez_device_interface_added), device);
 
 	g_list_foreach(ifaces, parse_bluez_device_interfaces, device);
 
