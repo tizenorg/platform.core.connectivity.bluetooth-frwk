@@ -30,6 +30,7 @@
 #define MEDIATRANSPORT_INTERFACE "org.bluez.MediaTransport1"
 #define MEDIACONTROL_INTERFACE "org.bluez.MediaControl1"
 #define DEVICE_INTERFACE "org.bluez.Device1"
+#define NETWORK_INTERFACE "org.bluez.Network1"
 #define AGENT_INTERFACE "org.bluez.AgentManager1"
 #define PROFILE_INTERFACE "org.bluez.ProfileManager1"
 #define PROPERTIES_INTERFACE "org.freedesktop.DBus.Properties"
@@ -114,8 +115,10 @@ struct _bluez_device {
 	char *object_path;
 	GDBusInterface *interface;
 	GDBusInterface *control_interface;
+	GDBusInterface *network_interface;
 	GDBusProxy *proxy;
 	GDBusProxy *control_proxy;
+	GDBusProxy *network_proxy;
 	struct _bluez_object *parent;
 	struct _device_head *head;
 
@@ -585,6 +588,18 @@ static void control_properties_changed(GDBusProxy *proxy,
 	g_free(properties);
 }
 
+static void network_properties_changed(GDBusProxy *proxy,
+					GVariant *changed_properties,
+					GStrv *invalidated_properties,
+					gpointer user_data)
+{
+	gchar *properties = g_variant_print(changed_properties, TRUE);
+
+	DBG("properties %s", properties);
+
+	g_free(properties);
+}
+
 static void parse_bluez_device_interfaces(gpointer data, gpointer user_data)
 {
 	struct _bluez_device *device = user_data;
@@ -610,6 +625,11 @@ static void parse_bluez_device_interfaces(gpointer data, gpointer user_data)
 		device->control_proxy = proxy;
 		g_signal_connect(proxy, "g-properties-changed",
 			G_CALLBACK(control_properties_changed), device);
+	} else if (g_strcmp0(iface_name, NETWORK_INTERFACE) == 0) {
+		device->network_interface = interface;
+		device->network_proxy = proxy;
+		g_signal_connect(proxy, "g-properties-changed",
+			G_CALLBACK(network_properties_changed), device);
 	}
 }
 
@@ -684,6 +704,13 @@ static void free_bluez_device(gpointer data)
 	g_free(device->object_path);
 	g_object_unref(device->interface);
 	g_object_unref(device->proxy);
+
+	if (device->network_interface)
+		g_object_unref(device->network_interface);
+
+	if (device->network_proxy)
+		g_object_unref(device->network_proxy);
+
 	g_free(device);
 }
 
