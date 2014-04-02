@@ -1779,6 +1779,12 @@ int bluez_device_network_disconnect(struct _bluez_device *device)
 	return 0;
 }
 
+int bluez_device_network_get_property_connected(struct _bluez_device *device,
+						gboolean *connected)
+{
+	return property_get_boolean(device->network_proxy, "Connected", connected);
+}
+
 void bluez_device_set_paired_changed_cb(struct _bluez_device *device,
 					bluez_device_paired_cb_t cb,
 					gpointer user_data)

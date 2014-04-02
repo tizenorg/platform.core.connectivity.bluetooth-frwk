@@ -248,6 +248,10 @@ int bluez_device_network_connect(
 int bluez_device_network_disconnect(
 				struct _bluez_device *device);
 
+int bluez_device_network_get_property_connected(
+				struct _bluez_device *device,
+				gboolean *connected);
+
 typedef void (*bluez_device_paired_cb_t)(
 				struct _bluez_device *device,
 				gboolean paired,
