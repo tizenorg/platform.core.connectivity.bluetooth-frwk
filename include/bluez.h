@@ -245,6 +245,8 @@ GList *bluez_adapter_get_devices(
 int bluez_device_network_connect(
 				struct _bluez_device *device,
 				const gchar *role);
+int bluez_device_network_disconnect(
+				struct _bluez_device *device);
 
 typedef void (*bluez_device_paired_cb_t)(
 				struct _bluez_device *device,

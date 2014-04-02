@@ -1756,6 +1756,29 @@ int bluez_device_network_connect(struct _bluez_device *device,
 	return 0;
 }
 
+int bluez_device_network_disconnect(struct _bluez_device *device)
+{
+	struct simple_reply_data *reply_data;
+
+	reply_data = g_try_new0(struct simple_reply_data, 1);
+	if (reply_data == NULL) {
+		ERROR("no memory");
+		return -1;
+	}
+
+	reply_data->proxy = device->network_proxy;
+
+	DBG("%p", device->network_proxy);
+	if (!device->network_proxy)
+		return -1;
+
+	g_dbus_proxy_call(device->network_proxy, "Disconnect",
+				NULL, 0, -1, NULL,
+				simple_reply_callback, reply_data);
+
+	return 0;
+}
+
 void bluez_device_set_paired_changed_cb(struct _bluez_device *device,
 					bluez_device_paired_cb_t cb,
 					gpointer user_data)
