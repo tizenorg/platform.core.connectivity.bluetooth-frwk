@@ -3547,3 +3547,71 @@ done:
 
 	return ret;
 }
+
+int bt_panu_disconnect(const char *remote_address)
+{
+	GDBusConnection *connection;
+	char *path, *adapter_address;
+	bluez_device_t *device;
+	int connected, ret;
+	GError *error = NULL;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!remote_address)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	device = bluez_adapter_get_device_by_address(default_adapter,
+							remote_address);
+
+	if (device == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	bluez_device_network_get_property_connected(device, &connected);
+	if (connected == FALSE)
+		return BT_ERROR_REMOTE_DEVICE_NOT_CONNECTED;
+
+	adapter_address = bluez_adapter_get_property_address(default_adapter);
+	if (adapter_address == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	path = get_connman_service_path(adapter_address, remote_address);
+	if (path == NULL) {
+		free(adapter_address);
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	DBG("path %s", path);
+
+	connection = get_system_dbus_connect();
+	if (connection == NULL) {
+		ret = BT_ERROR_OPERATION_FAILED;
+		goto done;
+	}
+
+	g_dbus_connection_call_sync(connection, CONNMAN_DBUS_NAME, path,
+					"net.connman.Service", "Disconnect",
+					NULL, NULL, 0, -1, NULL, &error);
+
+	if (error) {
+		DBG("error %s", error->message);
+		g_error_free(error);
+		ret = BT_ERROR_OPERATION_FAILED;
+
+		goto done;
+	}
+
+	ret = BT_SUCCESS;
+
+done:
+	free(path);
+	free(adapter_address);
+
+	return ret;
+}

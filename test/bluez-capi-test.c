@@ -1432,6 +1432,22 @@ static int panu_connect(const char *p1, const char *p2)
 	return 0;
 }
 
+static int panu_disconnect(const char *p1, const char *p2)
+{
+	int ret;
+
+	if (p1 == NULL) {
+		ERROR("panu_disconnect need remote address");
+		return 0;
+	}
+
+	ret = bt_panu_disconnect(p1);
+	if (ret != BT_SUCCESS)
+		DBG("bt_panu_disconnect failed %d", ret);
+
+	return 0;
+}
+
 struct {
 	const char *command;
 	int (*function)(const char *p1, const char *p2);
@@ -1622,6 +1638,9 @@ struct {
 
 	{"panu_connect", panu_connect,
 		"Usage: panu_connect 70:F9:27:64:DF:65\n\tconnect address for panu"},
+
+	{"panu_disconnect", panu_disconnect,
+		"Usage: panu_disconnect 70:F9:27:64:DF:65\n\tdisconnect address for panu"},
 
 	{"q", quit,
 		"Usage: q\n\tQuit"},
