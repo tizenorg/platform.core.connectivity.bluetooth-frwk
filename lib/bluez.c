@@ -1805,6 +1805,13 @@ void bluez_device_network_set_connected_changed_cb(
 	device->network_connected_cb_data = user_data;
 }
 
+void bluez_device_network_unset_connected_changed_cb(
+					struct _bluez_device *device)
+{
+	device->network_connected_cb = NULL;
+	device->network_connected_cb_data = NULL;
+}
+
 int bluez_device_network_get_property_connected(struct _bluez_device *device,
 						gboolean *connected)
 {

@@ -260,6 +260,8 @@ void bluez_device_network_set_connected_changed_cb(
 				struct _bluez_device *device,
 				bluez_device_network_connected_cb_t cb,
 				gpointer user_data);
+void bluez_device_network_unset_connected_changed_cb(
+				struct _bluez_device *device);
 
 typedef void (*bluez_device_paired_cb_t)(
 				struct _bluez_device *device,
