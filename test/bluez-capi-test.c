@@ -1416,6 +1416,28 @@ static int spp_send(const char *p1, const char *p2)
 	return 0;
 }
 
+static void panu_connected_changed(int result, bool connected,
+					const char *remote_address,
+					bt_panu_service_type_e type,
+					void *user_data)
+{
+	DBG("Device %s connected %d", remote_address, connected);
+}
+
+static int panu_set_state_changed(const char *p1, const char *p2)
+{
+	int ret;
+
+	ret = bt_panu_set_connection_state_changed_cb(
+					panu_connected_changed, NULL);
+	if (ret != BT_SUCCESS) {
+		ERROR("set_panu_connected_callback error: %d", ret);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int panu_connect(const char *p1, const char *p2)
 {
 	int ret;
@@ -1635,6 +1657,9 @@ struct {
 
 	{"spp_send", spp_send,
 		"Usage: spp_send fd 'data'\n\tsend spp data to fd"},
+
+	{"panu_set_state_changed", panu_set_state_changed,
+		"Usage: panu_set_state_changed\n\tset panu state changed callback"},
 
 	{"panu_connect", panu_connect,
 		"Usage: panu_connect 70:F9:27:64:DF:65\n\tconnect address for panu"},

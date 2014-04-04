@@ -125,6 +125,11 @@ struct audio_connection_state_changed_cb_node {
 	void *user_data;
 };
 
+struct panu_connection_state_changed_cb_node {
+	bt_panu_connection_state_changed_cb cb;
+	void *user_data;
+};
+
 static struct avrcp_repeat_mode_changed_node *avrcp_repeat_node;
 static struct avrcp_set_shuffle_mode_changed_node *avrcp_shuffle_node;
 static struct adapter_name_cb_node *adapter_name_node;
@@ -141,6 +146,7 @@ static struct spp_data_received_cb_node *spp_data_received_node;
 static struct avrcp_target_connection_state_changed_node
 					*avrcp_target_state_node;
 static struct audio_connection_state_changed_cb_node *audio_state_node;
+static struct panu_connection_state_changed_cb_node *panu_state_node;
 
 static gboolean generic_device_removed_set;
 
@@ -487,12 +493,29 @@ static void device_auth_changed(bluez_device_t *device,
 	g_free(device_address);
 }
 
+static void device_panu_connected_changed(bluez_device_t *device,
+					int connected, void *user_data)
+{
+	struct panu_connection_state_changed_cb_node *node = user_data;
+	char *device_address;
+
+	DBG("");
+
+	device_address = bluez_device_get_property_address(device);
+
+	node->cb(BT_SUCCESS, connected, device_address,
+			BT_PANU_SERVICE_TYPE_NAP, node->user_data);
+
+	g_free(device_address);
+}
+
 static unsigned int dev_property_callback_flags;
 
 enum bluez_device_property_callback_flag {
 	DEV_PROP_FLAG_PAIR = 0x01,
 	DEV_PROP_FLAG_CONNECT = 0x02,
-	DEV_PROP_FLAG_AUTH = 0x04
+	DEV_PROP_FLAG_AUTH = 0x04,
+	DEV_PROP_FLAG_PANU_CONNECT = 0x8
 };
 
 static void set_device_property_changed_callback(bluez_device_t *device)
@@ -511,6 +534,11 @@ static void set_device_property_changed_callback(bluez_device_t *device)
 		bluez_device_set_trusted_changed_cb(device,
 					device_auth_changed,
 					device_auth_node);
+
+	if (dev_property_callback_flags & DEV_PROP_FLAG_PANU_CONNECT)
+		bluez_device_network_set_connected_changed_cb(device,
+					device_panu_connected_changed,
+					panu_state_node);
 }
 
 static void unset_device_property_changed_callback(bluez_device_t *device)
@@ -3614,4 +3642,45 @@ done:
 	free(adapter_address);
 
 	return ret;
+}
+
+int bt_panu_set_connection_state_changed_cb(
+				bt_panu_connection_state_changed_cb callback,
+				void *user_data)
+{
+	struct panu_connection_state_changed_cb_node *node_data;
+	GList *list;
+
+	DBG("");
+
+	if (callback == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (panu_state_node) {
+		DBG("network connected state changed callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
+
+	node_data = g_new0(struct panu_connection_state_changed_cb_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->cb = callback;
+	node_data->user_data = user_data;
+
+	panu_state_node = node_data;
+
+	dev_property_callback_flags |= DEV_PROP_FLAG_PANU_CONNECT;
+
+	if (!default_adapter)
+		return BT_SUCCESS;
+
+	list = bluez_adapter_get_devices(default_adapter);
+	foreach_device_property_callback(list, DEV_PROP_FLAG_PANU_CONNECT);
+
+	g_list_free(list);
+
+	return BT_SUCCESS;
 }
