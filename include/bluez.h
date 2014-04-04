@@ -252,6 +252,15 @@ int bluez_device_network_get_property_connected(
 				struct _bluez_device *device,
 				gboolean *connected);
 
+typedef void (*bluez_device_network_connected_cb_t)(
+				struct _bluez_device *device,
+				gboolean connected,
+				gpointer user_data);
+void bluez_device_network_set_connected_changed_cb(
+				struct _bluez_device *device,
+				bluez_device_network_connected_cb_t cb,
+				gpointer user_data);
+
 typedef void (*bluez_device_paired_cb_t)(
 				struct _bluez_device *device,
 				gboolean paired,

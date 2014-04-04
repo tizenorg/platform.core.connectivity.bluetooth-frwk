@@ -128,6 +128,8 @@ struct _bluez_device {
 	gpointer device_connected_cb_data;
 	bluez_device_trusted_cb_t device_trusted_cb;
 	gpointer device_trusted_cb_data;
+	bluez_device_network_connected_cb_t network_connected_cb;
+	gpointer network_connected_cb_data;
 };
 
 struct _bluez_agent {
@@ -588,14 +590,29 @@ static void control_properties_changed(GDBusProxy *proxy,
 	g_free(properties);
 }
 
+static inline void handle_device_network_connected(
+					GVariant *changed_properties,
+					struct _bluez_device *device)
+{
+	gboolean connected;
+
+	if (g_variant_lookup(changed_properties, "Connected", "b", &connected))
+		device->network_connected_cb(device, connected,
+					device->network_connected_cb_data);
+}
+
 static void network_properties_changed(GDBusProxy *proxy,
 					GVariant *changed_properties,
 					GStrv *invalidated_properties,
 					gpointer user_data)
 {
 	gchar *properties = g_variant_print(changed_properties, TRUE);
+	struct _bluez_device *device = user_data;
 
 	DBG("properties %s", properties);
+
+	if (device->network_connected_cb)
+		handle_device_network_connected(changed_properties, user_data);
 
 	g_free(properties);
 }
@@ -1777,6 +1794,15 @@ int bluez_device_network_disconnect(struct _bluez_device *device)
 				simple_reply_callback, reply_data);
 
 	return 0;
+}
+
+void bluez_device_network_set_connected_changed_cb(
+					struct _bluez_device *device,
+					bluez_device_network_connected_cb_t cb,
+					gpointer user_data)
+{
+	device->network_connected_cb = cb;
+	device->network_connected_cb_data = user_data;
 }
 
 int bluez_device_network_get_property_connected(struct _bluez_device *device,
