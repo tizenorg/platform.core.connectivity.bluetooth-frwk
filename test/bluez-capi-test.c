@@ -1438,6 +1438,19 @@ static int panu_set_state_changed(const char *p1, const char *p2)
 	return 0;
 }
 
+static int panu_unset_state_changed(const char *p1, const char *p2)
+{
+	int ret;
+
+	ret = bt_panu_unset_connection_state_changed_cb();
+	if (ret != BT_SUCCESS) {
+		ERROR("unset_panu_connected_callback error: %d", ret);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int panu_connect(const char *p1, const char *p2)
 {
 	int ret;
@@ -1660,6 +1673,9 @@ struct {
 
 	{"panu_set_state_changed", panu_set_state_changed,
 		"Usage: panu_set_state_changed\n\tset panu state changed callback"},
+
+	{"panu_unset_state_changed", panu_unset_state_changed,
+		"Usage: panu_unset_state_changed\n\tunset panu state changed callback"},
 
 	{"panu_connect", panu_connect,
 		"Usage: panu_connect 70:F9:27:64:DF:65\n\tconnect address for panu"},

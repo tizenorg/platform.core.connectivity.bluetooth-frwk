@@ -551,6 +551,9 @@ static void unset_device_property_changed_callback(bluez_device_t *device)
 
 	if (dev_property_callback_flags ^ DEV_PROP_FLAG_AUTH)
 		bluez_device_unset_trusted_changed_cb(device);
+
+	if (dev_property_callback_flags ^ DEV_PROP_FLAG_PANU_CONNECT)
+		bluez_device_network_unset_connected_changed_cb(device);
 }
 
 static void foreach_device_property_callback(GList *list, unsigned int flag)
@@ -3681,6 +3684,31 @@ int bt_panu_set_connection_state_changed_cb(
 	foreach_device_property_callback(list, DEV_PROP_FLAG_PANU_CONNECT);
 
 	g_list_free(list);
+
+	return BT_SUCCESS;
+}
+
+int bt_panu_unset_connection_state_changed_cb(void)
+{
+	GList *list;
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!panu_state_node)
+		return BT_SUCCESS;
+
+	dev_property_callback_flags &= ~DEV_PROP_FLAG_PANU_CONNECT;
+
+	list = bluez_adapter_get_devices(default_adapter);
+	foreach_device_property_callback(list, DEV_PROP_FLAG_PANU_CONNECT);
+
+	g_free(panu_state_node);
+	panu_state_node = NULL;
 
 	return BT_SUCCESS;
 }
