@@ -137,7 +137,7 @@ int main(void)
 
 	g_type_init();
 
-	if (set_app_privilege("bluetooth-frwk-service", NULL, NULL) !=
+	if (perm_app_set_privilege("bluetooth-frwk-service", NULL, NULL) !=
 								PC_OPERATION_SUCCESS)
 		BT_ERR("Failed to set app privilege.\n");
 
