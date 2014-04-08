@@ -38,6 +38,8 @@
 #define BLUETOOTH_IDENT_LEN 6
 #define CONNMAN_DBUS_NAME "net.connman"
 #define CONNMAN_BLUETOOTH_SERVICE_PREFIX "/net/connman/service/bluetooth_"
+#define CONNMAN_BLUETOOTH_TECHNOLOGY_PATH "/net/connman/technology/bluetooth"
+#define CONNMAN_BLUETOTOH_TECHNOLOGY_INTERFACE "net.connman.Technology"
 
 static bool initialized;
 static bool bt_service_init;
@@ -3711,4 +3713,44 @@ int bt_panu_unset_connection_state_changed_cb(void)
 	panu_state_node = NULL;
 
 	return BT_SUCCESS;
+}
+
+static int connman_set_tethering(bool tethering)
+{
+	GDBusConnection *connection;
+	GVariant *tethering_val;
+	GError *error = NULL;
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	connection = get_system_dbus_connect();
+	if (connection == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	tethering_val = g_variant_new("b", tethering);
+
+	g_dbus_connection_call_sync(connection, CONNMAN_DBUS_NAME,
+				CONNMAN_BLUETOOTH_TECHNOLOGY_PATH,
+				CONNMAN_BLUETOTOH_TECHNOLOGY_INTERFACE,
+				"SetProperty",
+				g_variant_new("(sv)",
+					"Tethering", tethering_val),
+				NULL, 0, -1, NULL, &error);
+
+	if (error) {
+		DBG("error %s", error->message);
+		g_error_free(error);
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	return BT_SUCCESS;
+}
+
+int bt_nap_activate(void)
+{
+	return connman_set_tethering(true);
 }

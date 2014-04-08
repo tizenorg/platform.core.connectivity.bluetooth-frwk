@@ -1483,6 +1483,17 @@ static int panu_disconnect(const char *p1, const char *p2)
 	return 0;
 }
 
+static int nap_activate(const char *p1, const char *p2)
+{
+	int ret;
+
+	ret = bt_nap_activate();
+	if (ret != BT_SUCCESS)
+		DBG("bt_nap_activate failed %d", ret);
+
+	return 0;
+}
+
 struct {
 	const char *command;
 	int (*function)(const char *p1, const char *p2);
@@ -1682,6 +1693,9 @@ struct {
 
 	{"panu_disconnect", panu_disconnect,
 		"Usage: panu_disconnect 70:F9:27:64:DF:65\n\tdisconnect address for panu"},
+
+	{"nap_activate", nap_activate,
+		"Usage: nap_activate\n\tactivate NAP"},
 
 	{"q", quit,
 		"Usage: q\n\tQuit"},
