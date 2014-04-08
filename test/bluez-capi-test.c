@@ -1494,6 +1494,17 @@ static int nap_activate(const char *p1, const char *p2)
 	return 0;
 }
 
+static int nap_deactivate(const char *p1, const char *p2)
+{
+	int ret;
+
+	ret = bt_nap_deactivate();
+	if (ret != BT_SUCCESS)
+		DBG("bt_nap_deactivate failed %d", ret);
+
+	return 0;
+}
+
 struct {
 	const char *command;
 	int (*function)(const char *p1, const char *p2);
@@ -1696,6 +1707,9 @@ struct {
 
 	{"nap_activate", nap_activate,
 		"Usage: nap_activate\n\tactivate NAP"},
+
+	{"nap_deactivate", nap_deactivate,
+		"Usage: nap_deactivate\n\tdeactivate NAP"},
 
 	{"q", quit,
 		"Usage: q\n\tQuit"},

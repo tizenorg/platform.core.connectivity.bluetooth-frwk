@@ -3754,3 +3754,8 @@ int bt_nap_activate(void)
 {
 	return connman_set_tethering(true);
 }
+
+int bt_nap_deactivate(void)
+{
+	return connman_set_tethering(false);
+}
