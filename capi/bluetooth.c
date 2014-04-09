@@ -1321,6 +1321,27 @@ int bt_adapter_unset_device_discovery_state_changed_cb(void)
 	return BT_SUCCESS;
 }
 
+int bt_adapter_unset_visibility_duration_changed_cb(void)
+{
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!adapter_visibility_duration_node)
+		return BT_SUCCESS;
+
+	bluez_adapter_unset_discoverable_timeout_changed_cb(default_adapter);
+
+	g_free(adapter_visibility_duration_node);
+	adapter_visibility_duration_node = NULL;
+
+	return BT_SUCCESS;
+}
+
 int bt_adapter_reset(void)
 {
 	DBG("Not implement");
@@ -3479,13 +3500,6 @@ int bt_adapter_set_visibility_mode_changed_cb(
 }
 
 int bt_adapter_unset_visibility_mode_changed_cb(void)
-{
-	DBG("Not implement");
-
-	return BT_SUCCESS;
-}
-
-int bt_adapter_unset_visibility_duration_changed_cb(void)
 {
 	DBG("Not implement");
 
