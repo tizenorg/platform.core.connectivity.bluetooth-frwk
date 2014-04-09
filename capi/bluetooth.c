@@ -62,6 +62,11 @@ struct adapter_discovering_cb_node {
 	void *user_data;
 };
 
+struct adapter_visibility_duration_cb_node {
+	bt_adapter_visibility_duration_changed_cb cb;
+	void *user_data;
+};
+
 struct device_destroy_unpaired_cb_node {
 	bt_adapter_device_discovery_state_changed_cb cb;
 	void *user_data;
@@ -138,6 +143,8 @@ static struct adapter_name_cb_node *adapter_name_node;
 static struct device_created_cb_node *device_created_node;
 static struct adapter_state_cb_node *adapter_state_node;
 static struct adapter_discovering_cb_node *adapter_discovering_node;
+static struct adapter_visibility_duration_cb_node
+					*adapter_visibility_duration_node;
 static struct device_destroy_unpaired_cb_node *unpaired_device_removed_node;
 static struct device_bond_cb_node *device_bond_node;
 static struct device_auth_cb_node *device_auth_node;
@@ -654,6 +661,14 @@ void adapter_name_changed(bluez_adapter_t *adapter,
 	g_free(adapter_name);
 }
 
+static void discoverable_timeout_changed(bluez_adapter_t *adapter,
+					guint32 timeout, void *user_data)
+{
+	struct adapter_visibility_duration_cb_node *node = user_data;
+
+	node->cb(timeout, node->user_data);
+}
+
 static void _bt_update_bluetooth_callbacks(void)
 {
 	DBG("default_adpater: %p", default_adapter);
@@ -680,6 +695,12 @@ static void _bt_update_bluetooth_callbacks(void)
 		bluez_adapter_set_device_discovering_cb(default_adapter,
 					bluez_adapter_discovering_changed,
 					adapter_discovering_node);
+
+	if (adapter_visibility_duration_node)
+		bluez_adapter_set_discoverable_timeout_changed_cb(
+					default_adapter,
+					discoverable_timeout_changed,
+					adapter_visibility_duration_node);
 
 	if (generic_device_removed_set == FALSE)
 		set_device_removed_generic_callback(default_adapter);
@@ -1208,6 +1229,37 @@ int bt_adapter_set_state_changed_cb(bt_adapter_state_changed_cb callback,
 
 	_bt_update_bluetooth_callbacks();
 
+	return BT_SUCCESS;
+}
+
+int bt_adapter_set_visibility_duration_changed_cb(
+			bt_adapter_visibility_duration_changed_cb callback,
+			void *user_data)
+{
+	struct adapter_visibility_duration_cb_node *node_data;
+
+	DBG("");
+
+	if (callback == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (adapter_visibility_duration_node) {
+		DBG("duration changed callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
+
+	node_data = g_new0(struct adapter_visibility_duration_cb_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->cb = callback;
+	node_data->user_data = user_data;
+
+	adapter_visibility_duration_node = node_data;
+
+	_bt_update_bluetooth_callbacks();
 	return BT_SUCCESS;
 }
 
@@ -3419,15 +3471,6 @@ int bt_spp_unset_data_received_cb(void)
 
 int bt_adapter_set_visibility_mode_changed_cb(
 			bt_adapter_visibility_mode_changed_cb callback,
-			void *user_data)
-{
-	DBG("Not implement");
-
-	return BT_SUCCESS;
-}
-
-int bt_adapter_set_visibility_duration_changed_cb(
-			bt_adapter_visibility_duration_changed_cb callback,
 			void *user_data)
 {
 	DBG("Not implement");

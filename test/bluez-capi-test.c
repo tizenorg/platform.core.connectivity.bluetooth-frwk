@@ -291,6 +291,24 @@ static int get_adapter_visibility(const char *p1, const char *p2)
 	return 0;
 }
 
+static void visibility_duration_changed_callback(int duration,
+						void *user_data)
+{
+	DBG("adapter visibility changed to %d seconds", duration);
+}
+
+static int set_visibility_duration_callback(const char *p1, const char *p2)
+{
+	int ret = bt_adapter_set_visibility_duration_changed_cb(
+				visibility_duration_changed_callback, NULL);
+	if (ret != BT_SUCCESS) {
+		ERROR("set_visibility_duration_changed_cb failed %d", ret);
+		return 0;
+	}
+
+	return 0;
+}
+
 static void device_discovery_cb(int result,
 			bt_adapter_device_discovery_state_e state,
 			bt_adapter_device_discovery_info_s *discovery_info,
@@ -1548,6 +1566,9 @@ struct {
 
 	{"get_adapter_visibility", get_adapter_visibility,
 		"Usage: get_adapter_visibility\n\tGet local adapter visibility"},
+
+	{"set_visibility_duration_callback", set_visibility_duration_callback,
+		"Usage: set_visibility_duration_callback\n\tSet duration callback"},
 
 	{"set_discovery_callback", set_discovery_callback,
 		"Usage: set_discovery_callback\n\tSet device found callback"},
