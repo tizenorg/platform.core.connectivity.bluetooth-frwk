@@ -320,6 +320,41 @@ static int unset_visibility_duration_callback(const char *p1, const char *p2)
 	return 0;
 }
 
+static void visibility_mode_changed_callback(int result,
+					bt_adapter_visibility_mode_e mode,
+					void *user_data)
+{
+	const char *string;
+
+	if (result != BT_SUCCESS) {
+		DBG("visibility mode changed error %d", result);
+		return;
+	}
+
+	if (mode == BT_ADAPTER_VISIBILITY_MODE_NON_DISCOVERABLE)
+		string = "BT_ADAPTER_VISIBILITY_MODE_NON_DISCOVERABLE";
+	else if (mode == BT_ADAPTER_VISIBILITY_MODE_GENERAL_DISCOVERABLE)
+		string = "BT_ADAPTER_VISIBILITY_MODE_GENERAL_DISCOVERABLE";
+	else if (mode == BT_ADAPTER_VISIBILITY_MODE_LIMITED_DISCOVERABLE)
+		string = "BT_ADAPTER_VISIBILITY_MODE_LIMITED_DISCOVERABLE";
+	else
+		string = "Unknown type";
+
+	DBG("visibility mode changed to %s", string);
+}
+
+static int set_visibility_mode_callback(const char *p1, const char *p2)
+{
+	int ret = bt_adapter_set_visibility_mode_changed_cb(
+				visibility_mode_changed_callback, NULL);
+	if (ret != BT_SUCCESS) {
+		ERROR("set_visibility_mode_changed_cb failed %d", ret);
+		return 0;
+	}
+
+	return 0;
+}
+
 static void device_discovery_cb(int result,
 			bt_adapter_device_discovery_state_e state,
 			bt_adapter_device_discovery_info_s *discovery_info,
@@ -1583,6 +1618,9 @@ struct {
 
 	{"unset_visibility_duration_callback", unset_visibility_duration_callback,
 		"Usage: unset_visibility_duration_callback\n\tunet duration callback"},
+
+	{"set_visibility_mode_callback", set_visibility_mode_callback,
+		"Usage: set_visibility_mode_callback\n\tSet mode callback"},
 
 	{"set_discovery_callback", set_discovery_callback,
 		"Usage: set_discovery_callback\n\tSet device found callback"},
