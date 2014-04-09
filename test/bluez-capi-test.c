@@ -355,6 +355,17 @@ static int set_visibility_mode_callback(const char *p1, const char *p2)
 	return 0;
 }
 
+static int unset_visibility_mode_callback(const char *p1, const char *p2)
+{
+	int ret = bt_adapter_unset_visibility_mode_changed_cb();
+	if (ret != BT_SUCCESS) {
+		ERROR("unset_visibility_mode_changed_cb failed %d", ret);
+		return 0;
+	}
+
+	return 0;
+}
+
 static void device_discovery_cb(int result,
 			bt_adapter_device_discovery_state_e state,
 			bt_adapter_device_discovery_info_s *discovery_info,
@@ -1621,6 +1632,9 @@ struct {
 
 	{"set_visibility_mode_callback", set_visibility_mode_callback,
 		"Usage: set_visibility_mode_callback\n\tSet mode callback"},
+
+	{"unset_visibility_mode_callback", unset_visibility_mode_callback,
+		"Usage: unset_visibility_mode_callback\n\tUnset mode callback"},
 
 	{"set_discovery_callback", set_discovery_callback,
 		"Usage: set_discovery_callback\n\tSet device found callback"},

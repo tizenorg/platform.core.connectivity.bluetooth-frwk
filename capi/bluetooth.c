@@ -1412,6 +1412,27 @@ int bt_adapter_unset_visibility_duration_changed_cb(void)
 	return BT_SUCCESS;
 }
 
+int bt_adapter_unset_visibility_mode_changed_cb(void)
+{
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!adapter_visibility_mode_node)
+		return BT_SUCCESS;
+
+	bluez_adapter_unset_discoverable_changed_cb(default_adapter);
+
+	g_free(adapter_visibility_mode_node);
+	adapter_visibility_mode_node = NULL;
+
+	return BT_SUCCESS;
+}
+
 int bt_adapter_reset(void)
 {
 	DBG("Not implement");
@@ -3556,13 +3577,6 @@ int bt_spp_unset_data_received_cb(void)
 
 	g_free(spp_data_received_node);
 	spp_data_received_node = NULL;
-
-	return BT_SUCCESS;
-}
-
-int bt_adapter_unset_visibility_mode_changed_cb(void)
-{
-	DBG("Not implement");
 
 	return BT_SUCCESS;
 }
