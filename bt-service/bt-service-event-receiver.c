@@ -760,7 +760,7 @@ void __bt_adapter_property_changed_event(DBusMessageIter *msg_iter, const char *
 			}
 			__bt_discovery_finished();
 		}
-	} else if (strcasecmp(property, "Name") == 0) {
+	} else if (strcasecmp(property, "Alias") == 0) {
 		char *name = NULL;
 
 		dbus_message_iter_recurse(&dict_iter, &value_iter);
