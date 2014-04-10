@@ -1778,6 +1778,16 @@ int bt_device_start_service_search(const char *remote_address)
 	return BT_SUCCESS;
 }
 
+int bt_device_cancel_service_search(void)
+{
+	/*
+	 * BlueZ 5.x don't support cancel device service search
+	 * So only return SUCCESS.
+	 */
+
+	return BT_SUCCESS;
+}
+
 int bt_device_set_bond_created_cb(bt_device_bond_created_cb callback,
 							void *user_data)
 {
