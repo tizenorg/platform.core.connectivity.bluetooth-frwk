@@ -1675,6 +1675,109 @@ int bt_device_set_authorization(const char *remote_address,
 	return BT_SUCCESS;
 }
 
+static bt_device_sdp_info_s *get_device_sdp_info(bluez_device_t *device)
+{
+	bt_device_sdp_info_s *sdp_info;
+	char *address;
+	char **uuids;
+	guint len;
+
+	sdp_info = g_new0(bt_device_sdp_info_s, 1);
+	if (sdp_info == NULL) {
+		ERROR("no memeory");
+		return NULL;
+	}
+ 
+	address = bluez_device_get_property_address(device);
+	uuids = bluez_device_get_property_uuids(device);
+
+	len = g_strv_length(uuids);
+
+	sdp_info->remote_address = address;
+	sdp_info->service_uuid = uuids;
+	sdp_info->service_count = len;
+
+	return sdp_info;
+}
+
+static void free_device_sdp_info(bt_device_sdp_info_s *sdp_info)
+{
+	gsize i;
+
+	if (sdp_info == NULL)
+		return;
+
+	g_free(sdp_info->remote_address);
+	for (i = 0; i < sdp_info->service_count; ++i)
+		g_free(sdp_info->service_uuid[i]);
+
+	g_free(sdp_info->service_uuid);
+	g_free(sdp_info);
+}
+
+int bt_device_start_service_search(const char *remote_address)
+{
+	bluez_device_t *device = NULL;
+	bt_device_sdp_info_s *sdp_info;
+	int powered, paired;
+	char *address;
+	GList *list, *iter, *next;
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!remote_address)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	bluez_adapter_get_property_powered(default_adapter, &powered);
+	if (powered == FALSE)
+		return BT_ERROR_NOT_ENABLED;
+
+	if (!device_service_search_node)
+		return BT_SUCCESS;
+
+	list = bluez_adapter_get_devices(default_adapter);
+	for (iter = g_list_first(list); iter; iter = next) {
+		bluez_device_t *dev;
+		dev = iter->data;
+
+		next = g_list_next(iter);
+
+		if (dev == NULL)
+			continue;
+
+		address = bluez_device_get_property_address(dev);
+		if (!g_strcmp0(remote_address, address)) {
+			device = dev;
+			g_free(address);
+			break;
+		}
+
+		g_free(address);
+	}
+
+	g_list_free(list);
+
+	if (device == NULL)
+		return BT_ERROR_SERVICE_SEARCH_FAILED;
+
+	bluez_device_get_property_paired(device, &paired);
+	if (paired == FALSE)
+		return BT_ERROR_REMOTE_DEVICE_NOT_BONDED;
+
+	sdp_info = get_device_sdp_info(device);
+
+	device_service_search_node->cb(BT_SUCCESS, sdp_info,
+				device_service_search_node->user_data);
+
+	free_device_sdp_info(sdp_info);
+
+	return BT_SUCCESS;
+}
+
 int bt_device_set_bond_created_cb(bt_device_bond_created_cb callback,
 							void *user_data)
 {
