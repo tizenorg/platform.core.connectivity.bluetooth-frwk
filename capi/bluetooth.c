@@ -107,6 +107,11 @@ struct device_connected_state_cb_node {
 	void *user_data;
 };
 
+struct device_service_search_cb_node {
+	bt_device_service_searched_cb cb;
+	void *user_data;
+};
+
 struct spp_connection_requested_cb_node {
 	bt_spp_connection_requested_cb cb;
 	void *user_data;
@@ -156,6 +161,7 @@ static struct device_bond_cb_node *device_bond_node;
 static struct device_auth_cb_node *device_auth_node;
 static struct device_destroy_paired_cb_node *paired_device_removed_node;
 static struct device_connected_state_cb_node *device_connected_state_node;
+static struct device_service_search_cb_node *device_service_search_node;
 static struct spp_connection_requested_cb_node *spp_connection_requested_node;
 static struct spp_data_received_cb_node *spp_data_received_node;
 static struct avrcp_target_connection_state_changed_node
@@ -1853,14 +1859,44 @@ int bt_device_unset_authorization_changed_cb(void)
 int bt_device_set_service_searched_cb(bt_device_service_searched_cb callback,
 							void *user_data)
 {
-	DBG("Not implement");
+	struct device_service_search_cb_node *node;
+
+	DBG("");
+
+	if (callback == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (device_service_search_node) {
+		DBG("Device service serach callback already set.");
+		return BT_SUCCESS;
+	}
+
+	node = g_new0(struct device_service_search_cb_node, 1);
+	if (node == NULL) {
+		ERROR("no memeroy");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node->cb = callback;
+	node->user_data = user_data;
+
+	device_service_search_node = node;
 
 	return BT_SUCCESS;
 }
 
 int bt_device_unset_service_searched_cb(void)
 {
-	DBG("Not implement");
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (!device_service_search_node)
+		return BT_SUCCESS;
+
+	g_free(device_service_search_node);
+	device_service_search_node = NULL;
 
 	return BT_SUCCESS;
 }
