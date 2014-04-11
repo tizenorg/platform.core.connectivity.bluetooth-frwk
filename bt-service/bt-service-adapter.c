@@ -979,7 +979,6 @@ int _bt_get_local_address(bluetooth_device_address_t *local_address)
 int _bt_get_local_name(bluetooth_device_name_t *local_name)
 {
 	DBusGProxy *proxy;
-	GHashTable *hash = NULL;
 	GError *err = NULL;
 	GValue name_v = { 0 };
 	char *name = NULL;
@@ -1017,7 +1016,6 @@ int _bt_get_local_name(bluetooth_device_name_t *local_name)
 		ret = BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	g_hash_table_destroy(hash);
 	return ret;
 }
 
