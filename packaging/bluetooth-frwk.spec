@@ -13,8 +13,6 @@ BuildRequires:  pkgconfig(glib-2.0)
 BuildRequires:  pkgconfig(gio-2.0)
 BuildRequires:  pkgconfig(gio-unix-2.0)
 BuildRequires:  pkgconfig(capi-base-common)
-BuildRequires:  pkgconfig(aul)
-BuildRequires:  pkgconfig(syspopup-caller)
 BuildRequires:  pkgconfig(notification)
 
 BuildRequires:  cmake
@@ -60,7 +58,7 @@ make %{?jobs:-j%jobs}
 %manifest %{name}.manifest
 %defattr(-, root, root)
 %{_bindir}/bluetooth-service
-/usr/lib/bluetooth-service/plugins/bluetooth-mobile.so
+/usr/lib/bluetooth-service/plugins/bluetooth-ivi.so
 %{_libdir}/libcapi-network-bluetooth.so.*
 %config %{_sysconfdir}/dbus-1/system.d/bluezlib.conf
 %config %{_sysconfdir}/dbus-1/system.d/bluezobex.conf

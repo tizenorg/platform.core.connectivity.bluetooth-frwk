@@ -21,7 +21,11 @@
 #include "common.h"
 #include "vertical.h"
 
+#ifdef IVI
+#define VERTICAL "IVI"
+#else
 #define VERTICAL "Mobile"
+#endif
 
 static struct bluetooth_vertical_driver *bluetooth_driver;
 

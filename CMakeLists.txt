@@ -39,7 +39,25 @@ ENDFOREACH(flag)
 ADD_DEFINITIONS(-DMOBILE)
 ENDIF()
 
-IF(platform STREQUAL "GEEK" OR platform STREQUAL "IVI")
+IF(platform STREQUAL "IVI")
+SET(IVI_FLAGS "ivi-flags")
+pkg_check_modules(${IVI_FLAGS} REQUIRED
+			dlog
+			notification
+			capi-base-common)
+FOREACH(flag ${${IVI_FLAGS}_CFLAGS})
+	SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${flag}")
+ENDFOREACH(flag)
+
+FOREACH(flag ${${IVI_FLAGS}_LDFLAGS})
+	SET(${TEST}_LDFLAGS "${${TEST}_LDFLAGS} ${flag}")
+ENDFOREACH(flag)
+
+ADD_DEFINITIONS(-DTIZEN)
+ADD_DEFINITIONS(-DIVI)
+ENDIF()
+
+IF(platform STREQUAL "GEEK")
 SET(TIZEN_FLAGS "tizen-flags")
 pkg_check_modules(${TIZEN_FLAGS} REQUIRED
 			dlog
@@ -223,10 +241,10 @@ ENDIF()
 
 IF(platform STREQUAL "IVI")
 	# CAPI-BLUETOOTH
-	SET(PLUGIN_BLUETOOTH_MOBILE "bluetooth-mobile")
+	SET(PLUGIN_BLUETOOTH_MOBILE "bluetooth-ivi")
 
 	SET(SOURCE_PLUGIN_BLUETOOTH_MOBILE
-		plugins/bluetooth-mobile.c
+		plugins/bluetooth-ivi.c
 	   )
 
 	ADD_LIBRARY(${PLUGIN_BLUETOOTH_MOBILE} SHARED ${SOURCE_PLUGIN_BLUETOOTH_MOBILE})
