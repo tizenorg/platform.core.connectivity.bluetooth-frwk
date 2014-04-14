@@ -1994,6 +1994,31 @@ void bluez_device_pair(struct _bluez_device *device,
 			reply_data);
 }
 
+void bluez_device_cancel_pair(struct _bluez_device *device,
+				simple_reply_cb_t cancel_pair_cb,
+				void *user_data)
+{
+	struct simple_reply_data *reply_data;
+
+	DBG("");
+
+	reply_data = g_try_new0(struct simple_reply_data, 1);
+	if (reply_data == NULL) {
+		ERROR("no memory");
+		return;
+	}
+
+	reply_data->proxy = device->proxy;
+	reply_data->reply_cb = cancel_pair_cb;
+	reply_data->user_data = user_data;
+
+	g_dbus_proxy_call(device->proxy,
+			"CancelPairing", NULL,
+			0, -1, NULL,
+			simple_reply_callback,
+			reply_data);
+}
+
 static void device_profile_connect_cb(GObject *source_object,
 						GAsyncResult *res,
 						gpointer user_data)

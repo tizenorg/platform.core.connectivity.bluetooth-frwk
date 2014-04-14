@@ -37,6 +37,7 @@ static const GDBusMethodInfo *_pairing_method_info_pointers[] =
 	GDBUS_METHOD("UnregisterPairingAgent",
 				GDBUS_ARGS(_ARG("agent", "o")), NULL),
 	GDBUS_METHOD("Pair", GDBUS_ARGS(_ARG("address", "s")), NULL),
+	GDBUS_METHOD("CancelPairing", NULL, NULL),
 	NULL
 };
 
@@ -86,6 +87,7 @@ static PairingSkeleton *bt_pairing;
 static bluez_agent_t *bluez_agent;
 static guint pairing_agent_dbus_id;
 static GDBusNodeInfo *pairing_introspection_data;
+static gchar *pairing_device_address;
 
 static void bt_pairing_register_dbus_interface(PairingSkeleton *skeleton,
 						GDBusConnection *connection)
@@ -132,7 +134,7 @@ static void handle_error_message(GDBusMethodInvocation *invocation,
 		comms_error_invalid_args(invocation);
 		break;
 	case ERROR_ALREADY_EXISTS:
-		comms_error_does_not_exist(invocation);
+		comms_error_already_exists(invocation);
 		break;
 	case ERROR_AUTH_CANCELED:
 		g_dbus_method_invocation_return_dbus_error(invocation,
@@ -819,10 +821,15 @@ static void pairing_handler(GDBusConnection *connection,
 
 	g_variant_get(parameters, "(s)", &address);
 
+	if (pairing_device_address)
+		g_free(pairing_device_address);
+
+	pairing_device_address = g_strdup(address);
+
 	device = bluez_adapter_get_device_by_address(
 					default_adapter, address);
 	if (device == NULL) {
-		comms_error_failed(invocation, "No device found");
+		comms_error_does_not_exist(invocation);
 
 		g_free(address);
 		return;
@@ -831,6 +838,41 @@ static void pairing_handler(GDBusConnection *connection,
 	bluez_device_pair(device, device_pair_cb, invocation);
 
 	g_free(address);
+}
+
+static void device_cancel_pair_cb(enum bluez_error_type type, void *user_data)
+{
+	GDBusMethodInvocation *invocation = user_data;
+
+	DBG("");
+
+	if (type != ERROR_NONE) {
+		handle_error_message(invocation, type);
+
+		return;
+	}
+
+	g_dbus_method_invocation_return_value(invocation, NULL);
+}
+
+static void cancel_pairing_handler(GDBusConnection *connection,
+					GVariant *parameters,
+					GDBusMethodInvocation *invocation,
+					gpointer user_data)
+{
+	bluez_device_t *device;
+
+	DBG("");
+
+	device = bluez_adapter_get_device_by_address(default_adapter,
+						pairing_device_address);
+	if (device == NULL) {
+		comms_error_does_not_exist(invocation);
+
+		return;
+	}
+
+	bluez_device_cancel_pair(device, device_cancel_pair_cb, invocation);
 }
 
 static void pairing_skeleton_handle_method_call(GDBusConnection *connection,
@@ -852,6 +894,9 @@ static void pairing_skeleton_handle_method_call(GDBusConnection *connection,
 						invocation, user_data);
 	else if (g_strcmp0(method_name, "Pair") == 0)
 		pairing_handler(connection, parameters, invocation, user_data);
+	else if (g_strcmp0(method_name, "CancelPairing") == 0)
+		cancel_pairing_handler(connection, parameters,
+					invocation, user_data);
 	else
 		WARN("Unknown method");
 }

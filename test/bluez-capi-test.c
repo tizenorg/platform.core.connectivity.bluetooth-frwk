@@ -748,6 +748,19 @@ static int device_destroy_bond(const char *p1, const char *p2)
 	return 0;
 }
 
+static int device_cancel_bonding(const char *p1, const char *p2)
+{
+	int ret;
+
+	ret = bt_device_cancel_bonding();
+	if (ret != BT_SUCCESS) {
+		ERROR("bt_device_cancel_bonding error: %d", ret);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int device_service_search(const char *p1, const char *p2)
 {
 	int err;
@@ -1727,6 +1740,9 @@ struct {
 
 	{"device_destroy_bond", device_destroy_bond,
 		"Usage: device_destroy_bond 70:F9:27:64:DF:65\n\tUnPair the specfic device"},
+
+	{"device_cancel_bonding", device_cancel_bonding,
+		"Usage: device_cancel_bonding\n\tCancel bonding device"},
 
 	{"device_service_search", device_service_search,
 		"Usage: device_service_search 70:F9:27:64:DF:65\n\tSearch device service"},

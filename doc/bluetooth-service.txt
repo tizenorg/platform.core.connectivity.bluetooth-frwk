@@ -99,6 +99,14 @@ Methods		void RegisterParingAgent(object agent)
 					 org.bluez.Error.AuthenticationTimeout
 					 org.bluez.Error.ConnectionAttemptFailed
 
+		void CancelPairing()
+
+			This method can be used to cancel current pairing
+			operation by the Pair method.
+
+			Possible errors: org.bluez.Error.DoesNotExist
+					 org.bluez.Error.Failed
+
 Object Push Manager hierarchy
 =========================
 

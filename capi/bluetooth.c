@@ -1565,7 +1565,6 @@ static void bt_device_paired_cb(enum bluez_error_type error,
 		capi_error = BT_ERROR_OPERATION_FAILED;
 		break;
 	case ERROR_AUTH_CANCELED:
-		break;
 	case ERROR_AUTH_FAILED:
 		capi_error = BT_ERROR_AUTH_FAILED;
 		break;
@@ -1596,6 +1595,32 @@ int bt_device_create_bond(const char *remote_address)
 				bt_device_paired_cb, strdup(remote_address));
 
 	return BT_SUCCESS;
+}
+
+int bt_device_cancel_bonding(void)
+{
+	enum bluez_error_type error_type;
+	int powered;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	bluez_adapter_get_property_powered(default_adapter, &powered);
+	if (powered == FALSE)
+		return BT_ERROR_NOT_ENABLED;
+
+	error_type = comms_bluetooth_device_cancel_pairing_sync();
+	if (error_type == ERROR_NONE)
+		return BT_SUCCESS;
+	else if (error_type == ERROR_DOES_NOT_EXIST)
+		return BT_ERROR_NOT_IN_PROGRESS;
+	else
+		return BT_ERROR_OPERATION_FAILED;
 }
 
 int bt_device_destroy_bond(const char *remote_address)

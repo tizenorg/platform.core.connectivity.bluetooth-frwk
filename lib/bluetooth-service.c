@@ -712,6 +712,34 @@ void comms_bluetooth_device_pair(const char *address,
 					async_result_node);
 }
 
+enum bluez_error_type comms_bluetooth_device_cancel_pairing_sync()
+{
+	enum bluez_error_type error_type = ERROR_NONE;
+	GError *error = NULL;
+	GVariant *ret;
+
+	DBG("");
+
+	if (this_bluetooth == NULL) {
+		ERROR("bluetooth not register");
+		return ERROR_FAILED;
+	}
+
+	ret = g_dbus_proxy_call_sync(this_bluetooth->pairing.proxy,
+					"CancelPairing", NULL,
+					0, -1, NULL, &error);
+	if (ret == NULL) {
+		DBG("%s", error->message);
+
+		error_type = get_error_type(error);
+
+		g_error_free(error);
+	} else
+		g_variant_unref(ret);
+
+	return error_type;
+}
+
 void comms_bluetooth_register_pairing_agent(const char *agent_path,
 					bluetooth_simple_callback cb,
 					void *user_data)

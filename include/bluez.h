@@ -356,6 +356,9 @@ enum device_pair_state {
 void bluez_device_pair(struct _bluez_device *device,
 				simple_reply_cb_t pair_cb,
 				void *user_data);
+void bluez_device_cancel_pair(struct _bluez_device *device,
+				simple_reply_cb_t cancel_pair_cb,
+				void *user_data);
 
 enum device_profile_state {
 	PROFILE_NOT_EXIST,

@@ -52,6 +52,8 @@ void comms_bluetooth_device_pair(
 			bluetooth_simple_callback cb,
 			void *user_data);
 
+enum bluez_error_type comms_bluetooth_device_cancel_pairing_sync();
+
 void comms_bluetooth_register_pairing_agent(
 			const char *agent_path,
 			bluetooth_simple_callback cb,
