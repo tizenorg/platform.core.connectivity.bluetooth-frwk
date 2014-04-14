@@ -688,6 +688,8 @@ static void print_bonded_device_info(bt_device_info_s *device_info)
 	for (len = 0; len < device_info->service_count; len++)
 		printf("\n\t\t service %d: %s", len,
 					device_info->service_uuid[len]);
+
+	printf("\n");
 }
 
 bool bonded_devices(bt_device_info_s *device_info, void *user_data)
@@ -740,6 +742,24 @@ static int device_destroy_bond(const char *p1, const char *p2)
 	err = bt_device_destroy_bond(p1);
 	if (err != BT_SUCCESS) {
 		ERROR("bt_device_destroy_bond error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
+static int device_service_search(const char *p1, const char *p2)
+{
+	int err;
+
+	if (p1 == NULL) {
+		ERROR("Search device service must give the device address");
+		return 0;
+	}
+
+	err = bt_device_start_service_search(p1);
+	if (err != BT_SUCCESS) {
+		ERROR("bt_device_start_service_search error: %d", err);
 		return 0;
 	}
 
@@ -1707,6 +1727,9 @@ struct {
 
 	{"device_destroy_bond", device_destroy_bond,
 		"Usage: device_destroy_bond 70:F9:27:64:DF:65\n\tUnPair the specfic device"},
+
+	{"device_service_search", device_service_search,
+		"Usage: device_service_search 70:F9:27:64:DF:65\n\tSearch device service"},
 
 	{"device_set_bond_created_cb", device_set_bond_created_cb,
 		"Usage: device_set_bond_created_cb\n\tSet Device bond state changed callback"},
