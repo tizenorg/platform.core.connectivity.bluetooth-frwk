@@ -75,6 +75,7 @@ SET(SOURCES_BLUETOOTH_SERVICE
 	src/map_bmessage.c
 	src/bluetooth_map_agent.c
 	lib/bluez.c
+	lib/bluez-hdp.c
 	lib/common.c
 	lib/obex.c
    )
@@ -88,6 +89,7 @@ SET(SOURCES_BLUETOOTH_SERVICE
 	src/opp.c
 	src/media.c
 	lib/bluez.c
+	lib/bluez-hdp.c
 	lib/common.c
 	lib/obex.c
    )
@@ -113,6 +115,7 @@ SET(BLUEZ-TEST "bluez-lib-test")
 SET(SOURCES_BLUEZ_TEST
 	lib/common.c
 	lib/bluez.c
+	lib/bluez-hdp.c
 	test/bluez-lib-test.c
    )
 
@@ -160,6 +163,7 @@ SET(CAPI-BLUETOOTH "capi-network-bluetooth")
 SET(SOURCE_CAPI_BLUETOOTH
 	lib/common.c
 	lib/bluez.c
+	lib/bluez-hdp.c
 	capi/bluetooth.c
 	lib/obex.c
 	capi/bluetooth-obex.c

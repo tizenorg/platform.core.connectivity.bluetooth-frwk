@@ -231,3 +231,75 @@ void simple_reply_callback(GObject *source_object, GAsyncResult *res,
 done:
 	g_free(reply_data);
 }
+
+void convert_address_to_hex(bluetooth_device_address_t *addr_hex,
+							const char *addr_str)
+{
+	int i = 0;
+	unsigned int addr[BLUETOOTH_ADDRESS_LENGTH] = { 0, };
+
+	if (addr_str == NULL)
+		return;
+
+	i = sscanf(addr_str, "%X:%X:%X:%X:%X:%X", &addr[0], &addr[1],
+				&addr[2], &addr[3], &addr[4], &addr[5]);
+
+	if (i != BLUETOOTH_ADDRESS_LENGTH)
+		DBG("Invalid format string - %s", addr_str);
+
+	for (i = 0; i < BLUETOOTH_ADDRESS_LENGTH; i++)
+		addr_hex->addr[i] = (unsigned char)addr[i];
+}
+
+void convert_addr_type_to_string(char *address,
+					unsigned char *addr)
+{
+	if (address == NULL && addr == NULL)
+		return;
+
+	snprintf(address, BLUETOOTH_ADDRESS_LENGTH,
+			"%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X",
+			addr[0], addr[1], addr[2],
+			addr[3], addr[4], addr[5]);
+}
+
+void device_path_to_address(const char *device_path, char *device_address)
+{
+	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
+	char *dev_addr = NULL;
+
+	if (!device_path || !device_address)
+		return;
+
+	dev_addr = strstr(device_path, "dev_");
+	if (dev_addr != NULL) {
+		char *pos = NULL;
+		dev_addr += 4;
+		g_strlcpy(address, dev_addr, sizeof(address));
+
+		while ((pos = strchr(address, '_')) != NULL)
+			*pos = ':';
+
+		g_strlcpy(device_address, address, BT_ADDRESS_STRING_SIZE);
+	}
+}
+
+void convert_addr_string_to_type(unsigned char *addr,
+						const char *address)
+{
+	int i;
+	char *ptr = NULL;
+
+	if (address == NULL || addr == NULL)
+		return;
+
+	for (i = 0; i < BLUETOOTH_ADDRESS_LENGTH; i++) {
+		addr[i] = strtol(address, &ptr, 16);
+		if (ptr != NULL) {
+			if (ptr[0] != ':')
+				return;
+
+			address = ptr + 1;
+		}
+	}
+}

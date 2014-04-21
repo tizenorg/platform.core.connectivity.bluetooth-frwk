@@ -4065,3 +4065,102 @@ int bt_nap_deactivate(void)
 {
 	return connman_set_tethering(false);
 }
+
+int bt_hdp_register_sink_app(unsigned short data_type, char **app_id)
+{
+	int result = BT_ERROR_NONE;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	result = bluetooth_hdp_activate(data_type,
+			HDP_ROLE_SINK, HDP_QOS_ANY, app_id);
+	return result;
+}
+
+int bt_hdp_unregister_sink_app(const char *app_id)
+{
+	int result = BT_ERROR_NONE;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	result = bluetooth_hdp_deactivate(app_id);
+
+	return result;
+}
+
+int bt_hdp_send_data(unsigned int channel, const char *data,
+						unsigned int size)
+{
+	int result = BT_ERROR_NONE;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	result = bluetooth_hdp_send_data(channel, data, size);
+
+	return result;
+}
+
+int bt_hdp_connect_to_source(const char *remote_address,
+						const char *app_id)
+{
+	int result = BT_ERROR_NONE;
+	bluetooth_device_address_t addr_hex = { {0,} };
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (remote_address == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	convert_address_to_hex(&addr_hex, remote_address);
+
+	result = bluetooth_hdp_connect(app_id, HDP_QOS_ANY, &addr_hex);
+
+	return result;
+}
+
+int bt_hdp_disconnect(const char *remote_address, unsigned int channel)
+{
+	int result = BT_ERROR_NONE;
+	bluetooth_device_address_t addr_hex = { {0,} };
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (remote_address == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	convert_address_to_hex(&addr_hex, remote_address);
+
+	result = bluetooth_hdp_disconnect(channel, &addr_hex);
+
+	return result;
+}

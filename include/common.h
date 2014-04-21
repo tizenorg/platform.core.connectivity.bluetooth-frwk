@@ -23,6 +23,7 @@
 #include <stdio.h>
 
 #include <gio/gio.h>
+#include "bluetooth-api.h"
 
 #ifndef TIZEN
 #define DBG(fmt, arg...) printf("%s:%d %s()" fmt "\n", __FILE__, __LINE__, __func__, ## arg)
@@ -40,6 +41,8 @@
 
 #define DEFAULT_ADAPTER_NAME "hci0"
 #define BT_ADDRESS_STRING_SIZE 18
+#define BLUETOOTH_ADDRESS_LENGTH 6
+#define BT_ADAPTER_OBJECT_PATH_MAX 50
 
 #define BLUEZ_NAME "org.bluez"
 #define HDP_MANAGER_INTERFACE "org.bluez.HealthManager1"
@@ -98,4 +101,16 @@ void comms_service_plugin_cleanup(void);
 
 void convert_device_path_to_address(const gchar *device_path,
 					gchar *device_address);
+
+void convert_address_to_hex(bluetooth_device_address_t *addr_hex,
+					const char *addr_str);
+
+void convert_addr_type_to_string(char *address,
+					unsigned char *addr);
+
+void device_path_to_address(const char *device_path,
+					char *device_address);
+
+void convert_addr_string_to_type(unsigned char *addr,
+					const char *address);
 #endif
