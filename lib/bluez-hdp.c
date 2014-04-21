@@ -16,6 +16,8 @@ typedef struct {
 	GSList *obj_info;
 } hdp_app_list_t;
 
+#define HDP_BUFFER_SIZE 1024
+
 static bluez_hdp_state_changed_t hdp_state_changed_cb;
 static gpointer hdp_state_changed_cb_data;
 static bluez_set_data_received_changed_t data_received_changed_cb;
@@ -52,6 +54,302 @@ void bluez_unset_data_received_changed_cb()
 {
 	data_received_changed_cb = NULL;
 	data_received_changed_data = NULL;
+}
+
+static hdp_obj_info_t *hdp_internal_gslist_obj_find_using_path(
+					const char *obj_channel_path)
+{
+	GSList *l;
+	GSList *iter;
+	hdp_obj_info_t *info = NULL;
+
+	if (g_app_list == NULL)
+		return NULL;
+
+	DBG("List length = %d\n", g_slist_length(g_app_list));
+	for (l = g_app_list; l != NULL; l = l->next) {
+		hdp_app_list_t *list = l->data;
+		if (!list)
+			return NULL;
+
+		for (iter = list->obj_info; iter != NULL;
+						iter = iter->next) {
+			info = iter->data;
+			if (!info)
+				return NULL;
+
+			if (0 == g_strcmp0(info->obj_channel_path,
+							obj_channel_path)) {
+				list->obj_info = g_slist_remove(list->obj_info,
+									info);
+				return info;
+			}
+		}
+	}
+
+	return NULL;
+}
+
+static void hdp_internal_handle_disconnect_cb(int sk, const char *path)
+{
+	char address[BT_ADDRESS_STRING_SIZE] = { 0, };
+	hdp_obj_info_t *info;
+
+	DBG("******** Socket Error  ******\n");
+
+	info = hdp_internal_gslist_obj_find_using_path(path);
+	if (info == NULL)
+		return;
+
+	device_path_to_address(path, address);
+
+	if (hdp_state_changed_cb)
+		hdp_state_changed_cb(BT_ERROR_NONE, address, NULL,
+				0, sk, hdp_state_changed_cb_data);
+
+	DBG(" Removed connection from list\n");
+
+	hdp_obj_info_free(info);
+}
+
+static gboolean hdp_internal_data_received(GIOChannel *gio,
+				GIOCondition cond, gpointer data)
+{
+	char buff[HDP_BUFFER_SIZE] = { 0, };
+	int sk;
+	int act_read;
+	const char *path = (const char *)data;
+
+	DBG("+");
+
+	sk = g_io_channel_unix_get_fd(gio);
+
+	if (cond & (G_IO_NVAL | G_IO_HUP | G_IO_ERR)) {
+		DBG("GIOCondition %d.............path = %s\n", cond, path);
+		hdp_internal_handle_disconnect_cb(sk, path);
+		return FALSE;
+	}
+
+	act_read = recv(sk, (void *)buff, sizeof(buff), 0);
+
+	if (act_read > 0) {
+		DBG("Received data of %d\n", act_read);
+	} else {
+		DBG("Read failed.....\n");
+		return FALSE;
+	}
+
+	if (data_received_changed_cb)
+		data_received_changed_cb(sk, buff, act_read,
+					data_received_changed_data);
+
+	DBG("-\n");
+
+	return TRUE;
+}
+
+static void hdp_internal_watch_fd(int file_desc, const char *path)
+{
+	GIOChannel *gio;
+
+	DBG("+");
+
+	gio = g_io_channel_unix_new(file_desc);
+
+	g_io_channel_set_close_on_unref(gio, TRUE);
+
+	g_io_add_watch(gio, G_IO_IN | G_IO_ERR | G_IO_HUP | G_IO_NVAL,
+				hdp_internal_data_received, (void *)path);
+
+	DBG("-");
+}
+
+static int hdp_internal_acquire_fd(GVariant *param, const char *path)
+{
+	char address[BT_ADDRESS_STRING_SIZE] = { 0, };
+	char *type_qos = NULL;
+	char *device = NULL;
+	char *app_handle = NULL;
+	hdp_app_list_t *list = NULL;
+	bt_hdp_channel_type_e type = HDP_QOS_RELIABLE;
+	hdp_obj_info_t *info;
+	int fd = 0;
+	GVariant *val;
+	GDBusConnection *conn;
+	int ret;
+	GError *error;
+
+	DBG("+");
+
+	conn = get_system_lib_dbus_connect();
+	if (conn == NULL) {
+		ret = BT_ERROR_OPERATION_FAILED;
+		goto done;
+	}
+
+	val = g_dbus_connection_call_sync(conn, BLUEZ_NAME, path,
+				HDP_CHANNEL_INTERFACE, "Acquire",
+				NULL, NULL, 0, -1, NULL, &error);
+
+	if (error) {
+		DBG(" HDP:****** dbus Can't create application ****");
+		DBG("error %s", error->message);
+		g_error_free(error);
+		ret = BT_ERROR_OPERATION_FAILED;
+		goto done;
+	}
+
+	g_variant_get(param, "h", &fd);
+	if (fd == 0) {
+		DBG("HDP:dbus Can't get reply arguments");
+		ret = BT_ERROR_OPERATION_FAILED;
+		goto done;
+	}
+
+	DBG("File Descriptor = %d, Dev_path = %s\n", fd, path);
+
+	val =  g_dbus_connection_call_sync(conn, BLUEZ_NAME, path,
+		PROPERTIES_INTERFACE, "GetAll",
+		g_variant_new("(s)", HDP_CHANNEL_INTERFACE),
+		NULL, 0, -1, NULL, &error);
+
+	if (error) {
+		DBG(" HDP:dbus Can't get the reply");
+		DBG("error %s", error->message);
+		g_error_free(error);
+		ret = BT_ERROR_OPERATION_FAILED;
+		goto done;
+	}
+
+	if (val != NULL) {
+		if (g_variant_is_of_type(val, G_VARIANT_TYPE("(a{sv})"))) {
+			GVariantIter *iter;
+			GVariant *item;
+			g_variant_get(val, "(a{sv})", &iter);
+			while ((item = g_variant_iter_next_value(iter))) {
+				gchar *key;
+				GVariant *value;
+				g_variant_get(item, "{sv}", &key, &value);
+				if (g_strcmp0("Type", key) == 0)
+					g_variant_get(value, "(s)", &type_qos);
+				else if (g_strcmp0("Device", key) == 0)
+					g_variant_get(value, "(o)", &device);
+				else if (g_strcmp0("Application", key) == 0)
+					g_variant_get(value, "(o)",
+								&app_handle);
+			}
+		}
+	}
+
+	DBG("QOS = %s, Device = %s, Apphandler = %s",
+				type_qos, device, app_handle);
+
+	if (NULL == type_qos || NULL == app_handle) {
+		DBG("Pasing failed\n");
+		ret = BT_ERROR_OPERATION_FAILED;
+		goto done;
+	}
+
+	type = (g_strcmp0(type_qos, "Reliable") == 0) ?
+		HDP_QOS_RELIABLE : HDP_QOS_STREAMING;
+
+	list = hdp_internal_gslist_find_app_handler((void *)app_handle);
+
+	if (NULL == list) {
+		DBG("**** Could not locate the list for %s*****\n", app_handle);
+		ret = BT_ERROR_OPERATION_FAILED;
+		goto done;
+	}
+
+	info = g_new0(hdp_obj_info_t, 1);
+	info->fd = fd;
+	info->obj_channel_path = g_strdup(path);
+	list->obj_info = g_slist_append(list->obj_info, info);
+
+	hdp_internal_watch_fd(fd, info->obj_channel_path);
+
+	device_path_to_address(path, address);
+
+	DBG("Going to give callback\n");
+
+	if (hdp_state_changed_cb)
+		hdp_state_changed_cb(BT_ERROR_NONE,
+				address, app_handle, type, fd,
+				hdp_state_changed_cb_data);
+
+	DBG("Updated fd in the list*\n");
+	DBG("-\n");
+
+	ret = BT_ERROR_NONE;
+done:
+	DBG("error");
+
+	if (hdp_state_changed_cb)
+		hdp_state_changed_cb(BT_ERROR_REMOTE_DEVICE_NOT_CONNECTED,
+				address, app_handle, type, fd,
+				hdp_state_changed_cb_data);
+
+	return ret;
+}
+
+void hdp_internal_handle_connect(gpointer user_data,
+						GVariant *param)
+{
+	const char *path = (const char *)user_data;
+	const char *obj_channel_path;
+
+	DBG("+********Signal - ChannelConnected******\n\n");
+	DBG("Path = %s", path);
+
+	g_variant_get(param, "o", &obj_channel_path);
+	if (obj_channel_path == NULL) {
+		DBG("Unexpected parameters in ChannelConnected signal");
+		return;
+	}
+
+	DBG("Channel connected, Path = %s", obj_channel_path);
+
+	hdp_internal_acquire_fd(param, obj_channel_path);
+
+	DBG("-");
+}
+
+void hdp_internal_handle_disconnect(gpointer user_data,
+						GVariant *param)
+{
+	const char *path = (const char *)user_data;
+	const char *obj_channel_path;
+	char address[BT_ADDRESS_STRING_SIZE] = { 0, };
+	hdp_obj_info_t *info;
+
+	DBG("+********Signal - ChannelDeleted ******\n\n");
+	DBG("Path = %s", path);
+
+	g_variant_get(param, "o", &obj_channel_path);
+
+	if (obj_channel_path == NULL) {
+		DBG("Unexpected parameters in ChannelDeleted signal");
+		return;
+	}
+
+	DBG("Channel Deleted, Path = %s", obj_channel_path);
+
+	info = hdp_internal_gslist_obj_find_using_path(obj_channel_path);
+	if (!info) {
+		DBG("No obj info for ob_channel_path [%s]\n",
+						obj_channel_path);
+		return;
+	}
+
+	device_path_to_address(path, address);
+
+	if (hdp_state_changed_cb)
+		hdp_state_changed_cb(BT_ERROR_NONE, address, NULL,
+			0, info->fd, hdp_state_changed_cb_data);
+
+	DBG(" Removed connection from list\n");
+
+	hdp_obj_info_free(info);
 }
 
 static int hdp_internal_create_application(unsigned int data_type,

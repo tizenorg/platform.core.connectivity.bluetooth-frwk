@@ -33,7 +33,6 @@
 #define NETWORK_INTERFACE "org.bluez.Network1"
 #define AGENT_INTERFACE "org.bluez.AgentManager1"
 #define PROFILE_INTERFACE "org.bluez.ProfileManager1"
-#define PROPERTIES_INTERFACE "org.freedesktop.DBus.Properties"
 #define MANAGER_INTERFACE "org.freedesktop.DBus.ObjectManager"
 
 #define BT_MEDIA_OBJECT_PATH "/Musicplayer"
@@ -617,6 +616,36 @@ static void network_properties_changed(GDBusProxy *proxy,
 	g_free(properties);
 }
 
+static void hdp_properties_changed(GDBusProxy *proxy,
+					GVariant *changed,
+					GStrv *invalidated,
+					gpointer user_data)
+{
+	char *path = NULL;
+
+	g_variant_lookup(changed,
+				"MainChannel", "o", &path);
+
+	if (path == NULL)
+		return;
+
+	DBG("object_path = %s", path);
+}
+
+static void hdp_signal_changed(GDBusProxy *proxy,
+					gchar *sender_name,
+					gchar *signal_name,
+					GVariant *param,
+					gpointer user_data)
+{
+	if (g_strcmp0(signal_name, "ChannelConnected") == 0) {
+		hdp_internal_handle_connect(user_data, param);
+	} else if (g_strcmp0(signal_name, "ChannelDeleted")
+							== 0) {
+		hdp_internal_handle_disconnect(user_data, param);
+	}
+}
+
 static void parse_bluez_device_interfaces(gpointer data, gpointer user_data)
 {
 	struct _bluez_device *device = user_data;
@@ -647,6 +676,11 @@ static void parse_bluez_device_interfaces(gpointer data, gpointer user_data)
 		device->network_proxy = proxy;
 		g_signal_connect(proxy, "g-properties-changed",
 			G_CALLBACK(network_properties_changed), device);
+	} else if (g_strcmp0(iface_name, HDP_DEVICE_INTERFACE) == 0) {
+		g_signal_connect(proxy, "g-properties-changed",
+			G_CALLBACK(hdp_properties_changed), device);
+		g_signal_connect(proxy, "g-signal",
+			G_CALLBACK(hdp_signal_changed), device);
 	}
 }
 

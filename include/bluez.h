@@ -542,4 +542,10 @@ int bluetooth_hdp_connect(const char *app_handle,
 int bluetooth_hdp_disconnect(unsigned int channel_id,
 			const bluetooth_device_address_t *device_address);
 
+void hdp_internal_handle_disconnect(gpointer user_data,
+						GVariant *param);
+
+void hdp_internal_handle_connect(gpointer user_data,
+						GVariant *param);
+
 #endif

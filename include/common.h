@@ -48,6 +48,7 @@
 #define HDP_MANAGER_INTERFACE "org.bluez.HealthManager1"
 #define HDP_DEVICE_INTERFACE "org.bluez.HealthDevice1"
 #define HDP_CHANNEL_INTERFACE "org.bluez.HealthChannel1"
+#define PROPERTIES_INTERFACE "org.freedesktop.DBus.Properties"
 
 enum bluez_error_type {
 	ERROR_NONE,
