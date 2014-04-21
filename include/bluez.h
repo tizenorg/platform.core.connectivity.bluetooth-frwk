@@ -24,6 +24,7 @@
 
 #include "common.h"
 #include "bluetooth.h"
+#include "bluetooth-api.h"
 
 #define BT_GENERIC_AUDIO_UUID      "00001203-0000-1000-8000-00805f9b34fb"
 
@@ -497,5 +498,23 @@ int bluez_media_player_change_property(struct _bluez_adapter *adapter,
 
 int bluez_media_player_set_properties(struct _bluez_adapter *adapter,
 				media_player_settings_t *properties);
+
+int bluetooth_hdp_activate(unsigned short data_type,
+					bt_hdp_role_type_t role,
+					bt_hdp_qos_type_t channel_type,
+					char **app_handle);
+
+int bluetooth_hdp_deactivate(const char *app_handle);
+
+int bluetooth_hdp_send_data(unsigned int channel_id,
+					const char *buffer,
+					unsigned int size);
+
+int bluetooth_hdp_connect(const char *app_handle,
+			bt_hdp_qos_type_t channel_type,
+			const bluetooth_device_address_t *device_address);
+
+int bluetooth_hdp_disconnect(unsigned int channel_id,
+			const bluetooth_device_address_t *device_address);
 
 #endif

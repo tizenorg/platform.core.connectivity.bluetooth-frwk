@@ -41,6 +41,11 @@
 #define DEFAULT_ADAPTER_NAME "hci0"
 #define BT_ADDRESS_STRING_SIZE 18
 
+#define BLUEZ_NAME "org.bluez"
+#define HDP_MANAGER_INTERFACE "org.bluez.HealthManager1"
+#define HDP_DEVICE_INTERFACE "org.bluez.HealthDevice1"
+#define HDP_CHANNEL_INTERFACE "org.bluez.HealthChannel1"
+
 enum bluez_error_type {
 	ERROR_NONE,
 	ERROR_DOES_NOT_EXIST,
