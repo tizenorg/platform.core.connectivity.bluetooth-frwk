@@ -17,6 +17,10 @@
 *
 */
 
+#include <stdbool.h>
+#include <gio/gio.h>
+#include <dbus/dbus.h>
+#include <gio/gunixfdlist.h>
 #include <string.h>
 #include <stdio.h>
 #include "common.h"
@@ -36,6 +40,8 @@ struct error_map_t {
 	{"Error.ConnectionAttemptFailed",ERROR_AUTH_ATTEMPT_FAILED},
 	{NULL, 				ERROR_NONE},
 };
+
+static GDBusConnection *conn;
 
 enum bluez_error_type get_error_type(GError *error)
 {
@@ -302,4 +308,21 @@ void convert_addr_string_to_type(unsigned char *addr,
 			address = ptr + 1;
 		}
 	}
+}
+
+GDBusConnection *get_system_lib_dbus_connect(void)
+{
+	GError *error = NULL;
+
+	if (conn)
+		return conn;
+
+	conn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
+	if (conn == NULL) {
+		DBG("%s", error->message);
+
+		g_error_free(error);
+	}
+
+	return conn;
 }

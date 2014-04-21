@@ -113,4 +113,7 @@ void device_path_to_address(const char *device_path,
 
 void convert_addr_string_to_type(unsigned char *addr,
 					const char *address);
+
+GDBusConnection *get_system_lib_dbus_connect(void);
+
 #endif
