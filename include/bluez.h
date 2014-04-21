@@ -303,6 +303,31 @@ void bluez_device_set_alias(
 				struct _bluez_device *device,
 				const gchar *alias);
 
+typedef void (*bluez_set_data_received_changed_t)(
+				unsigned int channel,
+				const char *data,
+				unsigned int size,
+				gpointer user_data);
+
+void bluez_set_data_received_changed_cb(
+				bluez_set_data_received_changed_t cb,
+				gpointer user_data);
+
+void bluez_unset_data_received_changed_cb();
+
+typedef void (*bluez_hdp_state_changed_t)(int result,
+				const char *remote_address,
+				const char *app_id,
+				bt_hdp_channel_type_e type,
+				unsigned int channel,
+				gpointer user_data);
+
+void bluez_set_hdp_state_changed_cb(
+				bluez_hdp_state_changed_t cb,
+				gpointer user_data);
+
+void bluez_unset_hdp_state_changed_cb();
+
 typedef void (*bluez_avrcp_repeat_changed_cb_t)(
 				const gchar *repeat,
 				gpointer user_data);

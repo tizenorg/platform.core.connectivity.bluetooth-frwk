@@ -147,6 +147,17 @@ struct panu_connection_state_changed_cb_node {
 	void *user_data;
 };
 
+struct hdp_connection_changed_cb_node {
+	bt_hdp_connected_cb conn_cb;
+	bt_hdp_disconnected_cb disconn_cb;
+	void *user_data;
+};
+
+struct hdp_set_data_received_cb_node {
+	bt_hdp_data_received_cb cb;
+	void *user_data;
+};
+
 static struct avrcp_repeat_mode_changed_node *avrcp_repeat_node;
 static struct avrcp_set_shuffle_mode_changed_node *avrcp_shuffle_node;
 static struct adapter_name_cb_node *adapter_name_node;
@@ -168,6 +179,8 @@ static struct avrcp_target_connection_state_changed_node
 					*avrcp_target_state_node;
 static struct audio_connection_state_changed_cb_node *audio_state_node;
 static struct panu_connection_state_changed_cb_node *panu_state_node;
+static struct hdp_connection_changed_cb_node *hdp_state_node;
+static struct hdp_set_data_received_cb_node *hdp_set_data_received_node;
 
 static gboolean generic_device_removed_set;
 
@@ -432,6 +445,42 @@ static void bluez_avrcp_shuffle_changed(gboolean shuffle,
 
 	if (data->cb)
 		data->cb(shuffle_mode, data->user_data);
+}
+
+static void bluez_set_data_received_changed(
+				unsigned int channel,
+				const char *data,
+				unsigned int size,
+				void *user_data)
+{
+	struct hdp_set_data_received_cb_node *data_node =
+						user_data;
+
+	if (data_node->cb)
+		data_node->cb(channel, data, size,
+				data_node->user_data);
+}
+
+
+static void bluez_hdp_state_changed(int result,
+				const char *remote_address,
+				const char *app_id,
+				bt_hdp_channel_type_e type,
+				unsigned int channel,
+				void *user_data)
+{
+	struct hdp_connection_changed_cb_node *data =
+						user_data;
+
+	if (app_id != NULL) {
+		if (data->conn_cb)
+			data->conn_cb(result, remote_address,
+					app_id, type, channel,
+					data->user_data);
+		else if (data->disconn_cb)
+			data->disconn_cb(result, remote_address,
+					channel, data->user_data);
+	}
 }
 
 static void bluez_avrcp_target_state_changed(const char *remote_address,
@@ -768,6 +817,16 @@ static void _bt_update_bluetooth_callbacks(void)
 		bluez_set_avrcp_shuffle_changed_cb(
 					bluez_avrcp_shuffle_changed,
 					avrcp_shuffle_node);
+
+	if (hdp_state_node)
+		bluez_set_hdp_state_changed_cb(
+					bluez_hdp_state_changed,
+					hdp_state_node);
+
+	if (hdp_set_data_received_node)
+		bluez_set_data_received_changed_cb(
+					bluez_set_data_received_changed,
+					hdp_set_data_received_node);
 }
 
 static void setup_bluez_lib(void)
@@ -4163,4 +4222,99 @@ int bt_hdp_disconnect(const char *remote_address, unsigned int channel)
 	result = bluetooth_hdp_disconnect(channel, &addr_hex);
 
 	return result;
+}
+
+int bt_hdp_set_connection_state_changed_cb(bt_hdp_connected_cb connected_cb,
+		bt_hdp_disconnected_cb disconnected_cb, void *user_data)
+{
+	struct hdp_connection_changed_cb_node *node_data = NULL;
+
+	if (connected_cb == NULL || disconnected_cb == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (hdp_state_node) {
+		DBG("hdp state callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
+
+	node_data = g_new0(struct hdp_connection_changed_cb_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->conn_cb = connected_cb;
+	node_data->disconn_cb = disconnected_cb;
+	node_data->user_data = user_data;
+
+	hdp_state_node = node_data;
+
+	_bt_update_bluetooth_callbacks();
+
+	return BT_SUCCESS;
+}
+
+int bt_hdp_unset_connection_state_changed_cb(void)
+{
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (!hdp_state_node)
+		return BT_SUCCESS;
+
+	bluez_unset_hdp_state_changed_cb();
+
+	g_free(hdp_state_node);
+	hdp_state_node = NULL;
+
+	return BT_SUCCESS;
+}
+
+int bt_hdp_set_data_received_cb(bt_hdp_data_received_cb callback,
+							void *user_data)
+{
+	struct hdp_set_data_received_cb_node *node_data = NULL;
+
+	if (callback == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (hdp_set_data_received_node) {
+		DBG("hdp set data receive dnode callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
+
+	node_data = g_new0(struct hdp_set_data_received_cb_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->cb = callback;
+	node_data->user_data = user_data;
+
+	hdp_set_data_received_node = node_data;
+
+	_bt_update_bluetooth_callbacks();
+
+	return BT_SUCCESS;
+}
+
+int bt_hdp_unset_data_received_cb(void)
+{
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (!hdp_set_data_received_node)
+		return BT_SUCCESS;
+
+	bluez_unset_data_received_changed_cb();
+
+	g_free(hdp_set_data_received_node);
+	hdp_set_data_received_node = NULL;
+
+	return BT_SUCCESS;
 }
