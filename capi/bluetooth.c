@@ -585,11 +585,15 @@ enum bluez_device_property_callback_flag {
 	DEV_PROP_FLAG_PAIR = 0x01,
 	DEV_PROP_FLAG_CONNECT = 0x02,
 	DEV_PROP_FLAG_AUTH = 0x04,
-	DEV_PROP_FLAG_PANU_CONNECT = 0x8
+	DEV_PROP_FLAG_PANU_CONNECT = 0x08,
+	DEV_PROP_FLAG_HDP_CONNECT = 0x10,
+	DEV_PROP_FLAG_HDP_DATA = 0x20
 };
 
 static void set_device_property_changed_callback(bluez_device_t *device)
 {
+	DBG("");
+
 	if (dev_property_callback_flags & DEV_PROP_FLAG_PAIR)
 		bluez_device_set_paired_changed_cb(device,
 					device_paired_changed,
@@ -609,10 +613,22 @@ static void set_device_property_changed_callback(bluez_device_t *device)
 		bluez_device_network_set_connected_changed_cb(device,
 					device_panu_connected_changed,
 					panu_state_node);
+
+	if (dev_property_callback_flags & DEV_PROP_FLAG_HDP_CONNECT)
+		bluez_set_hdp_state_changed_cb(device,
+					bluez_hdp_state_changed,
+					hdp_state_node);
+
+	if (dev_property_callback_flags & DEV_PROP_FLAG_HDP_DATA)
+		bluez_set_data_received_changed_cb(device,
+					bluez_set_data_received_changed,
+					hdp_set_data_received_node);
 }
 
 static void unset_device_property_changed_callback(bluez_device_t *device)
 {
+	DBG("");
+
 	if (dev_property_callback_flags ^ DEV_PROP_FLAG_PAIR)
 		bluez_device_unset_paired_changed_cb(device);
 
@@ -624,12 +640,20 @@ static void unset_device_property_changed_callback(bluez_device_t *device)
 
 	if (dev_property_callback_flags ^ DEV_PROP_FLAG_PANU_CONNECT)
 		bluez_device_network_unset_connected_changed_cb(device);
+
+	if (dev_property_callback_flags ^ DEV_PROP_FLAG_HDP_CONNECT)
+		bluez_unset_hdp_state_changed_cb(device);
+
+	if (dev_property_callback_flags ^ DEV_PROP_FLAG_HDP_DATA)
+		bluez_unset_data_received_changed_cb(device);
 }
 
 static void foreach_device_property_callback(GList *list, unsigned int flag)
 {
 	bluez_device_t *device;
 	GList *iter, *next;
+
+	DBG("");
 
 	for (iter = g_list_first(list); iter; iter = next) {
 		next = g_list_next(iter);
@@ -817,16 +841,6 @@ static void _bt_update_bluetooth_callbacks(void)
 		bluez_set_avrcp_shuffle_changed_cb(
 					bluez_avrcp_shuffle_changed,
 					avrcp_shuffle_node);
-
-	if (hdp_state_node)
-		bluez_set_hdp_state_changed_cb(
-					bluez_hdp_state_changed,
-					hdp_state_node);
-
-	if (hdp_set_data_received_node)
-		bluez_set_data_received_changed_cb(
-					bluez_set_data_received_changed,
-					hdp_set_data_received_node);
 }
 
 static void setup_bluez_lib(void)
@@ -4228,6 +4242,7 @@ int bt_hdp_set_connection_state_changed_cb(bt_hdp_connected_cb connected_cb,
 		bt_hdp_disconnected_cb disconnected_cb, void *user_data)
 {
 	struct hdp_connection_changed_cb_node *node_data = NULL;
+	GList *list;
 
 	if (connected_cb == NULL || disconnected_cb == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
@@ -4249,13 +4264,23 @@ int bt_hdp_set_connection_state_changed_cb(bt_hdp_connected_cb connected_cb,
 
 	hdp_state_node = node_data;
 
-	_bt_update_bluetooth_callbacks();
+	dev_property_callback_flags |= DEV_PROP_FLAG_HDP_CONNECT;
+
+	if (!default_adapter)
+		return BT_SUCCESS;
+
+	list = bluez_adapter_get_devices(default_adapter);
+	foreach_device_property_callback(list, DEV_PROP_FLAG_HDP_CONNECT);
+
+	g_list_free(list);
 
 	return BT_SUCCESS;
 }
 
 int bt_hdp_unset_connection_state_changed_cb(void)
 {
+	GList *list;
+
 	DBG("");
 
 	if (initialized == false)
@@ -4264,7 +4289,10 @@ int bt_hdp_unset_connection_state_changed_cb(void)
 	if (!hdp_state_node)
 		return BT_SUCCESS;
 
-	bluez_unset_hdp_state_changed_cb();
+	dev_property_callback_flags &= ~DEV_PROP_FLAG_HDP_CONNECT;
+
+	list = bluez_adapter_get_devices(default_adapter);
+	foreach_device_property_callback(list, DEV_PROP_FLAG_HDP_CONNECT);
 
 	g_free(hdp_state_node);
 	hdp_state_node = NULL;
@@ -4276,6 +4304,9 @@ int bt_hdp_set_data_received_cb(bt_hdp_data_received_cb callback,
 							void *user_data)
 {
 	struct hdp_set_data_received_cb_node *node_data = NULL;
+	GList *list;
+
+	DBG("");
 
 	if (callback == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
@@ -4296,13 +4327,23 @@ int bt_hdp_set_data_received_cb(bt_hdp_data_received_cb callback,
 
 	hdp_set_data_received_node = node_data;
 
-	_bt_update_bluetooth_callbacks();
+	dev_property_callback_flags |= DEV_PROP_FLAG_HDP_DATA;
+
+	if (!default_adapter)
+		return BT_SUCCESS;
+
+	list = bluez_adapter_get_devices(default_adapter);
+	foreach_device_property_callback(list, DEV_PROP_FLAG_HDP_DATA);
+
+	g_list_free(list);
 
 	return BT_SUCCESS;
 }
 
 int bt_hdp_unset_data_received_cb(void)
 {
+	GList *list;
+
 	DBG("");
 
 	if (initialized == false)
@@ -4311,7 +4352,10 @@ int bt_hdp_unset_data_received_cb(void)
 	if (!hdp_set_data_received_node)
 		return BT_SUCCESS;
 
-	bluez_unset_data_received_changed_cb();
+	dev_property_callback_flags &= ~DEV_PROP_FLAG_HDP_DATA;
+
+	list = bluez_adapter_get_devices(default_adapter);
+	foreach_device_property_callback(list, DEV_PROP_FLAG_HDP_DATA);
 
 	g_free(hdp_set_data_received_node);
 	hdp_set_data_received_node = NULL;

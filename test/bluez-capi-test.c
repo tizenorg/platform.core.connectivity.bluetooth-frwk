@@ -1655,6 +1655,75 @@ static int nap_deactivate(const char *p1, const char *p2)
 	return 0;
 }
 
+void bt_hdp_connected_cb_test(int result, const char *remote_address,
+			const char *app_id, bt_hdp_channel_type_e type,
+			unsigned int channel, void *user_data)
+{
+	DBG("");
+}
+
+void bt_hdp_disconnected_cb_test(int result, const char *remote_address,
+				unsigned int channel, void *user_data)
+{
+	DBG("");
+}
+
+static int hdp_set_connection_state_changed_cb(const char *p1,
+						const char *p2)
+{
+	int ret;
+
+	ret = bt_hdp_set_connection_state_changed_cb(
+				bt_hdp_connected_cb_test,
+				bt_hdp_disconnected_cb_test,
+				NULL);
+
+	DBG("ret = %d", ret);
+
+	return 0;
+}
+
+static int hdp_unset_connection_state_changed_cb(const char *p1,
+						const char *p2)
+{
+	int ret;
+
+	ret = bt_hdp_unset_connection_state_changed_cb();
+
+	DBG("ret = %d", ret);
+
+	return 0;
+}
+
+void bt_hdp_data_received_cb_test(unsigned int channel,
+		const char *data, unsigned int size, void *user_data)
+{
+	DBG("");
+}
+
+static int hdp_set_data_received_cb(const char *p1, const char *p2)
+{
+	int ret;
+
+	ret = bt_hdp_set_data_received_cb(bt_hdp_data_received_cb_test,
+						NULL);
+
+	DBG("ret = %d", ret);
+
+	return 0;
+}
+
+static int hdp_unset_data_received_cb(const char *p1, const char *p2)
+{
+	int ret;
+
+	ret = bt_hdp_unset_data_received_cb();
+
+	DBG("ret = %d", ret);
+
+	return 0;
+}
+
 struct {
 	const char *command;
 	int (*function)(const char *p1, const char *p2);
@@ -1884,6 +1953,18 @@ struct {
 
 	{"nap_deactivate", nap_deactivate,
 		"Usage: nap_deactivate\n\tdeactivate NAP"},
+
+	{"hdo_set_connect_cb", hdp_set_connection_state_changed_cb,
+		"Usage: hdp_set_connect_cb\n\tset hdp conn cb"},
+
+	{"hdp_set_data_rec_cb", hdp_set_data_received_cb,
+		"Usage: hdp_set_data_rec_cb\n\tset hdp data rec cb"},
+
+	{"hdo_unset_connect_cb", hdp_unset_connection_state_changed_cb,
+		"Usage: hdp_set_connect_cb\n\tset hdp conn cb"},
+
+	{"hdp_unset_data_rec_cb", hdp_unset_data_received_cb,
+		"Usage: hdp_set_data_rec_cb\n\tset hdp data rec cb"},
 
 	{"q", quit,
 		"Usage: q\n\tQuit"},

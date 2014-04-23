@@ -109,28 +109,6 @@ struct _bluez_adapter {
 	gpointer discoverable_timeout_cb_data;
 };
 
-struct _bluez_device {
-	char *interface_name;
-	char *object_path;
-	GDBusInterface *interface;
-	GDBusInterface *control_interface;
-	GDBusInterface *network_interface;
-	GDBusProxy *proxy;
-	GDBusProxy *control_proxy;
-	GDBusProxy *network_proxy;
-	struct _bluez_object *parent;
-	struct _device_head *head;
-
-	bluez_device_paired_cb_t device_paired_cb;
-	gpointer device_paired_cb_data;
-	bluez_device_connected_cb_t device_connected_cb;
-	gpointer device_connected_cb_data;
-	bluez_device_trusted_cb_t device_trusted_cb;
-	gpointer device_trusted_cb_data;
-	bluez_device_network_connected_cb_t network_connected_cb;
-	gpointer network_connected_cb_data;
-};
-
 struct _bluez_agent {
 	char *interface_name;
 	char *object_path;
