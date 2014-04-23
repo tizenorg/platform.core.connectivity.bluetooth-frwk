@@ -481,6 +481,35 @@ static int agent_off(void *parameter)
 	return 0;
 }
 
+static char *app_id;
+
+static int hdp_activate(void *parameter)
+{
+	int result = 0;
+
+	DBG("");
+
+	result = bluetooth_hdp_activate(1,
+		HDP_ROLE_SINK, HDP_QOS_ANY, &app_id);
+
+	DBG("result = %d app_id = %s", result, app_id);
+
+	return result;
+}
+
+static int hdp_deactivate(void *parameter)
+{
+	int result = 0;
+
+	DBG("app_id = %s", app_id);
+
+	result = bluetooth_hdp_deactivate((const char *)(app_id));
+
+	DBG("result = %d", result);
+
+	return result;
+}
+
 static int default_agent(void *parameter)
 {
 	bluez_agent_request_default_agent((const gchar*)parameter);
@@ -867,6 +896,12 @@ struct {
 
 	{"agent_off", agent_off,
 		"Usage: agent_off\n\tUnregister agent"},
+
+	{"hdp_activate", hdp_activate,
+		"Usage: hdp_activate\n\thdp activate"},
+
+	{"hdp_deactivate", hdp_deactivate,
+		"Usage: hdp_activate\n\thdp deactivate"},
 
 	{"default_agent", default_agent,
 		"Usage: default_agent /path/to/agent\n\tSet default agent"},
