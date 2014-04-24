@@ -2570,6 +2570,45 @@ int bt_avrcp_target_notify_track(const char *title, const char *artist,
 							NULL, NULL);
 }
 
+int bt_avrcp_target_notify_equalizer_state(bt_avrcp_equalizer_state_e state)
+{
+	/*bluez-5.X doesn't provide the property*/
+	return BT_SUCCESS;
+}
+
+int bt_avrcp_target_notify_scan_mode(bt_avrcp_scan_mode_e mode)
+{
+	/*bluez-5.X doesn't provide the property*/
+	return BT_SUCCESS;
+}
+
+int bt_avrcp_set_equalizer_state_changed_cb(
+				bt_avrcp_equalizer_state_changed_cb callback,
+				void *user_data)
+{
+	/*bluez-5.X doesn't provide the property*/
+	return BT_SUCCESS;
+}
+
+int bt_avrcp_unset_equalizer_state_changed_cb(void)
+{
+	/*bluez-5.X doesn't provide the property*/
+	return BT_SUCCESS;
+}
+
+int bt_avrcp_set_scan_mode_changed_cb(bt_avrcp_scan_mode_changed_cb callback,
+				void *user_data)
+{
+	/*bluez-5.X doesn't provide the property*/
+	return BT_SUCCESS;
+}
+
+int bt_avrcp_unset_scan_mode_changed_cb(void)
+{
+	 /*bluez-5.X doesn't provide the property*/
+	return BT_SUCCESS;
+}
+
 /* Hid function */
 int bt_hid_host_initialize(
 		bt_hid_host_connection_state_changed_cb connection_cb,
