@@ -52,6 +52,12 @@ static void profile_connect_callback(bluez_device_t *device,
 static void profile_disconnect_callback(bluez_device_t *device,
 					enum device_profile_state state);
 
+static void device_connect_callback(bluez_device_t *device,
+					enum device_state state);
+
+static void device_disconnect_callback(bluez_device_t *device,
+					enum device_state state);
+
 struct device_created_cb_node {
 	bt_adapter_device_discovery_state_changed_cb cb;
 	void *user_data;
@@ -4398,6 +4404,91 @@ int bt_hdp_unset_data_received_cb(void)
 
 	g_free(hdp_set_data_received_node);
 	hdp_set_data_received_node = NULL;
+
+	return BT_SUCCESS;
+}
+
+static void device_connect_callback(bluez_device_t *device,
+					enum device_state state)
+{
+	switch (state) {
+	case DEVICE_CONNECT_SUCCESS:
+		DBG("Connect device: %s", "DEVICE_CONNECT_SUCCESS");
+		break;
+	case DEVICE_NOT_READY:
+		DBG("Connect device: %s", "DEVICE_NOT_READY");
+		break;
+	case DEVICE_ALREADY_CONNECTED:
+		DBG("Connect device: %s", "DEVICE_ALREADY_CONNECTED");
+		break;
+	case DEVICE_CONNECT_FAILED:
+		DBG("Connect device: %s", "DEVICE_CONNECT_FAILED");
+		break;
+	case DEVICE_CONNECT_INPROGRESS:
+		DBG("Connect device: %s", "DEVICE_CONNECT_INPROGRESS");
+		break;
+	default:
+		ERROR("Unknown error code");
+		break;
+	}
+}
+
+int bt_device_connect_le(const char *remote_address)
+{
+	bluez_device_t *device;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	device = bluez_adapter_get_device_by_address(default_adapter,
+							remote_address);
+	if (device == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	bluez_device_connect_le(device, device_connect_callback);
+
+	return BT_SUCCESS;
+}
+
+static void device_disconnect_callback(bluez_device_t *device,
+					enum device_state state)
+{
+	switch (state) {
+	case DEVICE_DISCONNECT_SUCCESS:
+		DBG("Disconnect device: %s", "DEVICE_DISCONNECT_SUCCESS");
+		break;
+	case DEVICE_NOT_CONNECTED:
+		DBG("Disconnect device: %s", "DEVICE_NOT_CONNECTED");
+		break;
+	default:
+		ERROR("Unknown error code");
+		break;
+	}
+}
+
+int bt_device_disconnect_le(const char *remote_address)
+{
+	bluez_device_t *device;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	device = bluez_adapter_get_device_by_address(default_adapter,
+							remote_address);
+	if (device == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	bluez_device_disconnect_le(device, device_disconnect_callback);
 
 	return BT_SUCCESS;
 }

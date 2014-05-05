@@ -950,6 +950,19 @@ static int set_device_alias(const char *p1, const char *p2)
 	return 0;
 }
 
+static int device_connect_le(const char *p1, const char *p2)
+{
+	int err;
+
+	err = bt_device_connect_le(p1);
+	if (err != BT_SUCCESS) {
+		ERROR("bt_device_connect_le error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int hid_connect(const char *p1, const char *p2)
 {
 	int err;
@@ -1084,13 +1097,26 @@ static int get_bonded_device_info(const char *p1, const char *p2)
 	return 0;
 }
 
+static int device_disconnect_le(const char *p1, const char *p2)
+{
+	int err;
+
+	err = bt_device_disconnect_le(p1);
+	if (err != BT_SUCCESS) {
+		ERROR("bt_device_disconnect_le error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int hid_disconnect(const char *p1, const char *p2)
 {
 	int err;
 
 	err = bt_hid_host_disconnect(p1);
 	if (err != BT_SUCCESS) {
-		ERROR("bt_hid_host_connect error: %d", err);
+		ERROR("bt_hid_host_disconnect error: %d", err);
 		return 0;
 	}
 
@@ -1836,6 +1862,12 @@ struct {
 
 	{"set_device_authorization", set_device_authorization,
 		"Usage: set_device_authorization 70:F9:27:64:DF:65 1/0\n\tSet device authorization"},
+
+	{"device_connect_le", device_connect_le,
+		"Usage: device_connect_le 70:F9:27:64:DF:65\n\tConnect LE device"},
+
+	{"device_disconnect_le", device_disconnect_le,
+		"Usage: device_disconnect_le 70:F9:27:64:DF:65\n\tDisconnect LE device"},
 
 	{"hid_connect", hid_connect,
 		"Usage: hid_connect 70:F9:27:64:DF:65\n\tConnect HID profile"},
