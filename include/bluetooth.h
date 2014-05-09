@@ -3744,6 +3744,74 @@ void bt_agent_pincode_cancel(bt_req_t *requestion);
 /**
  * @}
  */
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE
+ * @brief  Called when GATT connection state is changed.
+ * @param[in]  result  The connection result (1 - Connected 0 - Disconnected)
+ * @param[in]  user_data  The user data passed from the foreach function
+ * @see bt_device_connect_le()
+ * @see bt_device_disconnect_le()
+ */
+typedef void (*bt_device_gatt_state_changed_cb)(int result, void *user_data);
+
+/**
+ * * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE
+ * * @brief Connects to remote BLE device, asynchronously.
+ *
+ * @remarks A Connection can be destroyed by bt_device_disconnect_le()
+ *
+ * @param[in] callback  The result callback
+ * @param[in] address The address of the remote BLE device with
+ * which the connection should be created
+ *
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_RESOURCE_BUSY      Device or resource busy
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ *
+ * @pre The state of local Bluetooth must be #BT_ADAPTER_ENABLED with bt_adapter_enable()
+ * @pre The remote device must be discoverable with bt_adapter_start_device_discovery().
+ * @post This function invokes bt_device_gatt_state_changed_cb().
+ *
+ * @see bt_adapter_enable()
+ * @see bt_adapter_start_device_discovery()
+ */
+int bt_device_connect_le(bt_device_gatt_state_changed_cb callback,
+			const char *address);
+
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE
+ * @brief Disconnects remote BLE device, asynchronously.
+ *
+ * @remarks A Connection can be established by bt_device_connect_le()
+ *
+ * @param[in] callback  The result callback
+ * @param[in] address The address of the remote BLE device with
+ * which the connection should be created
+ *
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_RESOURCE_BUSY      Device or resource busy
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ *
+ * @pre The state of local Bluetooth must be #BT_ADAPTER_ENABLED
+ * with bt_adapter_enable()
+ * @pre The remote device must be discoverable with
+ * bt_adapter_start_device_discovery().
+ * @pre The remote device must be connected with bt_device_connect_le().
+ * @post This function invokes bt_device_gatt_state_changed_cb().
+ *
+ * @see bt_adapter_enable()
+ * @see bt_adapter_start_device_discovery()
+ */
+int bt_device_disconnect_le(bt_device_gatt_state_changed_cb callback,
+			const char *address);
 
 /* SPP */
 typedef void (*bt_spp_new_connection_cb)(

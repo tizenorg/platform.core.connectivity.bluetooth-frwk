@@ -145,6 +145,10 @@ static bluez_avrcp_target_cb_t avrcp_target_cb;
 static gpointer avrcp_target_cb_data;
 static bluez_audio_state_cb_t audio_state_cb;
 static gpointer audio_state_cb_data;
+static device_connect_cb_t dev_connect_cb;
+static gpointer dev_connect_data;
+static device_disconnect_cb_t dev_disconnect_cb;
+static gpointer dev_disconnect_data;
 
 static GDBusNodeInfo *introspection_data;
 static guint bt_register_avrcp_property(struct _bluez_adapter *adapter);
@@ -987,6 +991,20 @@ static struct _bluez_profile *this_profile;
 struct _bluez_agent *bluez_agent_get_agent(void)
 {
 	return this_agent;
+}
+
+void bluez_set_device_connect_changed_cb(device_connect_cb_t cb,
+					gpointer user_data)
+{
+	dev_connect_cb = cb;
+	dev_connect_data = user_data;
+}
+
+void bluez_set_device_disconnect_changed_cb(device_disconnect_cb_t cb,
+					gpointer user_data)
+{
+	dev_disconnect_cb = cb;
+	dev_disconnect_data = user_data;
 }
 
 void bluez_set_avrcp_repeat_changed_cb(bluez_avrcp_repeat_changed_cb_t cb,
@@ -1958,6 +1976,16 @@ struct profile_disconnect_state_notify {
 	profile_disconnect_cb_t cb;
 };
 
+struct device_connect_state_notify {
+	struct _bluez_device *device;
+	device_connect_cb_t cb;
+};
+
+struct device_disconnect_state_notify {
+	struct _bluez_device *device;
+	device_disconnect_cb_t cb;
+};
+
 static inline enum device_pair_state get_pairing_error_state(GError *error)
 {
 	if (g_strrstr(error->message,
@@ -2792,4 +2820,129 @@ static guint bt_register_avrcp_property(struct _bluez_adapter *adapter)
 					NULL);
 
 	return rid;
+}
+
+static void bluez_device_connect_cb(GObject *source_object,
+						GAsyncResult *res,
+						gpointer user_data)
+{
+	GVariant *ret;
+	struct _bluez_device *device;
+	device_connect_cb_t device_connect_cb;
+	struct device_connect_state_notify *notify = user_data;
+	GError *error = NULL;
+
+	DBG("");
+
+	device = notify->device;
+	device_connect_cb = notify->cb;
+
+	if (device_connect_cb == NULL)
+		return;
+
+	ret = g_dbus_proxy_call_finish(device->proxy,
+					res, &error);
+
+	if (ret == NULL) {
+		if (g_strrstr(error->message,
+				"org.bluez.Error.NotReady"))
+			device_connect_cb(device, DEVICE_NOT_READY,
+					dev_connect_data);
+		else if (g_strrstr(error->message,
+				"org.bluez.Error.AlreadyConnected"))
+			device_connect_cb(device, DEVICE_ALREADY_CONNECTED,
+					dev_connect_data);
+		else if (g_strrstr(error->message,
+				"org.bluez.Error.Failed"))
+			device_connect_cb(device, DEVICE_CONNECT_FAILED,
+					dev_connect_data);
+		else if (g_strrstr(error->message,
+				"org.bluez.Error.InProgress"))
+			device_connect_cb(device, DEVICE_CONNECT_INPROGRESS,
+					dev_connect_data);
+		else
+			DBG("error: %s", error->message);
+	} else {
+		device_connect_cb(device, DEVICE_CONNECT_SUCCESS,
+				dev_connect_data);
+
+		g_variant_unref(ret);
+	}
+
+	g_free(notify);
+}
+
+void bluez_device_connect_le(struct _bluez_device *device)
+{
+	struct device_connect_state_notify *notify;
+
+	notify = g_try_new0(struct device_connect_state_notify, 1);
+	if (notify == NULL) {
+		ERROR("no memory");
+		return;
+	}
+
+	notify->device = device;
+	notify->cb = dev_connect_cb;
+
+	g_dbus_proxy_call(device->proxy,
+			"Connect", NULL,
+			0, -1, NULL,
+			bluez_device_connect_cb, notify);
+
+}
+
+static void bluez_device_disconnect_cb(GObject *source_object,
+						GAsyncResult *res,
+						gpointer user_data)
+{
+	GVariant *ret;
+	struct _bluez_device *device;
+	device_disconnect_cb_t device_disconnect_cb;
+	struct device_disconnect_state_notify *notify = user_data;
+	GError *error = NULL;
+
+	DBG("");
+
+	device = notify->device;
+	device_disconnect_cb = notify->cb;
+
+	if (device_disconnect_cb == NULL)
+		return;
+
+	ret = g_dbus_proxy_call_finish(device->proxy,
+					res, &error);
+
+	if (ret == NULL) {
+		if (g_strrstr(error->message,
+				"org.bluez.Error.NotConnected"))
+			device_disconnect_cb(device, DEVICE_NOT_CONNECTED,
+					dev_disconnect_data);
+	} else {
+		device_disconnect_cb(device, DEVICE_DISCONNECT_SUCCESS,
+				dev_disconnect_data);
+
+		g_variant_unref(ret);
+	}
+
+	g_free(notify);
+}
+
+void bluez_device_disconnect_le(struct _bluez_device *device)
+{
+	struct device_disconnect_state_notify *notify;
+
+	notify = g_try_new0(struct device_disconnect_state_notify, 1);
+	if (notify == NULL) {
+		ERROR("no memory");
+		return;
+	}
+
+	notify->device = device;
+	notify->cb = dev_disconnect_cb;
+
+	g_dbus_proxy_call(device->proxy,
+			"Disconnect", NULL,
+			0, -1, NULL,
+			bluez_device_disconnect_cb, notify);
 }

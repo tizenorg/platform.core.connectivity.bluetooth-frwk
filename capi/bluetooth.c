@@ -52,6 +52,16 @@ static void profile_connect_callback(bluez_device_t *device,
 static void profile_disconnect_callback(bluez_device_t *device,
 					enum device_profile_state state);
 
+struct device_connect_cb_node {
+	bt_device_gatt_state_changed_cb cb;
+	void *user_data;
+};
+
+struct device_disconnect_cb_node {
+	bt_device_gatt_state_changed_cb cb;
+	void *user_data;
+};
+
 struct device_created_cb_node {
 	bt_adapter_device_discovery_state_changed_cb cb;
 	void *user_data;
@@ -158,6 +168,8 @@ struct hdp_set_data_received_cb_node {
 	void *user_data;
 };
 
+static struct device_connect_cb_node *device_connect_node;
+static struct device_disconnect_cb_node *device_disconnect_node;
 static struct avrcp_repeat_mode_changed_node *avrcp_repeat_node;
 static struct avrcp_set_shuffle_mode_changed_node *avrcp_shuffle_node;
 static struct adapter_name_cb_node *adapter_name_node;
@@ -781,6 +793,60 @@ done:
 	node->cb(BT_SUCCESS, discoverable_mode, node->user_data);
 }
 
+static void bluez_device_connect_changed(bluez_device_t *device,
+					enum device_state state,
+					gpointer user_data)
+{
+	struct device_connect_cb_node *data = user_data;
+
+	switch (state) {
+	case DEVICE_CONNECT_SUCCESS:
+		DBG("Connect device: %s", "DEVICE_CONNECT_SUCCESS");
+		break;
+	case DEVICE_NOT_READY:
+		DBG("Connect device: %s", "DEVICE_NOT_READY");
+		break;
+	case DEVICE_ALREADY_CONNECTED:
+		DBG("Connect device: %s", "DEVICE_ALREADY_CONNECTED");
+		break;
+	case DEVICE_CONNECT_FAILED:
+		DBG("Connect device: %s", "DEVICE_CONNECT_FAILED");
+		break;
+	case DEVICE_CONNECT_INPROGRESS:
+		DBG("Connect device: %s", "DEVICE_CONNECT_INPROGRESS");
+		break;
+	default:
+		ERROR("Unknown error code");
+		break;
+	}
+
+	if (data->cb)
+		data->cb(state, data->user_data);
+
+}
+
+static void bluez_device_disconnect_changed(bluez_device_t *device,
+					enum device_state state,
+					gpointer user_data)
+{
+	struct device_disconnect_cb_node *data = user_data;
+
+	switch (state) {
+	case DEVICE_DISCONNECT_SUCCESS:
+		DBG("Disconnect device: %s", "DEVICE_DISCONNECT_SUCCESS");
+		break;
+	case DEVICE_NOT_CONNECTED:
+		DBG("Disconnect device: %s", "DEVICE_NOT_CONNECTED");
+		break;
+	default:
+		ERROR("Unknown error code");
+		break;
+	}
+
+	if (data->cb)
+		data->cb(state, data->user_data);
+}
+
 static void _bt_update_bluetooth_callbacks(void)
 {
 	DBG("default_adpater: %p", default_adapter);
@@ -841,6 +907,15 @@ static void _bt_update_bluetooth_callbacks(void)
 		bluez_set_avrcp_shuffle_changed_cb(
 					bluez_avrcp_shuffle_changed,
 					avrcp_shuffle_node);
+	if (device_connect_node)
+		bluez_set_device_connect_changed_cb(
+					bluez_device_connect_changed,
+					device_connect_node);
+
+	if (device_disconnect_node)
+		bluez_set_device_disconnect_changed_cb(
+					bluez_device_disconnect_changed,
+					device_disconnect_node);
 }
 
 static void setup_bluez_lib(void)
@@ -4398,6 +4473,100 @@ int bt_hdp_unset_data_received_cb(void)
 
 	g_free(hdp_set_data_received_node);
 	hdp_set_data_received_node = NULL;
+
+	return BT_SUCCESS;
+}
+
+int bt_device_connect_le(bt_device_gatt_state_changed_cb callback,
+			const char *remote_address)
+{
+	bluez_device_t *device;
+
+	struct device_connect_cb_node *node_data = NULL;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (callback == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	device = bluez_adapter_get_device_by_address(default_adapter,
+							remote_address);
+	if (device == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	if (device_connect_node) {
+		DBG("device disconnect callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
+
+	node_data =
+		g_new0(struct device_connect_cb_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->cb = callback;
+	node_data->user_data = NULL;
+
+	device_connect_node = node_data;
+
+	_bt_update_bluetooth_callbacks();
+
+	bluez_device_connect_le(device);
+
+	return BT_SUCCESS;
+}
+
+int bt_device_disconnect_le(bt_device_gatt_state_changed_cb callback,
+			const char *remote_address)
+{
+	bluez_device_t *device;
+
+	struct device_disconnect_cb_node *node_data = NULL;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (callback == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	device = bluez_adapter_get_device_by_address(default_adapter,
+							remote_address);
+	if (device == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	if (device_disconnect_node) {
+		DBG("device disconnect callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
+
+	node_data =
+		g_new0(struct device_disconnect_cb_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->cb = callback;
+	node_data->user_data = NULL;
+
+	device_disconnect_node = node_data;
+
+	_bt_update_bluetooth_callbacks();
+
+	bluez_device_disconnect_le(device);
 
 	return BT_SUCCESS;
 }

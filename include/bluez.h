@@ -399,6 +399,34 @@ enum device_profile_state {
 	PROFILE_NOT_SUPPORTED
 };
 
+enum device_state {
+	DEVICE_DISCONNECT_SUCCESS,
+	DEVICE_CONNECT_SUCCESS,
+	DEVICE_ALREADY_CONNECTED,
+	DEVICE_CONNECT_FAILED,
+	DEVICE_CONNECT_INPROGRESS,
+	DEVICE_NOT_READY,
+	DEVICE_NOT_CONNECTED
+};
+
+typedef void (*device_connect_cb_t)(
+				struct _bluez_device *device,
+				enum device_state state,
+				gpointer user_data);
+void bluez_set_device_connect_changed_cb(device_connect_cb_t cb,
+					gpointer user_data);
+
+void bluez_device_connect_le(struct _bluez_device *device);
+
+typedef void (*device_disconnect_cb_t)(
+				struct _bluez_device *device,
+				enum device_state state,
+				gpointer user_data);
+void bluez_set_device_disconnect_changed_cb(device_disconnect_cb_t cb,
+					gpointer user_data);
+
+void bluez_device_disconnect_le(struct _bluez_device *device);
+
 typedef void (*profile_connect_cb_t)(
 				struct _bluez_device *device,
 				enum device_profile_state state);
