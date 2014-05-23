@@ -641,22 +641,22 @@ static void unset_device_property_changed_callback(bluez_device_t *device)
 {
 	DBG("");
 
-	if (dev_property_callback_flags ^ DEV_PROP_FLAG_PAIR)
+	if (!(dev_property_callback_flags & DEV_PROP_FLAG_PAIR))
 		bluez_device_unset_paired_changed_cb(device);
 
-	if (dev_property_callback_flags ^ DEV_PROP_FLAG_CONNECT)
+	if (!(dev_property_callback_flags & DEV_PROP_FLAG_CONNECT))
 		bluez_device_unset_connected_changed_cb(device);
 
-	if (dev_property_callback_flags ^ DEV_PROP_FLAG_AUTH)
+	if (!(dev_property_callback_flags & DEV_PROP_FLAG_AUTH))
 		bluez_device_unset_trusted_changed_cb(device);
 
-	if (dev_property_callback_flags ^ DEV_PROP_FLAG_PANU_CONNECT)
+	if (!(dev_property_callback_flags & DEV_PROP_FLAG_PANU_CONNECT))
 		bluez_device_network_unset_connected_changed_cb(device);
 
-	if (dev_property_callback_flags ^ DEV_PROP_FLAG_HDP_CONNECT)
+	if (!(dev_property_callback_flags & DEV_PROP_FLAG_HDP_CONNECT))
 		bluez_unset_hdp_state_changed_cb(device);
 
-	if (dev_property_callback_flags ^ DEV_PROP_FLAG_HDP_DATA)
+	if (!(dev_property_callback_flags & DEV_PROP_FLAG_HDP_DATA))
 		bluez_unset_data_received_changed_cb(device);
 }
 

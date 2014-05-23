@@ -530,9 +530,11 @@ static void device_properties_changed(GDBusProxy *proxy,
 
 	if (device->device_paired_cb)
 		handle_device_paired(changed_properties, user_data);
-	else if (device->device_connected_cb)
+
+	if (device->device_connected_cb)
 		handle_device_connected(changed_properties, user_data);
-	else if (device->device_trusted_cb)
+
+	if (device->device_trusted_cb)
 		handle_device_trusted(changed_properties, user_data);
 
 	g_free(properties);
