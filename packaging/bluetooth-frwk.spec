@@ -72,6 +72,7 @@ make %{?jobs:-j%jobs}
 %{_libdir}/%{name}-test/bt-serivce-lib-test
 %{_libdir}/%{name}-test/bluez-lib-test
 %{_libdir}/%{name}-test/obex-lib-test
+%{_libdir}/%{name}-test/test-perso
 %config %{_sysconfdir}/dbus-1/system.d/bluez-lib-test.conf
 
 %files devel
