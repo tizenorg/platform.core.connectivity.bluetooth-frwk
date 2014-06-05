@@ -18,9 +18,8 @@ FOREACH(flag ${${TEST}_CFLAGS})
 	SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${flag}")
 ENDFOREACH(flag)
 
-SET(LIB_INSTALL_DIR "/usr/lib/")
-SET(TEST_INSTALL_DIR "${LIB_INSTALL_DIR}bluetooth-frwk-test/")
-SET(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}bluetooth-service/plugins/")
+SET(TEST_INSTALL_DIR "${LIB_INSTALL_DIR}/bluetooth-frwk-test/")
+SET(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/bluetooth-service/plugins/")
 
 IF(platform STREQUAL "Mobile")
 SET(MOBILE_FLAGS "mobile-flags")
