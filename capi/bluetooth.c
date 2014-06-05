@@ -2795,6 +2795,7 @@ int bt_hid_host_disconnect(const char *remote_address)
 }
 
 struct spp_context {
+	int fd;
 	gchar *uuid;
 	gchar *spp_path;
 	GIOChannel *channel;
@@ -2844,6 +2845,23 @@ static struct spp_context *find_spp_context_from_uuid(const char *uuid)
 		spp_ctx = list->data;
 
 		if (spp_ctx && !g_strcmp0(spp_ctx->uuid, uuid))
+			return spp_ctx;
+	}
+
+	return NULL;
+}
+
+static struct spp_context *find_spp_context_from_socketfd(int socket_fd)
+{
+	struct spp_context *spp_ctx;
+	GList *list, *next;
+
+	for (list = g_list_first(spp_ctx_list); list; list = next) {
+		next = g_list_next(list);
+
+		spp_ctx = list->data;
+
+		if (spp_ctx && (spp_ctx->fd == socket_fd))
 			return spp_ctx;
 	}
 
@@ -3940,6 +3958,38 @@ int bt_spp_unset_data_received_cb(void)
 	spp_data_received_node = NULL;
 
 	return BT_SUCCESS;
+}
+
+int bt_socket_create_rfcomm(const char *service_uuid, int *socket_fd)
+{
+	struct spp_context *spp_ctx;
+	int ret;
+
+	if (!service_uuid || !socket_fd)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	ret = bt_spp_create_rfcomm(service_uuid, NULL, NULL);
+	if (ret != BT_SUCCESS)
+		return ret;
+
+	spp_ctx = find_spp_context_from_uuid(service_uuid);
+	if (spp_ctx == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	*socket_fd = spp_ctx->fd;
+
+	return BT_SUCCESS;
+}
+
+int bt_socket_destroy_rfcomm(int socket_fd)
+{
+	struct spp_context *spp_ctx;
+
+	spp_ctx = find_spp_context_from_socketfd(socket_fd);
+	if (!spp_ctx)
+		return BT_ERROR_OPERATION_FAILED;
+
+	return bt_spp_destroy_rfcomm(spp_ctx->uuid);
 }
 
 int bt_socket_set_connection_state_changed_cb(
