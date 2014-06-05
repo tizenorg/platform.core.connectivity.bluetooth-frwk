@@ -2796,11 +2796,16 @@ int bt_hid_host_disconnect(const char *remote_address)
 
 struct spp_context {
 	int fd;
+	gchar *remote_address;
 	gchar *uuid;
 	gchar *spp_path;
 	GIOChannel *channel;
 	bt_spp_new_connection_cb new_connection;
 	void *new_connection_data;
+
+	int max_pending;
+	void *requestion;
+	gboolean is_accept;
 };
 
 GList *spp_ctx_list;
@@ -2830,6 +2835,9 @@ static void free_spp_context(struct spp_context *spp_ctx)
 
 	if (spp_ctx->spp_path)
 		g_free(spp_ctx->spp_path);
+
+	if (spp_ctx->remote_address)
+		g_free(spp_ctx->remote_address);
 
 	g_free(spp_ctx);
 }
@@ -3046,11 +3054,44 @@ static void request_confirmation_handler(const gchar *device_path,
 		this_agent->request_confirm(device_name, passkey, invocation);
 }
 
+static void handle_spp_authorize_request(bluez_device_t *device,
+					struct spp_context *spp_ctx,
+					GDBusMethodInvocation *invocation)
+{
+	char *device_name, *device_address;
+
+	if (spp_ctx->max_pending == 0) {
+		bt_spp_reject(invocation);
+		return;
+	}
+
+	device_name = bluez_device_get_property_alias(device);
+	device_address = bluez_device_get_property_address(device);
+
+	/* New API handler */
+	if (spp_connection_requested_node)
+		spp_connection_requested_node->cb(
+				spp_ctx->uuid, device_name, invocation,
+				spp_connection_requested_node->user_data);
+
+	/* Old API handler */
+	if (spp_ctx->is_accept)
+		bt_spp_accept(invocation);
+
+	spp_ctx->requestion = invocation;
+
+	if (device_name)
+		g_free(device_name);
+
+	if (device_address)
+		g_free(device_address);
+}
+
 static void request_authorize_service_handler(const gchar *device_path,
 					const gchar *uuid,
 					GDBusMethodInvocation *invocation)
 {
-	struct spp_connection_requested_cb_node *node_data;
+	struct spp_context *spp_ctx;
 	gchar *device_name;
 	bluez_device_t *device;
 
@@ -3068,24 +3109,19 @@ static void request_authorize_service_handler(const gchar *device_path,
 		return;
 	}
 
-	device_name = bluez_device_get_property_alias(device);
-
-	/* Don't match the local spp UUID, it means other profile UUID */
-	if (!find_spp_context_from_uuid(uuid)) {
-		if (!this_agent || !this_agent->authorize_service)
-			return;
-
-		this_agent->authorize_service(device_name, uuid, invocation);
-
-		g_free(device_name);
-
+	spp_ctx = find_spp_context_from_uuid(uuid);
+	if (spp_ctx != NULL) {
+		handle_spp_authorize_request(device, spp_ctx, invocation);
 		return;
 	}
 
-	node_data = spp_connection_requested_node;
-	if (node_data && node_data->cb)
-		node_data->cb(uuid, device_name, invocation,
-				node_data->user_data);
+	/* Other profile Authorize request */
+	if (!this_agent || !this_agent->authorize_service)
+		return;
+
+	device_name = bluez_device_get_property_alias(device);
+
+	this_agent->authorize_service(device_name, uuid, invocation);
 
 	g_free(device_name);
 }
@@ -3990,6 +4026,49 @@ int bt_socket_destroy_rfcomm(int socket_fd)
 		return BT_ERROR_OPERATION_FAILED;
 
 	return bt_spp_destroy_rfcomm(spp_ctx->uuid);
+}
+
+int bt_socket_connect_rfcomm(const char *remote_address,
+				const char *service_uuid)
+{
+	struct spp_context *spp_ctx;
+	int ret;
+
+	if (!remote_address || !service_uuid)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	spp_ctx = find_spp_context_from_uuid(service_uuid);
+	if (spp_ctx)
+		goto done;
+
+	/* BlueZ 5.x should create_rfcomm using a specify UUID,
+	 * then it can connect remote device.
+	 */
+	ret = bt_spp_create_rfcomm(service_uuid, NULL, NULL);
+	if (ret != BT_SUCCESS)
+		return ret;
+
+	spp_ctx = find_spp_context_from_uuid(service_uuid);
+	if (!spp_ctx)
+		return BT_ERROR_OPERATION_FAILED;
+
+done:
+	if (!spp_ctx->remote_address)
+		spp_ctx->remote_address = g_strdup(remote_address);
+
+	return bt_spp_connect_rfcomm(remote_address, service_uuid);
+}
+
+int bt_socket_disconnect_rfcomm(int socket_fd)
+{
+	struct spp_context *spp_ctx;
+
+	spp_ctx = find_spp_context_from_fd(socket_fd);
+	if (!spp_ctx)
+		return BT_ERROR_OPERATION_FAILED;
+
+	return bt_spp_disconnect_rfcomm(spp_ctx->remote_address,
+					spp_ctx->uuid);
 }
 
 int bt_socket_set_connection_state_changed_cb(
