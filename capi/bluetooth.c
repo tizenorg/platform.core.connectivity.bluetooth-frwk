@@ -4148,6 +4148,13 @@ int bt_socket_send_data(int socket_fd, const char *data, int length)
 	return bt_spp_send_data(socket_fd, data, length);
 }
 
+int bt_socket_set_data_received_cb(bt_socket_data_received_cb callback,
+							void *user_data)
+{
+	return bt_spp_set_data_received_cb(
+				(bt_spp_data_received_cb)callback, user_data);
+}
+
 int bt_socket_set_connection_state_changed_cb(
 			bt_socket_connection_state_changed_cb callback,
 			void *user_data)
@@ -4159,9 +4166,7 @@ int bt_socket_set_connection_state_changed_cb(
 
 int bt_socket_unset_data_received_cb(void)
 {
-	DBG("Not implement");
-
-	return BT_SUCCESS;
+	return bt_spp_unset_data_received_cb();
 }
 
 int bt_socket_unset_connection_state_changed_cb(void)
