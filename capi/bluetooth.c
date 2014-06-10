@@ -4127,6 +4127,22 @@ int bt_socket_accept(int requested_socket_fd, int *connected_socket_fd)
 	return BT_SUCCESS;
 }
 
+int bt_socket_reject(int socket_fd)
+{
+	struct spp_context *spp_ctx;
+
+	spp_ctx = find_spp_context_from_socketfd(socket_fd);
+	if (spp_ctx == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	bt_spp_reject(spp_ctx->requestion);
+
+	if (spp_ctx->max_pending >= 0)
+		spp_ctx->max_pending++;
+
+	return BT_SUCCESS;
+}
+
 int bt_socket_set_connection_state_changed_cb(
 			bt_socket_connection_state_changed_cb callback,
 			void *user_data)
