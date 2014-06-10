@@ -1457,6 +1457,226 @@ static int register_agent(const char *p1, const char *p2)
 	return 0;
 }
 
+static int socket_fd;
+static int client_fd;
+static int socket_create(const char *p1, const char *p2)
+{
+	int ret;
+
+	DBG("");
+
+	if (p1 == NULL) {
+		ERROR("socket create must give the UUID");
+		return 0;
+	}
+
+	ret = bt_socket_create_rfcomm(p1, &socket_fd);
+	if (ret != BT_SUCCESS)
+		DBG("socket create failed");
+
+	return 0;
+}
+
+static int socket_destroy(const char *p1, const char *p2)
+{
+	int ret;
+
+	DBG("");
+
+	if (p1 == NULL) {
+		ERROR("socket create must give the UUID");
+		return 0;
+	}
+
+	ret = bt_socket_destroy_rfcomm(socket_fd);
+	if (ret != BT_SUCCESS)
+		DBG("destroy socket failed");
+
+	socket_fd = 0;
+
+	return 0;
+}
+
+void bt_socket_connection_requested_cb_test(int fd,
+				const char *remote_address,
+				void *user_data)
+{
+
+	DBG("socket_fd = %d", socket_fd);
+	DBG("remote_address = %s", remote_address);
+
+	socket_fd = fd;
+}
+
+int socket_set_connection_requested_cb(const char *p1, const char *p2)
+{
+	int ret;
+
+	DBG("");
+
+	ret = bt_socket_set_connection_requested_cb(
+			bt_socket_connection_requested_cb_test, NULL);
+	if (ret != BT_SUCCESS)
+		DBG("listen and accept socket failed");
+
+	return 0;
+}
+
+void bt_socket_connection_state_changed_cb_test(int result,
+				bt_socket_connection_state_e connection_state,
+				bt_socket_connection_s *connection,
+				void *user_data)
+{
+	if (connection_state == BT_SOCKET_CONNECTED)
+		client_fd = connection->socket_fd;
+	else
+		client_fd = 0;
+
+	DBG("result = %d", result);
+	DBG("connection_state = %d", connection_state);
+	DBG("connection->socket_fd = %d", connection->socket_fd);
+	DBG("connection->local_role = %d", connection->local_role);
+	DBG("connection->remote_address = %s", connection->remote_address);
+	DBG("connection->service_uuid = %s", connection->service_uuid);
+}
+
+int socket_set_connection_state_changed_cb(const char *p1, const char *p2)
+{
+	int ret;
+
+	DBG("");
+
+	ret = bt_socket_set_connection_state_changed_cb(
+			bt_socket_connection_state_changed_cb_test, NULL);
+	if (ret != BT_SUCCESS)
+		DBG("socket unset connection state changed failed");
+
+	return 0;
+}
+
+int socket_unset_connection_state_changed_cb(const char *p1, const char *p2)
+{
+	int ret;
+
+	DBG("");
+
+	ret = bt_socket_unset_connection_requested_cb();
+	if (ret != BT_SUCCESS)
+		DBG("socket unset connection state changed failed");
+
+	return 0;
+}
+
+int socket_unset_connection_requested_cb(const char *p1, const char *p2)
+{
+	int ret;
+
+	DBG("");
+
+	ret = bt_socket_unset_connection_requested_cb();
+	if (ret != BT_SUCCESS)
+		DBG("listen and accept socket failed");
+
+	return 0;
+}
+
+static int socket_listen_and_accept(const char *p1, const char *p2)
+{
+	int ret;
+
+	DBG("");
+
+	ret = bt_socket_listen_and_accept_rfcomm(socket_fd, 1);
+	if (ret != BT_SUCCESS)
+		DBG("listen and accept socket failed");
+
+	return 0;
+}
+
+static int socket_connection(const char *p1, const char *p2)
+{
+	int ret;
+
+	DBG("");
+
+	if (p1 == NULL) {
+		ERROR("socket connect must give the device address");
+		return 0;
+	}
+
+	if (p2 == NULL) {
+		ERROR("socket connect must give the UUID");
+		return 0;
+	}
+
+	ret = bt_socket_connect_rfcomm(p1, p2);
+	if (ret != BT_SUCCESS)
+		DBG("socket connect failed");
+
+	return 0;
+}
+
+static int socket_disconnect(const char *p1, const char *p2)
+{
+	int ret;
+
+	DBG("");
+
+	ret = bt_socket_disconnect_rfcomm(client_fd);
+	if (ret != BT_SUCCESS)
+		DBG("disconnect spp failed");
+
+	return 0;
+}
+
+static int socket_send(const char *p1, const char *p2)
+{
+	int ret;
+
+	DBG("");
+
+	ret = bt_socket_send_data(client_fd, "12345", 5);
+	if (ret != BT_SUCCESS)
+		DBG("send data socket failed");
+
+	return 0;
+}
+
+void bt_socket_data_received_cb_test(bt_socket_received_data_s *data, void *user_data)
+{
+	DBG("data->socket_fd = %d", data->socket_fd);
+	DBG("data->data = %s", data->data);
+	DBG("data->data_size = %d", data->data_size);
+}
+
+static int socket_set_data_received_cb(const char *p1, const char *p2)
+{
+	int ret;
+
+	DBG("");
+
+	ret = bt_socket_set_data_received_cb(
+				bt_socket_data_received_cb_test,
+				NULL);
+	if (ret != BT_SUCCESS)
+		DBG("set received data socket failed");
+
+	return 0;
+}
+
+static int socket_unset_data_received_cb(const char *p1, const char *p2)
+{
+	int ret;
+
+	DBG("");
+
+	ret = bt_socket_unset_data_received_cb();
+	if (ret != BT_SUCCESS)
+		DBG("unset received data socket failed");
+
+	return 0;
+}
+
 static void new_connection(const char *uuid, const char *device_name,
 						int fd, void *user_data)
 {
@@ -1957,6 +2177,42 @@ struct {
 
 	{"opp_watch", opp_watch,
 		"Usage: opp_watch on/off\n\ton/off opp_watch"},
+
+	{"socket_create", socket_create,
+		"Usage: socket_create 00001101-0000-1000-8000-00805f9b34fb\n\tcreate socket with uuid"},
+
+	{"socket_destroy", socket_destroy,
+		"Usage: socket_destroy\n\tdestory spp"},
+
+	{"socket_set_connection_state_changed_cb", socket_set_connection_state_changed_cb,
+		"Usage: socket_set_connection_state_changed_cb\n\tset connection state changed callback"},
+
+	{"socket_unset_connection_state_changed_cb", socket_unset_connection_state_changed_cb,
+		"Usage: socket_unset_connection_state_changed_cb\n\tunset socket connection requested callback"},
+
+	{"socket_listen_and_accept", socket_listen_and_accept,
+		"Usage: socket_listen_and_accept\n\tlisten and accept socket"},
+
+	{"socket_connection", socket_connection,
+		"Usage: socket_connection 70:F9:27:64:DF:65 00001101-0000-1000-8000-00805f9b34fb\n\tconnect socket"},
+
+	{"socket_disconnect", socket_disconnect,
+		"Usage: socket_disconnect 70:F9:27:64:DF:65 00001101-0000-1000-8000-00805f9b34fb\n\tdisconnect socket"},
+
+	{"socket_send", socket_send,
+		"Usage: spp_send fd 'data'\n\tsend socket data to fd"},
+
+	{"socket_set_data_receive_cb", socket_set_data_received_cb,
+		"Usage: socket_set_data_receive_cb\n\tset socket data recieved callback"},
+
+	{"socket_unset_data_receive_cb", socket_unset_data_received_cb,
+		"Usage: socket_unset_data_receive_cb\n\tunset socket data recieved callback"},
+
+	{"socket_set_connection_requested_cb", socket_set_connection_requested_cb,
+		"Usage: socket_set_connection_requested_cb\n\tset socket connection requested callback"},
+
+	{"socket_unset_connection_requested_cb", socket_unset_connection_requested_cb,
+		"Usage: socket_unset_connection_requested_cb\n\tunset socket connection requested callback"},
 
 	{"spp_create", spp_create,
 		"Usage: spp_create 00001101-0000-1000-8000-00805f9b34fb\n\tcreate spp with uuid"},
