@@ -4143,6 +4143,11 @@ int bt_socket_reject(int socket_fd)
 	return BT_SUCCESS;
 }
 
+int bt_socket_send_data(int socket_fd, const char *data, int length)
+{
+	return bt_spp_send_data(socket_fd, data, length);
+}
+
 int bt_socket_set_connection_state_changed_cb(
 			bt_socket_connection_state_changed_cb callback,
 			void *user_data)
