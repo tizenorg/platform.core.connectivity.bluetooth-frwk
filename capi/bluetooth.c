@@ -173,6 +173,11 @@ struct socket_connection_requested_cb_node {
 	void *user_data;
 };
 
+struct socket_connection_state_changed_cb_node {
+	bt_socket_connection_state_changed_cb cb;
+	void *user_data;
+};
+
 static struct device_connect_cb_node *device_connect_node;
 static struct device_disconnect_cb_node *device_disconnect_node;
 static struct avrcp_repeat_mode_changed_node *avrcp_repeat_node;
@@ -201,6 +206,8 @@ static struct hdp_set_data_received_cb_node *hdp_set_data_received_node;
 
 static struct socket_connection_requested_cb_node
 					*socket_connection_requested_node;
+static struct socket_connection_state_changed_cb_node
+					*socket_connection_state_node;
 
 static gboolean generic_device_removed_set;
 
@@ -3570,11 +3577,13 @@ done:
 	return TRUE;
 }
 
-static void notify_new_connection(gchar *device_path, gint fd,
-					struct spp_context *spp_ctx)
+static void notify_connection_state(gchar *device_path,
+				bt_socket_connection_state_e state,
+				struct spp_context *spp_ctx)
 {
 	bluez_device_t *device;
-	gchar *device_name;
+	gchar *device_name, *address;
+	int fd;
 
 	device = bluez_adapter_get_device_by_path(default_adapter,
 						device_path);
@@ -3584,12 +3593,29 @@ static void notify_new_connection(gchar *device_path, gint fd,
 	}
 
 	device_name = bluez_device_get_property_alias(device);
+	address = bluez_device_get_property_address(device);
+
+	fd = g_io_channel_unix_get_fd(spp_ctx->channel);
 
 	if (spp_ctx->new_connection)
 		spp_ctx->new_connection(spp_ctx->uuid, device_name,
 					fd, spp_ctx->new_connection_data);
 
+	if (socket_connection_state_node) {
+		bt_socket_connection_s connection;
+
+		connection.socket_fd = fd;
+		connection.remote_address = address;
+		connection.service_uuid = spp_ctx->uuid;
+		connection.local_role = spp_ctx->role;
+
+		socket_connection_state_node->cb(
+				BT_SUCCESS, state, &connection,
+				socket_connection_state_node->user_data);
+	}
+
 	g_free(device_name);
+	g_free(address);
 }
 
 static void handle_new_connection(gchar *device_path, gint fd,
@@ -3622,7 +3648,7 @@ static void handle_new_connection(gchar *device_path, gint fd,
 						received_data, user_data);
 
 done:
-	notify_new_connection(device_path, fd, spp_ctx);
+	notify_connection_state(device_path, BT_SOCKET_CONNECTED, spp_ctx);
 
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
@@ -3631,9 +3657,12 @@ static void handle_request_disconnection(gchar *device_path,
 					GDBusMethodInvocation *invocation,
 					void *user_data)
 {
+	struct spp_context *spp_ctx = user_data;
+
 	DBG("device path %s", device_path);
 
-	/* TODO: We should close the fd */
+	g_io_channel_unref(spp_ctx->channel);
+	notify_connection_state(device_path, BT_SOCKET_DISCONNECTED, spp_ctx);
 
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
@@ -4148,7 +4177,15 @@ int bt_socket_accept(int requested_socket_fd, int *connected_socket_fd)
 	if (spp_ctx->max_pending > 0)
 		spp_ctx->max_pending--;
 
-	*connected_socket_fd = g_io_channel_unix_get_fd(spp_ctx->channel);
+	/* BlueZ 5.x GAP.
+	 * Note: this connected_socket_fd maybe invalid, because
+	 * connected_socket_fd should return by connection_state_changed,
+	 */
+	if (spp_ctx->channel == NULL)
+		*connected_socket_fd = -1;
+	else
+		*connected_socket_fd =
+				g_io_channel_unix_get_fd(spp_ctx->channel);
 
 	return BT_SUCCESS;
 }
@@ -4216,7 +4253,31 @@ int bt_socket_set_connection_state_changed_cb(
 			bt_socket_connection_state_changed_cb callback,
 			void *user_data)
 {
-	DBG("Not implement");
+	struct socket_connection_state_changed_cb_node *node_data;
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (callback == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (socket_connection_state_node) {
+		DBG("socket connection state changed callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
+
+	node_data = g_new0(struct socket_connection_state_changed_cb_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->cb = callback;
+	node_data->user_data = user_data;
+
+	socket_connection_state_node = node_data;
+
+	return BT_SUCCESS;
 
 	return BT_SUCCESS;
 }
@@ -4242,7 +4303,14 @@ int bt_socket_unset_data_received_cb(void)
 
 int bt_socket_unset_connection_state_changed_cb(void)
 {
-	DBG("Not implement");
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (!socket_connection_state_node)
+		return BT_SUCCESS;
+
+	g_free(socket_connection_state_node);
+	socket_connection_state_node = NULL;
 
 	return BT_SUCCESS;
 }
