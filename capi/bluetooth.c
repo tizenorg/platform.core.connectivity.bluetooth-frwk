@@ -168,6 +168,11 @@ struct hdp_set_data_received_cb_node {
 	void *user_data;
 };
 
+struct socket_connection_requested_cb_node {
+	bt_socket_connection_requested_cb cb;
+	void *user_data;
+};
+
 static struct device_connect_cb_node *device_connect_node;
 static struct device_disconnect_cb_node *device_disconnect_node;
 static struct avrcp_repeat_mode_changed_node *avrcp_repeat_node;
@@ -193,6 +198,9 @@ static struct audio_connection_state_changed_cb_node *audio_state_node;
 static struct panu_connection_state_changed_cb_node *panu_state_node;
 static struct hdp_connection_changed_cb_node *hdp_state_node;
 static struct hdp_set_data_received_cb_node *hdp_set_data_received_node;
+
+static struct socket_connection_requested_cb_node
+					*socket_connection_requested_node;
 
 static gboolean generic_device_removed_set;
 
@@ -2806,6 +2814,7 @@ struct spp_context {
 	int max_pending;
 	void *requestion;
 	gboolean is_accept;
+	bt_socket_role_e role;
 };
 
 GList *spp_ctx_list;
@@ -3075,11 +3084,26 @@ static void handle_spp_authorize_request(bluez_device_t *device,
 				spp_connection_requested_node->user_data);
 
 	/* Old API handler */
-	if (spp_ctx->is_accept)
+	if (spp_ctx->max_pending <=0) {
+		bt_spp_reject(invocation);
+		goto done;
+	}
+
+	if (spp_ctx->is_accept) {
 		bt_spp_accept(invocation);
+		goto done;
+	}
 
 	spp_ctx->requestion = invocation;
+	spp_ctx->role = BT_SOCKET_SERVER;
+	spp_ctx->remote_address = g_strdup(device_address);
 
+	if (socket_connection_requested_node)
+		socket_connection_requested_node->cb(
+				spp_ctx->fd, (const char *)device_address,
+				socket_connection_requested_node->user_data);
+
+done:
 	if (device_name)
 		g_free(device_name);
 
@@ -4053,8 +4077,10 @@ int bt_socket_connect_rfcomm(const char *remote_address,
 		return BT_ERROR_OPERATION_FAILED;
 
 done:
-	if (!spp_ctx->remote_address)
+	if (!spp_ctx->remote_address) {
 		spp_ctx->remote_address = g_strdup(remote_address);
+		spp_ctx->role = BT_SOCKET_CLIENT;
+	}
 
 	return bt_spp_connect_rfcomm(remote_address, service_uuid);
 }
@@ -4155,11 +4181,56 @@ int bt_socket_set_data_received_cb(bt_socket_data_received_cb callback,
 				(bt_spp_data_received_cb)callback, user_data);
 }
 
+int bt_socket_set_connection_requested_cb(
+				bt_socket_connection_requested_cb callback,
+				void *user_data)
+{
+	struct socket_connection_requested_cb_node *node_data;
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (callback == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (spp_connection_requested_node) {
+		DBG("socket connection requested callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
+
+	node_data = g_new0(struct socket_connection_requested_cb_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->cb = callback;
+	node_data->user_data = user_data;
+
+	socket_connection_requested_node = node_data;
+
+	return BT_SUCCESS;
+}
+
 int bt_socket_set_connection_state_changed_cb(
 			bt_socket_connection_state_changed_cb callback,
 			void *user_data)
 {
 	DBG("Not implement");
+
+	return BT_SUCCESS;
+}
+
+int bt_socket_unset_connection_requested_cb(void)
+{
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (!socket_connection_requested_node)
+		return BT_SUCCESS;
+
+	g_free(socket_connection_requested_node);
+	socket_connection_requested_node = NULL;
 
 	return BT_SUCCESS;
 }
