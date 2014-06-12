@@ -2043,12 +2043,101 @@ int bt_socket_set_connection_state_changed_cb(bt_socket_connection_state_changed
  */
 int bt_socket_unset_connection_state_changed_cb(void);
 
-/* OPP */
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_OPP_SERVER_MODULE
+ * @brief  Called when the push is requested.
+ * @details You must call bt_opp_server_accept() if you want to accept.
+ * Otherwise, you must call bt_opp_server_reject().
+ * @param[in] file  The path of file to be pushed
+ * @param[in] size The file size (bytes)
+ * @param[in] user_data The user data passed from the callback registration function
+ * @see bt_opp_server_initialize()
+ */
+typedef void (*bt_opp_server_push_requested_cb)(const char *file, int size, void *user_data);
+
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_OPP_SERVER_MODULE
+ * @brief  Called when an OPP connection is requested.
+ * @details You must call bt_opp_server_accept_connection() if you want to accept.
+ * Otherwise, you must call bt_opp_server_reject_connection().
+ * @param[in] remote_address  The address of remote device
+ * @param[in] user_data The user data passed from the callback registration function
+ * @see bt_opp_server_initialize()
+ * @see bt_opp_server_accept_connection()
+ * @see bt_opp_server_reject_connection()
+ */
+typedef void (*bt_opp_server_connection_requested_cb)(const char *remote_address, void *user_data);
+
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_OPP_SERVER_MODULE
+ * @brief Initializes the Bluetooth OPP server requested by bt_opp_server_push_requested_cb().
+ * @details The popup appears when an OPP connection is requested from a remote device.
+ * If you accept the request, then connection will be established and bt_opp_server_push_requested_cb() will be called.
+ * At that time, you can call either bt_opp_server_accept() or bt_opp_server_reject().
+ * @remarks This function must be called to start Bluetooth OPP server. You must free all resources of the Bluetooth service
+ * by calling bt_opp_server_deinitialize() if Bluetooth OPP service is no longer needed.
+ * @param[in] destination  The destination path
+ * @param[in] push_requested_cb  The callback called when a push is requested
+ * @param[in] user_data The user data to be passed to the callback function
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_RESOURCE_BUSY  Device or resource busy
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ * @see  bt_opp_server_push_requested_cb()
+ * @see  bt_opp_server_deinitialize()
+ * @see  bt_opp_server_accept()
+ * @see  bt_opp_server_reject()
+ */
+int bt_opp_server_initialize(const char *destination, bt_opp_server_push_requested_cb push_requested_cb, void *user_data);
+
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_OPP_SERVER_MODULE
+ * @brief Initializes the Bluetooth OPP server requested by bt_opp_server_connection_requested_cb().
+ * @details No popup appears when an OPP connection is requested from a remote device.
+ * Instead, @a connection_requested_cb() will be called.
+ * At that time, you can call either bt_opp_server_accept() or bt_opp_server_reject().
+ * @remarks This function must be called to start Bluetooth OPP server. \n
+ * You must free all resources of the Bluetooth service by calling bt_opp_server_deinitialize() if Bluetooth OPP service is no longer needed.
+ * @param[in] destination  The destination path
+ * @param[in] connection_requested_cb  The callback called when an OPP connection is requested
+ * @param[in] user_data The user data to be passed to the callback function
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_RESOURCE_BUSY  Device or resource busy
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ * @see  bt_opp_server_connection_requested_cb()
+ * @see  bt_opp_server_deinitialize()
+ * @see  bt_opp_server_accept_connection()
+ * @see  bt_opp_server_reject_connection()
+ */
+int bt_opp_server_initialize_by_connection_request(const char *destination, bt_opp_server_connection_requested_cb connection_requested_cb, void *user_data);
+
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_OPP_SERVER_MODULE
+ * @brief Denitializes the Bluetooth OPP server.
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ * @see  bt_opp_server_initialize()
+ * @see  bt_opp_server_deinitialize()
+ * @see  bt_opp_server_initialize()
+ */
+int bt_opp_server_deinitialize(void);
+
+/* New OPP API*/
 int bt_opp_init(void);
 
 int bt_opp_deinit(void);
 
-typedef void (*bt_opp_server_push_requested_cb)(
+typedef void (*bt_opp_server_push_file_requested_cb)(
 			const char *remote_address,
 			const char *name,
 			uint64_t size,
@@ -2056,7 +2145,7 @@ typedef void (*bt_opp_server_push_requested_cb)(
 
 int bt_opp_register_server(
 			const char *dir,
-			bt_opp_server_push_requested_cb push_requested_cb,
+			bt_opp_server_push_file_requested_cb push_requested_cb,
 			void *user_data);
 
 int bt_opp_unregister_server(void);

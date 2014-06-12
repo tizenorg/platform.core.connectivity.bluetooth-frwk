@@ -35,7 +35,7 @@
 static struct {
 	char *root_folder;
 	char *pending_name;
-	bt_opp_server_push_requested_cb requested_cb;
+	bt_opp_server_push_file_requested_cb requested_cb;
 	void *user_data;
 	obex_transfer_t *pending_transfer;
 	GDBusMethodInvocation *pending_invocation;
@@ -225,7 +225,7 @@ static int register_agent(void)
 }
 
 int bt_opp_register_server(const char *dir,
-			bt_opp_server_push_requested_cb push_requested_cb,
+			bt_opp_server_push_file_requested_cb push_requested_cb,
 			void *user_data)
 {
 	if (dir == NULL || push_requested_cb == NULL)
@@ -456,4 +456,71 @@ int bt_opp_deinit(void)
 	obex_lib_deinit();
 
 	return 0;
+}
+
+/* Deprecate OPP APIs.
+ * Always implement using NEW OPP APIs*/
+struct opp_server_push_cb_node {
+	bt_opp_server_push_requested_cb callback;
+	void *user_data;
+};
+
+struct opp_server_push_cb_node *opp_server_push_node;
+
+void server_push_requested_cb(const char *remote_address, const char *name,
+					uint64_t size, void *user_data)
+{
+	if (opp_server_push_node)
+		opp_server_push_node->callback(name, size,
+				opp_server_push_node->user_data);
+}
+
+int bt_opp_server_initialize(const char *destination,
+			bt_opp_server_push_requested_cb push_requested_cb,
+			void *user_data)
+{
+	int ret;
+
+	ret = bt_opp_init();
+	if (ret != BT_SUCCESS)
+		return ret;
+
+	if (!destination || !push_requested_cb)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (opp_server_push_node) {
+		ERROR("Already registered");
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	opp_server_push_node = g_new0(struct opp_server_push_cb_node, 1);
+	if (opp_server_push_node == NULL) {
+		ERROR("no memroy");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	ret = bt_opp_register_server(destination,
+				server_push_requested_cb, NULL);
+	if (ret != BT_SUCCESS) {
+		g_free(opp_server_push_node);
+		opp_server_push_node = NULL;
+	}
+
+	return ret;
+}
+
+int bt_opp_server_deinitialize(void)
+{
+	int ret;
+
+	if (opp_server_push_node) {
+		g_free(opp_server_push_node);
+		opp_server_push_node = NULL;
+	}
+
+	ret = bt_opp_deinit();
+	if (ret != BT_SUCCESS)
+		return ret;
+
+	return bt_opp_unregister_server();
 }
