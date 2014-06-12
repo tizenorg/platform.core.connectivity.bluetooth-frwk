@@ -178,6 +178,11 @@ struct socket_connection_state_changed_cb_node {
 	void *user_data;
 };
 
+struct hid_host_connection_state_changed_cb_node {
+	bt_hid_host_connection_state_changed_cb cb;
+	void *user_data;
+};
+
 static struct device_connect_cb_node *device_connect_node;
 static struct device_disconnect_cb_node *device_disconnect_node;
 static struct avrcp_repeat_mode_changed_node *avrcp_repeat_node;
@@ -208,6 +213,7 @@ static struct socket_connection_requested_cb_node
 					*socket_connection_requested_node;
 static struct socket_connection_state_changed_cb_node
 					*socket_connection_state_node;
+static struct hid_host_connection_state_changed_cb_node *hid_host_state_node;
 
 static gboolean generic_device_removed_set;
 
@@ -606,6 +612,21 @@ static void device_panu_connected_changed(bluez_device_t *device,
 	g_free(device_address);
 }
 
+static void device_hid_connected_changed(bluez_device_t *device,
+					int connected, void *user_data)
+{
+	struct hid_host_connection_state_changed_cb_node *node = user_data;
+	char *device_address;
+
+	DBG("");
+
+	device_address = bluez_device_get_property_address(device);
+
+	node->cb(BT_SUCCESS, connected, device_address, node->user_data);
+
+	g_free(device_address);
+}
+
 static unsigned int dev_property_callback_flags;
 
 enum bluez_device_property_callback_flag {
@@ -614,7 +635,8 @@ enum bluez_device_property_callback_flag {
 	DEV_PROP_FLAG_AUTH = 0x04,
 	DEV_PROP_FLAG_PANU_CONNECT = 0x08,
 	DEV_PROP_FLAG_HDP_CONNECT = 0x10,
-	DEV_PROP_FLAG_HDP_DATA = 0x20
+	DEV_PROP_FLAG_HDP_DATA = 0x20,
+	DEV_PROP_FLAG_HID_CONNECT = 0x40
 };
 
 static void set_device_property_changed_callback(bluez_device_t *device)
@@ -650,6 +672,12 @@ static void set_device_property_changed_callback(bluez_device_t *device)
 		bluez_set_data_received_changed_cb(device,
 					bluez_set_data_received_changed,
 					hdp_set_data_received_node);
+
+	if (dev_property_callback_flags & DEV_PROP_FLAG_HID_CONNECT)
+		bluez_device_input_set_connected_changed_cb(device,
+					device_hid_connected_changed,
+					hid_host_state_node);
+
 }
 
 static void unset_device_property_changed_callback(bluez_device_t *device)
@@ -673,6 +701,9 @@ static void unset_device_property_changed_callback(bluez_device_t *device)
 
 	if (!(dev_property_callback_flags & DEV_PROP_FLAG_HDP_DATA))
 		bluez_unset_data_received_changed_cb(device);
+
+	if (!(dev_property_callback_flags & DEV_PROP_FLAG_HID_CONNECT))
+		bluez_device_input_unset_connected_changed_cb(device);
 }
 
 static void foreach_device_property_callback(GList *list, unsigned int flag)
@@ -2704,14 +2735,64 @@ int bt_hid_host_initialize(
 		bt_hid_host_connection_state_changed_cb connection_cb,
 		void *user_data)
 {
-	DBG("Not implement");
+	struct hid_host_connection_state_changed_cb_node *node_data;
+	GList *list;
+
+	DBG("");
+
+	if (connection_cb == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (hid_host_state_node) {
+		DBG("hid host connected state changed callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
+
+	node_data = g_new0(struct hid_host_connection_state_changed_cb_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->cb = connection_cb;
+	node_data->user_data = user_data;
+
+	hid_host_state_node = node_data;
+
+	dev_property_callback_flags |= DEV_PROP_FLAG_HID_CONNECT;
+
+	if (!default_adapter)
+		return BT_SUCCESS;
+
+	list = bluez_adapter_get_devices(default_adapter);
+	foreach_device_property_callback(list, DEV_PROP_FLAG_HID_CONNECT);
+
+	g_list_free(list);
 
 	return BT_SUCCESS;
 }
 
 int bt_hid_host_deinitialize(void)
 {
-	DBG("Not implement");
+	GList *list;
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!hid_host_state_node)
+		return BT_SUCCESS;
+
+	dev_property_callback_flags &= ~DEV_PROP_FLAG_HID_CONNECT;
+
+	list = bluez_adapter_get_devices(default_adapter);
+	foreach_device_property_callback(list, DEV_PROP_FLAG_HID_CONNECT);
+
+	g_free(hid_host_state_node);
+	hid_host_state_node = NULL;
 
 	return BT_SUCCESS;
 }

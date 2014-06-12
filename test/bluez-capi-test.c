@@ -969,6 +969,39 @@ static int device_connect_le(const char *p1, const char *p2)
 	return 0;
 }
 
+void connection_cb(int result, bool connected,
+			const char *remote_address, void *user_data)
+{
+	if (connected)
+		DBG("connected true");
+	else
+		DBG("connected false");
+
+	DBG("result = %d", result);
+
+	DBG("remote_address = %s", remote_address);
+}
+
+static int hid_host_initialize()
+{
+	int err;
+
+	err = bt_hid_host_initialize(connection_cb, NULL);
+
+	DBG("err = %d", err);
+	return err;
+}
+
+static int hid_host_deinitialize()
+{
+	int err;
+
+	err = bt_hid_host_deinitialize();
+
+	DBG("err = %d", err);
+	return err;
+}
+
 static int hid_connect(const char *p1, const char *p2)
 {
 	int err;
@@ -2099,6 +2132,12 @@ struct {
 
 	{"device_disconnect_le", device_disconnect_le,
 		"Usage: device_disconnect_le 70:F9:27:64:DF:65\n\tDisconnect LE device"},
+
+	{"hid_host_initialize", hid_host_initialize,
+		"Usage: hid_host_initialize\n\tInitialize hid host"},
+
+	{"hid_host_deinitialize", hid_host_deinitialize,
+		"Usage: hid_host_deinitialize\n\tDe-initialize hid host"},
 
 	{"hid_connect", hid_connect,
 		"Usage: hid_connect 70:F9:27:64:DF:65\n\tConnect HID profile"},

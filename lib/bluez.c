@@ -31,6 +31,7 @@
 #define MEDIACONTROL_INTERFACE "org.bluez.MediaControl1"
 #define DEVICE_INTERFACE "org.bluez.Device1"
 #define NETWORK_INTERFACE "org.bluez.Network1"
+#define INPUT_INTERFACE "org.bluez.Input1"
 #define AGENT_INTERFACE "org.bluez.AgentManager1"
 #define PROFILE_INTERFACE "org.bluez.ProfileManager1"
 #define MANAGER_INTERFACE "org.freedesktop.DBus.ObjectManager"
@@ -630,6 +631,32 @@ static void hdp_signal_changed(GDBusProxy *proxy,
 	}
 }
 
+static inline void handle_device_input_connected(GVariant *changed_properties,
+					struct _bluez_device *device)
+{
+	gboolean connected;
+
+	if (g_variant_lookup(changed_properties, "Connected", "b", &connected))
+		device->input_connected_cb(device, connected,
+					device->input_connected_cb_data);
+}
+
+static void input_properties_changed(GDBusProxy *proxy,
+					GVariant *changed_properties,
+					GStrv *invalidated_properties,
+					gpointer user_data)
+{
+	gchar *properties = g_variant_print(changed_properties, TRUE);
+	struct _bluez_device *device = user_data;
+
+	DBG("properties %s", properties);
+
+	if (device->input_connected_cb)
+		handle_device_input_connected(changed_properties, user_data);
+
+	g_free(properties);
+}
+
 static void parse_bluez_device_interfaces(gpointer data, gpointer user_data)
 {
 	struct _bluez_device *device = user_data;
@@ -665,7 +692,13 @@ static void parse_bluez_device_interfaces(gpointer data, gpointer user_data)
 			G_CALLBACK(hdp_properties_changed), device);
 		g_signal_connect(proxy, "g-signal",
 			G_CALLBACK(hdp_signal_changed), device);
+	} else if (g_strcmp0(iface_name, INPUT_INTERFACE) == 0) {
+		device->input_interface = interface;
+		device->input_proxy = proxy;
+		g_signal_connect(proxy, "g-properties-changed",
+			G_CALLBACK(input_properties_changed), device);
 	}
+
 }
 
 static void parse_bluez_control_interfaces(gpointer data, gpointer user_data)
@@ -1848,6 +1881,31 @@ int bluez_device_network_get_property_connected(struct _bluez_device *device,
 						gboolean *connected)
 {
 	return property_get_boolean(device->network_proxy, "Connected", connected);
+}
+
+void bluez_device_input_set_connected_changed_cb(
+					struct _bluez_device *device,
+					bluez_device_input_connected_cb_t cb,
+					gpointer user_data)
+{
+	DBG("");
+	device->input_connected_cb = cb;
+	device->input_connected_cb_data = user_data;
+}
+
+void bluez_device_input_unset_connected_changed_cb(
+					struct _bluez_device *device)
+{
+	DBG("");
+	device->input_connected_cb = NULL;
+	device->input_connected_cb_data = NULL;
+}
+
+int bluez_device_input_get_property_connected(struct _bluez_device *device,
+						gboolean *connected)
+{
+	return property_get_boolean(device->input_proxy,
+					"Connected", connected);
 }
 
 void bluez_device_set_paired_changed_cb(struct _bluez_device *device,

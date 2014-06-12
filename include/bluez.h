@@ -263,6 +263,16 @@ void bluez_device_network_set_connected_changed_cb(
 				gpointer user_data);
 void bluez_device_network_unset_connected_changed_cb(
 				struct _bluez_device *device);
+typedef void (*bluez_device_input_connected_cb_t)(
+				struct _bluez_device *device,
+				gboolean connected,
+				gpointer user_data);
+void bluez_device_input_set_connected_changed_cb(
+				struct _bluez_device *device,
+				bluez_device_input_connected_cb_t cb,
+				gpointer user_data);
+void bluez_device_input_unset_connected_changed_cb(
+				struct _bluez_device *device);
 
 typedef void (*bluez_device_paired_cb_t)(
 				struct _bluez_device *device,
@@ -584,9 +594,11 @@ struct _bluez_device {
 	GDBusInterface *interface;
 	GDBusInterface *control_interface;
 	GDBusInterface *network_interface;
+	GDBusInterface *input_interface;
 	GDBusProxy *proxy;
 	GDBusProxy *control_proxy;
 	GDBusProxy *network_proxy;
+	GDBusProxy *input_proxy;
 	struct _bluez_object *parent;
 	struct _device_head *head;
 
@@ -602,6 +614,9 @@ struct _bluez_device {
 	gpointer hdp_state_changed_cb_data;
 	bluez_set_data_received_changed_t data_received_changed_cb;
 	gpointer data_received_changed_data;
+	bluez_device_input_connected_cb_t input_connected_cb;
+	gpointer input_connected_cb_data;
+
 };
 
 #endif
