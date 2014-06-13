@@ -569,6 +569,8 @@ void hdp_internal_handle_disconnect(gpointer user_data,
 void hdp_internal_handle_connect(gpointer user_data,
 						GVariant *param);
 
+gboolean bluez_get_media_type(const char *remote_address);
+
 struct _bluez_device {
 	char *interface_name;
 	char *object_path;

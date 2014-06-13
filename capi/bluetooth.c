@@ -3850,6 +3850,8 @@ static void handle_request_disconnection(gchar *device_path,
 	DBG("device path %s", device_path);
 
 	g_io_channel_unref(spp_ctx->channel);
+	spp_ctx->channel = NULL;
+
 	notify_connection_state(device_path, BT_SOCKET_DISCONNECTED, spp_ctx);
 
 	g_dbus_method_invocation_return_value(invocation, NULL);
@@ -5105,6 +5107,75 @@ int bt_device_disconnect_le(bt_device_gatt_state_changed_cb callback,
 	_bt_update_bluetooth_callbacks();
 
 	bluez_device_disconnect_le(device);
+
+	return BT_SUCCESS;
+}
+
+static gboolean spp_is_device_connected(const char *address)
+{
+	struct spp_context *spp_ctx;
+	GList *list, *next;
+
+	DBG("");
+
+	for (list = g_list_first(spp_ctx_list); list; list = next) {
+		next = g_list_next(list);
+
+		spp_ctx = list->data;
+		if (spp_ctx)
+			if (spp_ctx->channel &&
+				g_strcmp0(spp_ctx->remote_address,
+						address) == 0)
+				return true;
+	}
+
+	return false;
+}
+
+int bt_device_foreach_connected_profiles(
+			const char *remote_address,
+			bt_device_connected_profile callback,
+			void *user_data)
+{
+	bluez_device_t *device;
+	bt_device_info_s *device_info;
+	gboolean rfcomm_connected;
+	gboolean is_type;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!remote_address || !callback)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	device = bluez_adapter_get_device_by_address(default_adapter,
+							remote_address);
+	if (device == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	device_info = get_device_info(device);
+
+	if (device_info->is_connected == false)
+		return  BT_ERROR_REMOTE_DEVICE_NOT_CONNECTED;
+
+	rfcomm_connected = spp_is_device_connected(remote_address);
+	if (rfcomm_connected)
+		callback(BT_PROFILE_RFCOMM, user_data);
+
+	is_type = bluez_get_media_type(remote_address);
+
+	/*not check hfp and hsp connected, hfp is not ready*/
+	/*todo hfp and hsp checking*/
+
+	if (is_type)
+		callback(BT_PROFILE_A2DP, user_data);
+
+	free_device_info(device_info);
 
 	return BT_SUCCESS;
 }

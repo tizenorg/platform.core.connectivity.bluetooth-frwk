@@ -2762,3 +2762,35 @@ void bluez_device_disconnect_le(struct _bluez_device *device)
 			0, -1, NULL,
 			bluez_device_disconnect_cb, notify);
 }
+
+gboolean bluez_get_media_type(const char *remote_address)
+{
+	struct _bluez_object *object;
+	GList *list, *next;
+	int length;
+	gboolean is_type = false;
+	gchar device_address[BT_ADDRESS_STRING_SIZE];
+
+	DBG("");
+
+	length = g_list_length(bluez_object_list);
+
+	if (length == 0)
+		return false;
+
+	for (list = g_list_first(bluez_object_list); list; list = next) {
+		next = g_list_next(list);
+		object = list->data;
+
+		convert_device_path_to_address(object->path_name,
+						(gchar *)device_address);
+
+		if (!g_strcmp0(remote_address, device_address) &&
+			object->media_type == BT_AUDIO_PROFILE_TYPE_A2DP) {
+			is_type = true;
+			break;
+		}
+	}
+
+	return is_type;
+}
