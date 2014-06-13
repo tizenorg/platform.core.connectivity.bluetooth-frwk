@@ -149,7 +149,22 @@ Service         org.tizen.comms
 Interface       org.tizen.comms.mediaplayer
 Object path     /org/tizen/comms/bluetooth
 
-Methods         void MediaPlayerChangeProperty(uint32 type, uint32 value)
+Methods		void RegisterMediaAgent(object agent)
+
+		Registers an Media agent handler.
+
+			Object path agent defines the path of the agent
+			that will be called when authorize each received object
+
+			Possible errors: org.bluez.Error.AlreadyExists
+
+		void UnregisterMediaAgent(object agent)
+
+			Unregisters the registiered Media agent.
+
+			Possible errors: org.bluez.Error.DoesNotExist
+
+		void MediaPlayerChangeProperty(uint32 type, uint32 value)
 
 			Set AVRCP property.
 

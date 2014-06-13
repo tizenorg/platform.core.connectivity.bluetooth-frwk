@@ -340,25 +340,6 @@ void bluez_set_hdp_state_changed_cb(
 
 void bluez_unset_hdp_state_changed_cb(struct _bluez_device *device);
 
-typedef void (*bluez_avrcp_repeat_changed_cb_t)(
-				const gchar *repeat,
-				gpointer user_data);
-
-void bluez_set_avrcp_repeat_changed_cb(
-				bluez_avrcp_repeat_changed_cb_t cb,
-				gpointer user_data);
-
-void bluez_unset_avrcp_repeat_changed_cb();
-
-typedef void (*bluez_avrcp_shuffle_changed_cb_t)(
-				gboolean shuffle_mode,
-				gpointer user_data);
-
-void bluez_set_avrcp_shuffle_changed_cb(
-				bluez_avrcp_shuffle_changed_cb_t cb,
-				gpointer user_data);
-void bluez_unset_avrcp_shuffle_changed_cb();
-
 typedef void (*bluez_avrcp_target_cb_t)(
 				const char *remote_address,
 				gboolean connected,

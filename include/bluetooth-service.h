@@ -59,6 +59,10 @@ void comms_bluetooth_register_pairing_agent(
 			bluetooth_simple_callback cb,
 			void *user_data);
 
+int comms_bluetooth_register_pairing_agent_sync(
+					const char *agent_path,
+					void *user_data);
+
 void comms_bluetooth_unregister_pairing_agent(
 			const char *agent_path,
 			bluetooth_simple_callback cb,
@@ -67,6 +71,10 @@ void comms_bluetooth_unregister_pairing_agent(
 void comms_bluetooth_register_opp_agent(
 			const char *agent_path,
 			bluetooth_simple_callback cb,
+			void *user_data);
+
+int comms_bluetooth_register_opp_agent_sync(
+			const char *agent_path,
 			void *user_data);
 
 void comms_bluetooth_unregister_opp_agent(
@@ -93,6 +101,20 @@ int comms_bluetooth_avrcp_change_properties(
 
 int comms_bluetooth_avrcp_change_track(
 			void *track_data,
+			bluetooth_simple_callback cb,
+			void *user_data);
+
+void comms_bluetooth_register_media_agent(
+			const char *agent_path,
+			bluetooth_simple_callback cb,
+			void *user_data);
+
+int comms_bluetooth_register_media_agent_sync(
+			const char *agent_path,
+			void *user_data);
+
+void comms_bluetooth_unregister_media_agent(
+			const char *agent_path,
 			bluetooth_simple_callback cb,
 			void *user_data);
 #endif

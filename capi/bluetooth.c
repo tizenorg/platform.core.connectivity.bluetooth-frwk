@@ -41,8 +41,16 @@
 #define CONNMAN_BLUETOOTH_TECHNOLOGY_PATH "/net/connman/technology/bluetooth"
 #define CONNMAN_BLUETOTOH_TECHNOLOGY_INTERFACE "net.connman.Technology"
 
+#define BLUEZ_AGENT_SERVICE "org.bluezlib.agent"
+#define AGENT_INTERFACE "org.bluez.Agent1"
+#define AGENT_OBJECT_PATH "/org/bluezlib/agent"
+
 static bool initialized;
 static bool bt_service_init;
+
+static guint bluetooth_agent_id;
+static guint profile_id;
+static GDBusConnection *conn;
 
 static bluez_adapter_t *default_adapter;
 
@@ -51,6 +59,9 @@ static void profile_connect_callback(bluez_device_t *device,
 
 static void profile_disconnect_callback(bluez_device_t *device,
 					enum device_profile_state state);
+
+static int request_name_on_dbus(const char *name);
+static void release_name_on_dbus(const char *name);
 
 struct device_connect_cb_node {
 	bt_device_gatt_state_changed_cb cb;
@@ -944,15 +955,6 @@ static void _bt_update_bluetooth_callbacks(void)
 					bluez_avrcp_target_state_changed,
 					avrcp_target_state_node);
 
-	if (avrcp_repeat_node)
-		bluez_set_avrcp_repeat_changed_cb(
-					bluez_avrcp_repeat_changed,
-					avrcp_repeat_node);
-
-	if (avrcp_shuffle_node)
-		bluez_set_avrcp_shuffle_changed_cb(
-					bluez_avrcp_shuffle_changed,
-					avrcp_shuffle_node);
 	if (device_connect_node)
 		bluez_set_device_connect_changed_cb(
 					bluez_device_connect_changed,
@@ -2441,11 +2443,121 @@ int bt_audio_unset_connection_state_changed_cb(void)
 	return BT_SUCCESS;
 }
 
+static gboolean media_handle_set_property(GDBusConnection *connection,
+				const gchar *sender,
+				const gchar *object_path,
+				const gchar *interface_name,
+				const gchar *property_name,
+				GVariant *value,
+				GError **error,
+				gpointer user_data)
+{
+	DBG("property_name = %s", property_name);
+
+	if (g_strcmp0(property_name, "LoopStatus") == 0) {
+		const gchar *loopstatus = g_variant_get_string(value, NULL);
+		DBG("loopstatus = %s", loopstatus);
+
+		if (avrcp_repeat_node)
+			bluez_avrcp_repeat_changed(loopstatus,
+							avrcp_repeat_node);
+	} else if (g_strcmp0(property_name, "Shuffle") == 0) {
+		gboolean shuffle_mode = g_variant_get_boolean(value);
+		if (shuffle_mode == TRUE)
+			DBG("shuffle_mode TRUE");
+		else
+			DBG("shuffle_mode FALSE");
+
+		if (avrcp_shuffle_node)
+			bluez_avrcp_shuffle_changed(shuffle_mode,
+							avrcp_shuffle_node);
+	}
+
+	return *error == NULL;
+}
+
+static const gchar media_xml[] =
+"<node>"
+"  <interface name='org.mpris.MediaPlayer2.Player'>"
+"    <property type='b' name='Shuffle' access='readwrite'/>"
+"    <property type='s' name='LoopStatus' access='readwrite'/>"
+"  </interface>"
+"</node>";
+
+static const GDBusInterfaceVTable media_handle = {
+	NULL,
+	NULL,
+	media_handle_set_property
+};
+
+static GDBusNodeInfo *media_data;
+static int bluetooth_media_agent_id;
+
+static int destory_media_agent(void)
+{
+	if (bluetooth_media_agent_id > 0) {
+		comms_bluetooth_unregister_media_agent(AGENT_OBJECT_PATH,
+							NULL, NULL);
+
+		g_dbus_connection_unregister_object(conn,
+						bluetooth_media_agent_id);
+
+		bluetooth_media_agent_id = 0;
+
+		release_name_on_dbus(BLUEZ_AGENT_SERVICE);
+	}
+
+	return 0;
+}
+
+static int create_media_agent(void)
+{
+	int ret;
+
+	if (bluetooth_media_agent_id)
+		return BT_ERROR_ALREADY_DONE;
+
+	media_data =
+		g_dbus_node_info_new_for_xml(media_xml, NULL);
+
+	ret = request_name_on_dbus(BLUEZ_AGENT_SERVICE);
+	if (ret != 0)
+		return -1;
+
+	DBG("%s requested success", BLUEZ_AGENT_SERVICE);
+
+	bluetooth_media_agent_id = g_dbus_connection_register_object(
+						conn,
+						AGENT_OBJECT_PATH,
+						media_data->
+							interfaces[0],
+						&media_handle,
+						NULL,
+						NULL,
+						NULL);
+
+	if (bluetooth_media_agent_id == 0)
+		return BT_ERROR_OPERATION_FAILED;
+
+	ret = comms_bluetooth_register_media_agent_sync(AGENT_OBJECT_PATH,
+								NULL);
+
+	DBG("ret = %d", ret);
+
+	if (ret != BT_SUCCESS) {
+		destory_media_agent();
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	return BT_SUCCESS;
+}
+
 int bt_avrcp_target_initialize(
 			bt_avrcp_target_connection_state_changed_cb callback,
 			void *user_data)
 {
 	struct avrcp_target_connection_state_changed_node *node_data = NULL;
+	int ret;
 
 	DBG("default_adpater: %p", default_adapter);
 
@@ -2459,6 +2571,11 @@ int bt_avrcp_target_initialize(
 		DBG("avrcp target callback already set.");
 		return BT_ERROR_ALREADY_DONE;
 	}
+
+	ret = create_media_agent();
+
+	if (ret != BT_SUCCESS)
+		return ret;
 
 	node_data =
 		g_new0(struct avrcp_target_connection_state_changed_node, 1);
@@ -2491,6 +2608,8 @@ int bt_avrcp_target_deinitialize(void)
 
 	g_free(avrcp_target_state_node);
 	avrcp_target_state_node = NULL;
+
+	destory_media_agent();
 
 	return BT_SUCCESS;
 }
@@ -2525,8 +2644,6 @@ int bt_avrcp_set_repeat_mode_changed_cb(
 
 	avrcp_repeat_node = node_data;
 
-	_bt_update_bluetooth_callbacks();
-
 	return BT_SUCCESS;
 }
 
@@ -2539,8 +2656,6 @@ int bt_avrcp_unset_repeat_mode_changed_cb(void)
 
 	if (!avrcp_repeat_node)
 		return BT_SUCCESS;
-
-	bluez_unset_avrcp_repeat_changed_cb();
 
 	g_free(avrcp_repeat_node);
 	avrcp_repeat_node = NULL;
@@ -2578,8 +2693,6 @@ int bt_avrcp_set_shuffle_mode_changed_cb(
 
 	avrcp_shuffle_node = node_data;
 
-	_bt_update_bluetooth_callbacks();
-
 	return BT_SUCCESS;
 }
 
@@ -2592,8 +2705,6 @@ int bt_avrcp_unset_shuffle_mode_changed_cb(void)
 
 	if (!avrcp_shuffle_node)
 		return BT_SUCCESS;
-
-	bluez_unset_avrcp_shuffle_changed_cb();
 
 	g_free(avrcp_shuffle_node);
 	avrcp_shuffle_node = NULL;
@@ -2995,10 +3106,6 @@ static struct spp_context *find_spp_context_from_fd(int fd)
 
 /* Agent Function */
 
-#define BLUEZ_AGENT_SERVICE "org.bluezlib.agent"
-#define AGENT_INTERFACE "org.bluez.Agent1"
-#define AGENT_OBJECT_PATH "/org/bluezlib/agent"
-
 static bt_agent *this_agent;
 
 static GDBusNodeInfo *introspection_data;
@@ -3361,9 +3468,6 @@ static const GDBusInterfaceVTable interface_handle = {
 	NULL
 };
 
-static guint bluetooth_agent_id;
-static guint profile_id;
-static GDBusConnection *conn;
 
 static void release_dbus_connection(void)
 {

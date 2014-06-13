@@ -767,6 +767,30 @@ void comms_bluetooth_register_pairing_agent(const char *agent_path,
 					async_result_node);
 }
 
+int comms_bluetooth_register_pairing_agent_sync(const char *agent_path,
+						 void *user_data)
+{
+	GError *error = NULL;
+
+	if (this_bluetooth == NULL) {
+		ERROR("bluetooth not register");
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	g_dbus_proxy_call_sync(this_bluetooth->pairing.proxy,
+					"RegisterPairingAgent",
+					g_variant_new("(o)", agent_path),
+					0, -1, NULL, &error);
+
+	if (error) {
+		ERROR("%s", error->message);
+		g_error_free(error);
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	return BT_SUCCESS;
+}
+
 void comms_bluetooth_unregister_pairing_agent(const char *agent_path,
 					bluetooth_simple_callback cb,
 					void *user_data)
@@ -789,6 +813,86 @@ void comms_bluetooth_unregister_pairing_agent(const char *agent_path,
 
 	g_dbus_proxy_call(this_bluetooth->pairing.proxy,
 				"UnregisterPairingAgent",
+				g_variant_new("(o)", agent_path),
+				0, -1, NULL,
+				bluetooth_simple_async_cb,
+				async_result_node);
+}
+
+void comms_bluetooth_register_media_agent(const char *agent_path,
+					bluetooth_simple_callback cb,
+					void *user_data)
+{
+	struct _bluetooth_simple_async_result *async_result_node;
+
+	if (this_bluetooth == NULL) {
+		ERROR("bluetooth not register");
+		return;
+	}
+
+	async_result_node = g_new0(struct _bluetooth_simple_async_result, 1);
+	if (async_result_node == NULL) {
+		ERROR("no memory");
+		return;
+	}
+
+	async_result_node->callback = cb;
+	async_result_node->user_data = user_data;
+
+	g_dbus_proxy_call(this_bluetooth->mediaplayer.proxy,
+				"RegisterMediaAgent",
+				g_variant_new("(o)", agent_path),
+				0, -1, NULL,
+				bluetooth_simple_async_cb,
+				async_result_node);
+}
+
+int comms_bluetooth_register_media_agent_sync(const char *agent_path,
+						void *user_data)
+{
+	GError *error = NULL;
+
+	if (this_bluetooth == NULL) {
+		ERROR("bluetooth not register");
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	g_dbus_proxy_call_sync(this_bluetooth->mediaplayer.proxy,
+					"RegisterMediaAgent",
+					g_variant_new("(o)", agent_path),
+					0, -1, NULL, &error);
+
+	if (error) {
+		ERROR("%s", error->message);
+		g_error_free(error);
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	return BT_SUCCESS;
+}
+
+void comms_bluetooth_unregister_media_agent(const char *agent_path,
+					bluetooth_simple_callback cb,
+					void *user_data)
+{
+	struct _bluetooth_simple_async_result *async_result_node;
+
+	if (this_bluetooth == NULL) {
+		ERROR("bluetooth not register");
+		return;
+	}
+
+	async_result_node = g_new0(struct _bluetooth_simple_async_result, 1);
+	if (async_result_node == NULL) {
+		ERROR("no memory");
+		return;
+	}
+
+	async_result_node->callback = cb;
+	async_result_node->user_data = user_data;
+
+	g_dbus_proxy_call(this_bluetooth->mediaplayer.proxy,
+				"UnregisterMediaAgent",
 				g_variant_new("(o)", agent_path),
 				0, -1, NULL,
 				bluetooth_simple_async_cb,
@@ -821,6 +925,30 @@ void comms_bluetooth_register_opp_agent(const char *agent_path,
 				0, -1, NULL,
 				bluetooth_simple_async_cb,
 				async_result_node);
+}
+
+int comms_bluetooth_register_opp_agent_sync(const char *agent_path,
+						void *user_data)
+{
+	GError *error = NULL;
+
+	if (this_bluetooth == NULL) {
+		ERROR("bluetooth not register");
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	g_dbus_proxy_call_sync(this_bluetooth->opp.proxy,
+					"RegisterObexAgent",
+					g_variant_new("(o)", agent_path),
+					0, -1, NULL, &error);
+
+	if (error) {
+		ERROR("%s", error->message);
+		g_error_free(error);
+		return -1;
+	}
+
+	return BT_SUCCESS;
 }
 
 void comms_bluetooth_unregister_opp_agent(const char *agent_path,
