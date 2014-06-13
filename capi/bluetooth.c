@@ -3535,6 +3535,9 @@ static int request_name_on_dbus(const char *name)
 	guint32 request_name_reply;
 	GError *error = NULL;
 
+	if (bluetooth_agent_id || profile_id)
+		return 0;
+
 	connection = get_system_dbus_connect();
 	if (connection == NULL)
 		return -1;
