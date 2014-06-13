@@ -2191,6 +2191,21 @@ int bt_opp_server_accept(bt_opp_server_transfer_progress_cb progress_cb, bt_opp_
  */
 int bt_opp_server_reject(void);
 
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_OPP_SERVER_MODULE
+ * @brief Cancels the transfer.
+ * @param[in] transfer_id  The ID of transfer
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ * @see  bt_opp_server_accept_connection()
+ * @see  bt_opp_server_accept()
+ */
+int bt_opp_server_cancel_transfer(int transfer_id);
+
 /* New OPP API*/
 int bt_opp_init(void);
 

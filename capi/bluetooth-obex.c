@@ -572,3 +572,8 @@ int bt_opp_server_reject(void)
 {
 	return bt_opp_server_reject_request();
 }
+
+int bt_opp_server_cancel_transfer(int transfer_id)
+{
+	return bt_opp_transfer_cancel(transfer_id);
+}
