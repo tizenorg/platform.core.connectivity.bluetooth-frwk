@@ -618,7 +618,7 @@ static void server_push_requested_cb(const char *remote_address,
 	printf("\n\t%s push %s size %ju\n\t", remote_address, file, size);
 	printf("\n\tAccept it...\n\t");
 
-	bt_opp_server_accept(NULL, NULL, NULL, &id);
+	bt_opp_server_accept_request(NULL, NULL, NULL, &id);
 
 	printf("\n\ttransfer %d accepted\n", id);
 }

@@ -2132,6 +2132,65 @@ int bt_opp_server_initialize_by_connection_request(const char *destination, bt_o
  */
 int bt_opp_server_deinitialize(void);
 
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_OPP_SERVER_MODULE
+ * @brief  Called when a file is being transfered.
+ * @param[in] file  The path of file to be pushed
+ * @param[in] size The file size (bytes)
+ * @param[in] percent The progress in percentage (1 ~ 100)
+ * @param[in] user_data The user data passed from the callback registration function
+ * @see bt_opp_server_accept()
+ * @see bt_opp_server_accept_connection()
+ */
+typedef void (*bt_opp_server_transfer_progress_cb) (const char *file, long long size, int percent, void *user_data);
+
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_OPP_SERVER_MODULE
+ * @brief  Called when a transfer is finished.
+ * @param[in] error_code  The result of push
+ * @param[in] file  The path of file to be pushed
+ * @param[in] size The file size (bytes)
+ * @param[in] user_data The user data passed from the callback registration function
+ * @see bt_opp_server_accept()
+ * @see bt_opp_server_accept_connection()
+ */
+typedef void (*bt_opp_server_transfer_finished_cb) (int result, const char *file, long long size, void *user_data);
+
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_OPP_SERVER_MODULE
+ * @brief Accepts the push request from the remote device.
+ * @remarks If you initialize OPP server by bt_opp_server_initialize_by_connection_request(), then name is ignored.
+ * You can cancel the pushes by bt_opp_server_cancel_transfer() with transfer_id.
+ * @param[in] progress_cb  The callback called when a file is being transfered
+ * @param[in] finished_cb  The callback called when a transfer is finished
+ * @param[in] name  The name to store. This can be NULL if you initialize OPP server by bt_opp_server_initialize_by_connection_request().
+ * @param[in] user_data The user data to be passed to the callback function
+ * @param[out]  transfer_id  The ID of transfer
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ * @retval #BT_ERROR_NOW_IN_PROGRESS  Operation now in progress
+ * @see  bt_opp_server_reject()
+ */
+int bt_opp_server_accept(bt_opp_server_transfer_progress_cb progress_cb, bt_opp_server_transfer_finished_cb finished_cb, const char *name,
+ void *user_data, int *transfer_id);
+
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_OPP_SERVER_MODULE
+ * @brief Rejects the push request from the remote device.
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ * @see  bt_opp_server_accept()
+ */
+int bt_opp_server_reject(void);
+
 /* New OPP API*/
 int bt_opp_init(void);
 
@@ -2168,13 +2227,13 @@ typedef void (*bt_opp_transfer_state_cb)(
 			unsigned char percent,
 			void *user_data);
 
-int bt_opp_server_accept(
+int bt_opp_server_accept_request(
 			const char *name,
 			bt_opp_transfer_state_cb cb,
 			void *user_data,
 			int *transfer_id);
 
-int bt_opp_server_reject(void);
+int bt_opp_server_reject_request(void);
 
 int bt_opp_server_set_directroy(const char *dir);
 

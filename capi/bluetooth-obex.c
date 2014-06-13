@@ -32,6 +32,8 @@
 #define OBEX_LIB_SERVICE "org.obex.lib"
 #define AGENT_OBJECT_PATH "/org/obex/lib"
 
+#define OBEX_ERROR_INTERFACE "org.bluez.obex.Error"
+
 static struct {
 	char *root_folder;
 	char *pending_name;
@@ -338,7 +340,7 @@ void bt_opp_clear_transfers_state_cb(void)
 	watch_node = NULL;
 }
 
-int bt_opp_server_accept(const char *name, bt_opp_transfer_state_cb cb,
+int bt_opp_server_accept_request(const char *name, bt_opp_transfer_state_cb cb,
 					void *user_data, int *transfer_id)
 {
 	obex_transfer_t *transfer;
@@ -377,6 +379,8 @@ int bt_opp_server_accept(const char *name, bt_opp_transfer_state_cb cb,
 	g_dbus_method_invocation_return_value(invocation,
 					g_variant_new("(s)", file_name));
 
+	opp_server.pending_invocation = NULL;
+
 	g_free(file_name);
 
 	*transfer_id = obex_transfer_get_id(transfer);
@@ -386,8 +390,17 @@ int bt_opp_server_accept(const char *name, bt_opp_transfer_state_cb cb,
 	return BT_SUCCESS;
 }
 
-int bt_opp_server_reject(void)
+int bt_opp_server_reject_request(void)
 {
+	if (opp_server.pending_invocation) {
+		g_dbus_method_invocation_return_dbus_error(
+					opp_server.pending_invocation,
+					OBEX_ERROR_INTERFACE ".Rejected",
+					"RejectByUser");
+
+		opp_server.pending_invocation = NULL;
+	}
+
 	return 0;
 }
 
@@ -466,6 +479,8 @@ struct opp_server_push_cb_node {
 };
 
 struct opp_server_push_cb_node *opp_server_push_node;
+static bt_opp_server_transfer_progress_cb bt_transfer_progress_cb;
+static bt_opp_server_transfer_finished_cb bt_transfer_finished_cb;
 
 void server_push_requested_cb(const char *remote_address, const char *name,
 					uint64_t size, void *user_data)
@@ -523,4 +538,37 @@ int bt_opp_server_deinitialize(void)
 		return ret;
 
 	return bt_opp_unregister_server();
+}
+
+static void bt_opp_server_transfer_state_cb(int transfer_id,
+			bt_opp_transfer_state_e state, const char *name,
+			uint64_t size, unsigned char percent, void *user_data)
+{
+	if (transfer_id < 10000)
+		return;
+
+	if (state == BT_OPP_TRANSFER_QUEUED ||
+			state == BT_OPP_TRANSFER_ACTIVE)
+		bt_transfer_progress_cb(name, size, percent, user_data);
+	else if (state == BT_OPP_TRANSFER_COMPLETED)
+		bt_transfer_finished_cb(BT_ERROR_NONE, name, size, user_data);
+	else if (state == BT_OPP_TRANSFER_ERROR || BT_OPP_TRANSFER_CANCELED)
+		bt_transfer_finished_cb(BT_ERROR_CANCELLED, name, size, user_data);
+
+}
+
+int bt_opp_server_accept(bt_opp_server_transfer_progress_cb progress_cb,
+			bt_opp_server_transfer_finished_cb finished_cb,
+			const char *name, void *user_data, int *transfer_id)
+{
+	bt_transfer_progress_cb = progress_cb;
+	bt_transfer_finished_cb = finished_cb;
+
+	return bt_opp_server_accept_request(name, bt_opp_server_transfer_state_cb,
+							user_data, transfer_id);
+}
+
+int bt_opp_server_reject(void)
+{
+	return bt_opp_server_reject_request();
 }
