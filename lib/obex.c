@@ -688,12 +688,46 @@ static GList *session_notify_list;
 
 struct _session_state_notify {
 	char *id;
+	gboolean is_watch;
 	struct _obex_session *session;
 	obex_session_state_cb cb;
 	enum session_state state;
 	char *error_msg;
 	void *data;
 };
+
+static struct _session_state_notify *session_watch;
+
+static void free_session_state_notify(struct _session_state_notify *notify)
+{
+	if (notify->id)
+		g_free(notify->id);
+
+	if (notify->error_msg)
+		g_free(notify->error_msg);
+
+	if (notify->is_watch)
+		session_watch = NULL;
+}
+
+static struct _session_state_notify *create_session_state_notify(
+						obex_session_state_cb cb,
+						gboolean is_watch, void *data)
+{
+	struct _session_state_notify *notify;
+
+	notify = g_try_new0(struct _session_state_notify, 1);
+	if (notify == NULL)
+		return NULL;
+
+	notify->is_watch = TRUE;
+	notify->session = NULL;
+	notify->cb = cb;
+	notify->data = data;
+	notify->state = OBEX_SESSION_NO_SERVICE;
+
+	return notify;
+}
 
 static void free_session(struct _obex_session *session)
 {
@@ -737,8 +771,7 @@ static void session_remove_notify(struct _session_state_notify *notify)
 {
 	session_notify_list = g_list_remove(session_notify_list, notify);
 
-	g_free(notify->id);
-	g_free(notify);	
+	free_session_state_notify(notify);
 }
 
 gboolean _notify_session(gpointer user_data)
@@ -1221,6 +1254,7 @@ static void match_transfer(struct _obex_session *session)
 static void register_obex_session(struct _obex_session *session)
 {
 	GList **interface_list = &session->parent->interfaces;
+	struct _session_state_notify *watched_notify;
 
 	DBG("%p", session);
 
@@ -1234,6 +1268,12 @@ static void register_obex_session(struct _obex_session *session)
 				(gpointer) session->object_path,
 				(gpointer) session);
 
+	if (session_watch) {
+		watched_notify = create_session_state_notify(session_watch->cb,
+						FALSE, session_watch->data);
+		watched_notify->id = session->identity;
+		session_add_notify(watched_notify);
+	}
 
 	session_notify_state(session, OBEX_SESSION_CREATED);
 
@@ -1670,16 +1710,13 @@ int obex_create_session(const char *destination,
 		return -1;
 	}
 
-	notify = g_try_new0(struct _session_state_notify, 1);
+	notify = create_session_state_notify(cb, FALSE, data);
 	if (notify == NULL)
 		return -ENOMEM;
 
 	target_s = get_obex_target_string(target);
 
 	notify->id = g_strconcat("local", destination, target_s, NULL);
-	notify->session = NULL;
-	notify->cb = cb;
-	notify->data = data;
 
 	session = get_session(notify->id);
 	if (session) {
@@ -1718,6 +1755,26 @@ void obex_session_remove_session(struct _obex_session *session)
 	g_dbus_proxy_call(this_client->proxy, "RemoveSession",
 				g_variant_new("(o)", session->object_path),
 				0, -1, NULL, simple_reply_callback, NULL);
+}
+
+int obex_session_set_watch(obex_session_state_cb cb, void *data)
+{
+	struct _session_state_notify *notify;
+
+	if (session_watch) {
+		ERROR("Session watch busy");
+		return -EBUSY;
+	}
+
+	notify = create_session_state_notify(cb, TRUE, data);
+	if (notify == NULL)
+		return -ENOMEM;
+
+	session_add_notify(notify);
+
+	session_watch = notify;
+
+	return 0;
 }
 
 struct _obex_session *obex_session_get_session(const char *id)

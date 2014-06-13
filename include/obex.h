@@ -103,6 +103,10 @@ int obex_create_session(
 void obex_session_remove_session(
 			struct _obex_session *session);
 
+int obex_session_set_watch(
+			obex_session_state_cb cb,
+			void *data);
+
 struct _obex_session *obex_session_get_session(
 			const char *id);
 
