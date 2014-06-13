@@ -43,6 +43,8 @@ static struct {
 	GDBusMethodInvocation *pending_invocation;
 } opp_server;
 
+static char *setting_destination;
+
 static GDBusNodeInfo *introspection_data;
 
 static const gchar introspection_xml[] =
@@ -372,16 +374,20 @@ int bt_opp_server_accept_request(const char *name, bt_opp_transfer_state_cb cb,
 						(void *) notify_node);
 	}
 
-	n = (name != NULL) ? (char *) name : opp_server.pending_name;
+	if (!setting_destination) {
+		n = (name != NULL) ? (char *) name : opp_server.pending_name;
 
-	file_name = g_build_filename(opp_server.root_folder, n, NULL);
+		file_name = g_build_filename(opp_server.root_folder, n, NULL);
 
-	g_dbus_method_invocation_return_value(invocation,
+		g_dbus_method_invocation_return_value(invocation,
 					g_variant_new("(s)", file_name));
 
-	opp_server.pending_invocation = NULL;
+		g_free(file_name);
+	} else
+		g_dbus_method_invocation_return_value(invocation,
+				g_variant_new("(s)", setting_destination));
 
-	g_free(file_name);
+	opp_server.pending_invocation = NULL;
 
 	*transfer_id = obex_transfer_get_id(transfer);
 
@@ -533,6 +539,12 @@ int bt_opp_server_deinitialize(void)
 		opp_server_push_node = NULL;
 	}
 
+	bt_transfer_progress_cb = NULL;
+	bt_transfer_finished_cb = NULL;
+
+	if (setting_destination)
+		g_free(setting_destination);
+
 	ret = bt_opp_deinit();
 	if (ret != BT_SUCCESS)
 		return ret;
@@ -576,4 +588,25 @@ int bt_opp_server_reject(void)
 int bt_opp_server_cancel_transfer(int transfer_id)
 {
 	return bt_opp_transfer_cancel(transfer_id);
+}
+
+int bt_opp_server_set_destination(const char *destination)
+{
+	DIR *dp = NULL;
+
+	if (destination == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	dp = opendir(destination);
+
+	if (dp == NULL) {
+		DBG("The directory does not exist");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	if (setting_destination)
+		g_free(setting_destination);
+
+	setting_destination = g_strdup(destination);
+	return BT_ERROR_NONE;
 }

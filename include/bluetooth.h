@@ -2206,6 +2206,20 @@ int bt_opp_server_reject(void);
  */
 int bt_opp_server_cancel_transfer(int transfer_id);
 
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_OPP_SERVER_MODULE
+ * @brief Sets the destination path of file to be pushed.
+ * @param[in] destination  The destination path of file to be pushed
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ * @see  bt_opp_server_initialize()
+ */
+int bt_opp_server_set_destination(const char *destination);
+
 /* New OPP API*/
 int bt_opp_init(void);
 
