@@ -88,6 +88,10 @@ void comms_bluetooth_opp_send_file(
 			bluetooth_simple_callback cb,
 			void *user_data);
 
+void comms_bluetooth_opp_cancel_transfer(int transfer_id,
+			bluetooth_simple_callback cb,
+			void *user_data);
+
 int comms_bluetooth_avrcp_change_property(
 			unsigned int type,
 			unsigned int value,

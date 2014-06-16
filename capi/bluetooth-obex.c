@@ -567,7 +567,7 @@ struct opp_push_data{
 int bt_opp_client_push_file(
 			const char *file_name,
 			const char *remote_address,
-			bt_opp_client_push_responded_cb responded_cb,
+			bt_opp_client_push_responded_new_cb responded_cb,
 			void *responded_data,
 			bt_opp_transfer_state_cb transfer_state_cb,
 			void *transfer_data)
@@ -601,9 +601,15 @@ struct opp_server_push_cb_node {
 	void *user_data;
 };
 
+static GList *sending_files;
+static int pending_file_count;
+
 struct opp_server_push_cb_node *opp_server_push_node;
 static bt_opp_server_transfer_progress_cb bt_transfer_progress_cb;
 static bt_opp_server_transfer_finished_cb bt_transfer_finished_cb;
+static bt_opp_client_push_progress_cb bt_progress_cb;
+static bt_opp_client_push_responded_cb bt_push_request_cb;
+static bt_opp_client_push_finished_cb bt_finished_cb;
 
 void server_push_requested_cb(const char *remote_address, const char *name,
 					uint64_t size, void *user_data)
@@ -644,7 +650,19 @@ int bt_opp_server_initialize(const char *destination,
 		opp_server_push_node = NULL;
 	}
 
+	opp_server_push_node->callback = push_requested_cb;
+	opp_server_push_node->user_data = user_data;
+
 	return ret;
+}
+
+int bt_opp_server_initialize_by_connection_request(const char *destination,
+		bt_opp_server_connection_requested_cb connection_requested_cb,
+		void *user_data)
+{
+	/* TODO: Implement */
+
+	return BT_SUCCESS;
 }
 
 int bt_opp_server_deinitialize(void)
@@ -727,3 +745,202 @@ int bt_opp_server_set_destination(const char *destination)
 	setting_destination = g_strdup(destination);
 	return BT_ERROR_NONE;
 }
+
+int bt_opp_client_initialize(void)
+{
+	int ret;
+
+	DBG("");
+
+	ret = bt_opp_init();
+
+	return ret;
+}
+
+int bt_opp_client_deinitialize(void)
+{
+	int ret;
+
+	DBG("");
+
+	ret = bt_opp_deinit();
+
+	return ret;
+}
+
+int bt_opp_client_add_file(const char *file)
+{
+	int ret = BT_ERROR_NONE;
+
+	if (file == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (access(file, F_OK) == 0) {
+		sending_files = g_list_append(sending_files,
+						g_strdup(file));
+	} else {
+		ret = BT_ERROR_INVALID_PARAMETER;
+		DBG("ret = %d", ret);
+	}
+
+	return ret;
+}
+
+int bt_opp_client_clear_files(void)
+{
+	int i = 0;
+	int file_num = 0;
+	char *c_file = NULL;
+
+	if (sending_files) {
+		file_num = g_list_length(sending_files);
+
+		for (i = 0; i < file_num; i++) {
+			c_file = (char *)g_list_nth_data(sending_files, i);
+
+			if (c_file == NULL)
+				continue;
+
+			free(c_file);
+		}
+
+		g_list_free(sending_files);
+		sending_files = NULL;
+	}
+
+	return BT_ERROR_NONE;
+}
+
+static void client_transfer_state_cb(int id, bt_opp_transfer_state_e state,
+				const char *name, uint64_t size,
+				unsigned char percent, void *data)
+{
+	struct _obex_transfer *transfer = NULL;
+	char *remote_address;
+
+	DBG("");
+
+	if (id < 10000 && bt_progress_cb != NULL) {
+
+		DBG("state: %d", state);
+
+		if (state == BT_OPP_TRANSFER_QUEUED) {
+			bt_progress_cb(name, size, 0, data);
+			return;
+		}
+
+		if (state == BT_OPP_TRANSFER_ACTIVE) {
+			bt_progress_cb(name, size, percent, data);
+
+			return;
+		}
+
+		if (state == BT_OPP_TRANSFER_COMPLETED) {
+			bt_progress_cb(name, size, 100, data);
+
+			pending_file_count--;
+		}
+
+		if (state == BT_OPP_TRANSFER_CANCELED ||
+				state == BT_OPP_TRANSFER_ERROR)
+			pending_file_count--;
+	}
+
+	transfer = obex_transfer_get_transfer_from_id(id);
+	if (transfer == NULL) {
+		ERROR("invalid transfer");
+		return;
+	}
+
+	remote_address = obex_transfer_get_property_destination(transfer);
+
+	if (pending_file_count == 0) {
+		bt_finished_cb(BT_SUCCESS, remote_address, data);
+
+		bt_push_request_cb = NULL;
+		bt_progress_cb = NULL;
+		bt_finished_cb = NULL;
+	}
+}
+
+static void session_state_changed(const char *session_id,
+				struct _obex_session *session,
+				enum session_state state,
+				void *data, char *error_msg)
+{
+	DBG("session id %s state %d", session_id, state);
+	if (state == OBEX_SESSION_CREATED) {
+		char *remote_address;
+
+		remote_address =
+			obex_session_property_get_destination(session);
+		bt_push_request_cb(BT_SUCCESS, remote_address, data);
+		g_free(remote_address);
+	}
+}
+
+int bt_opp_client_push_files(const char *remote_address,
+				bt_opp_client_push_responded_cb responded_cb,
+				bt_opp_client_push_progress_cb progress_cb,
+				bt_opp_client_push_finished_cb finished_cb,
+				void *user_data)
+{
+	char *c_file = NULL;
+	GList *list, *next;
+
+	DBG("");
+
+	bt_push_request_cb = responded_cb;
+	bt_progress_cb = progress_cb;
+	bt_finished_cb = finished_cb;
+
+	bt_opp_set_transfers_state_cb(client_transfer_state_cb, user_data);
+	obex_session_set_watch(session_state_changed, user_data);
+
+	pending_file_count = g_list_length(sending_files);
+
+	for (list = g_list_first(sending_files); list; list = next) {
+		c_file = list->data;
+
+		next = g_list_next(list);
+
+		if (c_file == NULL)
+			continue;
+
+		bt_opp_client_push_file(c_file, remote_address,
+					NULL, NULL, NULL, NULL);
+
+		sending_files = g_list_remove(sending_files, c_file);
+	}
+
+	g_list_free_full(sending_files, g_free);
+	sending_files = NULL;
+
+	return BT_ERROR_NONE;
+}
+
+int bt_opp_client_cancel_push(void)
+{
+	const GList *transfer_list;
+	GList *list, *next;
+
+	transfer_list = obex_transfer_get_pathes();
+
+	for (list = g_list_first((GList *)transfer_list); list; list = next) {
+		struct _obex_transfer *transfer;
+		int transfer_id;
+
+		next = g_list_next(list);
+
+		transfer = obex_transfer_get_transfer_from_path(list->data);
+		transfer_id = obex_transfer_get_id(transfer);
+
+		/* Only cancel client push */
+		if (transfer_id < 10000)
+			comms_bluetooth_opp_cancel_transfer(
+						transfer_id, NULL, NULL);
+	}
+
+	return 0;
+}
+

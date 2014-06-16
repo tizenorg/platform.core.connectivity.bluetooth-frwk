@@ -600,6 +600,146 @@ static int stop_discovery(const char *p1, const char *p2)
 	return 0;
 }
 
+static void bt_opp_server_transfer_progress_cb_test(const char *file,
+							long long size,
+							int percent,
+							void *user_data)
+{
+	DBG("file = %s", file);
+	DBG("size = %lld", size);
+	DBG("percent = %d", percent);
+}
+
+static void bt_opp_server_transfer_finished_cb_test(int result,
+						const char *file,
+						long long size,
+						void *user_data)
+{
+	DBG("file = %s", file);
+	DBG("size = %lld", size);
+	DBG("result = %d", result);
+}
+
+void bt_opp_server_push_requested_cb_test(const char *file, int size,
+						void *user_data)
+{
+	int transfer_id;
+	DBG("file = %s", file);
+	DBG("size = %d", size);
+
+	bt_opp_server_accept(bt_opp_server_transfer_progress_cb_test,
+				bt_opp_server_transfer_finished_cb_test,
+				file, NULL, &transfer_id);
+}
+
+static int register_opp_server_initialize(const char *p1, const char *p2)
+{
+
+	DBG("");
+
+	bt_opp_server_initialize("/tmp", bt_opp_server_push_requested_cb_test, NULL);
+	return 0;
+}
+
+static int unregister_opp_server(const char *p1, const char *p2)
+{
+	DBG("");
+
+	bt_opp_server_deinitialize();
+	return 0;
+}
+
+static int opp_client_init(const char *p1, const char *p2)
+{
+	int ret;
+
+	DBG("");
+
+	ret = bt_opp_client_initialize();
+	if (ret)
+		DBG("opp client init error");
+
+	return 0;
+}
+
+static int opp_client_add_file(const char *p1, const char *p2)
+{
+	int ret;
+
+	DBG("");
+
+	ret = bt_opp_client_add_file(p1);
+	if (ret != BT_ERROR_NONE)
+		DBG("opp client add file fail");
+
+	return ret;
+}
+
+void bt_opp_client_push_responded_cb_test(int result,
+				const char *remote_address,
+				void *user_data)
+{
+	DBG("result = %d", result);
+	DBG("remote_address = %s", remote_address);
+}
+
+void bt_opp_client_push_progress_cb_test(const char *file,
+				long long size, int percent,
+				void *user_data)
+{
+	DBG("file = %s", file);
+	DBG("size = %lld", size);
+	DBG("percent = %d", percent);
+}
+
+void bt_opp_client_push_finished_cb_test(int result,
+				const char *remote_address,
+				void *user_data)
+{
+	DBG("result = %d", result);
+	DBG("remote_address = %s", remote_address);
+}
+
+static int opp_client_send(const char *p1, const char *p2)
+{
+	int ret;
+
+	DBG("");
+
+	ret = bt_opp_client_add_file(p1);
+	if (ret != BT_ERROR_NONE) {
+		DBG("opp client add file fail");
+		return ret;
+	}
+
+	ret = bt_opp_client_push_files(p2,
+			bt_opp_client_push_responded_cb_test,
+			bt_opp_client_push_progress_cb_test,
+			bt_opp_client_push_finished_cb_test,
+			NULL);
+	if (ret != BT_ERROR_NONE) {
+		DBG("opp client send file fail");
+		return ret;
+	}
+
+	return ret;
+}
+
+static int opp_client_cancel_push(const char *p1, const char *p2)
+{
+	int ret;
+
+	DBG("");
+
+	ret = bt_opp_client_cancel_push();
+	if (ret != BT_ERROR_NONE) {
+		DBG("opp client cancel push fail");
+		return ret;
+	}
+
+	return ret;
+}
+
 static void transfer_state_cb(int transfer_id,
 				bt_opp_transfer_state_e state,
 					const char *file, guint64 size,
@@ -2201,6 +2341,24 @@ struct {
 
 	{"list_devices", list_devices,
 		"Usage: list_devices\n\tList devices"},
+
+	{"register_opp_server_initialize", register_opp_server_initialize,
+		"Usage: register_opp_server_initialize\n\tregister opp server"},
+
+	{"unregister_opp_server", unregister_opp_server,
+		"Usage: unregister_opp_server\n\tunregister server"},
+
+	{"opp_client_init", opp_client_init,
+		"Usage: opp_client_init\n\topp client init"},
+
+	{"opp_client_add_file", opp_client_add_file,
+		"Usage: opp_client_add_file file\n\topp client add file"},
+
+	{"opp_client_send", opp_client_send,
+		"Usage: opp_client_send file 70:F9:27:64:DF:65\n\topp client send"},
+
+	{"opp_client_cancel_push", opp_client_cancel_push,
+		"Usage: opp_client_cancel_push\n\topp client cancel"},
 
 	{"init_opp", init_opp,
 		"Usage: init_opp\n\tinitialize obex_lib"},
