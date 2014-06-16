@@ -598,7 +598,7 @@ static inline enum obex_target target_uuid_to_target(const char *target_uuid)
 	 * OPP target header should not be used see
 	 * SIG OBJECT PUSH PROFILE v.12 Section 5.4
 	 */
-	if (target_uuid == NULL)
+	if (target_uuid == NULL || !g_strcmp0(target_uuid, "00001105-0000-1000-8000-00805f9b34fb"))
 		return OBEX_OPP;
 
 	if (!g_strcmp0(target_uuid, FTP_TARGET_UUID))

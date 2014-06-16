@@ -2220,6 +2220,135 @@ int bt_opp_server_cancel_transfer(int transfer_id);
  */
 int bt_opp_server_set_destination(const char *destination);
 
+/**
+ ** @ingroup CAPI_NETWORK_BLUETOOTH_OPP_CLIENT_MODULE
+ ** @brief Initializes the Bluetooth OPP client.
+ ** @remarks This function must be called before Bluetooth OPP client starts. \n
+ ** You must free all resources of the Bluetooth service by calling bt_opp_client_deinitialize()
+ ** if Bluetooth OPP service is no longer needed.
+ ** @return 0 on success, otherwise a negative error value.
+ ** @retval #BT_ERROR_NONE  Successful
+ ** @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ ** @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ ** @retval #BT_ERROR_RESOURCE_BUSY  Device or resource busy
+ ** @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ ** @see  bt_opp_client_deinitialize()
+ **/
+int bt_opp_client_initialize(void);
+
+/**
+ ** @ingroup CAPI_NETWORK_BLUETOOTH_OPP_CLIENT_MODULE
+ ** @brief Denitializes the Bluetooth OPP client.
+ ** @return 0 on success, otherwise a negative error value.
+ ** @retval #BT_ERROR_NONE  Successful
+ ** @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ ** @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ ** @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ ** @see  bt_opp_client_initialize()
+ **/
+int bt_opp_client_deinitialize(void);
+
+/**
+ ** @ingroup CAPI_NETWORK_BLUETOOTH_OPP_CLIENT_MODULE
+ ** @brief Adds file to be pushed.
+ ** @param[in] file  The path of file to be pushed
+ ** @return 0 on success, otherwise a negative error value.
+ ** @retval #BT_ERROR_NONE  Successful
+ ** @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ ** @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ ** @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ ** @see  bt_opp_client_clear_files()
+ ** @see  bt_opp_client_push_files()
+ **/
+int bt_opp_client_add_file(const char *file);
+
+/**
+ ** @ingroup CAPI_NETWORK_BLUETOOTH_OPP_CLIENT_MODULE
+ ** @brief Adds file to be pushed.
+ ** @return 0 on success, otherwise a negative error value.
+ ** @retval #BT_ERROR_NONE  Successful
+ ** @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ ** @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ ** @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ ** @see  bt_opp_client_add_file()
+ ** @see  bt_opp_client_push_files()
+ **/
+int bt_opp_client_clear_files(void);
+
+/**
+ ** @ingroup CAPI_NETWORK_BLUETOOTH_OPP_CLIENT_MODULE
+ ** @brief  Called when OPP server responds to the push request.
+ ** @param[in] result  The result of OPP server response
+ ** @param[in] remote_address  The remote address
+ ** @param[in] user_data  The user data passed from the callback registration function
+ ** @pre bt_opp_client_push_files() will invoke this function.
+ ** @see bt_opp_client_push_files()
+ **/
+typedef void (*bt_opp_client_push_responded_cb)(int result, const char *remote_address, void *user_data);
+
+/**
+ ** @ingroup CAPI_NETWORK_BLUETOOTH_OPP_CLIENT_MODULE
+ ** @brief  Called when each file is being transfered.
+ ** @param[in] file  The path of file to be pushed
+ ** @param[in] size The file size (bytes)
+ ** @param[in] percent The progress in percentage (1 ~ 100). 100 means that a file is transfered completely.
+ ** @param[in] user_data The user data passed from the callback registration function
+ ** @pre bt_opp_client_push_files() will invoke this function.
+ ** @see bt_opp_client_push_files()
+ **/
+typedef void (*bt_opp_client_push_progress_cb)(const char *file, long long size, int percent, void *user_data);
+
+/**
+ ** @ingroup CAPI_NETWORK_BLUETOOTH_OPP_CLIENT_MODULE
+ ** @brief  Called when the push request is finished.
+ ** @param[in] result  The result of the push request
+ ** @param[in] remote_address  The remote address
+ ** @param[in] user_data The user data passed from the callback registration function
+ ** @see bt_opp_client_push_files()
+ **/
+typedef void (*bt_opp_client_push_finished_cb)(int result, const char *remote_address, void *user_data);
+
+/**
+ ** @ingroup CAPI_NETWORK_BLUETOOTH_OPP_CLIENT_MODULE
+ ** @brief Pushes the file to the remote device, asynchronously.
+ ** @details At first, bt_opp_client_push_responded_cb() will be called when OPP server responds to the push request.
+ ** After connection is established, bt_opp_client_push_progress_cb() will be called repeatedly until a file is tranfered completely.
+ ** If you send several files, then bt_opp_client_push_progress_cb() with another file will be called repeatedly until the file is tranfered completely.
+ ** bt_opp_client_push_finished_cb() will be called when the push request is finished.
+ ** @param[in] remote_address The remote address
+ ** @param[in] responded_cb  The callback called when OPP server responds to the push request
+ ** @param[in] progress_cb  The callback called when each file is being transfered
+ ** @param[in] finished_cb  The callback called when the push request is finished
+ ** @param[in] user_data The user data to be passed to the callback function
+ ** @return 0 on success, otherwise a negative error value.
+ ** @retval #BT_ERROR_NONE  Successful
+ ** @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ ** @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ ** @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ ** @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ ** @retval #BT_ERROR_NOW_IN_PROGRESS  Operation now in progress
+ ** @see bt_opp_client_initialize()
+ ** @see bt_opp_client_cancel_push
+ **/
+int bt_opp_client_push_files(const char *remote_address, bt_opp_client_push_responded_cb responded_cb,
+ bt_opp_client_push_progress_cb progress_cb, bt_opp_client_push_finished_cb finished_cb, void *user_data);
+
+/**
+ ** @ingroup CAPI_NETWORK_BLUETOOTH_OPP_CLIENT_MODULE
+ ** @brief Cancels the push request in progress, asynchronously.
+ ** @return 0 on success, otherwise a negative error value.
+ ** @retval #BT_ERROR_NONE  Successful
+ ** @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ ** @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ ** @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ ** @pre bt_opp_client_push_files() must be called.
+ ** @post bt_opp_client_push_finished_cb() will be invoked with result #BT_ERROR_CANCELLED,
+ ** which is a parameter of bt_opp_client_push_files().
+ ** @see bt_opp_client_initialize()
+ ** @see bt_opp_client_push_files()
+ **/
+int bt_opp_client_cancel_push(void);
+
 /* New OPP API*/
 int bt_opp_init(void);
 
@@ -2275,7 +2404,7 @@ typedef enum {
 	BT_OPP_PUSH_NO_SERVICE
 } push_state_e;
 
-typedef void (*bt_opp_client_push_responded_cb)(
+typedef void (*bt_opp_client_push_responded_new_cb)(
 			const char *remote_address,
 			push_state_e state,
 			void *user_data);
@@ -2283,7 +2412,7 @@ typedef void (*bt_opp_client_push_responded_cb)(
 int bt_opp_client_push_file(
 			const char *name,
 			const char *remote_address,
-			bt_opp_client_push_responded_cb responded_cb,
+			bt_opp_client_push_responded_new_cb responded_cb,
 			void *responded_data,
 			bt_opp_transfer_state_cb transfer_state_cb,
 			void *transfer_data);

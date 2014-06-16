@@ -52,7 +52,7 @@ static const GDBusMethodInfo * const _method_info_pointers[] =
 	GDBUS_METHOD("SendFile", GDBUS_ARGS(_ARG("remote_address", "s"),
 						_ARG("sourcefile", "s")),
 				GDBUS_ARGS(_ARG("transfer_id", "i"))),
-	GDBUS_METHOD("CancelTrnasfer", GDBUS_ARGS(_ARG("transfer_id", "i")), NULL),
+	GDBUS_METHOD("CancelTransfer", GDBUS_ARGS(_ARG("transfer_id", "i")), NULL),
 	NULL
 };
 

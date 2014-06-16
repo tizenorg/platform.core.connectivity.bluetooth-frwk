@@ -1008,6 +1008,34 @@ void comms_bluetooth_opp_send_file(const char *address,
 				async_result_node);
 }
 
+void comms_bluetooth_opp_cancel_transfer(int transfer_id,
+				bluetooth_simple_callback cb,
+				void *user_data)
+{
+	struct _bluetooth_simple_async_result *async_result_node;
+
+	if (this_bluetooth == NULL) {
+		ERROR("bluetooth not register");
+		return;
+	}
+
+	async_result_node = g_new0(struct _bluetooth_simple_async_result, 1);
+	if (async_result_node == NULL) {
+		ERROR("no memory");
+		return;
+	}
+
+	async_result_node->callback = cb;
+	async_result_node->user_data = user_data;
+
+	g_dbus_proxy_call(this_bluetooth->opp.proxy,
+				"CancelTransfer",
+				g_variant_new("(i)", transfer_id),
+				0, -1, NULL,
+				bluetooth_simple_async_cb,
+				async_result_node);
+}
+
 int comms_bluetooth_avrcp_change_property(
 					unsigned int type,
 					unsigned int value,
