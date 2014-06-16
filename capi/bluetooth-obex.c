@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <glib.h>
 #include <gio/gio.h>
+#include <dbus/dbus.h>
 
 #include "bluetooth.h"
 #include "obex.h"
@@ -164,66 +165,175 @@ static const GDBusInterfaceVTable interface_handle = {
 	NULL
 };
 
-static guint bus_id;
 static GDBusConnection *conn;
+static guint bluetooth_opp_agent_id;
 
-static void bus_acquired(GDBusConnection *connection,
-				const gchar *name,
-				gpointer user_data)
+static GDBusConnection *get_system_dbus_connect(void)
 {
-	DBG("");
+	GError *error = NULL;
 
-	bus_id = g_dbus_connection_register_object(
-						connection,
-						AGENT_OBJECT_PATH,
-						introspection_data->
-							interfaces[0],
-						&interface_handle,
-						NULL,
-						NULL,
-						NULL);
-	g_assert(bus_id > 0);
+	if (conn != NULL)
+		return conn;
 
-	conn = connection;
+	conn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
+	if (conn == NULL) {
+		DBG("%s", error->message);
 
-	comms_bluetooth_register_opp_agent(AGENT_OBJECT_PATH, NULL, NULL);
-}
+		g_error_free(error);
 
-static void name_acquired(GDBusConnection *connection,
-			const gchar *name,
-			gpointer user_data)
-{
-	DBG("");
-}
-
-static void name_lost(GDBusConnection *connection,
-			const gchar *name,
-			gpointer user_data)
-{
-	DBG("Name Lost");
-
-	if (bus_id) {
-		g_dbus_connection_unregister_object(connection, bus_id);
-		bus_id = 0;
+		return NULL;
 	}
+
+	return conn;
 }
 
-static int register_agent(void)
+static void release_dbus_connection(void)
 {
+	g_object_unref(conn);
+	conn = NULL;
+}
+
+static void release_name_on_dbus(const char *name)
+{
+	GVariant *ret;
+	guint32 request_name_reply;
+	GError *error = NULL;
+
+	if (bluetooth_opp_agent_id)
+		return;
+
+	ret = g_dbus_connection_call_sync(conn, "org.freedesktop.DBus",
+			"/org/freedesktop/DBus", "org.freedesktop.DBus",
+			"ReleaseName", g_variant_new("(s)", name),
+			G_VARIANT_TYPE("(u)"), G_DBUS_CALL_FLAGS_NONE,
+			-1, NULL, &error);
+	if (ret == NULL) {
+		WARN("%s", error->message);
+		return;
+	}
+
+	g_variant_get(ret, "(u)", &request_name_reply);
+	g_variant_unref(ret);
+
+	if (request_name_reply != 1) {
+		WARN("Unexpected reply");
+		return;
+	}
+
+	release_dbus_connection();
+
+	return;
+}
+
+static int request_name_on_dbus(const char *name)
+{
+	GDBusConnection *connection;
+	GVariant *ret;
+	guint32 request_name_reply;
+	GError *error = NULL;
+
+	if (bluetooth_opp_agent_id)
+		return 0;
+
+	connection = get_system_dbus_connect();
+	if (connection == NULL)
+		return -1;
+
+	ret = g_dbus_connection_call_sync(connection, "org.freedesktop.DBus",
+			"/org/freedesktop/DBus", "org.freedesktop.DBus",
+			"RequestName", g_variant_new("(su)", name,
+				G_BUS_NAME_OWNER_FLAGS_NONE),
+			G_VARIANT_TYPE("(u)"), G_DBUS_CALL_FLAGS_NONE,
+			-1, NULL, &error);
+	if (ret == NULL) {
+		WARN("%s", error->message);
+		g_error_free(error);
+
+		goto failed;
+	}
+
+	g_variant_get(ret, "(u)", &request_name_reply);
+	g_variant_unref(ret);
+
+	/* RequestName will return the uint32 value:
+	 * 1: DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER
+	 * 2: BUS_REQUEST_NAME_REPLY_IN_QUEUE
+	 * 3: DBUS_REQUEST_NAME_REPLY_EXISTS
+	 * 4: DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER
+	 * Also see dbus doc
+	 */
+
+	if (request_name_reply != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
+		DBG("Lost name");
+
+		release_name_on_dbus(name);
+
+		goto failed;
+	}
+
+	return 0;
+failed:
+	g_object_unref(connection);
+
+	return -1;
+}
+
+static void destory_opp_agent(void)
+{
+	DBG("bluetooth_opp_agent_id = %d", bluetooth_opp_agent_id);
+
+	if (bluetooth_opp_agent_id > 0) {
+		comms_bluetooth_unregister_opp_agent(
+				AGENT_OBJECT_PATH, NULL, NULL);
+
+		g_dbus_connection_unregister_object(conn,
+					bluetooth_opp_agent_id);
+
+		bluetooth_opp_agent_id = 0;
+
+		release_name_on_dbus(OBEX_LIB_SERVICE);
+	}
+
+	return;
+}
+
+static int register_opp_agent(void)
+{
+	int ret;
+
 	DBG("");
+
+	if (bluetooth_opp_agent_id)
+		return BT_ERROR_ALREADY_DONE;
 
 	introspection_data =
-			g_dbus_node_info_new_for_xml(introspection_xml, NULL);
+		g_dbus_node_info_new_for_xml(introspection_xml, NULL);
 
-	/* Error handle */
-	bus_id = g_bus_own_name(G_BUS_TYPE_SYSTEM,
-				OBEX_LIB_SERVICE,
-				G_BUS_NAME_OWNER_FLAGS_NONE,
-				bus_acquired,
-				name_acquired,
-				name_lost,
-				NULL,
-				NULL);
+	ret = request_name_on_dbus(OBEX_LIB_SERVICE);
+	if (ret != 0)
+		return -1;
+
+	DBG("%s requested success", OBEX_LIB_SERVICE);
+
+	bluetooth_opp_agent_id = g_dbus_connection_register_object(conn,
+					AGENT_OBJECT_PATH,
+					introspection_data-> interfaces[0],
+					&interface_handle, NULL, NULL, NULL);
+
+	DBG("bluetooth_opp_agent_id = %d", bluetooth_opp_agent_id);
+
+	if (bluetooth_opp_agent_id == 0)
+		return -1;
+
+	ret = comms_bluetooth_register_opp_agent_sync(
+					AGENT_OBJECT_PATH, NULL);
+
+	DBG("ret = %d", ret);
+
+	if (ret != BT_SUCCESS) {
+		destory_opp_agent();
+		return BT_ERROR_OPERATION_FAILED;
+	}
 
 	return 0;
 }
@@ -232,6 +342,8 @@ int bt_opp_register_server(const char *dir,
 			bt_opp_server_push_file_requested_cb push_requested_cb,
 			void *user_data)
 {
+	int ret;
+
 	if (dir == NULL || push_requested_cb == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
 
@@ -244,13 +356,15 @@ int bt_opp_register_server(const char *dir,
 		return BT_ERROR_INVALID_PARAMETER;
 	}
 
+	ret = register_opp_agent();
+	if (ret != BT_SUCCESS)
+		return ret;
+
 	/* TODO: Do we need to check the dir privilege? */
 
 	opp_server.root_folder = g_strdup(dir);
 	opp_server.requested_cb = push_requested_cb;
 	opp_server.user_data = user_data;
-
-	register_agent();
 
 	return 0;
 }
@@ -264,6 +378,9 @@ int bt_opp_unregister_server(void)
 	opp_server.requested_cb = NULL;
 	opp_server.user_data = NULL;
 	obex_lib_deinit();
+
+	destory_opp_agent();
+
 	return 0;
 }
 
