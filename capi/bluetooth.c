@@ -3162,6 +3162,7 @@ static void handle_method_call(GDBusConnection *connection,
 	}
 
 	if (g_strcmp0(method_name, "RequestConfirmation") == 0) {
+		ERROR("RequestConfirmation method was catched, retrieve parameters !");
 		gchar *device_path = NULL;
 		guint32 passkey = 0;
 		g_variant_get(parameters, "(ou)", &device_path, &passkey);
@@ -3378,17 +3379,26 @@ static int destory_agent(void)
 
 int bt_agent_register(bt_agent *agent)
 {
-	if (initialized == false)
+	if (initialized == false) {
+		ERROR("BT_ERROR_NOT_INITIALIZED");
 		return BT_ERROR_NOT_INITIALIZED;
+	}
 
-	if (agent == NULL)
+	if (agent == NULL) {
+		ERROR("BT_ERROR_INVALID_PARAMETER");
 		return BT_ERROR_INVALID_PARAMETER;
+	}
 
-	if (bluetooth_agent_id > 0)
+	if (bluetooth_agent_id > 0) {
+		ERROR("bluetooth_agent_id > 0");
 		return BT_ERROR_ALREADY_DONE;
+	}
 
-	if (this_agent != NULL)
+
+	if (this_agent != NULL) {
+		ERROR("this_agent != NULL");
 		return BT_ERROR_ALREADY_DONE;
+	}
 
 	create_agent();
 

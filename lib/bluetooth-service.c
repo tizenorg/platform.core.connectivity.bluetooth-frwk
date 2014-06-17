@@ -248,6 +248,8 @@ static void register_comms_bluetooth(struct _comms_bluetooth *bluetooth)
 	if (this_bluetooth)
 		WARN("manager %p not unregister", this_manager);
 
+	ERROR("this_bluetooth object register");
+
 	this_bluetooth = bluetooth;
 }
 
@@ -761,6 +763,8 @@ void comms_bluetooth_register_pairing_agent(const char *agent_path,
 
 	async_result_node->callback = cb;
 	async_result_node->user_data = user_data;
+
+	ERROR("call method RegisterPairingAgent !");
 
 	g_dbus_proxy_call(this_bluetooth->pairing.proxy, "RegisterPairingAgent",
 					g_variant_new("(o)", agent_path),
