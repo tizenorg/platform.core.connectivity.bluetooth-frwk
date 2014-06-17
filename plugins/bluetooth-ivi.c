@@ -281,15 +281,26 @@ static int bt_pairing_agent_on(void)
 	bundle *b;
 	int ret;
 
-	DBG("");
+	ERROR("");
+	
+	noti = notification_create(NOTIFICATION_TYPE_NOTI);
+	notification_set_pkgname(noti, BT_AGENT_APP_NAME);
+	notification_set_text(noti, NOTIFICATION_TEXT_TYPE_TITLE,
+                                   "Bluetooth pairing agent", NULL,
+                                   NOTIFICATION_VARIABLE_TYPE_NONE); 
+	notification_set_text(noti, NOTIFICATION_TEXT_TYPE_CONTENT,
+                                    "Pairing agent will execute itself...", NULL,   
+                                    NOTIFICATION_VARIABLE_TYPE_NONE);
+    notification_insert(noti, NULL);
 
 	b = bundle_create();
 	if (!b)
 		return -1;
 
 	bundle_add(b, "agent_type", PAIRING_AGENT);
+	bundle_add(b, "event_type", "passkey-confirm-request");
 
-	// ret = syspopup_launch(BT_AGENT_APP_NAME, b);
+	//ret = syspopup_launch(BT_AGENT_APP_NAME, b);
 	ret = 0;
 	if (ret < 0) {
 		ERROR("Launch pairing agent failed");
