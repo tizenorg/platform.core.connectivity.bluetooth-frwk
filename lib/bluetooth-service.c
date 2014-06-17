@@ -705,6 +705,8 @@ void comms_bluetooth_device_pair(const char *address,
 	async_result_node->callback = cb;
 	async_result_node->user_data = user_data;
 
+	DBG("call Pair method on proxy pairing !");
+
 	g_dbus_proxy_call(this_bluetooth->pairing.proxy, "Pair",
 					g_variant_new("(s)", address),
 					0, -1, NULL,

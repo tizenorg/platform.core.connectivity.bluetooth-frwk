@@ -1007,7 +1007,7 @@ int bt_adapter_enable(void)
 		return BT_ERROR_NOT_INITIALIZED;
 
 	comms_manager_enable_bluetooth();
-
+	
 	return BT_SUCCESS;
 }
 
@@ -2992,7 +2992,7 @@ static void request_passkey_handler(const gchar *device_path,
 	gchar *device_name;
 	bluez_device_t *device;
 
-	DBG("");
+	ERROR("");
 
 	if (default_adapter == NULL) {
 		ERROR("No default adapter");
@@ -3019,7 +3019,7 @@ static void request_confirmation_handler(const gchar *device_path,
 	gchar *device_name;
 	bluez_device_t *device;
 
-	DBG("");
+	ERROR("");
 
 	if (default_adapter == NULL) {
 		ERROR("No default adapter");
@@ -3117,6 +3117,10 @@ static void handle_method_call(GDBusConnection *connection,
 				GDBusMethodInvocation *invocation,
 				gpointer user_data)
 {
+
+	ERROR("sender [%s] / object_path [%s]", sender, object_path);
+	ERROR("interface_name [%s] / method_name [%s]", interface_name, method_name);
+
 	if (g_strcmp0(method_name, "Release") == 0) {
 		handle_release(invocation);
 
@@ -3335,7 +3339,7 @@ static int create_agent(void)
 	if (ret != 0)
 		return -1;
 
-	DBG("%s requested success", BLUEZ_AGENT_SERVICE);
+	ERROR("%s requested success", BLUEZ_AGENT_SERVICE);
 
 	bluetooth_agent_id = g_dbus_connection_register_object(
 						conn,

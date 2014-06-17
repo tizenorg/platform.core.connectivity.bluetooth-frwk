@@ -1084,7 +1084,7 @@ void bluez_agent_unset_agent_added(void)
 }
 static void register_bluez_agent(struct _bluez_agent *agent)
 {
-	DBG("");
+	ERROR("");
 
 	if (this_agent)
 		WARN("agent %p not unregister", this_agent);
@@ -1100,7 +1100,7 @@ static void bluez_agent_added(struct _bluez_object *object,
 {
 	struct _bluez_agent *agent;
 
-	DBG("");
+	ERROR("Register agent on BlueZ !!! ");
 
 	agent = create_agent(object);
 
@@ -2229,7 +2229,7 @@ void bluez_agent_register_agent(const gchar *path,
 	struct simple_reply_data *reply_data;
 	const gchar *cap_string;
 
-	DBG("");
+	ERROR("call RegisterAgent dbus method / path: [%s]", path);
 
 	cap_string = get_capability_string(capability);
 	if (cap_string == NULL) {
@@ -2284,7 +2284,7 @@ void bluez_agent_unregister_agent(const gchar *path,
 
 void bluez_agent_request_default_agent(const gchar *path)
 {
-	DBG("path %s", path);
+	ERROR("path %s", path);
 
 	g_dbus_proxy_call(this_agent->proxy,
 				"RequestDefaultAgent",

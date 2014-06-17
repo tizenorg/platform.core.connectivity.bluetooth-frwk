@@ -94,7 +94,7 @@ static void bt_pairing_register_dbus_interface(PairingSkeleton *skeleton,
 {
 	GDBusInterfaceSkeleton *pairing_interface;
 
-	DBG("");
+	ERROR("");
 
 	pairing_interface = G_DBUS_INTERFACE_SKELETON(skeleton);
 
@@ -171,7 +171,7 @@ static void register_pairing_agent_cb(enum bluez_error_type type, void *user_dat
 {
 	GDBusConnection *connection = user_data;
 
-	DBG("");
+	ERROR("");
 	if (type != ERROR_NONE) {
 		ERROR("Register pairing agent failed %d", type);
 
@@ -193,7 +193,7 @@ static void unregister_pairing_agent_cb(enum bluez_error_type type, void *user_d
 	GDBusConnection *connection = user_data;
 
 	if (type != ERROR_NONE)
-		DBG("%d", type);
+		ERROR("%d", type);
 
 	destruct_pairing_agent(connection);
 
@@ -210,13 +210,13 @@ static void relay_agent_reply(GObject *source_object, GAsyncResult *res,
 	GError *error = NULL;
 	struct agent_reply_data *reply_data = user_data;
 
-	DBG("");
+	ERROR("");
 
 	ret = g_dbus_connection_call_finish(reply_data->connection,
 							res, &error);
 
 	if (ret == NULL && error != NULL) {
-		DBG("%s", error->message);
+		ERROR("%s", error->message);
 		if (g_strrstr(error->message, "org.bluez.Error.Rejected"))
 			g_dbus_method_invocation_return_dbus_error(
 						reply_data->invocation,
@@ -281,7 +281,7 @@ static void handle_release(GDBusConnection *connection,
 {
 	struct agent_reply_data *reply_data;
 
-	DBG("");
+	ERROR("");
 
 	reply_data = g_new0(struct agent_reply_data, 1);
 
@@ -308,7 +308,7 @@ static void handle_request_pincode(GDBusConnection *connection,
 {
 	struct agent_reply_data *reply_data;
 
-	DBG("");
+	ERROR("");
 
 	reply_data = g_new0(struct agent_reply_data, 1);
 
@@ -335,7 +335,7 @@ static void handle_display_pincode(GDBusConnection *connection,
 {
 	struct agent_reply_data *reply_data;
 
-	DBG("");
+	ERROR("");
 
 	reply_data = g_new0(struct agent_reply_data, 1);
 
@@ -362,7 +362,7 @@ static void handle_request_passkey(GDBusConnection *connection,
 {
 	struct agent_reply_data *reply_data;
 
-	DBG("");
+	ERROR("");
 
 	reply_data = g_new0(struct agent_reply_data, 1);
 
@@ -389,7 +389,7 @@ static void handle_display_passkey(GDBusConnection *connection,
 {
 	struct agent_reply_data *reply_data;
 
-	DBG("");
+	ERROR("");
 
 	reply_data = g_new0(struct agent_reply_data, 1);
 
@@ -416,7 +416,7 @@ static void handle_request_confirmation(GDBusConnection *connection,
 {
 	struct agent_reply_data *reply_data;
 
-	DBG("");
+	ERROR("call RequestConfirmation ");
 
 	reply_data = g_new0(struct agent_reply_data, 1);
 
@@ -443,7 +443,7 @@ static void handle_request_authorization(GDBusConnection *connection,
 {
 	struct agent_reply_data *reply_data;
 
-	DBG("");
+	ERROR("");
 
 	reply_data = g_new0(struct agent_reply_data, 1);
 
@@ -470,7 +470,7 @@ static void handle_authorize_service(GDBusConnection *connection,
 {
 	struct agent_reply_data *reply_data;
 
-	DBG("");
+	ERROR("");
 
 	reply_data = g_new0(struct agent_reply_data, 1);
 
@@ -497,7 +497,7 @@ static void handle_cancel(GDBusConnection *connection,
 {
 	struct agent_reply_data *reply_data;
 
-	DBG("");
+	ERROR("");
 
 	reply_data = g_new0(struct agent_reply_data, 1);
 
@@ -521,6 +521,8 @@ static void handle_pairing(GDBusConnection *connection,
 					struct pairing_context *context)
 {
 	gchar *method_name = context->method_name;
+
+	ERROR("method_name [%s]", method_name);
 
 	if (g_strcmp0(method_name, "Release") == 0)
 		handle_release(connection,
@@ -590,6 +592,8 @@ static struct pairing_context *create_pairing_context(
 	context->invocation = invocation;
 	context->user_data = user_data;
 
+	ERROR("method_name [%s]",method_name);
+
 	return context;
 }
 
@@ -625,6 +629,9 @@ static void handle_pairing_agent_method_call(GDBusConnection *connection,
 					GDBusMethodInvocation *invocation,
 					gpointer user_data)
 {
+	ERROR("sender [%s] object_path [%s]", sender, object_path);
+	ERROR("interface [%s] method [%s]", interface, method_name);
+
 	if (pairing_context) {
 		WARN("Pairing context already exist");
 		return;
@@ -634,6 +641,7 @@ static void handle_pairing_agent_method_call(GDBusConnection *connection,
 							invocation, user_data);
 
 	if (relay_agent) {
+		ERROR("relay agent is defined ");
 		handle_pairing(connection, pairing_context);
 
 		free_pairing_context(pairing_context);
@@ -642,6 +650,7 @@ static void handle_pairing_agent_method_call(GDBusConnection *connection,
 		return;
 	}
 
+	ERROR("call plugin with timeout !!!");
 	vertical_notify_bt_pairing_agent_on();
 
 	relay_agent_timeout_id = g_timeout_add(5000,
@@ -657,7 +666,7 @@ static const GDBusInterfaceVTable pairing_agent_vtable =
 
 static gboolean create_pairing_agent(GDBusConnection *connection)
 {
-	DBG("");
+	ERROR("");
 
 	pairing_introspection_data = g_dbus_node_info_new_for_xml(
 					introspection_xml, NULL);
@@ -695,6 +704,8 @@ static struct agent *create_relay_agent(const gchar *sender,
 	agent->object_path = g_strdup(path);
 	agent->watch_id = watch_id;
 
+	ERROR("relay agent created : owner [%s] / object path [%s]", agent->owner, agent->object_path);
+
 	return agent;
 }
 
@@ -709,7 +720,7 @@ static void free_relay_agent(struct agent *agent)
 static void relay_agent_disconnected(GDBusConnection *connection,
 					const gchar *name, gpointer user_data)
 {
-	DBG("");
+	ERROR("");
 
 	if (!relay_agent)
 		return;
@@ -729,7 +740,7 @@ static void register_relay_agent_handler(
 	gchar *agent_path;
 	guint relay_agent_watch_id;
 
-	DBG("");
+	ERROR("agent_path: [%s]");
 
 	if (relay_agent)
 		return comms_error_already_exists(invocation);
@@ -760,6 +771,7 @@ static void register_relay_agent_handler(
 	if (!pairing_context)
 		return;
 
+	ERROR("call handle_pairing()");
 	handle_pairing(connection, pairing_context);
 
 	free_pairing_context(pairing_context);
@@ -774,7 +786,7 @@ static void unregister_relay_agent_handler(
 {
 	gchar *relay_agent_path;
 
-	DBG("");
+	ERROR("");
 
 	if (relay_agent == NULL)
 		return comms_error_does_not_exist(invocation);
@@ -798,7 +810,7 @@ static void device_pair_cb(enum bluez_error_type type, void *user_data)
 {
 	GDBusMethodInvocation *invocation = user_data;
 
-	DBG("");
+	ERROR("");
 
 	if (type != ERROR_NONE) {
 		handle_error_message(invocation, type);
@@ -817,7 +829,7 @@ static void pairing_handler(GDBusConnection *connection,
 	bluez_device_t *device;
 	gchar *address;
 
-	DBG("");
+	ERROR("");
 
 	g_variant_get(parameters, "(s)", &address);
 
@@ -844,7 +856,7 @@ static void device_cancel_pair_cb(enum bluez_error_type type, void *user_data)
 {
 	GDBusMethodInvocation *invocation = user_data;
 
-	DBG("");
+	ERROR("");
 
 	if (type != ERROR_NONE) {
 		handle_error_message(invocation, type);
@@ -862,7 +874,7 @@ static void cancel_pairing_handler(GDBusConnection *connection,
 {
 	bluez_device_t *device;
 
-	DBG("");
+	ERROR("");
 
 	device = bluez_adapter_get_device_by_address(default_adapter,
 						pairing_device_address);
@@ -884,7 +896,8 @@ static void pairing_skeleton_handle_method_call(GDBusConnection *connection,
 					GDBusMethodInvocation *invocation,
 					gpointer user_data)
 {
-	DBG("method: %s", method_name);
+	ERROR("sender [%s] object_path [%s]", sender, object_path);
+	ERROR("interface_name [%s] method [%s]", interface_name, method_name);
 
 	if (g_strcmp0(method_name, "RegisterPairingAgent") == 0)
 		register_relay_agent_handler(connection, parameters,
@@ -916,14 +929,14 @@ static GDBusInterfaceVTable *pairing_skeleton_dbus_interface_get_vtable(
 
 static void pairing_skeleton_object_finalize(GObject *object)
 {
-	DBG("Finalize");
+	ERROR("Finalize");
 
 	G_OBJECT_CLASS(pairing_skeleton_parent_class)->finalize(object);
 }
 
 static void pairing_skeleton_init(PairingSkeleton *skeleton)
 {
-	DBG("Instance Init");
+	ERROR("Instance Init");
 }
 
 static GVariant *pairing_skeleton_dbus_interface_get_properties(
@@ -931,7 +944,7 @@ static GVariant *pairing_skeleton_dbus_interface_get_properties(
 {
 	GVariantBuilder builder;
 
-	DBG("");
+	ERROR("");
 
 	g_variant_builder_init (&builder, G_VARIANT_TYPE ("a{sv}"));
 
@@ -943,7 +956,7 @@ static void pairing_skeleton_class_init(PairingSkeletonClass *klass)
 	GObjectClass *gobject_class;
 	GDBusInterfaceSkeletonClass *gdbus_skeleton_class;
 
-	DBG("Class Init");
+	ERROR("Class Init");
 
 	gobject_class = G_OBJECT_CLASS(klass);
 	gobject_class->finalize = pairing_skeleton_object_finalize;
@@ -960,6 +973,8 @@ static void pairing_skeleton_class_init(PairingSkeletonClass *klass)
 static void bluez_agent_added_cb(bluez_agent_t *agent, void *user_data)
 {
 	GDBusConnection *connection = user_data;
+
+	ERROR("");
 
 	bluez_agent_unset_agent_added();
 
@@ -1012,6 +1027,8 @@ void bt_service_pairing_init(GDBusObjectSkeleton *gdbus_object_skeleton,
 		return;
 	}
 
+	ERROR("");
+
 	bluez_agent_register_agent(PAIRING_AGENT_PATH,
 				DISPLAY_YES_NO,
 				register_pairing_agent_cb,
@@ -1022,7 +1039,7 @@ void bt_service_pairing_deinit(void)
 {
 	GDBusConnection *connection;
 
-	DBG("");
+	ERROR("");
 
 	if (bt_pairing == NULL)
 		return;
