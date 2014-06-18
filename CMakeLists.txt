@@ -11,6 +11,7 @@ INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include/)
 
 INCLUDE(FindPkgConfig)
 pkg_check_modules(${TEST} REQUIRED
+			bundle
 			glib-2.0
 			dbus-1
 			gio-2.0

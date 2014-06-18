@@ -83,13 +83,13 @@ void vertical_notify_bt_disabled(void)
 		bluetooth_driver->disabled();
 }
 
-void vertical_notify_bt_pairing_agent_on(void)
+void vertical_notify_bt_pairing_agent_on(bundle* b)
 {
 	if (!bluetooth_driver)
 		return;
 
 	if (bluetooth_driver->pairing_agent_on)
-		bluetooth_driver->pairing_agent_on();
+		bluetooth_driver->pairing_agent_on(b);
 }
 
 void vertical_notify_bt_opp_agent_on(void)

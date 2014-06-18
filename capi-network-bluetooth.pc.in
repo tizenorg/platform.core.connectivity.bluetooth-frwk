@@ -9,6 +9,6 @@ Name: Blutooth-CAPI
 Description: @PACKAGE_DESCRIPTION@
 Version: @VERSION@
 Requires: glib-2.0
-Libs: -L${libdir} -lcapi-network-bluetooth 
+Libs: -L${libdir} -lcapi-network-bluetooth -lglib-2.0
 Cflags: -I${includedir}
 

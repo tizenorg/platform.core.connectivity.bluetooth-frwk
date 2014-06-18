@@ -17,6 +17,8 @@
 *
 */
 
+#include <bundle.h>
+
 #include "common.h"
 #include "gdbus.h"
 #include "comms_error.h"
@@ -620,6 +622,70 @@ static gboolean relay_agent_timeout_cb(gpointer user_data)
 	return FALSE;
 }
 
+#define PAIRING_AGENT "bt_pairing_agent"
+
+static bundle* fill_notification_bundle(struct pairing_context* pairing_data)
+{
+	bundle* b = bundle_create();
+	if (!b)
+		return NULL;
+
+	bundle_add(b, "agent_type", PAIRING_AGENT);
+	bundle_add(b, "event_type", (char *) pairing_data->method_name);
+
+	if (!g_strcmp0(pairing_data->method_name, "DisplayPinCode")) {
+		gchar *device_path = NULL;
+		gchar *pincode =  NULL;
+		g_variant_get(pairing_data->parameters, "(os)", &device_path, &pincode);
+		bundle_add(b, "device-name", (char *) device_path);
+		bundle_add(b, "pincode", (char *) pincode);
+		g_free(device_path);
+		g_free(pincode);
+	}
+	else if (!g_strcmp0(pairing_data->method_name, "RequestPinCode")) {
+		gchar *device_path = NULL;
+		g_variant_get(pairing_data->parameters, "(o)", &device_path);
+		bundle_add(b, "device-name", (char *) device_path);
+		g_free(device_path);
+	}
+	else if (!g_strcmp0(pairing_data->method_name, "RequestPasskey")) {
+		gchar *device_path = NULL;
+		g_variant_get(pairing_data->parameters, "(o)", &device_path);
+		bundle_add(b, "device-name", (char *) device_path);
+		g_free(device_path);
+	}
+	else if (!g_strcmp0(pairing_data->method_name, "RequestConfirmation")) {
+		ERROR("set 'RequestConfirmation' parameters in bundle !");
+		gchar *device_path = NULL;
+		guint32 passkey = 0;
+		g_variant_get(pairing_data->parameters, "(ou)", &device_path, &passkey);
+		bundle_add(b, "device-name", (char *) device_path);
+		gchar *passkey_str = g_strdup_printf("%u", passkey);
+		bundle_add(b, "passkey", (char *) passkey_str);
+		g_free(device_path);
+		g_free(passkey_str);
+	}
+	else if (!g_strcmp0(pairing_data->method_name, "AuthorizeService")) {
+		gchar *device_path = NULL;
+		gchar *uuid = NULL;
+		g_variant_get(pairing_data->parameters, "(os)", &device_path, &uuid);
+		bundle_add(b, "device-name", (char *) device_path);
+		bundle_add(b, "uuid", (char *) uuid);
+		g_free(device_path);
+		g_free(uuid);
+	}
+	else if (!g_strcmp0(pairing_data->method_name, "RequestAuthorization")) {
+		gchar *device_path = NULL;
+		g_variant_get(pairing_data->parameters, "(o)", &device_path);
+		bundle_add(b, "device-name", (char *) device_path);
+		g_free(device_path);
+	}
+	else {
+		DBG("There is no data to add in bundle for 'Release' or 'Cancel' method calls");
+	}
+	return b;
+}
+
 static void handle_pairing_agent_method_call(GDBusConnection *connection,
 					const gchar *sender,
 					const gchar *object_path,
@@ -631,6 +697,8 @@ static void handle_pairing_agent_method_call(GDBusConnection *connection,
 {
 	ERROR("sender [%s] object_path [%s]", sender, object_path);
 	ERROR("interface [%s] method [%s]", interface, method_name);
+
+	bundle* b;
 
 	if (pairing_context) {
 		WARN("Pairing context already exist");
@@ -650,8 +718,12 @@ static void handle_pairing_agent_method_call(GDBusConnection *connection,
 		return;
 	}
 
+	b = fill_notification_bundle(pairing_context);
+
 	ERROR("call plugin with timeout !!!");
-	vertical_notify_bt_pairing_agent_on();
+	vertical_notify_bt_pairing_agent_on(b);
+
+	bundle_free(b);
 
 	relay_agent_timeout_id = g_timeout_add(5000,
 					relay_agent_timeout_cb, NULL);

@@ -20,6 +20,8 @@
 #ifndef __VERTICAL_H__
 #define __VERTICAL_H__
 
+#include <bundle.h>
+
 struct bluetooth_vertical_driver {
 	const char *name;
 	int (*probe)(void);
@@ -27,7 +29,7 @@ struct bluetooth_vertical_driver {
 	int (*disabled)(void);
 	int (*transfer)(double);
 	int (*opp_agent_on)(void);
-	int (*pairing_agent_on)(void);
+	int (*pairing_agent_on)(bundle*);
 };
 
 void comms_service_register_bt_vertical_driver(
@@ -42,7 +44,7 @@ void vertical_notify_bt_disabled(void);
 
 void vertical_notify_bt_transfer(double progress);
 
-void vertical_notify_bt_pairing_agent_on(void);
+void vertical_notify_bt_pairing_agent_on(bundle* b);
 
 void vertical_notify_bt_opp_agent_on(void);
 #endif

@@ -35,6 +35,30 @@
 static int noti_id;
 static notification_h noti = NULL;
 
+const char* error_to_string(notification_error_e error)
+{
+    if (error == NOTIFICATION_ERROR_INVALID_DATA)
+        return "NOTIFICATION_ERROR_INVALID_DATA";
+    if (error == NOTIFICATION_ERROR_NO_MEMORY)
+        return "NOTIFICATION_ERROR_NO_MEMORY";
+    if (error == NOTIFICATION_ERROR_FROM_DB)
+        return "NOTIFICATION_ERROR_FROM_DB";
+    if (error == NOTIFICATION_ERROR_ALREADY_EXIST_ID)
+        return "NOTIFICATION_ERROR_ALREADY_EXIST_ID";
+    if (error == NOTIFICATION_ERROR_FROM_DBUS)
+        return "NOTIFICATION_ERROR_FROM_DBUS";
+    if (error == NOTIFICATION_ERROR_NOT_EXIST_ID)
+        return "NOTIFICATION_ERROR_NOT_EXIST_ID";
+    if (error == NOTIFICATION_ERROR_IO)
+        return "NOTIFICATION_ERROR_IO";
+    if (error == NOTIFICATION_ERROR_SERVICE_NOT_READY)
+        return "NOTIFICATION_ERROR_SERVICE_NOT_READY";
+    if (error == NOTIFICATION_ERROR_NONE)
+        return "NOTIFICATION_ERROR_NONE";
+
+    return "UNHANDLED ERROR";
+}
+
 static notification_h create_notification(notification_type_e type)
 {
 	notification_h noti = NULL;
@@ -276,38 +300,90 @@ static int bt_transfer(double progress)
 	return 0;
 }
 
-static int bt_pairing_agent_on(void)
+static int set_notification_text(notification_h noti, char *title, char *body)
 {
-	bundle *b;
-	int ret;
+    notification_error_e err = NOTIFICATION_ERROR_NONE;
 
-	ERROR("");
-	
+    err = notification_set_text( noti, NOTIFICATION_TEXT_TYPE_TITLE, title,
+    		NULL, NOTIFICATION_VARIABLE_TYPE_NONE);
+    if (err != NOTIFICATION_ERROR_NONE) {
+        ERROR("Unable to set notification title: %s", error_to_string(err));
+        return 1;
+    }
+
+    err = notification_set_text( noti, NOTIFICATION_TEXT_TYPE_CONTENT, body,
+    		NULL, NOTIFICATION_VARIABLE_TYPE_NONE);
+    if (err != NOTIFICATION_ERROR_NONE) {
+        ERROR("Unable to set notification content: %s", error_to_string(err));
+        return 1;
+    }
+    return 0;
+}
+
+static int bt_pairing_agent_on(bundle* b)
+{
+	notification_h noti;
+	notification_error_e err = NOTIFICATION_ERROR_NONE;
+    const char *device_name = NULL;
+    const char *passkey = NULL;
+    const char *uuid = NULL;
+    const char *event_type = NULL;
+    char *title = NULL;
+    char *body = NULL;
+
+    event_type = bundle_get_val(b, "event-type");
+    ERROR("create notification for '%s' event", event_type);
+
 	noti = notification_create(NOTIFICATION_TYPE_NOTI);
 	notification_set_pkgname(noti, BT_AGENT_APP_NAME);
-	notification_set_text(noti, NOTIFICATION_TEXT_TYPE_TITLE,
-                                   "Bluetooth pairing agent", NULL,
-                                   NOTIFICATION_VARIABLE_TYPE_NONE); 
-	notification_set_text(noti, NOTIFICATION_TEXT_TYPE_CONTENT,
-                                    "Pairing agent will execute itself...", NULL,   
-                                    NOTIFICATION_VARIABLE_TYPE_NONE);
-    notification_insert(noti, NULL);
 
-	b = bundle_create();
-	if (!b)
-		return -1;
+	// notification_set_execute_option(noti, NOTIFICATION_EXECUTE_TYPE_SINGLE_LAUNCH, NULL, NULL, b);
 
-	bundle_add(b, "agent_type", PAIRING_AGENT);
-	bundle_add(b, "event_type", "passkey-confirm-request");
-
-	//ret = syspopup_launch(BT_AGENT_APP_NAME, b);
-	ret = 0;
-	if (ret < 0) {
-		ERROR("Launch pairing agent failed");
-		return -1;
+	if (!g_strcmp0(event_type, "RequestPinCode")) {
+        device_name = (gchar*) bundle_get_val(b, "device-name");
+        title = g_strdup_printf("Bluetooth pairing request");
+        body = g_strdup_printf("Enter PIN to pair with %s (Try 0000 or 1234)", device_name);
 	}
+	else if (!g_strcmp0(event_type, "DisplayPinCode")) {
+        device_name = (gchar*) bundle_get_val(b, "device-name");
+        passkey = (gchar*) bundle_get_val(b, "pincode");
+        title = g_strdup_printf("Bluetooth PIN code display");
+        body = g_strdup_printf("Display %s PIN code to pair with %s", passkey, device_name);
+	}
+	else if (!g_strcmp0(event_type, "RequestPasskey")) {
+        device_name = (gchar*) bundle_get_val(b, "device-name");
+        title = g_strdup_printf("Bluetooth pairing passkey request");
+        body = g_strdup_printf("Enter passkey to pair with %s ", device_name);
+	}
+	else if (!g_strcmp0(event_type, "RequestConfirmation")) {
+		device_name = (gchar*) bundle_get_val(b, "device-name");
+		passkey = (gchar*) bundle_get_val(b, "passkey");
+		ERROR("bundle contains device-name [%s] and passkey [%s]", device_name, passkey);
+        title = g_strdup_printf("Bluetooth passkey confirm request");
+        body = g_strdup_printf("Confirm passkey is %s to pair with %s", passkey, device_name);
+	}
+	else if (!g_strcmp0(event_type, "AuthorizeService")) {
+		device_name = (gchar*) bundle_get_val(b, "device-name");
+		uuid = (gchar*) bundle_get_val(b, "uuid");
+        title = g_strdup_printf("Bluetooth authorize service");
+        body = g_strdup_printf("Allow connection on %s service", uuid);
+	}
+	else if (!g_strcmp0(event_type, "RequestAuthorization")) {
+		device_name = (gchar*) bundle_get_val(b, "device-name");
+        title = g_strdup_printf("Bluetooth authorize request");
+        body = g_strdup_printf("Allow %s to connect?", device_name);
+	}
+    set_notification_text(noti, title, body);
+    g_free(title);
+    g_free(body);
 
 	bundle_free(b);
+
+    err = notification_insert(noti, NULL);
+    if (err != NOTIFICATION_ERROR_NONE) {
+        ERROR("Unable to insert notification: %s\n", error_to_string(err));
+        return 1;
+    }
 
 	return 0;
 }
