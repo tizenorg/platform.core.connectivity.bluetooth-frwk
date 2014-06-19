@@ -31,6 +31,7 @@
 #define MEDIACONTROL_INTERFACE "org.bluez.MediaControl1"
 #define DEVICE_INTERFACE "org.bluez.Device1"
 #define NETWORK_INTERFACE "org.bluez.Network1"
+#define NETWORKSERVER_INTERFACES "org.bluez.NetworkServer1"
 #define INPUT_INTERFACE "org.bluez.Input1"
 #define AGENT_INTERFACE "org.bluez.AgentManager1"
 #define PROFILE_INTERFACE "org.bluez.ProfileManager1"
@@ -89,9 +90,11 @@ struct _bluez_adapter {
 	char *object_path;
 	GDBusInterface *interface;
 	GDBusInterface *media_interface;
+	GDBusInterface *netserver_interface;
 	guint avrcp_registration_id;
 	GDBusProxy *proxy;
 	GDBusProxy *media_proxy;
+	GDBusProxy *netserver_proxy;
 	struct _bluez_object *parent;
 	struct _device_head *device_head;
 	bluez_adapter_powered_cb_t powered_cb;
@@ -142,6 +145,8 @@ static bluez_avrcp_target_cb_t avrcp_target_cb;
 static gpointer avrcp_target_cb_data;
 static bluez_audio_state_cb_t audio_state_cb;
 static gpointer audio_state_cb_data;
+static bluez_nap_connection_state_cb_t nap_connnection_state_cb;
+static gpointer nap_connnection_state_cb_data;
 static device_connect_cb_t dev_connect_cb;
 static gpointer dev_connect_data;
 static device_disconnect_cb_t dev_disconnect_cb;
@@ -264,6 +269,35 @@ static void handle_adapter_discoverable_timeout_changed(
 				adapter->discoverable_timeout_cb_data);
 }
 
+static void networkserver_on_signal(GDBusProxy *proxy,
+					gchar *sender_name,
+					gchar *signal_name,
+					GVariant *param,
+					gpointer user_data)
+{
+	gboolean connected;
+	gchar *device = NULL, *address =  NULL;
+
+	DBG("sender_name = %s, signal_name = %s",
+				sender_name, signal_name);
+	if (strcasecmp(signal_name, "PeerConnected"))
+		connected = true;
+	else if (strcasecmp(signal_name, "PeerDisconnected"))
+		connected = false;
+	else
+		return;
+
+	g_variant_get(param, "(ss)", &device, &address);
+
+	if (nap_connnection_state_cb)
+		nap_connnection_state_cb(connected,
+			address, device,
+			nap_connnection_state_cb_data);
+
+	g_free(device);
+	g_free(address);
+}
+
 static void adapter_properties_changed(GDBusProxy *proxy,
 					GVariant *changed_properties,
 					GStrv *invalidated_properties,
@@ -320,7 +354,8 @@ static void parse_bluez_adapter_interfaces(gpointer data, gpointer user_data)
 	struct _bluez_adapter *adapter = user_data;
 	GDBusInterface *interface = data;
 	GDBusProxy *proxy = G_DBUS_PROXY(interface);
-	const gchar *iface_name;
+	GDBusProxy *signal_proxy;
+	const gchar *iface_name, *adapter_path;
 
 	if (!adapter) {
 		WARN("no adapter");
@@ -341,7 +376,28 @@ static void parse_bluez_adapter_interfaces(gpointer data, gpointer user_data)
 		DBG("adapter->media_proxy = proxy");
 		adapter->media_interface = interface;
 		adapter->media_proxy = proxy;
+	} else if (g_strcmp0(iface_name,
+				NETWORKSERVER_INTERFACES) == 0) {
+		adapter_path = g_dbus_proxy_get_object_path(proxy);
+
+		signal_proxy = g_dbus_proxy_new_for_bus_sync(
+						G_BUS_TYPE_SYSTEM, 0,
+						NULL,
+						BLUEZ_NAME,
+						adapter_path,
+						iface_name,
+						NULL, NULL);
+
+		DBG("adapter->netserver_proxy = proxy");
+
+		adapter->netserver_interface = interface;
+		adapter->netserver_proxy = signal_proxy;
+
+		g_signal_connect(signal_proxy, "g-signal",
+					G_CALLBACK(networkserver_on_signal),
+							NULL);
 	}
+
 }
 
 static GList *bluez_object_list;
@@ -1046,6 +1102,20 @@ void bluez_unset_avrcp_target_cb()
 {
 	avrcp_target_cb = NULL;
 	avrcp_target_cb_data = NULL;
+}
+
+void bluez_set_nap_connection_state_cb(
+				bluez_nap_connection_state_cb_t cb,
+				gpointer user_data)
+{
+	nap_connnection_state_cb = cb;
+	nap_connnection_state_cb_data = user_data;
+}
+
+void bluez_unset_nap_connection_state_cb(void)
+{
+	nap_connnection_state_cb = NULL;
+	nap_connnection_state_cb_data = NULL;
 }
 
 void bluez_set_audio_state_cb(bluez_audio_state_cb_t cb,

@@ -2085,6 +2085,44 @@ static int nap_deactivate(const char *p1, const char *p2)
 	return 0;
 }
 
+void bt_nap_connection_state_changed_cb_test(bool connected,
+					const char *remote_address,
+					const char *interface_name,
+					void *user_data)
+{
+
+	DBG("");
+	DBG("connected = %d", connected);
+	DBG("remote_address = %s", remote_address);
+	DBG("interfaces_name = %s", interface_name);
+}
+
+static int nap_set_connection_state_changed_cb(const char *p1,
+						const char *p2)
+{
+	int ret;
+
+	ret = bt_nap_set_connection_state_changed_cb(
+			bt_nap_connection_state_changed_cb_test,
+			NULL);
+
+	DBG("ret = %d", ret);
+
+	return 0;
+}
+
+static int nap_unset_connection_state_changed_cb(const char *p1,
+						const char *p2)
+{
+	int ret;
+
+	ret = bt_nap_unset_connection_state_changed_cb();
+
+	DBG("ret = %d", ret);
+
+	return 0;
+}
+
 void bt_hdp_connected_cb_test(int result, const char *remote_address,
 			const char *app_id, bt_hdp_channel_type_e type,
 			unsigned int channel, void *user_data)
@@ -2449,6 +2487,12 @@ struct {
 
 	{"nap_deactivate", nap_deactivate,
 		"Usage: nap_deactivate\n\tdeactivate NAP"},
+
+	{"nap_set_connection_state_changed_cb", nap_set_connection_state_changed_cb,
+		"Usage: nap_set_connection_state_changed_cb\n\tset nap conn cb"},
+
+	{"nap_unset_connection_state_changed_cb", nap_unset_connection_state_changed_cb,
+		"Usage: nap_unset_connection_state_changed_cb\n\tunset nap conn cb"},
 
 	{"hdo_set_connect_cb", hdp_set_connection_state_changed_cb,
 		"Usage: hdp_set_connect_cb\n\tset hdp conn cb"},

@@ -22,7 +22,9 @@
 #include <unistd.h>
 #include <glib.h>
 #include <gio/gio.h>
+#include <dirent.h>
 #include <dbus/dbus.h>
+#include <gio/gunixfdlist.h>
 
 #include "bluetooth.h"
 #include "obex.h"

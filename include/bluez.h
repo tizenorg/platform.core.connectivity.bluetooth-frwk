@@ -350,6 +350,15 @@ void bluez_set_avrcp_target_cb(
 				gpointer user_data);
 void bluez_unset_avrcp_target_cb();
 
+typedef void (*bluez_nap_connection_state_cb_t)(bool connected,
+				const char *remote_address,
+				const char *interface_name,
+				gpointer user_data);
+void bluez_set_nap_connection_state_cb(
+				bluez_nap_connection_state_cb_t cb,
+				gpointer user_data);
+void bluez_unset_nap_connection_state_cb(void);
+
 typedef void (*bluez_audio_state_cb_t)(int result,
 				gboolean connected,
 				const char *remote_address,
