@@ -194,6 +194,11 @@ struct hid_host_connection_state_changed_cb_node {
 	void *user_data;
 };
 
+struct nap_connection_state_changed_cb_node {
+	bt_nap_connection_state_changed_cb cb;
+	void *user_data;
+};
+
 static struct device_connect_cb_node *device_connect_node;
 static struct device_disconnect_cb_node *device_disconnect_node;
 static struct avrcp_repeat_mode_changed_node *avrcp_repeat_node;
@@ -225,6 +230,8 @@ static struct socket_connection_requested_cb_node
 static struct socket_connection_state_changed_cb_node
 					*socket_connection_state_node;
 static struct hid_host_connection_state_changed_cb_node *hid_host_state_node;
+static struct nap_connection_state_changed_cb_node
+				*nap_connection_state_changed_node;
 
 static gboolean generic_device_removed_set;
 
@@ -489,6 +496,19 @@ static void bluez_avrcp_shuffle_changed(gboolean shuffle,
 
 	if (data->cb)
 		data->cb(shuffle_mode, data->user_data);
+}
+
+static void bluez_nap_connection_changed(bool connected,
+				const char *remote_address,
+				const char *interface_name,
+				void *user_data)
+{
+	struct nap_connection_state_changed_cb_node *data =
+						user_data;
+
+	if (data->cb)
+		data->cb(connected, remote_address,
+			interface_name, data->user_data);
 }
 
 static void bluez_set_data_received_changed(
@@ -964,6 +984,11 @@ static void _bt_update_bluetooth_callbacks(void)
 		bluez_set_device_disconnect_changed_cb(
 					bluez_device_disconnect_changed,
 					device_disconnect_node);
+
+	if (nap_connection_state_changed_node)
+		bluez_set_nap_connection_state_cb(
+				bluez_nap_connection_changed,
+				nap_connection_state_changed_node);
 }
 
 static void setup_bluez_lib(void)
@@ -5110,6 +5135,59 @@ int bt_device_disconnect_le(bt_device_gatt_state_changed_cb callback,
 	_bt_update_bluetooth_callbacks();
 
 	bluez_device_disconnect_le(device);
+
+	return BT_SUCCESS;
+}
+
+int bt_nap_set_connection_state_changed_cb(
+				bt_nap_connection_state_changed_cb callback,
+				void *user_data)
+{
+	struct nap_connection_state_changed_cb_node *node_data;
+
+	DBG("");
+
+	if (callback == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (nap_connection_state_changed_node) {
+		DBG("Powered state changed callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
+
+	node_data = g_new0(struct nap_connection_state_changed_cb_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->cb = callback;
+	node_data->user_data = user_data;
+
+	nap_connection_state_changed_node = node_data;
+
+	_bt_update_bluetooth_callbacks();
+
+	return BT_SUCCESS;
+}
+
+int bt_nap_unset_connection_state_changed_cb(void)
+{
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!adapter_name_node)
+		return BT_SUCCESS;
+
+	bluez_unset_nap_connection_state_cb();
+
+	g_free(nap_connection_state_changed_node);
+	nap_connection_state_changed_node = NULL;
 
 	return BT_SUCCESS;
 }
