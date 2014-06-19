@@ -5222,6 +5222,7 @@ int bt_device_foreach_connected_profiles(
 	bt_device_info_s *device_info;
 	gboolean rfcomm_connected;
 	gboolean is_type;
+	gboolean hid_connected = false;
 
 	DBG("");
 
@@ -5255,6 +5256,12 @@ int bt_device_foreach_connected_profiles(
 
 	if (is_type)
 		callback(BT_PROFILE_A2DP, user_data);
+
+	if (!(bluez_device_input_get_property_connected(device,
+					&hid_connected))) {
+		if (hid_connected)
+			callback(BT_PROFILE_HID, user_data);
+	}
 
 	free_device_info(device_info);
 

@@ -478,6 +478,10 @@ int bluez_device_get_property_rssi(
 char *bluez_device_get_property_icon(
 				struct _bluez_device *device);
 
+int bluez_device_input_get_property_connected(
+				struct _bluez_device *device,
+				gboolean *connected);
+
 /* agent functions */
 bluez_agent_t *bluez_agent_get_agent(void);
 
