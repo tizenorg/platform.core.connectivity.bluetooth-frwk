@@ -189,6 +189,8 @@ static void register_pairing_agent_cb(enum bluez_error_type type, void *user_dat
 		return;
 	}
 
+	ERROR("request default agent: path [%s]", PAIRING_AGENT_PATH);
+
 	bluez_agent_request_default_agent(PAIRING_AGENT_PATH);
 
 	bt_pairing_register_dbus_interface(bt_pairing, connection);
@@ -653,13 +655,21 @@ static gchar* get_device_name_from_device_path(gchar* device_path)
 
 }
 
-static bundle* fill_notification_bundle(struct pairing_context* pairing_data)
+static bundle* fill_notification_bundle(struct pairing_context* pairing_data, const gchar *object_path)
 {
 	bundle* b = bundle_create();
 	if (!b)
 		return NULL;
 
 	bundle_add(b, "event_type", (char *) pairing_data->method_name);
+
+	gchar *invocation_str = g_strdup_printf("%p", pairing_data->invocation);
+	bundle_add(b, "invocation", (char *) invocation_str);
+	ERROR("INVOCATION: [%p] !", pairing_data->invocation);
+	ERROR("INVOCATION BUNDLE: [%s] !", bundle_get_val(b, "invocation"));
+
+	bundle_add(b, "agent-path", (char *) object_path);
+	ERROR("INVOCATION: [%s] !", object_path);
 
 	if (!g_strcmp0(pairing_data->method_name, "DisplayPinCode")) {
 		gchar *device_path = NULL;
@@ -768,13 +778,10 @@ static void handle_pairing_agent_method_call(GDBusConnection *connection,
 		return;
 	}
 
-	b = fill_notification_bundle(pairing_context);
+	b = fill_notification_bundle(pairing_context, object_path);
 
 	ERROR("call plugin with timeout !!!");
 	vertical_notify_bt_pairing_agent_on(b);
-
-	ERROR("BUNDLE free !!!");
-	bundle_free(b);
 
 	relay_agent_timeout_id = g_timeout_add(5000,
 					relay_agent_timeout_cb, NULL);

@@ -1100,9 +1100,10 @@ static void bluez_agent_added(struct _bluez_object *object,
 {
 	struct _bluez_agent *agent;
 
-	ERROR("Register agent on BlueZ !!! ");
-
 	agent = create_agent(object);
+
+	ERROR("Register agent on BlueZ !!! ");
+	ERROR("BlueZ Agent: path: [%s] / interface: [%s] ", agent->object_path, agent->interface_name);
 
 	g_list_foreach(ifaces, parse_bluez_agent_interfaces, agent);
 
@@ -2040,6 +2041,8 @@ void bluez_device_pair(struct _bluez_device *device,
 	reply_data->reply_cb = pair_cb;
 	reply_data->user_data = user_data;
 
+	ERROR("call Pair : path [%s] / interface_name [%s]", device->object_path, device->interface_name);
+
 	g_dbus_proxy_call(device->proxy,
 			"Pair", NULL,
 			0, -1, NULL,
@@ -2229,8 +2232,6 @@ void bluez_agent_register_agent(const gchar *path,
 	struct simple_reply_data *reply_data;
 	const gchar *cap_string;
 
-	ERROR("call RegisterAgent dbus method / path: [%s]", path);
-
 	cap_string = get_capability_string(capability);
 	if (cap_string == NULL) {
 		ERROR("parameter capability error");
@@ -2246,6 +2247,8 @@ void bluez_agent_register_agent(const gchar *path,
 	reply_data->proxy = this_agent->proxy;
 	reply_data->reply_cb = register_agent_cb;
 	reply_data->user_data = user_data;
+
+	ERROR("call RegisterAgent : path [%s] / interface_name [%s]", path, this_agent->interface_name);
 
 	DBG("%s %s", path, cap_string);
 	g_dbus_proxy_call(this_agent->proxy,
@@ -2274,6 +2277,8 @@ void bluez_agent_unregister_agent(const gchar *path,
 	reply_data->reply_cb = unregister_agent_cb;
 	reply_data->user_data = user_data;
 
+	ERROR("call UnregisterAgent : path [%s] / interface_name [%s]", path, this_agent->interface_name);
+
 	g_dbus_proxy_call(this_agent->proxy,
 				"UnregisterAgent",
 				g_variant_new("(o)", path),
@@ -2284,7 +2289,7 @@ void bluez_agent_unregister_agent(const gchar *path,
 
 void bluez_agent_request_default_agent(const gchar *path)
 {
-	ERROR("path %s", path);
+	ERROR("call RequestDefaultAgent : path [%s] / interface_name [%s]", path, this_agent->interface_name);
 
 	g_dbus_proxy_call(this_agent->proxy,
 				"RequestDefaultAgent",

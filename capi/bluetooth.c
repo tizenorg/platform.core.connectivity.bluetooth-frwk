@@ -3162,11 +3162,11 @@ static void handle_method_call(GDBusConnection *connection,
 	}
 
 	if (g_strcmp0(method_name, "RequestConfirmation") == 0) {
-		ERROR("RequestConfirmation method was catched, retrieve parameters !");
 		gchar *device_path = NULL;
 		guint32 passkey = 0;
 		g_variant_get(parameters, "(ou)", &device_path, &passkey);
-
+		ERROR("RequestConfirmation method was catched, retrieve parameters !");
+		ERROR("device_path [%s] passkey [%d]", device_path, passkey);
 		request_confirmation_handler(device_path, passkey, invocation);
 
 		g_free(device_path);
@@ -3217,6 +3217,7 @@ static GDBusConnection *conn;
 
 static void release_dbus_connection(void)
 {
+	ERROR("release connection");
 	g_object_unref(conn);
 	conn = NULL;
 }
@@ -3229,6 +3230,8 @@ static void release_name_on_dbus(const char *name)
 
 	if (bluetooth_agent_id || profile_id)
 		return;
+
+	ERROR("release name [%s]", name);
 
 	ret = g_dbus_connection_call_sync(conn,
 					"org.freedesktop.DBus",
@@ -3271,6 +3274,8 @@ static GDBusConnection *get_system_dbus_connect(void)
 		g_error_free(error);
 	}
 
+	ERROR("get system dbus connection");
+
 	return conn;
 }
 
@@ -3284,6 +3289,8 @@ static int request_name_on_dbus(const char *name)
 	connection = get_system_dbus_connect();
 	if (connection == NULL)
 		return -1;
+
+	ERROR("request name [%s] on dbus", name);
 
 	ret = g_dbus_connection_call_sync(connection,
 					"org.freedesktop.DBus",
@@ -3340,7 +3347,9 @@ static int create_agent(void)
 	if (ret != 0)
 		return -1;
 
-	ERROR("%s requested success", BLUEZ_AGENT_SERVICE);
+	ERROR("[%s] name requested success", BLUEZ_AGENT_SERVICE);
+
+	ERROR("register object [%s] on dbus", AGENT_OBJECT_PATH);
 
 	bluetooth_agent_id = g_dbus_connection_register_object(
 						conn,
@@ -3421,11 +3430,13 @@ int bt_agent_unregister(void)
 
 static void bt_agent_simple_accept(GDBusMethodInvocation *invocation)
 {
+	ERROR(" ACCEPT: call g_dbus_method_invocation_return_value()");
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
 static void bt_agent_simple_reject(GDBusMethodInvocation *invocation)
 {
+	ERROR(" REJECT: call g_dbus_method_invocation_return_dbus_error()");
 	g_dbus_method_invocation_return_dbus_error(invocation,
 			ERROR_INTERFACE ".Rejected",
 			"RejectedByUser");

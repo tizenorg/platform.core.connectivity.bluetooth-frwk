@@ -764,7 +764,7 @@ void comms_bluetooth_register_pairing_agent(const char *agent_path,
 	async_result_node->callback = cb;
 	async_result_node->user_data = user_data;
 
-	ERROR("call method RegisterPairingAgent !");
+	ERROR("call method RegisterPairingAgent with agent_path [%s] ", agent_path);
 
 	g_dbus_proxy_call(this_bluetooth->pairing.proxy, "RegisterPairingAgent",
 					g_variant_new("(o)", agent_path),
