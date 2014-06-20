@@ -603,10 +603,16 @@ struct opp_server_push_cb_node {
 	void *user_data;
 };
 
+struct opp_server_connection_requested_cb {
+	bt_opp_server_connection_requested_cb callback;
+	void *user_data;
+};
+
 static GList *sending_files;
 static int pending_file_count;
 
 struct opp_server_push_cb_node *opp_server_push_node;
+struct opp_server_connection_requested_cb *opp_server_conn_req_node;
 static bt_opp_server_transfer_progress_cb bt_transfer_progress_cb;
 static bt_opp_server_transfer_finished_cb bt_transfer_finished_cb;
 static bt_opp_client_push_progress_cb bt_progress_cb;
@@ -619,6 +625,14 @@ void server_push_requested_cb(const char *remote_address, const char *name,
 	if (opp_server_push_node)
 		opp_server_push_node->callback(name, size,
 				opp_server_push_node->user_data);
+}
+
+void server_connect_requested_cb(const char *remote_address, const char *name,
+					uint64_t size, void *user_data)
+{
+	if (opp_server_conn_req_node)
+		opp_server_conn_req_node->callback(remote_address,
+				opp_server_conn_req_node->user_data);
 }
 
 int bt_opp_server_initialize(const char *destination,
@@ -655,6 +669,8 @@ int bt_opp_server_initialize(const char *destination,
 	opp_server_push_node->callback = push_requested_cb;
 	opp_server_push_node->user_data = user_data;
 
+	bt_opp_server_set_destination(destination);
+
 	return ret;
 }
 
@@ -662,9 +678,40 @@ int bt_opp_server_initialize_by_connection_request(const char *destination,
 		bt_opp_server_connection_requested_cb connection_requested_cb,
 		void *user_data)
 {
-	/* TODO: Implement */
+	int ret;
 
-	return BT_SUCCESS;
+	ret = bt_opp_init();
+	if (ret != BT_SUCCESS)
+		return ret;
+
+	if (!destination || !connection_requested_cb)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (opp_server_conn_req_node) {
+		ERROR("Already registered");
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	opp_server_conn_req_node =
+			g_new0(struct opp_server_connection_requested_cb, 1);
+	if (opp_server_conn_req_node == NULL) {
+		ERROR("no memroy");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	ret = bt_opp_register_server(destination,
+				server_connect_requested_cb, NULL);
+	if (ret != BT_SUCCESS) {
+		g_free(opp_server_conn_req_node);
+		opp_server_conn_req_node = NULL;
+	}
+
+	opp_server_conn_req_node->callback = connection_requested_cb;
+	opp_server_conn_req_node->user_data = user_data;
+
+	bt_opp_server_set_destination(destination);
+
+	return ret;
 }
 
 int bt_opp_server_deinitialize(void)
@@ -674,6 +721,11 @@ int bt_opp_server_deinitialize(void)
 	if (opp_server_push_node) {
 		g_free(opp_server_push_node);
 		opp_server_push_node = NULL;
+	}
+
+	if (opp_server_conn_req_node) {
+		g_free(opp_server_conn_req_node);
+		opp_server_conn_req_node = NULL;
 	}
 
 	bt_transfer_progress_cb = NULL;
