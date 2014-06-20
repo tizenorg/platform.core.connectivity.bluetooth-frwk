@@ -637,7 +637,27 @@ static int register_opp_server_initialize(const char *p1, const char *p2)
 
 	DBG("");
 
-	bt_opp_server_initialize("/tmp", bt_opp_server_push_requested_cb_test, NULL);
+	bt_opp_server_initialize("/tmp",
+				bt_opp_server_push_requested_cb_test, NULL);
+	return 0;
+}
+
+void bt_opp_server_connection_requested_cb_test(
+				const char *remote_address, void *user_data)
+{
+	DBG("remote_address = %s", remote_address);
+	bt_opp_server_reject();
+}
+
+static int register_opp_server_initialize_by_connection_request(
+					const char *p1, const char *p2)
+{
+	DBG("");
+
+	bt_opp_server_initialize_by_connection_request("/tmp",
+				bt_opp_server_connection_requested_cb_test,
+				NULL);
+
 	return 0;
 }
 
@@ -2382,6 +2402,10 @@ struct {
 
 	{"register_opp_server_initialize", register_opp_server_initialize,
 		"Usage: register_opp_server_initialize\n\tregister opp server"},
+
+	{"register_opp_server_init_by_conn_req",
+		register_opp_server_initialize_by_connection_request,
+		"Usage: register_opp_server_init_by_conn_req"},
 
 	{"unregister_opp_server", unregister_opp_server,
 		"Usage: unregister_opp_server\n\tunregister server"},
