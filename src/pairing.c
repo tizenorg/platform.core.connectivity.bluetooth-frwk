@@ -279,6 +279,11 @@ static const gchar introspection_xml[] =
 	"    </method>"
 	"    <method name='Cancel'>"
 	"    </method>"
+#if JUNK
+	"    <method name='ReplyConfirmation'>"
+	"      <arg type='u' name='value' direction='in'/>"
+	"    </method>"
+#endif
 	"  </interface>"
 	"</node>";
 
@@ -417,6 +422,7 @@ static void handle_display_passkey(GDBusConnection *connection,
 				reply_data);
 }
 
+#if JUNK
 static void handle_request_confirmation(GDBusConnection *connection,
 				GVariant *parameters,
 				GDBusMethodInvocation *invocation,
@@ -443,6 +449,196 @@ static void handle_request_confirmation(GDBusConnection *connection,
 				relay_agent_reply,
 				reply_data);
 }
+#else
+
+#define PAIRING_AGENT "bt_pairing_agent"
+
+static gchar* get_device_name_from_device_path(gchar* device_path)
+{
+	bluez_device_t *device;
+
+	if (default_adapter == NULL) {
+		ERROR("No default adapter");
+		return NULL;
+	}
+
+	if (device_path == NULL) {
+		ERROR("device_path is NULL");
+		return NULL;
+	}
+
+	device = bluez_adapter_get_device_by_path(default_adapter,
+							device_path);
+	if (device == NULL) {
+		ERROR("Can't find device %s", device_path);
+		return NULL;
+	}
+
+	return bluez_device_get_property_alias(device);
+
+}
+
+static bundle* fill_notification_bundle(const gchar *method_name, GVariant *parameters, int hndlid, const gchar *object_path)
+{
+	bundle* b = bundle_create();
+	if (!b)
+		return NULL;
+
+	bundle_add(b, "event_type", (char *) method_name);
+
+	gchar *invocation_str = g_strdup_printf("%p", invocation);
+	bundle_add(b, "invocation", (char *) invocation_str);
+	ERROR("INVOCATION: [%p] !", invocation);
+	ERROR("INVOCATION BUNDLE: [%s] !", bundle_get_val(b, "invocation"));
+
+	bundle_add(b, "agent-path", (char *) object_path);
+	ERROR("INVOCATION: [%s] !", object_path);
+
+	if (!g_strcmp0(method_name, "DisplayPinCode")) {
+		gchar *device_path = NULL;
+		gchar *device_name = NULL;
+		gchar *pincode =  NULL;
+		g_variant_get(parameters, "(os)", &device_path, &pincode);
+		device_name = get_device_name_from_device_path(device_path);
+		bundle_add(b, "device_name", (char *) device_name);
+		bundle_add(b, "pincode", (char *) pincode);
+		g_free(device_path);
+		g_free(pincode);
+	}
+	else if (!g_strcmp0(method_name, "RequestPinCode")) {
+		gchar *device_path = NULL;
+		gchar *device_name = NULL;
+		g_variant_get(parameters, "(o)", &device_path);
+		device_name = get_device_name_from_device_path(device_path);
+		bundle_add(b, "device_name", (char *) device_name);
+		g_free(device_path);
+	}
+	else if (!g_strcmp0(method_name, "RequestPasskey")) {
+		gchar *device_path = NULL;
+		gchar *device_name = NULL;
+		g_variant_get(parameters, "(o)", &device_path);
+		device_name = get_device_name_from_device_path(device_path);
+		bundle_add(b, "device_name", (char *) device_name);
+		g_free(device_path);
+	}
+	else if (!g_strcmp0(method_name, "RequestConfirmation")) {
+		ERROR("set [%s] parameters in bundle !", method_name);
+		gchar *device_path = NULL;
+		gchar *device_name = NULL;
+		guint32 passkey = 0;
+		g_variant_get(parameters, "(ou)", &device_path, &passkey);
+		device_name = get_device_name_from_device_path(device_path);
+		bundle_add(b, "device_name", (char *) device_name);
+		gchar *passkey_str = g_strdup_printf("%u", passkey);
+		// Set '0' padding if the passkey has less than 6 digits
+		char passkey_tab[PASSKEY_SIZE] = "000000";
+		int size = strlen((char *)passkey_str);
+		ERROR("size [%d]", size);
+		if (size <= PASSKEY_SIZE) {
+			memcpy(&passkey_tab[PASSKEY_SIZE - size], passkey_str, size);
+		}
+		bundle_add(b, "passkey", passkey_tab);
+		ERROR("device_path [%s] / passkey_str [%s]", device_path, passkey_str);
+		ERROR("BUNDLE contains: device_name [%s] / passkey [%s]", bundle_get_val(b, "device_name"), bundle_get_val(b, "passkey"));
+		g_free(device_path);
+		g_free(passkey_str);
+	}
+	else if (!g_strcmp0(method_name, "AuthorizeService")) {
+		gchar *device_path = NULL;
+		gchar *device_name = NULL;
+		gchar *uuid = NULL;
+		g_variant_get(parameters, "(os)", &device_path, &uuid);
+		device_name = get_device_name_from_device_path(device_path);
+		bundle_add(b, "device_name", (char *) device_name);
+		bundle_add(b, "uuid", (char *) uuid);
+		g_free(device_path);
+		g_free(uuid);
+	}
+	else if (!g_strcmp0(method_name, "RequestAuthorization")) {
+		gchar *device_path = NULL;
+		gchar *device_name = NULL;
+		g_variant_get(parameters, "(o)", &device_path);
+		device_name = get_device_name_from_device_path(device_path);
+		bundle_add(b, "device_name", (char *) device_name);
+		g_free(device_path);
+	}
+	else {
+		DBG("There is no data to add in bundle for 'Release' or 'Cancel' method calls");
+	}
+	ERROR("BUNDLE: event_type: [%s] and device_name: [%s]", bundle_get_val(b, "event_type"), bundle_get_val(b, "device_name"));
+	return b;
+}
+
+struct agent_reply_data *common_reply = NULL;
+
+static gboolean relay_agent_timeout_cb(gpointer user_data);
+
+static gboolean handle_request_confirmation_timeout_cb(gpointer user_data)
+{
+	struct agent_reply_data *reply = common_reply;
+	common_reply = NULL;
+	g_free(reply);
+	return relay_agent_timeout_cb(user_data);
+}
+
+static void handle_request_confirmation(GDBusConnection *connection,
+				GVariant *parameters,
+				GDBusMethodInvocation *invocation,
+				gpointer user_data)
+{
+	struct agent_reply_data *reply_data;
+	bundle* b;
+
+	ERROR("notify RequestConfirmation ");
+
+	reply_data = g_new0(struct agent_reply_data, 1);
+
+	b = fill_notification_bundle("RequestConfirmation", parameters, 1, PAIRING_AGENT_PATH);
+
+	reply_data->connection = connection;
+	reply_data->invocation = invocation;
+
+	ERROR("call plugin with timeout !!!");
+	vertical_notify_bt_pairing_agent_on(b);
+
+	common_reply = reply_data;
+	relay_agent_timeout_id = g_timeout_add(5000,
+					handle_request_confirmation_timeout_cb, NULL);
+}
+
+static void handle_reply_confirmation(GDBusConnection *connection,
+				GVariant *parameters,
+				GDBusMethodInvocation *invocation,
+				gpointer user_data)
+{
+	struct agent_reply_data *reply = common_reply;
+	GVariant *ret;
+	guint32 value;
+
+	common_reply = NULL;
+	if (!reply)
+		return;
+
+	g_variant_get(parameters, "(u)", &value);
+	switch (value) {
+		
+	case 0: /* ACCEPT */
+		g_dbus_method_invocation_return_value(reply->invocation, NULL);
+		break;
+		
+	case 1: /* REJECT */
+	case 2: /* CANCEL */
+	default: /* unexpected! */
+		g_dbus_method_invocation_return_dbus_error(
+					reply->invocation,
+					ERROR_INTERFACE ".Canceled",
+					"CancelByUser");
+		break;
+	}
+}
+
+#endif
+
 
 static void handle_request_authorization(GDBusConnection *connection,
 				GVariant *parameters,
@@ -577,6 +773,13 @@ static void handle_pairing(GDBusConnection *connection,
 					context->parameters,
 					context->invocation,
 					context->user_data);
+#if !JUNK
+	else if (g_strcmp0(method_name, "ReplyConfirmation") == 0)
+		handle_reply_confirmation(connection,
+					context->parameters,
+					context->invocation,
+					context->user_data);
+#endif
 	else
 		WARN("Unknown method %s", method_name);
 }
@@ -628,124 +831,6 @@ static gboolean relay_agent_timeout_cb(gpointer user_data)
 	return FALSE;
 }
 
-#define PAIRING_AGENT "bt_pairing_agent"
-
-static gchar* get_device_name_from_device_path(gchar* device_path)
-{
-	bluez_device_t *device;
-
-	if (default_adapter == NULL) {
-		ERROR("No default adapter");
-		return NULL;
-	}
-
-	if (device_path == NULL) {
-		ERROR("device_path is NULL");
-		return NULL;
-	}
-
-	device = bluez_adapter_get_device_by_path(default_adapter,
-							device_path);
-	if (device == NULL) {
-		ERROR("Can't find device %s", device_path);
-		return NULL;
-	}
-
-	return bluez_device_get_property_alias(device);
-
-}
-
-static bundle* fill_notification_bundle(struct pairing_context* pairing_data, const gchar *object_path)
-{
-	bundle* b = bundle_create();
-	if (!b)
-		return NULL;
-
-	bundle_add(b, "event_type", (char *) pairing_data->method_name);
-
-	gchar *invocation_str = g_strdup_printf("%p", pairing_data->invocation);
-	bundle_add(b, "invocation", (char *) invocation_str);
-	ERROR("INVOCATION: [%p] !", pairing_data->invocation);
-	ERROR("INVOCATION BUNDLE: [%s] !", bundle_get_val(b, "invocation"));
-
-	bundle_add(b, "agent-path", (char *) object_path);
-	ERROR("INVOCATION: [%s] !", object_path);
-
-	if (!g_strcmp0(pairing_data->method_name, "DisplayPinCode")) {
-		gchar *device_path = NULL;
-		gchar *device_name = NULL;
-		gchar *pincode =  NULL;
-		g_variant_get(pairing_data->parameters, "(os)", &device_path, &pincode);
-		device_name = get_device_name_from_device_path(device_path);
-		bundle_add(b, "device_name", (char *) device_name);
-		bundle_add(b, "pincode", (char *) pincode);
-		g_free(device_path);
-		g_free(pincode);
-	}
-	else if (!g_strcmp0(pairing_data->method_name, "RequestPinCode")) {
-		gchar *device_path = NULL;
-		gchar *device_name = NULL;
-		g_variant_get(pairing_data->parameters, "(o)", &device_path);
-		device_name = get_device_name_from_device_path(device_path);
-		bundle_add(b, "device_name", (char *) device_name);
-		g_free(device_path);
-	}
-	else if (!g_strcmp0(pairing_data->method_name, "RequestPasskey")) {
-		gchar *device_path = NULL;
-		gchar *device_name = NULL;
-		g_variant_get(pairing_data->parameters, "(o)", &device_path);
-		device_name = get_device_name_from_device_path(device_path);
-		bundle_add(b, "device_name", (char *) device_name);
-		g_free(device_path);
-	}
-	else if (!g_strcmp0(pairing_data->method_name, "RequestConfirmation")) {
-		ERROR("set [%s] parameters in bundle !", pairing_data->method_name);
-		gchar *device_path = NULL;
-		gchar *device_name = NULL;
-		guint32 passkey = 0;
-		g_variant_get(pairing_data->parameters, "(ou)", &device_path, &passkey);
-		device_name = get_device_name_from_device_path(device_path);
-		bundle_add(b, "device_name", (char *) device_name);
-		gchar *passkey_str = g_strdup_printf("%u", passkey);
-		// Set '0' padding if the passkey has less than 6 digits
-		char passkey_tab[PASSKEY_SIZE] = "000000";
-		int size = strlen((char *)passkey_str);
-		ERROR("size [%d]", size);
-		if (size <= PASSKEY_SIZE) {
-			memcpy(&passkey_tab[PASSKEY_SIZE - size], passkey_str, size);
-		}
-		bundle_add(b, "passkey", passkey_tab);
-		ERROR("device_path [%s] / passkey_str [%s]", device_path, passkey_str);
-		ERROR("BUNDLE contains: device_name [%s] / passkey [%s]", bundle_get_val(b, "device_name"), bundle_get_val(b, "passkey"));
-		g_free(device_path);
-		g_free(passkey_str);
-	}
-	else if (!g_strcmp0(pairing_data->method_name, "AuthorizeService")) {
-		gchar *device_path = NULL;
-		gchar *device_name = NULL;
-		gchar *uuid = NULL;
-		g_variant_get(pairing_data->parameters, "(os)", &device_path, &uuid);
-		device_name = get_device_name_from_device_path(device_path);
-		bundle_add(b, "device_name", (char *) device_name);
-		bundle_add(b, "uuid", (char *) uuid);
-		g_free(device_path);
-		g_free(uuid);
-	}
-	else if (!g_strcmp0(pairing_data->method_name, "RequestAuthorization")) {
-		gchar *device_path = NULL;
-		gchar *device_name = NULL;
-		g_variant_get(pairing_data->parameters, "(o)", &device_path);
-		device_name = get_device_name_from_device_path(device_path);
-		bundle_add(b, "device_name", (char *) device_name);
-		g_free(device_path);
-	}
-	else {
-		DBG("There is no data to add in bundle for 'Release' or 'Cancel' method calls");
-	}
-	ERROR("BUNDLE: event_type: [%s] and device_name: [%s]", bundle_get_val(b, "event_type"), bundle_get_val(b, "device_name"));
-	return b;
-}
-
 static void handle_pairing_agent_method_call(GDBusConnection *connection,
 					const gchar *sender,
 					const gchar *object_path,
@@ -758,7 +843,9 @@ static void handle_pairing_agent_method_call(GDBusConnection *connection,
 	ERROR("sender [%s] object_path [%s]", sender, object_path);
 	ERROR("interface [%s] method [%s]", interface, method_name);
 
+#if JUNK
 	bundle* b;
+#endif
 
 	if (pairing_context) {
 		WARN("Pairing context already exist");
@@ -777,7 +864,7 @@ static void handle_pairing_agent_method_call(GDBusConnection *connection,
 
 		return;
 	}
-
+#if JUNK
 	b = fill_notification_bundle(pairing_context, object_path);
 
 	ERROR("call plugin with timeout !!!");
@@ -785,6 +872,9 @@ static void handle_pairing_agent_method_call(GDBusConnection *connection,
 
 	relay_agent_timeout_id = g_timeout_add(5000,
 					relay_agent_timeout_cb, NULL);
+#else
+	/* TODO: emettre un truc */
+#endif
 }
 
 static const GDBusInterfaceVTable pairing_agent_vtable =
