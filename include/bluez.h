@@ -584,35 +584,4 @@ void hdp_internal_handle_connect(gpointer user_data,
 
 gboolean bluez_get_media_type(const char *remote_address);
 
-struct _bluez_device {
-	char *interface_name;
-	char *object_path;
-	GDBusInterface *interface;
-	GDBusInterface *control_interface;
-	GDBusInterface *network_interface;
-	GDBusInterface *input_interface;
-	GDBusProxy *proxy;
-	GDBusProxy *control_proxy;
-	GDBusProxy *network_proxy;
-	GDBusProxy *input_proxy;
-	struct _bluez_object *parent;
-	struct _device_head *head;
-
-	bluez_device_paired_cb_t device_paired_cb;
-	gpointer device_paired_cb_data;
-	bluez_device_connected_cb_t device_connected_cb;
-	gpointer device_connected_cb_data;
-	bluez_device_trusted_cb_t device_trusted_cb;
-	gpointer device_trusted_cb_data;
-	bluez_device_network_connected_cb_t network_connected_cb;
-	gpointer network_connected_cb_data;
-	bluez_hdp_state_changed_t hdp_state_changed_cb;
-	gpointer hdp_state_changed_cb_data;
-	bluez_set_data_received_changed_t data_received_changed_cb;
-	gpointer data_received_changed_data;
-	bluez_device_input_connected_cb_t input_connected_cb;
-	gpointer input_connected_cb_data;
-
-};
-
 #endif

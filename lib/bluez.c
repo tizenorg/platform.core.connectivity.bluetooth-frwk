@@ -129,6 +129,38 @@ struct _bluez_profile {
 	struct _bluez_object *parent;
 };
 
+struct _bluez_device {
+	char *interface_name;
+	char *object_path;
+	GDBusInterface *interface;
+	GDBusInterface *control_interface;
+	GDBusInterface *network_interface;
+	GDBusInterface *input_interface;
+	GDBusInterface *hdp_interface;
+	GDBusProxy *proxy;
+	GDBusProxy *control_proxy;
+	GDBusProxy *network_proxy;
+	GDBusProxy *input_proxy;
+	GDBusProxy *hdp_proxy;
+	struct _bluez_object *parent;
+	struct _device_head *head;
+
+	bluez_device_paired_cb_t device_paired_cb;
+	gpointer device_paired_cb_data;
+	bluez_device_connected_cb_t device_connected_cb;
+	gpointer device_connected_cb_data;
+	bluez_device_trusted_cb_t device_trusted_cb;
+	gpointer device_trusted_cb_data;
+	bluez_device_network_connected_cb_t network_connected_cb;
+	gpointer network_connected_cb_data;
+	bluez_hdp_state_changed_t hdp_state_changed_cb;
+	gpointer hdp_state_changed_cb_data;
+	bluez_set_data_received_changed_t data_received_changed_cb;
+	gpointer data_received_changed_data;
+	bluez_device_input_connected_cb_t input_connected_cb;
+	gpointer input_connected_cb_data;
+};
+
 static GHashTable *bluez_object_hash;
 
 static GList *bluez_adapter_list;
@@ -711,7 +743,8 @@ static void parse_bluez_device_interfaces(gpointer data, gpointer user_data)
 	struct _bluez_device *device = user_data;
 	GDBusInterface *interface = data;
 	GDBusProxy *proxy = G_DBUS_PROXY(interface);
-	const gchar *iface_name;
+	GDBusProxy *signal_proxy;
+	const gchar *iface_name, *path;
 
 	if (!device) {
 		WARN("no adapter");
@@ -737,10 +770,25 @@ static void parse_bluez_device_interfaces(gpointer data, gpointer user_data)
 		g_signal_connect(proxy, "g-properties-changed",
 			G_CALLBACK(network_properties_changed), device);
 	} else if (g_strcmp0(iface_name, HDP_DEVICE_INTERFACE) == 0) {
+		path = g_dbus_proxy_get_object_path(proxy);
+
+		DBG("hdp path = %s", path);
+
 		g_signal_connect(proxy, "g-properties-changed",
 			G_CALLBACK(hdp_properties_changed), device);
-		g_signal_connect(proxy, "g-signal",
+
+		signal_proxy = g_dbus_proxy_new_for_bus_sync(
+						G_BUS_TYPE_SYSTEM, 0,
+						NULL,
+						BLUEZ_NAME,
+						path,
+						iface_name,
+						NULL, NULL);
+
+		g_signal_connect(signal_proxy, "g-signal",
 			G_CALLBACK(hdp_signal_changed), device);
+		device->hdp_proxy = signal_proxy;
+		device->hdp_interface = interface;
 	} else if (g_strcmp0(iface_name, INPUT_INTERFACE) == 0) {
 		device->input_interface = interface;
 		device->input_proxy = proxy;
@@ -821,10 +869,20 @@ static void free_bluez_device(gpointer data)
 	g_free(device->object_path);
 	g_object_unref(device->interface);
 	g_object_unref(device->proxy);
-
+	if (device->control_proxy)
+		g_object_unref(device->control_proxy);
+	if (device->control_interface)
+		g_object_unref(device->control_interface);
+	if (device->input_proxy)
+		g_object_unref(device->input_proxy);
+	if (device->input_interface)
+		g_object_unref(device->input_interface);
+	if (device->hdp_proxy)
+		g_object_unref(device->hdp_proxy);
+	if (device->hdp_interface)
+		g_object_unref(device->hdp_interface);
 	if (device->network_interface)
 		g_object_unref(device->network_interface);
-
 	if (device->network_proxy)
 		g_object_unref(device->network_proxy);
 

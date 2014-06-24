@@ -19,6 +19,38 @@ typedef struct {
 
 #define HDP_BUFFER_SIZE 1024
 
+struct _bluez_device {
+	char *interface_name;
+	char *object_path;
+	GDBusInterface *interface;
+	GDBusInterface *control_interface;
+	GDBusInterface *network_interface;
+	GDBusInterface *input_interface;
+	GDBusInterface *hdp_interface;
+	GDBusProxy *proxy;
+	GDBusProxy *control_proxy;
+	GDBusProxy *network_proxy;
+	GDBusProxy *input_proxy;
+	GDBusProxy *hdp_proxy;
+	struct _bluez_object *parent;
+	struct _device_head *head;
+
+	bluez_device_paired_cb_t device_paired_cb;
+	gpointer device_paired_cb_data;
+	bluez_device_connected_cb_t device_connected_cb;
+	gpointer device_connected_cb_data;
+	bluez_device_trusted_cb_t device_trusted_cb;
+	gpointer device_trusted_cb_data;
+	bluez_device_network_connected_cb_t network_connected_cb;
+	gpointer network_connected_cb_data;
+	bluez_hdp_state_changed_t hdp_state_changed_cb;
+	gpointer hdp_state_changed_cb_data;
+	bluez_set_data_received_changed_t data_received_changed_cb;
+	gpointer data_received_changed_data;
+	bluez_device_input_connected_cb_t input_connected_cb;
+	gpointer input_connected_cb_data;
+};
+
 static void hdp_obj_info_free(hdp_obj_info_t *info);
 static hdp_app_list_t *hdp_internal_gslist_find_app_handler(void *app_handle);
 
