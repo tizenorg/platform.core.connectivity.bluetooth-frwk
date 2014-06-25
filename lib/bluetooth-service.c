@@ -412,7 +412,7 @@ static void parse_comms_manager(gpointer data, gpointer user_data)
 	GDBusInterface *interface = data;
 	GDBusProxy *proxy = G_DBUS_PROXY(interface);
 	GDBusProxy *properties_proxy;
-	gchar *iface_name, *path;
+	const gchar *iface_name, *path;
 
 	if (!manager) {
 		WARN("no manager");
