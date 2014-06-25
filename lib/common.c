@@ -59,16 +59,24 @@ enum bluez_error_type get_error_type(GError *error)
 	return ERROR_NONE;
 }
 int property_get_boolean(GDBusProxy *proxy,
-					const char *property,
-					gboolean *value)
+				const char *interface_name,
+				const char *property,
+				gboolean *value)
 {
-	GVariant *bool_v;
+	GVariant *bool_v, *bool_vv;
+	GError *error = NULL;
 
-	bool_v = g_dbus_proxy_get_cached_property(proxy, property);
-	if (bool_v == NULL) {
+	bool_vv = g_dbus_proxy_call_sync(
+			proxy, "Get",
+			g_variant_new("(ss)", interface_name, property),
+			0, -1, NULL, &error);
+
+	if (bool_vv == NULL) {
 		WARN("no cached property %s", property);
 		return -1;
 	}
+
+	g_variant_get(bool_vv, "(v)", &bool_v);
 
 	*value = g_variant_get_boolean(bool_v);
 
@@ -78,16 +86,24 @@ int property_get_boolean(GDBusProxy *proxy,
 }
 
 char *property_get_string(GDBusProxy *proxy,
-					const char *property)
+				const char *interface_name,
+				const char *property)
 {
-	GVariant *string_v;
+	GVariant *string_v, *string_vv;
 	char *string;
+	GError *error = NULL;
 
-	string_v = g_dbus_proxy_get_cached_property(proxy, property);
-	if (string_v == NULL) {
+	string_vv = g_dbus_proxy_call_sync(
+			proxy, "Get",
+			g_variant_new("(ss)", interface_name, property),
+			0, -1, NULL, &error);
+
+	if (string_vv == NULL) {
 		WARN("no cached property %s", property);
 		return NULL;
 	}
+
+	g_variant_get(string_vv, "(v)", &string_v);
 
 	string = g_variant_dup_string(string_v, NULL);
 
@@ -97,16 +113,24 @@ char *property_get_string(GDBusProxy *proxy,
 }
 
 int property_get_int16(GDBusProxy *proxy,
-					const char *property,
-					gint16 *value)
+				const char *interface_name,
+				const char *property,
+				gint16 *value)
 {
-	GVariant *int16_v;
+	GVariant *int16_v, *int16_vv;
+	GError *error = NULL;
 
-	int16_v = g_dbus_proxy_get_cached_property(proxy, property);
-	if (int16_v == NULL) {
+	int16_vv = g_dbus_proxy_call_sync(
+			proxy, "Get",
+			g_variant_new("(ss)", interface_name, property),
+			0, -1, NULL, &error);
+
+	if (int16_vv == NULL) {
 		WARN("no cached property %s", property);
 		return -1;
 	}
+
+	g_variant_get(int16_vv, "(v)", &int16_v);
 
 	*value = g_variant_get_int16(int16_v);
 
@@ -116,16 +140,23 @@ int property_get_int16(GDBusProxy *proxy,
 }
 
 int property_get_uint32(GDBusProxy *proxy,
-					const char *property,
-					guint32 *u32)
+				const char *interface_name,
+				const char *property,
+				guint32 *u32)
 {
-	GVariant *u32_v;
+	GVariant *u32_v, *u32_vv;
+	GError *error = NULL;
 
-	u32_v = g_dbus_proxy_get_cached_property(proxy, property);
-	if (u32_v == NULL) {
+	u32_vv = g_dbus_proxy_call_sync(
+			proxy, "Get",
+			g_variant_new("(ss)", interface_name, property),
+			0, -1, NULL, &error);
+	if (u32_vv == NULL) {
 		WARN("no cached property %s", property);
 		return -1;
 	}
+
+	g_variant_get(u32_vv, "(v)", &u32_v);
 
 	*u32 = g_variant_get_uint32(u32_v);
 
@@ -135,16 +166,23 @@ int property_get_uint32(GDBusProxy *proxy,
 }
 
 int property_get_uint64(GDBusProxy *proxy,
-					const char *property,
-					guint64 *u64)
+				const char *interface_name,
+				const char *property,
+				guint64 *u64)
 {
-	GVariant *u64_v;
+	GVariant *u64_v, *u64_vv;
+	GError *error = NULL;
 
-	u64_v = g_dbus_proxy_get_cached_property(proxy, property);
-	if (u64_v == NULL) {
+	u64_vv = g_dbus_proxy_call_sync(
+			proxy, "Get",
+			g_variant_new("(ss)", interface_name, property),
+			0, -1, NULL, &error);
+	if (u64_vv == NULL) {
 		WARN("no cached property %s", property);
 		return -1;
 	}
+
+	g_variant_get(u64_vv, "(v)", &u64_v);
 
 	*u64 = g_variant_get_uint64(u64_v);
 
@@ -154,16 +192,24 @@ int property_get_uint64(GDBusProxy *proxy,
 }
 
 char **property_get_string_list(GDBusProxy *proxy,
+					const char *interface_name,
 					const char *property)
 {
-	GVariant *strv_v;
+	GVariant *strv_v, *strv_vv;
 	char **strv;
+	GError *error = NULL;
 
-	strv_v = g_dbus_proxy_get_cached_property(proxy, property);
-	if (strv_v == NULL) {
+	strv_vv = g_dbus_proxy_call_sync(
+			proxy, "Get",
+			g_variant_new("(ss)", interface_name, property),
+			0, -1, NULL, &error);
+
+	if (strv_vv == NULL) {
 		WARN("no cached property %s", property);
 		return NULL;
 	}
+
+	g_variant_get(strv_vv, "(v)", &strv_v);
 
 	strv = g_variant_dup_strv(strv_v, NULL);
 
@@ -171,19 +217,33 @@ char **property_get_string_list(GDBusProxy *proxy,
 }
 
 void property_set_string(GDBusProxy *proxy,
+					const char *interface_name,
 					const char *property,
 					const char *str)
 {
-	g_dbus_proxy_set_cached_property(proxy, property,
-				g_variant_new("s", str));
+	GError *error = NULL;
+	GVariant *val = g_variant_new("s", str);
+	GVariant *parameters = g_variant_new("(ssv)",
+		interface_name, property, val);
+
+	g_dbus_proxy_call_sync(
+			proxy, "Set", parameters,
+			0, -1, NULL, &error);
 }
 
 void property_set_uint64(GDBusProxy *proxy,
+					const char *interface_name,
 					const char *property,
 					guint64 u64)
 {
-	g_dbus_proxy_set_cached_property(proxy, property,
-				g_variant_new("t", u64));
+	GError *error = NULL;
+	GVariant *val = g_variant_new("t", u64);
+	GVariant *parameters = g_variant_new("(ssv)",
+				interface_name, property, val);
+
+	g_dbus_proxy_call_sync(
+			proxy, "Set", parameters,
+			0, -1, NULL, &error);
 }
 
 void convert_device_path_to_address(const gchar *device_path,

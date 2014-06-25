@@ -58,6 +58,7 @@ struct _proxy {
 	char *interface_name;
 	GDBusInterface *interface;
 	GDBusProxy *proxy;
+	GDBusProxy *property_proxy;
 };
 
 struct _comms_bluetooth {
@@ -213,6 +214,25 @@ static inline int get_proxy(struct _proxy *proxy,
 
 	DBG("proxy %p", proxy->proxy);
 
+	proxy->property_proxy = g_dbus_proxy_new_for_bus_sync((is_system ?
+							G_BUS_TYPE_SYSTEM :
+							G_BUS_TYPE_SESSION),
+							0,
+							NULL,
+							object->service_name,
+							object->path_name,
+							PROPERTIES_INTERFACE,
+							NULL, NULL);
+	if (proxy->proxy == NULL) {
+		g_object_unref(proxy->interface);
+		proxy->interface = NULL;
+		g_free(proxy->interface_name);
+		proxy->interface_name = NULL;
+		return -1;
+	}
+
+	DBG("property proxy %p", proxy->property_proxy);
+
 	return 0;
 }
 
@@ -223,6 +243,9 @@ static void free_proxy(struct _proxy *proxy)
 		g_object_unref(proxy->interface);
 	if (proxy->proxy)
 		g_object_unref(proxy->proxy);
+	if (proxy->property_proxy)
+		g_object_unref(proxy->proxy);
+
 }
 
 void free_comms_bluetooth(struct _comms_bluetooth *bluetooth)
@@ -680,7 +703,7 @@ int comms_manager_get_property_bt_in_service(gboolean *in_service)
 		return -1;
 
 	return property_get_boolean(this_manager->proxy,
-				"BluetoothInService", in_service);
+		COMMS_MANAGER_INTERFACE, "BluetoothInService", in_service);
 }
 
 void comms_bluetooth_device_pair(const char *address,
