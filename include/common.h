@@ -76,22 +76,38 @@ struct simple_reply_data {
 enum bluez_error_type get_error_type(GError *error);
 
 int property_get_boolean(GDBusProxy *proxy,
+				const char *interface_name,
 				const char *property,
 				gboolean *value);
 char *property_get_string(GDBusProxy *proxy,
+				const char *interface_name,
 				const char *property);
 int property_get_int16(GDBusProxy *proxy,
+				const char *interface_name,
 				const char *property,
 				gint16 *value);
 int property_get_uint32(GDBusProxy *proxy,
+				const char *interface_name,
 				const char *property,
 				guint32 *u32);
 int property_get_uint64(GDBusProxy *proxy,
+				const char *interface_name,
 				const char *property,
 				guint64 *u64);
 
 char **property_get_string_list(GDBusProxy *proxy,
+				const char *interface_name,
 				const char *property);
+
+void property_set_string(GDBusProxy *proxy,
+				const char *interface_name,
+				const char *property,
+				const char *str);
+
+void property_set_uint64(GDBusProxy *proxy,
+				const char *interface_name,
+				const char *property,
+				guint64 u64);
 
 void simple_reply_callback(GObject *source_object,
 				GAsyncResult *res,

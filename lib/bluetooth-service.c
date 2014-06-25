@@ -51,6 +51,7 @@ struct _comms_manager {
 	char *object_path;
 	GDBusInterface *interface;
 	GDBusProxy *proxy;
+	GDBusProxy *property_proxy;
 	struct _comms_object *parent;
 };
 
@@ -58,6 +59,7 @@ struct _proxy {
 	char *interface_name;
 	GDBusInterface *interface;
 	GDBusProxy *proxy;
+	GDBusProxy *property_proxy;
 };
 
 struct _comms_bluetooth {
@@ -130,6 +132,7 @@ static void free_comms_manager(struct _comms_manager *manager)
 	g_free(manager->object_path);
 	g_object_unref(manager->interface);
 	g_object_unref(manager->proxy);
+	g_object_unref(manager->property_proxy);
 	g_free(manager);
 }
 
@@ -213,6 +216,25 @@ static inline int get_proxy(struct _proxy *proxy,
 
 	DBG("proxy %p", proxy->proxy);
 
+	proxy->property_proxy = g_dbus_proxy_new_for_bus_sync((is_system ?
+							G_BUS_TYPE_SYSTEM :
+							G_BUS_TYPE_SESSION),
+							0,
+							NULL,
+							object->service_name,
+							object->path_name,
+							PROPERTIES_INTERFACE,
+							NULL, NULL);
+	if (proxy->proxy == NULL) {
+		g_object_unref(proxy->interface);
+		proxy->interface = NULL;
+		g_free(proxy->interface_name);
+		proxy->interface_name = NULL;
+		return -1;
+	}
+
+	DBG("property proxy %p", proxy->property_proxy);
+
 	return 0;
 }
 
@@ -223,6 +245,9 @@ static void free_proxy(struct _proxy *proxy)
 		g_object_unref(proxy->interface);
 	if (proxy->proxy)
 		g_object_unref(proxy->proxy);
+	if (proxy->property_proxy)
+		g_object_unref(proxy->proxy);
+
 }
 
 void free_comms_bluetooth(struct _comms_bluetooth *bluetooth)
@@ -386,12 +411,15 @@ static void parse_comms_manager(gpointer data, gpointer user_data)
 	struct _comms_manager *manager = user_data;
 	GDBusInterface *interface = data;
 	GDBusProxy *proxy = G_DBUS_PROXY(interface);
-	gchar *iface_name;
+	GDBusProxy *properties_proxy;
+	gchar *iface_name, *path;
 
 	if (!manager) {
 		WARN("no manager");
 		return;
 	}
+
+	path = g_dbus_proxy_get_object_path(proxy);
 
 	iface_name = g_strdup(g_dbus_proxy_get_interface_name(proxy));
 	DBG("%s", iface_name);
@@ -399,8 +427,19 @@ static void parse_comms_manager(gpointer data, gpointer user_data)
 	if (g_strcmp0(iface_name, COMMS_MANAGER_INTERFACE))
 		return;
 
+	properties_proxy = g_dbus_proxy_new_for_bus_sync(
+						G_BUS_TYPE_SYSTEM, 0,
+						NULL,
+						COMMS_SERVICE_NAME,
+						path,
+						PROPERTIES_INTERFACE,
+						NULL, NULL);
+	if (properties_proxy == NULL)
+		WARN("create properties proxy error");
+
 	manager->interface = g_object_ref(interface);
 	manager->proxy = g_object_ref(proxy);
+	manager->property_proxy = properties_proxy;
 
 	g_signal_connect(proxy, "g-properties-changed",
 			G_CALLBACK(manager_properties_changed), NULL);
@@ -679,8 +718,8 @@ int comms_manager_get_property_bt_in_service(gboolean *in_service)
 	if (this_manager == NULL)
 		return -1;
 
-	return property_get_boolean(this_manager->proxy,
-				"BluetoothInService", in_service);
+	return property_get_boolean(this_manager->property_proxy,
+		COMMS_MANAGER_INTERFACE, "BluetoothInService", in_service);
 }
 
 void comms_bluetooth_device_pair(const char *address,

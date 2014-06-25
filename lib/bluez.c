@@ -95,6 +95,7 @@ struct _bluez_adapter {
 	GDBusProxy *proxy;
 	GDBusProxy *media_proxy;
 	GDBusProxy *netserver_proxy;
+	GDBusProxy *property_proxy;
 	struct _bluez_object *parent;
 	struct _device_head *device_head;
 	bluez_adapter_powered_cb_t powered_cb;
@@ -138,6 +139,7 @@ struct _bluez_device {
 	GDBusInterface *input_interface;
 	GDBusInterface *hdp_interface;
 	GDBusProxy *proxy;
+	GDBusProxy *property_proxy;
 	GDBusProxy *control_proxy;
 	GDBusProxy *network_proxy;
 	GDBusProxy *input_proxy;
@@ -386,7 +388,7 @@ static void parse_bluez_adapter_interfaces(gpointer data, gpointer user_data)
 	struct _bluez_adapter *adapter = user_data;
 	GDBusInterface *interface = data;
 	GDBusProxy *proxy = G_DBUS_PROXY(interface);
-	GDBusProxy *signal_proxy;
+	GDBusProxy *signal_proxy, *property_proxy;
 	const gchar *iface_name, *adapter_path;
 
 	if (!adapter) {
@@ -394,14 +396,24 @@ static void parse_bluez_adapter_interfaces(gpointer data, gpointer user_data)
 		return;
 	}
 
+	adapter_path = g_dbus_proxy_get_object_path(proxy);
+
 	iface_name = g_dbus_proxy_get_interface_name(proxy);
 	DBG("%s", iface_name);
 
 	if (g_strcmp0(iface_name, ADAPTER_INTERFACE) == 0) {
+		property_proxy = g_dbus_proxy_new_for_bus_sync(
+						G_BUS_TYPE_SYSTEM, 0,
+						NULL,
+						BLUEZ_NAME,
+						adapter_path,
+						PROPERTIES_INTERFACE,
+						NULL, NULL);
+
 		DBG("adapter->proxy = proxy");
 		adapter->interface = interface;
 		adapter->proxy = proxy;
-
+		adapter->property_proxy = property_proxy;
 		g_signal_connect(proxy, "g-properties-changed",
 			G_CALLBACK(adapter_properties_changed), adapter);
 	} else if (g_strcmp0(iface_name, MEDIA_INTERFACE) == 0) {
@@ -410,8 +422,6 @@ static void parse_bluez_adapter_interfaces(gpointer data, gpointer user_data)
 		adapter->media_proxy = proxy;
 	} else if (g_strcmp0(iface_name,
 				NETWORKSERVER_INTERFACES) == 0) {
-		adapter_path = g_dbus_proxy_get_object_path(proxy);
-
 		signal_proxy = g_dbus_proxy_new_for_bus_sync(
 						G_BUS_TYPE_SYSTEM, 0,
 						NULL,
@@ -743,20 +753,31 @@ static void parse_bluez_device_interfaces(gpointer data, gpointer user_data)
 	struct _bluez_device *device = user_data;
 	GDBusInterface *interface = data;
 	GDBusProxy *proxy = G_DBUS_PROXY(interface);
-	GDBusProxy *signal_proxy;
+	GDBusProxy *signal_proxy, *property_proxy;
 	const gchar *iface_name, *path;
 
 	if (!device) {
-		WARN("no adapter");
+		WARN("no device");
 		return;
 	}
+
+	path = g_dbus_proxy_get_object_path(proxy);
 
 	iface_name = g_dbus_proxy_get_interface_name(proxy);
 	DBG("%s", iface_name);
 
 	if (g_strcmp0(iface_name, DEVICE_INTERFACE) == 0) {
+		property_proxy = g_dbus_proxy_new_for_bus_sync(
+					G_BUS_TYPE_SYSTEM, 0,
+					NULL,
+					BLUEZ_NAME,
+					path,
+					PROPERTIES_INTERFACE,
+					NULL, NULL);
+
 		device->interface = interface;
 		device->proxy = proxy;
+		device->property_proxy = property_proxy;
 		g_signal_connect(proxy, "g-properties-changed",
 			G_CALLBACK(device_properties_changed), device);
 	} else if (g_strcmp0(iface_name, MEDIACONTROL_INTERFACE) == 0) {
@@ -770,8 +791,6 @@ static void parse_bluez_device_interfaces(gpointer data, gpointer user_data)
 		g_signal_connect(proxy, "g-properties-changed",
 			G_CALLBACK(network_properties_changed), device);
 	} else if (g_strcmp0(iface_name, HDP_DEVICE_INTERFACE) == 0) {
-		path = g_dbus_proxy_get_object_path(proxy);
-
 		DBG("hdp path = %s", path);
 
 		g_signal_connect(proxy, "g-properties-changed",
@@ -803,7 +822,8 @@ static void parse_bluez_control_interfaces(gpointer data, gpointer user_data)
 	struct _bluez_object *object = user_data;
 	GDBusInterface *interface = data;
 	GDBusProxy *proxy = G_DBUS_PROXY(interface);
-	const gchar *iface_name;
+	GDBusProxy *property_proxy;
+	const gchar *iface_name, *path;
 
 	iface_name = g_dbus_proxy_get_interface_name(proxy);
 	DBG("%s", iface_name);
@@ -813,11 +833,22 @@ static void parse_bluez_control_interfaces(gpointer data, gpointer user_data)
 		gchar *device_path;
 		bt_audio_profile_type_e type;
 
+		path = g_dbus_proxy_get_object_path(proxy);
+
+		property_proxy = g_dbus_proxy_new_for_bus_sync(
+						G_BUS_TYPE_SYSTEM, 0,
+						NULL,
+						BLUEZ_NAME,
+						path,
+						PROPERTIES_INTERFACE,
+						NULL, NULL);
+
 		device_address = g_malloc0(BT_ADDRESS_STRING_SIZE);
 		if (device_address == NULL)
 			return;
 
-		device_path = property_get_string(proxy, "Device");
+		device_path = property_get_string(property_proxy,
+				MEDIATRANSPORT_INTERFACE, "Device");
 		if (device_path == NULL) {
 			DBG("device_path == NULL");
 			g_free(device_address);
@@ -827,7 +858,8 @@ static void parse_bluez_control_interfaces(gpointer data, gpointer user_data)
 		convert_device_path_to_address((const gchar *)device_path,
 							device_address);
 
-		uuid = property_get_string(proxy, "UUID");
+		uuid = property_get_string(property_proxy,
+				MEDIATRANSPORT_INTERFACE, "UUID");
 		if (uuid == NULL) {
 			g_free(device_address);
 			g_free(device_path);
@@ -856,7 +888,8 @@ static void parse_bluez_control_interfaces(gpointer data, gpointer user_data)
 
 char *bluez_device_property_get_adapter(struct _bluez_device *device)
 {
-	return property_get_string(device->proxy, "Adapter");
+	return property_get_string(device->property_proxy,
+					DEVICE_INTERFACE, "Adapter");
 }
 
 static void free_bluez_device(gpointer data)
@@ -885,6 +918,8 @@ static void free_bluez_device(gpointer data)
 		g_object_unref(device->network_interface);
 	if (device->network_proxy)
 		g_object_unref(device->network_proxy);
+	if (device->property_proxy)
+		g_object_unref(device->property_proxy);
 
 	g_free(device);
 }
@@ -1331,6 +1366,7 @@ static void destruct_bluez_adapter(gpointer data)
 	g_object_unref(adapter->media_interface);
 	g_object_unref(adapter->netserver_proxy);
 	g_object_unref(adapter->netserver_interface);
+	g_object_unref(adapter->property_proxy);
 	g_object_unref(adapter->proxy);
 
 	g_free(adapter);
@@ -1669,7 +1705,8 @@ void bluez_adapter_stop_discovery(struct _bluez_adapter *adapter)
 int bluez_adapter_get_property_powered(struct _bluez_adapter *adapter,
 						gboolean *powered)
 {
-	return property_get_boolean(adapter->proxy, "Powered", powered);
+	return property_get_boolean(adapter->property_proxy, ADAPTER_INTERFACE,
+					"Powered", powered);
 }
 
 void bluez_adapter_set_powered_changed_cb(struct _bluez_adapter *adapter,
@@ -1778,7 +1815,8 @@ void bluez_adapter_unset_device_discovering_cb(struct _bluez_adapter *adapter)
 
 char *bluez_adapter_get_property_alias(struct _bluez_adapter *adapter)
 {
-	return property_get_string(adapter->proxy, "Alias");
+	return property_get_string(adapter->property_proxy,
+					ADAPTER_INTERFACE, "Alias");
 }
 
 void bluez_adapter_set_alias_changed_cb(struct _bluez_adapter *adapter,
@@ -1797,33 +1835,36 @@ void bluez_adapter_unset_alias_changed_cb(struct _bluez_adapter *adapter)
 
 char *bluez_adapter_get_property_address(struct _bluez_adapter *adapter)
 {
-	return property_get_string(adapter->proxy, "Address");
+	return property_get_string(adapter->property_proxy,
+					ADAPTER_INTERFACE, "Address");
 }
 
 int bluez_adapter_get_property_discoverable(struct _bluez_adapter *adapter,
 						gboolean *discoverable)
 {
-	return property_get_boolean(adapter->proxy, "Discoverable", discoverable);
+	return property_get_boolean(adapter->property_proxy, ADAPTER_INTERFACE,
+				"Discoverable", discoverable);
 }
 
 int bluez_adapter_get_property_discoverable_timeout(
 				struct _bluez_adapter *adapter,
 				guint32 *time)
 {
-	return property_get_uint32(adapter->proxy,
+	return property_get_uint32(adapter->property_proxy, ADAPTER_INTERFACE,
 				"DiscoverableTimeout", time);
 }
 
 int bluez_adapter_get_property_discovering(struct _bluez_adapter *adapter,
 						gboolean *discovering)
 {
-	return property_get_boolean(adapter->proxy,
+	return property_get_boolean(adapter->property_proxy, ADAPTER_INTERFACE,
 					"Discovering", discovering);
 }
 
 char **bluez_adapter_get_property_uuids(struct _bluez_adapter *adapter)
 {
-	return property_get_string_list(adapter->proxy, "UUIDs");
+	return property_get_string_list(adapter->property_proxy,
+						ADAPTER_INTERFACE, "UUIDs");
 }
 
 static gchar *address_to_path(const gchar *prefix, const gchar *address)
@@ -1978,7 +2019,8 @@ void bluez_device_network_unset_connected_changed_cb(
 int bluez_device_network_get_property_connected(struct _bluez_device *device,
 						gboolean *connected)
 {
-	return property_get_boolean(device->network_proxy, "Connected", connected);
+	return property_get_boolean(device->property_proxy, NETWORK_INTERFACE,
+					"Connected", connected);
 }
 
 void bluez_device_input_set_connected_changed_cb(
@@ -2002,8 +2044,8 @@ void bluez_device_input_unset_connected_changed_cb(
 int bluez_device_input_get_property_connected(struct _bluez_device *device,
 						gboolean *connected)
 {
-	return property_get_boolean(device->input_proxy,
-					"Connected", connected);
+	return property_get_boolean(device->property_proxy,
+			INPUT_INTERFACE, "Connected", connected);
 }
 
 void bluez_device_set_paired_changed_cb(struct _bluez_device *device,
@@ -2076,52 +2118,61 @@ void bluez_device_set_alias(struct _bluez_device *device,
 
 char **bluez_device_get_property_uuids(struct _bluez_device *device)
 {
-	return property_get_string_list(device->proxy, "UUIDs");
+	return property_get_string_list(device->property_proxy,
+					DEVICE_INTERFACE, "UUIDs");
 }
 
 char *bluez_device_get_property_address(struct _bluez_device *device)
 {
-	return property_get_string(device->proxy, "Address");
+	return property_get_string(device->property_proxy,
+					DEVICE_INTERFACE, "Address");
 }
 
 char *bluez_device_get_property_alias(struct _bluez_device *device)
 {
-	return property_get_string(device->proxy, "Alias");
+	return property_get_string(device->property_proxy,
+					DEVICE_INTERFACE, "Alias");
 }
 
 int bluez_device_get_property_class(struct _bluez_device *device,
 					guint32 *class)
 {
-	return property_get_uint32(device->proxy, "Class", class);
+	return property_get_uint32(device->property_proxy,
+				DEVICE_INTERFACE, "Class", class);
 }
 
 int bluez_device_get_property_paired(struct _bluez_device *device,
 					gboolean *paired)
 {
-	return property_get_boolean(device->proxy, "Paired", paired);
+	return property_get_boolean(device->property_proxy, DEVICE_INTERFACE,
+						"Paired", paired);
 }
 
 int bluez_device_get_property_trusted(struct _bluez_device *device,
 					gboolean *trusted)
 {
-	return property_get_boolean(device->proxy, "Trusted", trusted);
+	return property_get_boolean(device->property_proxy, DEVICE_INTERFACE,
+						"Trusted", trusted);
 }
 
 int bluez_device_get_property_connected(struct _bluez_device *device,
 					gboolean *connected)
 {
-	return property_get_boolean(device->proxy, "Connected", connected);
+	return property_get_boolean(device->property_proxy, DEVICE_INTERFACE,
+						"Connected", connected);
 }
 
 int bluez_device_get_property_rssi(struct _bluez_device *device,
 					gint16 *rssi)
 {
-	return property_get_int16(device->proxy, "RSSI", rssi);
+	return property_get_int16(device->property_proxy, DEVICE_INTERFACE,
+					"RSSI", rssi);
 }
 
 char *bluez_device_get_property_icon(struct _bluez_device *device)
 {
-	return property_get_string(device->proxy, "Icon");
+	return property_get_string(device->property_proxy, DEVICE_INTERFACE,
+					"Icon");
 }
 
 struct profile_connect_state_notify {
