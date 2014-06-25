@@ -331,7 +331,7 @@ static int bt_pairing_agent_on(bundle* b)
     char *title = NULL;
     char *body = NULL;
 
-    event_type = bundle_get_val(b, "event_type");
+    event_type = bundle_get_val(b, "event-type");
     ERROR("create notification for '%s' event", event_type);
 
     noti = notification_create(NOTIFICATION_TYPE_NOTI);
@@ -340,36 +340,36 @@ static int bt_pairing_agent_on(bundle* b)
 	notification_set_execute_option(noti, NOTIFICATION_EXECUTE_TYPE_SINGLE_LAUNCH, NULL, NULL, b);
 
 	if (!g_strcmp0(event_type, "RequestPinCode")) {
-		device_name = (gchar*) bundle_get_val(b, "device_name");
+		device_name = (gchar*) bundle_get_val(b, "device-name");
         title = g_strdup_printf("Bluetooth pairing request");
         body = g_strdup_printf("Enter PIN to pair with %s (Try 0000 or 1234)", device_name);
 	}
 	else if (!g_strcmp0(event_type, "DisplayPinCode")) {
-		device_name = (gchar*) bundle_get_val(b, "device_name");
+		device_name = (gchar*) bundle_get_val(b, "device-name");
         passkey = (gchar*) bundle_get_val(b, "pincode");
         title = g_strdup_printf("Bluetooth PIN code display");
         body = g_strdup_printf("Display %s PIN code to pair with %s", passkey, device_name);
 	}
 	else if (!g_strcmp0(event_type, "RequestPasskey")) {
-		device_name = (gchar*) bundle_get_val(b, "device_name");
+		device_name = (gchar*) bundle_get_val(b, "device-name");
         title = g_strdup_printf("Bluetooth pairing passkey request");
         body = g_strdup_printf("Enter passkey to pair with %s ", device_name);
 	}
 	else if (!g_strcmp0(event_type, "RequestConfirmation")) {
-		device_name = (gchar*) bundle_get_val(b, "device_name");
+		device_name = (gchar*) bundle_get_val(b, "device-name");
 		passkey = (gchar*) bundle_get_val(b, "passkey");
 		ERROR("bundle contains device_name [%s] and passkey [%s]", device_name, passkey);
         title = g_strdup_printf("Bluetooth passkey confirm request");
         body = g_strdup_printf("Confirm passkey is %s to pair with %s", passkey, device_name);
 	}
 	else if (!g_strcmp0(event_type, "AuthorizeService")) {
-		device_name = (gchar*) bundle_get_val(b, "device_name");
+		device_name = (gchar*) bundle_get_val(b, "device-name");
 		uuid = (gchar*) bundle_get_val(b, "uuid");
         title = g_strdup_printf("Bluetooth authorize service");
         body = g_strdup_printf("Allow connection on %s service", uuid);
 	}
 	else if (!g_strcmp0(event_type, "RequestAuthorization")) {
-		device_name = (gchar*) bundle_get_val(b, "device_name");
+		device_name = (gchar*) bundle_get_val(b, "device-name");
         title = g_strdup_printf("Bluetooth authorize request");
         body = g_strdup_printf("Allow %s to connect?", device_name);
 	}
@@ -377,14 +377,14 @@ static int bt_pairing_agent_on(bundle* b)
     g_free(title);
     g_free(body);
 
-	ERROR("BUNDLE free in IVI plugin!!!");
-	bundle_free(b);
-
     err = notification_insert(noti, NULL);
     if (err != NOTIFICATION_ERROR_NONE) {
         ERROR("Unable to insert notification: %s\n", error_to_string(err));
         return 1;
     }
+
+    ERROR("BUNDLE free in IVI plugin!!!");
+	bundle_free(b);
 
 	return 0;
 }

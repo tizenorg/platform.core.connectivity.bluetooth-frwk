@@ -279,7 +279,7 @@ static const gchar introspection_xml[] =
 	"    </method>"
 	"    <method name='Cancel'>"
 	"    </method>"
-#if JUNK
+#ifndef JUNK
 	"    <method name='ReplyConfirmation'>"
 	"      <arg type='u' name='value' direction='in'/>"
 	"    </method>"
@@ -484,15 +484,10 @@ static bundle* fill_notification_bundle(const gchar *method_name, GVariant *para
 	if (!b)
 		return NULL;
 
-	bundle_add(b, "event_type", (char *) method_name);
-
-	gchar *invocation_str = g_strdup_printf("%p", invocation);
-	bundle_add(b, "invocation", (char *) invocation_str);
-	ERROR("INVOCATION: [%p] !", invocation);
-	ERROR("INVOCATION BUNDLE: [%s] !", bundle_get_val(b, "invocation"));
+	bundle_add(b, "event-type", (char *) method_name);
 
 	bundle_add(b, "agent-path", (char *) object_path);
-	ERROR("INVOCATION: [%s] !", object_path);
+	ERROR("AGENT PATH: [%s] !", object_path);
 
 	if (!g_strcmp0(method_name, "DisplayPinCode")) {
 		gchar *device_path = NULL;
@@ -500,7 +495,7 @@ static bundle* fill_notification_bundle(const gchar *method_name, GVariant *para
 		gchar *pincode =  NULL;
 		g_variant_get(parameters, "(os)", &device_path, &pincode);
 		device_name = get_device_name_from_device_path(device_path);
-		bundle_add(b, "device_name", (char *) device_name);
+		bundle_add(b, "device-name", (char *) device_name);
 		bundle_add(b, "pincode", (char *) pincode);
 		g_free(device_path);
 		g_free(pincode);
@@ -510,7 +505,7 @@ static bundle* fill_notification_bundle(const gchar *method_name, GVariant *para
 		gchar *device_name = NULL;
 		g_variant_get(parameters, "(o)", &device_path);
 		device_name = get_device_name_from_device_path(device_path);
-		bundle_add(b, "device_name", (char *) device_name);
+		bundle_add(b, "device-name", (char *) device_name);
 		g_free(device_path);
 	}
 	else if (!g_strcmp0(method_name, "RequestPasskey")) {
@@ -518,7 +513,7 @@ static bundle* fill_notification_bundle(const gchar *method_name, GVariant *para
 		gchar *device_name = NULL;
 		g_variant_get(parameters, "(o)", &device_path);
 		device_name = get_device_name_from_device_path(device_path);
-		bundle_add(b, "device_name", (char *) device_name);
+		bundle_add(b, "device-name", (char *) device_name);
 		g_free(device_path);
 	}
 	else if (!g_strcmp0(method_name, "RequestConfirmation")) {
@@ -528,7 +523,7 @@ static bundle* fill_notification_bundle(const gchar *method_name, GVariant *para
 		guint32 passkey = 0;
 		g_variant_get(parameters, "(ou)", &device_path, &passkey);
 		device_name = get_device_name_from_device_path(device_path);
-		bundle_add(b, "device_name", (char *) device_name);
+		bundle_add(b, "device-name", (char *) device_name);
 		gchar *passkey_str = g_strdup_printf("%u", passkey);
 		// Set '0' padding if the passkey has less than 6 digits
 		char passkey_tab[PASSKEY_SIZE] = "000000";
@@ -539,7 +534,7 @@ static bundle* fill_notification_bundle(const gchar *method_name, GVariant *para
 		}
 		bundle_add(b, "passkey", passkey_tab);
 		ERROR("device_path [%s] / passkey_str [%s]", device_path, passkey_str);
-		ERROR("BUNDLE contains: device_name [%s] / passkey [%s]", bundle_get_val(b, "device_name"), bundle_get_val(b, "passkey"));
+		ERROR("BUNDLE contains: device_name [%s] / passkey [%s]", bundle_get_val(b, "device-name"), bundle_get_val(b, "passkey"));
 		g_free(device_path);
 		g_free(passkey_str);
 	}
@@ -549,7 +544,7 @@ static bundle* fill_notification_bundle(const gchar *method_name, GVariant *para
 		gchar *uuid = NULL;
 		g_variant_get(parameters, "(os)", &device_path, &uuid);
 		device_name = get_device_name_from_device_path(device_path);
-		bundle_add(b, "device_name", (char *) device_name);
+		bundle_add(b, "device-name", (char *) device_name);
 		bundle_add(b, "uuid", (char *) uuid);
 		g_free(device_path);
 		g_free(uuid);
@@ -559,13 +554,13 @@ static bundle* fill_notification_bundle(const gchar *method_name, GVariant *para
 		gchar *device_name = NULL;
 		g_variant_get(parameters, "(o)", &device_path);
 		device_name = get_device_name_from_device_path(device_path);
-		bundle_add(b, "device_name", (char *) device_name);
+		bundle_add(b, "device-name", (char *) device_name);
 		g_free(device_path);
 	}
 	else {
 		DBG("There is no data to add in bundle for 'Release' or 'Cancel' method calls");
 	}
-	ERROR("BUNDLE: event_type: [%s] and device_name: [%s]", bundle_get_val(b, "event_type"), bundle_get_val(b, "device_name"));
+	ERROR("BUNDLE: event_type: [%s] and device_name: [%s]", bundle_get_val(b, "event-type"), bundle_get_val(b, "device-name"));
 	return b;
 }
 
@@ -589,7 +584,7 @@ static void handle_request_confirmation(GDBusConnection *connection,
 	struct agent_reply_data *reply_data;
 	bundle* b;
 
-	ERROR("notify RequestConfirmation ");
+	ERROR("'RequestConfirmation' on agent path [%s]", PAIRING_AGENT_PATH);
 
 	reply_data = g_new0(struct agent_reply_data, 1);
 
@@ -612,14 +607,16 @@ static void handle_reply_confirmation(GDBusConnection *connection,
 				gpointer user_data)
 {
 	struct agent_reply_data *reply = common_reply;
-	GVariant *ret;
 	guint32 value;
+
+	ERROR("'ReplyConfirmation'");
 
 	common_reply = NULL;
 	if (!reply)
 		return;
 
 	g_variant_get(parameters, "(u)", &value);
+	ERROR("received value [%d]", value);
 	switch (value) {
 		
 	case 0: /* ACCEPT */
@@ -773,7 +770,7 @@ static void handle_pairing(GDBusConnection *connection,
 					context->parameters,
 					context->invocation,
 					context->user_data);
-#if !JUNK
+#ifndef JUNK
 	else if (g_strcmp0(method_name, "ReplyConfirmation") == 0)
 		handle_reply_confirmation(connection,
 					context->parameters,
@@ -855,15 +852,15 @@ static void handle_pairing_agent_method_call(GDBusConnection *connection,
 	pairing_context = create_pairing_context(method_name, parameters,
 							invocation, user_data);
 
-	if (relay_agent) {
+//	 if (relay_agent) {
 		ERROR("relay agent is defined ");
 		handle_pairing(connection, pairing_context);
 
 		free_pairing_context(pairing_context);
 		pairing_context = NULL;
 
-		return;
-	}
+//		return;
+//	}
 #if JUNK
 	b = fill_notification_bundle(pairing_context, object_path);
 
