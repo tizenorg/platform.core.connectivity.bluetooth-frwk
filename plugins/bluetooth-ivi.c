@@ -361,6 +361,10 @@ static int bt_pairing_agent_on(bundle* b)
 		ERROR("bundle contains device_name [%s] and passkey [%s]", device_name, passkey);
         title = g_strdup_printf("Bluetooth passkey confirm request");
         body = g_strdup_printf("Confirm passkey is %s to pair with %s", passkey, device_name);
+
+        notification_set_text( noti, NOTIFICATION_TEXT_TYPE_INFO_1, event_type,
+            		NULL, NOTIFICATION_VARIABLE_TYPE_NONE);
+
 	}
 	else if (!g_strcmp0(event_type, "AuthorizeService")) {
 		device_name = (gchar*) bundle_get_val(b, "device-name");
