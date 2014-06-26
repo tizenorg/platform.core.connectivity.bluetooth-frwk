@@ -30,6 +30,8 @@
 
 #define PASSKEY_SIZE 6
 
+#define PAIRING_TIMEOUT (20 * 1000) // BlueZ has 60s timeout to let user confirm pairing.
+
 #define BLUETOOTH_OBJECT "/org/tizen/comms/bluetooth"
 
 #define AGENT_INTERFACE "org.bluez.Agent1"
@@ -570,6 +572,7 @@ static gboolean relay_agent_timeout_cb(gpointer user_data);
 
 static gboolean handle_request_confirmation_timeout_cb(gpointer user_data)
 {
+	ERROR("free the agent reply !!!");
 	struct agent_reply_data *reply = common_reply;
 	common_reply = NULL;
 	g_free(reply);
@@ -593,11 +596,13 @@ static void handle_request_confirmation(GDBusConnection *connection,
 	reply_data->connection = connection;
 	reply_data->invocation = invocation;
 
-	ERROR("call plugin with timeout !!!");
+	ERROR("give the bundle to IVI plugin !!!");
 	vertical_notify_bt_pairing_agent_on(b);
 
+	// Save 'RequestConfirmation' connection/invocation data to release method call later after the reply.
 	common_reply = reply_data;
-	relay_agent_timeout_id = g_timeout_add(5000,
+
+	relay_agent_timeout_id = g_timeout_add(PAIRING_TIMEOUT,
 					handle_request_confirmation_timeout_cb, NULL);
 }
 
@@ -606,6 +611,7 @@ static void handle_reply_confirmation(GDBusConnection *connection,
 				GDBusMethodInvocation *invocation,
 				gpointer user_data)
 {
+	// Retrieve 'RequestConfirmation' connection/invocation data to release the method call
 	struct agent_reply_data *reply = common_reply;
 	guint32 value;
 
@@ -618,19 +624,23 @@ static void handle_reply_confirmation(GDBusConnection *connection,
 	g_variant_get(parameters, "(u)", &value);
 	ERROR("received value [%d]", value);
 	switch (value) {
+		case 0: /* ACCEPT */
+			g_dbus_method_invocation_return_value(reply->invocation, NULL);
+			break;
 		
-	case 0: /* ACCEPT */
-		g_dbus_method_invocation_return_value(reply->invocation, NULL);
-		break;
-		
-	case 1: /* REJECT */
-	case 2: /* CANCEL */
-	default: /* unexpected! */
-		g_dbus_method_invocation_return_dbus_error(
+		case 1: /* REJECT */
+			g_dbus_method_invocation_return_dbus_error(
+				reply->invocation,
+				ERROR_INTERFACE ".Rejected",
+				"RejectByUser");
+			break;
+		case 2: /* CANCEL */
+		default: /* unexpected! */
+			g_dbus_method_invocation_return_dbus_error(
 					reply->invocation,
 					ERROR_INTERFACE ".Canceled",
 					"CancelByUser");
-		break;
+			break;
 	}
 }
 
@@ -770,13 +780,11 @@ static void handle_pairing(GDBusConnection *connection,
 					context->parameters,
 					context->invocation,
 					context->user_data);
-#ifndef JUNK
 	else if (g_strcmp0(method_name, "ReplyConfirmation") == 0)
 		handle_reply_confirmation(connection,
 					context->parameters,
 					context->invocation,
 					context->user_data);
-#endif
 	else
 		WARN("Unknown method %s", method_name);
 }
@@ -853,7 +861,7 @@ static void handle_pairing_agent_method_call(GDBusConnection *connection,
 							invocation, user_data);
 
 //	 if (relay_agent) {
-		ERROR("relay agent is defined ");
+//		ERROR("relay agent is defined ");
 		handle_pairing(connection, pairing_context);
 
 		free_pairing_context(pairing_context);
