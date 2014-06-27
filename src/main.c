@@ -22,6 +22,7 @@
 #include <string.h>
 #include <glib.h>
 #include <gio/gio.h>
+#include <gio/gunixsocketaddress.h>
 #include <glib-object.h>
 #include <sys/signalfd.h>
 #include "common.h"
@@ -109,6 +110,27 @@ static int init_manager(void)
 	return 0;
 }
 
+static gboolean socket_handler(GIOChannel *channel, GIOCondition condition,
+                                                        gpointer user_data)
+{
+	GString *s;
+	GIOStatus status;
+	GError *error = NULL;
+
+	s = g_string_new(NULL);
+	status = g_io_channel_read_line_string(channel, s, NULL, &error);
+
+	if (status == G_IO_STATUS_ERROR) {
+		ERROR("Unable to receive from listening socket");
+		g_object_unref(user_data);
+		return FALSE;
+	}
+
+	g_printerr ("RECEIVED : %s\n", s->str);
+
+	return TRUE;
+}
+
 static gboolean signal_handler(GIOChannel *channel, GIOCondition condition,
 							gpointer user_data)
 {
@@ -136,6 +158,112 @@ static gboolean signal_handler(GIOChannel *channel, GIOCondition condition,
 	}
 
 	return TRUE;
+}
+
+static void cleanup_listening_socket(void)
+{
+//	GError *error = NULL;
+
+//	g_socket_close(socket, &error);
+
+}
+
+static guint setup_listening_socket(void)
+{
+	GSocket *socket;
+#if 0
+	GSocket *opened_socket;
+#endif
+	GSocketFamily socket_family;
+	GSocketType socket_type;
+	GSocketAddress *socket_address;
+#if 0
+	GIOStream *connection;
+	GInputStream *istream;
+#endif
+	GIOChannel *channel;
+	gint fd;
+	guint id;
+	GError *error = NULL;
+
+	socket_family = G_SOCKET_FAMILY_UNIX;
+	socket_type = G_SOCKET_TYPE_STREAM;
+	socket = g_socket_new(socket_family, socket_type, 0, &error);
+
+	if (socket == NULL) { g_print("NEW\n");
+		ERROR("Error to set listening socket");
+		return 0;
+	}
+
+	g_socket_set_blocking(socket, FALSE);
+	socket_address = g_unix_socket_address_new("/tmp/.bluetooth.service");
+	g_socket_bind(socket, socket_address, FALSE, &error);
+
+	if (error) { g_print("BIND\n");
+		ERROR("Error to bind listening socket");
+		return 0;
+	}
+g_print("APRES BIND\n");
+	g_socket_listen(socket, &error);
+
+	if (error) { g_print("LISTEN\n");
+		ERROR("Error to listen on socket");
+		return 0;
+	}
+g_print("APRES LISTEN\n");
+
+	g_object_unref(socket_address);
+#if 0
+	opened_socket = g_socket_accept(socket, NULL, &error);
+
+	if (opened_socket == NULL) {g_print("ACCEPT\n");
+		ERROR("Error to accept connections on listening socket");
+		return 0;
+	}
+#endif
+g_print("AVANT GET_FD\n");
+	fd = g_socket_get_fd(socket);
+	channel = g_io_channel_unix_new(fd);
+
+g_print("AVANT SET_ENCODING\n");
+	g_io_channel_set_encoding(channel, NULL, NULL);
+	g_io_channel_set_buffered(channel, FALSE);
+	g_io_channel_set_close_on_unref(channel, TRUE);
+
+	id = g_io_add_watch(channel,
+			G_IO_IN,
+			socket_handler, NULL);
+g_print("APRES ADD_WATCH\n");
+
+	//g_io_channel_unref(channel);
+#if 0
+	connection = G_IO_STREAM (g_socket_connection_factory_create_connection(opened_socket));
+
+	if (!connection) {
+		ERROR("Unable to establish connections on listening socket");
+		return 0;
+	}
+
+	istream = g_io_stream_get_input_stream(connection);
+
+	//while (1) {
+	gchar buffer[4096];
+	gssize size;
+	size = g_input_stream_read (istream, buffer, sizeof buffer, NULL, &error);
+
+	if (size < 0) {
+		ERROR("Unable to receive from listening socket");
+		return 0;
+	}
+
+	// if (size == 0) break;
+
+	g_print ("received %" G_GSSIZE_FORMAT "bytes of data : %s\n", size, buffer);
+
+	//}
+#endif
+
+	return id;
 }
 
 static guint setup_signal_handle(void)
@@ -179,6 +307,8 @@ int main(int argc, char **argv)
 	g_type_init();
 #endif
 
+	setup_listening_socket();
+
 	setup_signal_handle();
 
 	comms_service_plugin_init();
@@ -190,6 +320,8 @@ int main(int argc, char **argv)
 	g_main_loop_run(loop);
 
 	comms_service_plugin_cleanup();
+
+	cleanup_listening_socket();
 
 	deinit_manager();
 
