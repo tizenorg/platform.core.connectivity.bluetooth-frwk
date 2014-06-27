@@ -3047,13 +3047,21 @@ static GDBusNodeInfo *profile_xml_data;
 
 static struct spp_context *create_spp_context(void)
 {
-	struct spp_context *spp_ctx;
+	struct spp_context *spp_ctx, *spp_last;
+	GList *list;
 
 	spp_ctx = g_try_new0(struct spp_context, 1);
 	if (spp_ctx == NULL) {
 		DBG("no memroy");
 		return NULL;
 	}
+
+	if (g_list_length(spp_ctx_list) != 0) {
+		list = g_list_last(spp_ctx_list);
+		spp_last = list->data;
+		spp_ctx->fd = spp_last->fd + 1;
+	} else
+		spp_ctx->fd = 1;
 
 	return spp_ctx;
 }
