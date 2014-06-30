@@ -547,6 +547,8 @@ static void handle_pairing(GDBusConnection *connection,
 {
 	gchar *method_name = context->method_name;
 
+	DBG("method_name: [%s]", method_name);
+
 	if (g_strcmp0(method_name, "Release") == 0)
 		handle_release(connection,
 				context->parameters,
@@ -628,6 +630,7 @@ static void free_pairing_context(gpointer user_data)
 	g_free(context);
 }
 
+#ifndef TIZEN_3
 static gboolean relay_agent_timeout_cb(gpointer user_data)
 {
 	ERROR("Relay agent timeout");
@@ -640,6 +643,7 @@ static gboolean relay_agent_timeout_cb(gpointer user_data)
 
 	return FALSE;
 }
+#endif
 
 static void handle_pairing_agent_method_call(GDBusConnection *connection,
 					const gchar *sender,
@@ -659,18 +663,23 @@ static void handle_pairing_agent_method_call(GDBusConnection *connection,
 							invocation, user_data);
 
 	if (relay_agent) {
+		DBG("relay agent is defined");
 		handle_pairing(connection, pairing_context);
 
+#ifdef TIZEN_3
+		vertical_notify_bt_pairing_agent_on(pairing_context);
+#endif
 		free_pairing_context(pairing_context);
 		pairing_context = NULL;
-
 		return;
 	}
 
+#ifndef TIZEN_3
 	vertical_notify_bt_pairing_agent_on();
 
 	relay_agent_timeout_id = g_timeout_add(5000,
 					relay_agent_timeout_cb, NULL);
+#endif
 }
 
 static const GDBusInterfaceVTable pairing_agent_vtable =
@@ -909,7 +918,8 @@ static void pairing_skeleton_handle_method_call(GDBusConnection *connection,
 					GDBusMethodInvocation *invocation,
 					gpointer user_data)
 {
-	DBG("method: %s", method_name);
+
+  DBG("method: %s", method_name);
 
 	if (g_strcmp0(method_name, "RegisterPairingAgent") == 0)
 		register_relay_agent_handler(connection, parameters,
@@ -995,7 +1005,6 @@ static void bluez_agent_added_cb(bluez_agent_t *agent, void *user_data)
 		bt_pairing = NULL;
 	}
 
-
 	bluez_agent_register_agent(PAIRING_AGENT_PATH,
 					DISPLAY_YES_NO,
 					register_pairing_agent_cb,
@@ -1015,6 +1024,8 @@ void bt_service_pairing_init(GDBusObjectSkeleton *gdbus_object_skeleton,
 		return;
 
 	bt_object_skeleton = gdbus_object_skeleton;
+
+	DBG("");
 
 	default_adapter = adapter;
 
@@ -1041,6 +1052,22 @@ void bt_service_pairing_init(GDBusObjectSkeleton *gdbus_object_skeleton,
 				DISPLAY_YES_NO,
 				register_pairing_agent_cb,
 				connection);
+
+#ifdef TIZEN_3
+	DBG("popups app registers the agent here");
+	struct pairing_context *context;
+
+	context = g_new0(struct pairing_context, 1);
+	if (context == NULL) {
+		ERROR("no memroy");
+		return;
+	}
+	context->method_name = "RegisterPairingAgent";
+
+	vertical_notify_bt_pairing_agent_on(context);
+
+	g_free(context);
+#endif
 }
 
 void bt_service_pairing_deinit(void)

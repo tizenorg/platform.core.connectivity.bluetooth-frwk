@@ -577,6 +577,21 @@ typedef struct
 	void (*cancel)(void);
 } bt_agent;
 
+#ifdef TIZEN_3
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_AGENT_MODULE
+ *
+ * @brief  Enumerations used by user for synchronous agent replies
+ *
+ * @see bt_agent_reply_sync()
+ */
+typedef enum
+{
+  BT_AGENT_ACCEPT = 0, /**< accept user request over bt_agent */
+  BT_AGENT_REJECT, /**< reject user request over bt_agent */
+} bt_agent_accept_type_t;
+#endif
+
 /**
  * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
  * @brief  Called when the Bluetooth adapter state changes.
@@ -4020,6 +4035,26 @@ int bt_gatt_read_characteristic_value(bt_gatt_attribute_h char_handle,
  */
 int bt_agent_register(bt_agent *agent);
 
+#ifdef TIZEN_3
+/**
+ * @ingroup  CAPI_NETWORK_BLUETOOTH_AGENT_MODULE
+ * @brief  Register bluez agent in syncrhonous mode.
+ *
+ * @remarks This function is similar to bt_agent_register() but do not register
+ * any callback. In that way, user could make some synchronous replies.
+ *
+ * @return  0 on success, otherwise negative error value.
+ * @retval  #BT_ERROR_NONE  Successful
+ * @retval  #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval  #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval  #BT_ERROR_ALREADY_DONE Already register
+ *
+ * @see  bt_agent_unregister()
+ * @see  bt_agent_reply_sync()
+ *
+ */
+int bt_agent_register_sync(void);
+#endif
 /**
  * @ingroup  CAPI_NETWORK_BLUETOOTH_AGENT_MODULE
  * @brief Releases all resources of the Bluetooth Agent.
@@ -4047,6 +4082,21 @@ int bt_agent_unregister(void);
  */
 void bt_agent_confirm_accept(bt_req_t *requestion);
 
+#ifdef TIZEN_3
+/**
+ * @ingroup  CAPI_NETWORK_BLUETOOTH_AGENT_MODULE
+ * @brief  Agent synchronous reply.
+ *
+ * @param[in]  reply The accept or reject user reply which can be
+ *
+ * @pre to allow sync replies, user should have previously register the agent
+ * with bt_agent_register_sync()
+ *
+ * @see bt_agent_register_sync()
+ * @see bt_agent_unregister()
+ */
+void bt_agent_reply_sync(bt_agent_accept_type_t reply);
+#endif
 /**
  * @ingroup  CAPI_NETWORK_BLUETOOTH_AGENT_MODULE
  * @brief  Agent reject confirm info.
