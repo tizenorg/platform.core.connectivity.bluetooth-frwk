@@ -27,7 +27,11 @@ struct bluetooth_vertical_driver {
 	int (*disabled)(void);
 	int (*transfer)(double);
 	int (*opp_agent_on)(void);
+#ifdef TIZEN_3
+	int (*pairing_agent_on)(void*);
+#else
 	int (*pairing_agent_on)(void);
+#endif
 };
 
 void comms_service_register_bt_vertical_driver(
@@ -41,8 +45,11 @@ int vertical_notify_bt_enabled(void);
 void vertical_notify_bt_disabled(void);
 
 void vertical_notify_bt_transfer(double progress);
-
+#ifdef TIZEN_3
+void vertical_notify_bt_pairing_agent_on(void* data);
+#else
 void vertical_notify_bt_pairing_agent_on(void);
+#endif
 
 void vertical_notify_bt_opp_agent_on(void);
 #endif

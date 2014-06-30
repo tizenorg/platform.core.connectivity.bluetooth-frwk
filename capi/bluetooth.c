@@ -49,6 +49,9 @@
 
 #define WRITE_REQUEST "write"
 #define WRITE_COMMAND "write-without-response"
+
+static GDBusMethodInvocation *reply_invocation;
+
 static bool initialized;
 static bool bt_service_init;
 
@@ -3284,10 +3287,11 @@ static void handle_display_pincode(const gchar *device_path,
 					const char *pincode,
 					GDBusMethodInvocation *invocation)
 {
+  DBG("");
+
+#ifndef TIZEN_3
 	gchar *device_name;
 	bluez_device_t *device;
-
-	DBG("");
 
 	if (default_adapter == NULL) {
 		ERROR("No default adapter");
@@ -3305,17 +3309,20 @@ static void handle_display_pincode(const gchar *device_path,
 
 	if (this_agent && this_agent->display_pincode)
 		this_agent->display_pincode(device_name, pincode, invocation);
-
+#endif
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
 static void request_pincode_handler(const gchar *device_path,
 					GDBusMethodInvocation *invocation)
 {
-	gchar *device_name;
-	bluez_device_t *device;
+  DBG("");
 
-	DBG("");
+#ifdef TIZEN_3
+  reply_invocation = invocation;
+#else
+  gchar *device_name;
+	bluez_device_t *device;
 
 	if (default_adapter == NULL) {
 		ERROR("No default adapter");
@@ -3333,15 +3340,19 @@ static void request_pincode_handler(const gchar *device_path,
 
 	if (this_agent && this_agent->request_pincode)
 		this_agent->request_pincode(device_name, invocation);
+#endif
 }
 
 static void request_passkey_handler(const gchar *device_path,
 					GDBusMethodInvocation *invocation)
 {
-	gchar *device_name;
-	bluez_device_t *device;
-
 	DBG("");
+
+#ifdef TIZEN_3
+  reply_invocation = invocation;
+#else
+  gchar *device_name;
+  bluez_device_t *device;
 
 	if (default_adapter == NULL) {
 		ERROR("No default adapter");
@@ -3359,16 +3370,20 @@ static void request_passkey_handler(const gchar *device_path,
 
 	if (this_agent && this_agent->request_passkey)
 		this_agent->request_passkey(device_name, invocation);
+#endif
 }
 
 static void request_confirmation_handler(const gchar *device_path,
 					guint32 passkey,
 					GDBusMethodInvocation *invocation)
 {
+  DBG("");
+
+#ifdef TIZEN_3
+  reply_invocation = invocation;
+#else
 	gchar *device_name;
 	bluez_device_t *device;
-
-	DBG("");
 
 	if (default_adapter == NULL) {
 		ERROR("No default adapter");
@@ -3384,8 +3399,10 @@ static void request_confirmation_handler(const gchar *device_path,
 
 	device_name = bluez_device_get_property_alias(device);
 
+
 	if (this_agent && this_agent->request_confirm)
 		this_agent->request_confirm(device_name, passkey, invocation);
+#endif
 }
 
 static void handle_spp_authorize_request(bluez_device_t *device,
@@ -3454,7 +3471,6 @@ static void request_authorize_service_handler(const gchar *device_path,
 					GDBusMethodInvocation *invocation)
 {
 	struct spp_context *spp_ctx;
-	gchar *device_name;
 	bluez_device_t *device;
 
 	DBG("");
@@ -3476,6 +3492,10 @@ static void request_authorize_service_handler(const gchar *device_path,
 		handle_spp_authorize_request(device, spp_ctx, invocation);
 		return;
 	}
+#ifdef TIZEN_3
+  reply_invocation = invocation;
+#else
+	gchar *device_name;
 
 	/* Other profile Authorize request */
 	if (!this_agent || !this_agent->authorize_service)
@@ -3486,22 +3506,25 @@ static void request_authorize_service_handler(const gchar *device_path,
 	this_agent->authorize_service(device_name, uuid, invocation);
 
 	g_free(device_name);
+#endif
 }
 
 static void request_authorization_handler(const gchar *device_path,
 					GDBusMethodInvocation *invocation)
 {
+#ifndef TIZEN_3
 	if (!this_agent)
 		return;
 
 	if (!this_agent->cancel)
 		return;
-
+#endif
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
 static void cancel_handler(GDBusMethodInvocation *invocation)
 {
+#ifndef TIZEN_3
 	if (!this_agent)
 		return;
 
@@ -3509,7 +3532,7 @@ static void cancel_handler(GDBusMethodInvocation *invocation)
 		return;
 
 	this_agent->cancel();
-
+#endif
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
@@ -3818,6 +3841,26 @@ int bt_agent_register(bt_agent *agent)
 	return BT_SUCCESS;
 }
 
+int bt_agent_register_sync(void)
+{
+	int ret;
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (bluetooth_agent_id > 0)
+		return BT_ERROR_ALREADY_DONE;
+
+	if (this_agent != NULL)
+		return BT_ERROR_ALREADY_DONE;
+
+	ret = create_agent();
+	if (ret != BT_SUCCESS)
+		return ret;
+
+	return BT_SUCCESS;
+}
+
 int bt_agent_unregister(void)
 {
 	if (initialized == false)
@@ -3825,8 +3868,9 @@ int bt_agent_unregister(void)
 
 	destory_agent();
 
+#ifndef TIZEN_3
 	this_agent = NULL;
-
+#endif
 	return BT_SUCCESS;
 }
 
@@ -3847,6 +3891,24 @@ void bt_agent_confirm_accept(bt_req_t *requestion)
 	GDBusMethodInvocation *invocation = requestion;
 
 	bt_agent_simple_accept(invocation);
+}
+
+void bt_agent_reply_sync(bt_agent_accept_type_t reply)
+{
+  DBG("reply [%d]", reply);
+
+  if (reply == BT_AGENT_ACCEPT)
+    g_dbus_method_invocation_return_value(reply_invocation, NULL);
+  else if (reply == BT_AGENT_REJECT)
+    g_dbus_method_invocation_return_dbus_error(reply_invocation,
+          ERROR_INTERFACE ".Rejected",
+          "RejectedByUser");
+  else
+    g_dbus_method_invocation_return_dbus_error(reply_invocation,
+          ERROR_INTERFACE ".Canceled",
+          "CanceledByUser");
+
+  reply_invocation = NULL;
 }
 
 void bt_agent_confirm_reject(bt_req_t *requestion)
