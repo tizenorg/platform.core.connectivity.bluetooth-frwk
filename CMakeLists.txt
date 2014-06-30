@@ -1,7 +1,9 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 PROJECT("Tizen Bluetooth Framework" C)
 
-SET(CMAKE_C_FLAGS "-O3 -Wall -Werror -DPLUGINDIR=\\\"/usr/lib/bluetooth-service/plugins\\\"")
+SET(TEST_INSTALL_DIR "${LIB_INSTALL_DIR}/bluetooth-frwk-test/")
+SET(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/bluetooth-service/plugins/")
+SET(CMAKE_C_FLAGS "-O3 -Wall -Werror -DPLUGINDIR=\\\"${PLUGIN_INSTALL_DIR}\\\"")
 
 SET(TEST "test-flags")
 
@@ -17,10 +19,6 @@ pkg_check_modules(${TEST} REQUIRED
 FOREACH(flag ${${TEST}_CFLAGS})
 	SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${flag}")
 ENDFOREACH(flag)
-
-SET(LIB_INSTALL_DIR "/usr/lib/")
-SET(TEST_INSTALL_DIR "${LIB_INSTALL_DIR}bluetooth-frwk-test/")
-SET(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}bluetooth-service/plugins/")
 
 IF(platform STREQUAL "Mobile")
 SET(MOBILE_FLAGS "mobile-flags")
