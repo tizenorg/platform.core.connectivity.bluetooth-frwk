@@ -21,7 +21,11 @@
 #include "common.h"
 #include "vertical.h"
 
+#ifdef TIZEN_COMMON
+#define VERTICAL "Common"
+#else
 #define VERTICAL "Mobile"
+#endif
 
 static struct bluetooth_vertical_driver *bluetooth_driver;
 
@@ -79,6 +83,16 @@ void vertical_notify_bt_disabled(void)
 		bluetooth_driver->disabled();
 }
 
+#ifdef TIZEN_COMMON
+void vertical_notify_bt_pairing_agent_on(bundle* bundle)
+{
+	if (!bluetooth_driver)
+		return;
+
+	if (bluetooth_driver->pairing_agent_on)
+		bluetooth_driver->pairing_agent_on(bundle);
+}
+#else
 void vertical_notify_bt_pairing_agent_on(void)
 {
 	if (!bluetooth_driver)
@@ -87,7 +101,7 @@ void vertical_notify_bt_pairing_agent_on(void)
 	if (bluetooth_driver->pairing_agent_on)
 		bluetooth_driver->pairing_agent_on();
 }
-
+#endif
 void vertical_notify_bt_opp_agent_on(void)
 {
 	if (!bluetooth_driver)

@@ -23,7 +23,7 @@
 
 #include "pairing.h"
 #include "opp.h"
-#ifdef MOBILE
+#ifdef TIZEN_MOBILE
 #include "map_agent.h"
 #endif
 #include "media.h"
@@ -262,7 +262,7 @@ static void adapter_powered_on(CommsManagerSkeleton *skeleton)
 	bt_service_opp_init(bt_object, connection);
 	bt_service_media_init(bt_object, connection, default_adapter);
 
-#ifdef MOBILE
+#ifdef TIZEN_MOBILE
 	bt_map_agent_init();
 #endif
 
@@ -287,7 +287,7 @@ static void adapter_powered_off(CommsManagerSkeleton *skeleton)
 	bt_service_opp_deinit();
 	bt_service_media_deinit();
 
-#ifdef MOBILE
+#ifdef TIZEN_MOBILE
 	bt_map_agent_deinit();
 #endif
 

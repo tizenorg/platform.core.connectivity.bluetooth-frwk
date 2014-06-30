@@ -4,17 +4,19 @@ Version:    0.2
 Release:    1
 Group:      Network & Connectivity/Bluetooth
 License:    Apache-2.0
+Source1:    bt-icon.png
 Source0:    %{name}-%{version}.tar.gz
 Source1001: %{name}.manifest
-
 BuildRequires:  pkgconfig(dlog)
 BuildRequires:  pkgconfig(dbus-1)
 BuildRequires:  pkgconfig(glib-2.0)
 BuildRequires:  pkgconfig(gio-2.0)
 BuildRequires:  pkgconfig(gio-unix-2.0)
 BuildRequires:  pkgconfig(capi-base-common)
+%if %{profile}!=common || %{profile}!=ivi
 BuildRequires:  pkgconfig(aul)
 BuildRequires:  pkgconfig(syspopup-caller)
+%endif
 BuildRequires:  pkgconfig(notification)
 
 BuildRequires:  cmake
@@ -41,16 +43,26 @@ API descriptions files and config file.
 
 %prep
 %setup -q
-cp %{SOURCE1001} .
+cp %{SOURCE1} %{SOURCE1001} .
 
 %build
+%if %{profile}==common || %{profile}==ivi
+PLUGIN="Common"
+%define plugin_suffix common
+%endif
+%if %{profile}==mobile
+PLUGIN="Mobile"
+%define plugin_suffix %{profile}
+%endif
+
 MAJORVER=`echo %{version} | awk 'BEGIN {FS="."}{print $1}'`
-%cmake . -DFULLVER=%{version} -DMAJORVER=${MAJORVER}
+%cmake . -DFULLVER=%{version} -DMAJORVER=${MAJORVER} -Dplatform=${PLUGIN}
 
 make %{?jobs:-j%jobs}
 
 %install
 %make_install
+install -D -m 0644 %{SOURCE1} %{buildroot}%{_datadir}/icons/default/bt-icon.png
 
 %post -p /sbin/ldconfig
 
@@ -65,6 +77,10 @@ make %{?jobs:-j%jobs}
 %config %{_sysconfdir}/dbus-1/system.d/bluezobex.conf
 %config %{_sysconfdir}/dbus-1/system.d/bluetooth-service.conf
 %{_datadir}/dbus-1/system-services/org.tizen.comms.service
+%{_datadir}/icons/default/bt-icon.png
+%if %{profile}
+%{_libdir}/bluetooth-service/plugins/bluetooth-%{plugin_suffix}.so
+%endif
 
 %files test
 %manifest %{name}.manifest

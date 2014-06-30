@@ -3981,6 +3981,8 @@ int bt_gatt_destroy_attribute_handle(bt_gatt_attribute_h handle);
  */
 int bt_agent_register(bt_agent *agent);
 
+int bt_agent_register_sync(void);
+
 /**
  * @ingroup  CAPI_NETWORK_BLUETOOTH_AGENT_MODULE
  * @brief Releases all resources of the Bluetooth Agent.
@@ -4008,6 +4010,14 @@ int bt_agent_unregister(void);
  */
 void bt_agent_confirm_accept(bt_req_t *requestion);
 
+typedef enum {
+	BT_AGENT_ACCEPT,
+	BT_AGENT_REJECT,
+  // BT_AGENT_CANCEL,
+  // BT_CORE_AGENT_TIMEOUT,
+} bt_agent_accept_type_t;
+
+void bt_agent_reply_sync(bt_agent_accept_type_t reply);
 /**
  * @ingroup  CAPI_NETWORK_BLUETOOTH_AGENT_MODULE
  * @brief  Agent reject confirm info.

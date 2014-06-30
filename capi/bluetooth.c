@@ -45,6 +45,8 @@
 #define AGENT_INTERFACE "org.bluez.Agent1"
 #define AGENT_OBJECT_PATH "/org/bluezlib/agent"
 
+static GDBusMethodInvocation *reply_invocation;
+
 static bool initialized;
 static bool bt_service_init;
 
@@ -3273,10 +3275,11 @@ static void request_confirmation_handler(const gchar *device_path,
 					guint32 passkey,
 					GDBusMethodInvocation *invocation)
 {
+  DBG("");
+
+#ifndef TIZEN_COMMON
 	gchar *device_name;
 	bluez_device_t *device;
-
-	DBG("");
 
 	if (default_adapter == NULL) {
 		ERROR("No default adapter");
@@ -3292,8 +3295,15 @@ static void request_confirmation_handler(const gchar *device_path,
 
 	device_name = bluez_device_get_property_alias(device);
 
+
 	if (this_agent && this_agent->request_confirm)
 		this_agent->request_confirm(device_name, passkey, invocation);
+#else
+	// In case of Tizen Common implementation, we do not call any callback.
+	// Popup display is done by through notification-service and not dbus callback.
+	// We store the invocation in order to make the reply later.
+	reply_invocation = invocation;
+#endif
 }
 
 static void handle_spp_authorize_request(bluez_device_t *device,
@@ -3710,6 +3720,26 @@ int bt_agent_register(bt_agent *agent)
 	return BT_SUCCESS;
 }
 
+int bt_agent_register_sync(void)
+{
+	int ret;
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (bluetooth_agent_id > 0)
+		return BT_ERROR_ALREADY_DONE;
+
+	if (this_agent != NULL)
+		return BT_ERROR_ALREADY_DONE;
+
+	ret = create_agent();
+	if (ret != BT_SUCCESS)
+		return ret;
+
+	return BT_SUCCESS;
+}
+
 int bt_agent_unregister(void)
 {
 	if (initialized == false)
@@ -3717,10 +3747,12 @@ int bt_agent_unregister(void)
 
 	destory_agent();
 
+#ifndef TIZEN_COMMON
 	this_agent = NULL;
-
+#endif
 	return BT_SUCCESS;
 }
+
 
 static void bt_agent_simple_accept(GDBusMethodInvocation *invocation)
 {
@@ -3739,6 +3771,24 @@ void bt_agent_confirm_accept(bt_req_t *requestion)
 	GDBusMethodInvocation *invocation = requestion;
 
 	bt_agent_simple_accept(invocation);
+}
+
+void bt_agent_reply_sync(bt_agent_accept_type_t reply)
+{
+  DBG("reply [%d]", reply);
+
+  if (reply == 0)
+    g_dbus_method_invocation_return_value(reply_invocation, NULL);
+  else if (reply == 1)
+    g_dbus_method_invocation_return_dbus_error(reply_invocation,
+          ERROR_INTERFACE ".Rejected",
+          "RejectedByUser");
+  else
+    g_dbus_method_invocation_return_dbus_error(reply_invocation,
+          ERROR_INTERFACE ".Canceled",
+          "CanceledByUser");
+
+  reply_invocation = NULL;
 }
 
 void bt_agent_confirm_reject(bt_req_t *requestion)
