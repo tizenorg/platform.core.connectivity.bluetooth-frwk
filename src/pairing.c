@@ -547,6 +547,8 @@ static void handle_pairing(GDBusConnection *connection,
 {
 	gchar *method_name = context->method_name;
 
+	DBG("method_name: [%s]", method_name);
+
 	if (g_strcmp0(method_name, "Release") == 0)
 		handle_release(connection,
 				context->parameters,
@@ -641,6 +643,120 @@ static gboolean relay_agent_timeout_cb(gpointer user_data)
 	return FALSE;
 }
 
+#ifdef TIZEN_COMMON
+
+#define PASSKEY_SIZE 6
+#define PAIRING_TMEOUT (20 * 1000)
+
+static gchar* get_device_name_from_device_path(gchar* device_path)
+{
+  bluez_device_t *device;
+
+  if (default_adapter == NULL) {
+    ERROR("No default adapter");
+    return NULL;
+  }
+
+  if (device_path == NULL) {
+    ERROR("device_path is NULL");
+    return NULL;
+  }
+
+  device = bluez_adapter_get_device_by_path(default_adapter,
+              device_path);
+  if (device == NULL) {
+    ERROR("Can't find device %s", device_path);
+    return NULL;
+  }
+
+  return bluez_device_get_property_alias(device);
+}
+
+static bundle* fill_notification_bundle(const gchar *method_name,
+        GVariant *parameters,
+        const gchar *object_path)
+{
+  DBG("");
+
+  bundle* b = bundle_create();
+  if (!b)
+    return NULL;
+
+  bundle_add(b, "event-type", (char *) method_name);
+  bundle_add(b, "agent-path", (char *) object_path);
+
+  if (!g_strcmp0(method_name, "DisplayPinCode")) {
+    gchar *device_path = NULL;
+    gchar *device_name = NULL;
+    gchar *pincode =  NULL;
+    g_variant_get(parameters, "(os)", &device_path, &pincode);
+    device_name = get_device_name_from_device_path(device_path);
+    bundle_add(b, "device-name", (char *) device_name);
+    bundle_add(b, "pincode", (char *) pincode);
+    g_free(device_path);
+    g_free(pincode);
+  }
+  else if (!g_strcmp0(method_name, "RequestPinCode")) {
+    gchar *device_path = NULL;
+    gchar *device_name = NULL;
+    g_variant_get(parameters, "(o)", &device_path);
+    device_name = get_device_name_from_device_path(device_path);
+    bundle_add(b, "device-name", (char *) device_name);
+    g_free(device_path);
+  }
+  else if (!g_strcmp0(method_name, "RequestPasskey")) {
+    gchar *device_path = NULL;
+    gchar *device_name = NULL;
+    g_variant_get(parameters, "(o)", &device_path);
+    device_name = get_device_name_from_device_path(device_path);
+    bundle_add(b, "device-name", (char *) device_name);
+    g_free(device_path);
+  }
+  else if (!g_strcmp0(method_name, "RequestConfirmation")) {
+    gchar *device_path = NULL;
+    gchar *device_name = NULL;
+    guint32 passkey = 0;
+    g_variant_get(parameters, "(ou)", &device_path, &passkey);
+    device_name = get_device_name_from_device_path(device_path);
+    bundle_add(b, "device-name", (char *) device_name);
+    gchar *passkey_str = g_strdup_printf("%u", passkey);
+    // Set '0' padding if the passkey has less than 6 digits
+    char passkey_tab[PASSKEY_SIZE] = "000000";
+    int size = strlen((char *)passkey_str);
+    if (size <= PASSKEY_SIZE) {
+      memcpy(&passkey_tab[PASSKEY_SIZE - size], passkey_str, size);
+    }
+    bundle_add(b, "passkey", passkey_tab);
+    g_free(device_path);
+    g_free(passkey_str);
+  }
+  else if (!g_strcmp0(method_name, "AuthorizeService")) {
+    gchar *device_path = NULL;
+    gchar *device_name = NULL;
+    gchar *uuid = NULL;
+    guint32 fd = 0;
+    g_variant_get(parameters, "(osh)", &device_path, &uuid, &fd);
+    device_name = get_device_name_from_device_path(device_path);
+    bundle_add(b, "device-name", (char *) device_name);
+    bundle_add(b, "uuid", (char *) uuid);
+    g_free(device_path);
+    g_free(uuid);
+  }
+  else if (!g_strcmp0(method_name, "RequestAuthorization")) {
+    gchar *device_path = NULL;
+    gchar *device_name = NULL;
+    g_variant_get(parameters, "(o)", &device_path);
+    device_name = get_device_name_from_device_path(device_path);
+    bundle_add(b, "device-name", (char *) device_name);
+    g_free(device_path);
+  }
+  else {
+    DBG("There is no data to add in bundle for 'Release' or 'Cancel' method calls");
+  }
+  return b;
+}
+#endif // #ifdef TIZEN_COMMON
+
 static void handle_pairing_agent_method_call(GDBusConnection *connection,
 					const gchar *sender,
 					const gchar *object_path,
@@ -659,17 +775,25 @@ static void handle_pairing_agent_method_call(GDBusConnection *connection,
 							invocation, user_data);
 
 	if (relay_agent) {
+		DBG("relay agent is defined");
 		handle_pairing(connection, pairing_context);
 
 		free_pairing_context(pairing_context);
 		pairing_context = NULL;
 
+#ifdef TIZEN_COMMON
+		bundle* notification_bundle;
+		notification_bundle = fill_notification_bundle(method_name, parameters, relay_agent->object_path);
+		vertical_notify_bt_pairing_agent_on(notification_bundle);
+#endif
 		return;
 	}
 
+#ifndef TIZEN_COMMON
 	vertical_notify_bt_pairing_agent_on();
+#endif
 
-	relay_agent_timeout_id = g_timeout_add(5000,
+	relay_agent_timeout_id = g_timeout_add(PAIRING_TMEOUT,
 					relay_agent_timeout_cb, NULL);
 }
 
@@ -909,7 +1033,8 @@ static void pairing_skeleton_handle_method_call(GDBusConnection *connection,
 					GDBusMethodInvocation *invocation,
 					gpointer user_data)
 {
-	DBG("method: %s", method_name);
+
+  DBG("method: %s", method_name);
 
 	if (g_strcmp0(method_name, "RegisterPairingAgent") == 0)
 		register_relay_agent_handler(connection, parameters,
@@ -995,7 +1120,6 @@ static void bluez_agent_added_cb(bluez_agent_t *agent, void *user_data)
 		bt_pairing = NULL;
 	}
 
-
 	bluez_agent_register_agent(PAIRING_AGENT_PATH,
 					DISPLAY_YES_NO,
 					register_pairing_agent_cb,
@@ -1015,6 +1139,8 @@ void bt_service_pairing_init(GDBusObjectSkeleton *gdbus_object_skeleton,
 		return;
 
 	bt_object_skeleton = gdbus_object_skeleton;
+
+	DBG("");
 
 	default_adapter = adapter;
 
