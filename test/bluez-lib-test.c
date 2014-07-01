@@ -357,7 +357,9 @@ static void handle_method_call(GDBusConnection *connection,
 
 	if (g_strcmp0(method_name, "AuthorizeService") == 0) {
 		gchar *device_path, *uuid;
-		g_variant_get(parameters, "(os)", &device_path, &uuid);
+		gint32 fd_index;
+		g_variant_get(parameters, "(osh)", &device_path,
+					&uuid, &fd_index);
 
 		printf("\n\tdevice %s uuid %s", device_path, uuid);
 		printf("\n\tAuthorize connection (yes/no):\n");

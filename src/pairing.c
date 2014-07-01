@@ -17,6 +17,7 @@
 *
 */
 
+#include <gio/gunixfdlist.h>
 #include "common.h"
 #include "gdbus.h"
 #include "comms_error.h"
@@ -268,6 +269,7 @@ static const gchar introspection_xml[] =
 	"    <method name='AuthorizeService'>"
 	"      <arg type='o' name='device' direction='in'/>"
 	"      <arg type='s' name='uuid' direction='in'/>"
+	"      <arg type='h' name='fd' direction='in'/>"
 	"    </method>"
 	"    <method name='Cancel'>"
 	"    </method>"
@@ -469,25 +471,48 @@ static void handle_authorize_service(GDBusConnection *connection,
 				gpointer user_data)
 {
 	struct agent_reply_data *reply_data;
+	GDBusMessage *msg;
+	GUnixFDList *in_fd_list, *out_fd_list;
+	GError *error = NULL;
+	gchar *device_path, *uuid;
+	gint32 fd_index;
+	gint fd;
 
 	DBG("");
+
+	g_variant_get(parameters, "(osh)", &device_path,
+						&uuid, &fd_index);
+
+	msg = g_dbus_method_invocation_get_message(invocation);
+
+	in_fd_list = g_dbus_message_get_unix_fd_list(msg);
+
+	fd = g_unix_fd_list_get(in_fd_list, fd_index, NULL);
+
+	out_fd_list = g_unix_fd_list_new();
+
+	g_unix_fd_list_append(out_fd_list, fd, &error);
+
+	g_assert_no_error(error);
 
 	reply_data = g_new0(struct agent_reply_data, 1);
 
 	reply_data->connection = connection;
 	reply_data->invocation = invocation;
 
-	g_dbus_connection_call(connection,
-				relay_agent->owner,
-				relay_agent->object_path,
-				AGENT_INTERFACE,
-				"AuthorizeService",
-				parameters,
-				NULL,
-				G_DBUS_CALL_FLAGS_NONE,
-				-1, NULL,
-				relay_agent_reply,
-				reply_data);
+	g_dbus_connection_call_with_unix_fd_list(connection,
+						relay_agent->owner,
+						relay_agent->object_path,
+						AGENT_INTERFACE,
+						"AuthorizeService",
+						parameters,
+						NULL,
+						G_DBUS_CALL_FLAGS_NONE,
+						-1,
+						out_fd_list,
+						NULL,
+						relay_agent_reply,
+						reply_data);
 }
 
 static void handle_cancel(GDBusConnection *connection,

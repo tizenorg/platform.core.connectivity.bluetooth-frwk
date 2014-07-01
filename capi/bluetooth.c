@@ -3170,6 +3170,7 @@ static const gchar introspection_xml[] =
 	"    <method name='AuthorizeService'>"
 	"      <arg type='o' name='device' direction='in'/>"
 	"      <arg type='s' name='uuid' direction='in'/>"
+	"      <arg type='h' name='fd' direction='in'/>"
 	"    </method>"
 	"    <method name='Cancel'>"
 	"    </method>"
@@ -3296,11 +3297,22 @@ static void handle_spp_authorize_request(bluez_device_t *device,
 					GDBusMethodInvocation *invocation)
 {
 	char *device_name, *device_address;
+	GDBusMessage *msg;
+	GUnixFDList *fd_list;
+	gint fd;
 
 	if (spp_ctx->max_pending == 0) {
 		bt_spp_reject(invocation);
 		return;
 	}
+
+	msg = g_dbus_method_invocation_get_message(invocation);
+
+	fd_list = g_dbus_message_get_unix_fd_list(msg);
+
+	fd = g_unix_fd_list_get(fd_list, (gint)0, NULL);
+
+	spp_ctx->channel = g_io_channel_unix_new(fd);
 
 	device_name = bluez_device_get_property_alias(device);
 	device_address = bluez_device_get_property_address(device);
@@ -3466,7 +3478,10 @@ static void handle_method_call(GDBusConnection *connection,
 
 	if (g_strcmp0(method_name, "AuthorizeService") == 0) {
 		gchar *device_path, *uuid;
-		g_variant_get(parameters, "(os)", &device_path, &uuid);
+		gint32 fd_index;
+
+		g_variant_get(parameters, "(osh)", &device_path,
+						&uuid, &fd_index);
 
 		request_authorize_service_handler(device_path,
 						uuid, invocation);
@@ -3855,14 +3870,17 @@ static void handle_new_connection(gchar *device_path, gint fd,
 		return;
 	}
 
-	channel = g_io_channel_unix_new(fd);
-	if (channel == NULL) {
-		ERROR("Create connection channel error");
-		g_dbus_method_invocation_return_value(invocation, NULL);
-		goto done;
-	}
+	if (!(spp_ctx->channel)) {
+		channel = g_io_channel_unix_new(fd);
+		if (channel == NULL) {
+			ERROR("Create connection channel error");
+			g_dbus_method_invocation_return_value(invocation, NULL);
+			goto done;
+		}
 
-	spp_ctx->channel = channel;
+		spp_ctx->channel = channel;
+	} else
+		channel = spp_ctx->channel;
 
 	g_io_channel_set_close_on_unref(channel, TRUE);
 	g_io_channel_set_encoding(channel, NULL, NULL);
