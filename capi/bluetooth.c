@@ -1610,10 +1610,10 @@ int bt_adapter_unset_device_discovery_state_changed_cb(void)
 		bluez_adapter_unset_device_removed_cb(default_adapter);
 
 		generic_device_removed_set = FALSE;
-
-		g_free(unpaired_device_removed_node);
-		unpaired_device_removed_node = NULL;
 	}
+
+	g_free(unpaired_device_removed_node);
+	unpaired_device_removed_node = NULL;
 
 	return BT_SUCCESS;
 }
