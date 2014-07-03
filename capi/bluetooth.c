@@ -1605,14 +1605,16 @@ int bt_adapter_unset_device_discovery_state_changed_cb(void)
 		adapter_discovering_node = NULL;
 	}
 
+	if (unpaired_device_removed_node) {
+		g_free(unpaired_device_removed_node);
+		unpaired_device_removed_node = NULL;
+	}
+
 	if (paired_device_removed_node == NULL &&
 			generic_device_removed_set == TRUE) {
 		bluez_adapter_unset_device_removed_cb(default_adapter);
 
 		generic_device_removed_set = FALSE;
-
-		g_free(unpaired_device_removed_node);
-		unpaired_device_removed_node = NULL;
 	}
 
 	return BT_SUCCESS;
@@ -2138,15 +2140,17 @@ int bt_device_unset_bond_destroyed_cb(void)
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
+	if (paired_device_removed_node) {
+		g_free(paired_device_removed_node);
+		paired_device_removed_node = NULL;
+	}
+
 	if (unpaired_device_removed_node == NULL &&
 			generic_device_removed_set == TRUE) {
 		bluez_adapter_unset_device_removed_cb(default_adapter);
 
 		generic_device_removed_set = FALSE;
 	}
-
-	g_free(paired_device_removed_node);
-	paired_device_removed_node = NULL;
 
 	return BT_SUCCESS;
 }
