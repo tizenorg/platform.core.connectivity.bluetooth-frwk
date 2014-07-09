@@ -606,12 +606,10 @@ void bt_media_unregister_player(struct _bluez_adapter *adapter)
 		return;
 	}
 
-	g_dbus_proxy_call(adapter->media_proxy,
+	g_dbus_proxy_call_sync(adapter->media_proxy,
 			"UnregisterPlayer",
 			g_variant_new("(o)", BT_MEDIA_OBJECT_PATH),
-			0, -1, NULL,
-			handle_media_proxy_cb,
-			adapter);
+			0, -1, NULL, NULL);
 
 	if (adapter->avrcp_registration_id)
 		bt_unregister_avrcp_property(adapter,
