@@ -34,6 +34,8 @@
 
 #define DEVICE_SERVICE_CLASS_DISCOVERABLE_MODE	0x002000
 
+#define BT_STOP_DISCOVERY_TIMEOUT (1000*15)
+
 #define BT_SPP_BUFFER_MAX 1024
 #define BLUETOOTH_IDENT_LEN 6
 #define CONNMAN_DBUS_NAME "net.connman"
@@ -53,6 +55,8 @@ static guint profile_id;
 static GDBusConnection *conn;
 
 static bluez_adapter_t *default_adapter;
+
+static guint event_id;
 
 static void profile_connect_callback(bluez_device_t *device,
 					enum device_profile_state state);
@@ -1316,6 +1320,24 @@ int bt_adapter_set_visibility(bt_adapter_visibility_mode_e discoverable_mode,
 	return BT_SUCCESS;
 }
 
+static gboolean bt_stop_discovery_timeout_cb(gpointer user_data)
+{
+	event_id = 0;
+
+	bt_adapter_stop_device_discovery();
+
+	return FALSE;
+}
+
+static void bt_stop_discovery_timeout(void)
+{
+	if (event_id > 0)
+		return;
+
+	event_id = g_timeout_add(BT_STOP_DISCOVERY_TIMEOUT,
+		(GSourceFunc)bt_stop_discovery_timeout_cb, NULL);
+}
+
 int bt_adapter_start_device_discovery(void)
 {
 	DBG("");
@@ -1327,6 +1349,8 @@ int bt_adapter_start_device_discovery(void)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
 	bluez_adapter_start_discovery(default_adapter);
+
+	bt_stop_discovery_timeout();
 
 	return BT_SUCCESS;
 }
