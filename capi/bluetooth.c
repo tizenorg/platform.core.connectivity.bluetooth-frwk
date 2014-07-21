@@ -1194,6 +1194,8 @@ int bt_adapter_set_name_changed_cb(bt_adapter_name_changed_cb callback,
 {
 	struct adapter_name_cb_node *node_data;
 
+	DBG("");
+
 	if (callback == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
 
@@ -5235,7 +5237,7 @@ int bt_nap_unset_connection_state_changed_cb(void)
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
-	if (!adapter_name_node)
+	if (!nap_connection_state_changed_node)
 		return BT_SUCCESS;
 
 	bluez_unset_nap_connection_state_cb();
