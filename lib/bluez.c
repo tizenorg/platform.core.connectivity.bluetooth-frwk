@@ -36,6 +36,9 @@
 #define AGENT_INTERFACE "org.bluez.AgentManager1"
 #define PROFILE_INTERFACE "org.bluez.ProfileManager1"
 #define MANAGER_INTERFACE "org.freedesktop.DBus.ObjectManager"
+#define GATT_SERVICE_IFACE "org.bluez.GattService1"
+#define GATT_CHR_IFACE "org.bluez.GattCharacteristic1"
+#define GATT_DESCRIPTOR_IFACE "org.bluez.GattDescriptor1"
 
 #define BT_MEDIA_OBJECT_PATH "/Musicplayer"
 #define MEDIA_PLAYER_INTERFACE  "org.mpris.MediaPlayer2.Player"
@@ -83,6 +86,24 @@ struct _device_head {
 	char *adapter_path;
 	struct _bluez_adapter *adapter;
 	GHashTable *device_hash;
+};
+
+struct _gatt_service_head {
+	char *device_path;
+	struct _bluez_device *device;
+	GHashTable *gatt_service_hash;
+};
+
+struct _gatt_char_head {
+	char *gatt_service_path;
+	struct _bluez_gatt_service *service;
+	GHashTable *gatt_char_hash;
+};
+
+struct _gatt_desc_head {
+	char *gatt_char_path;
+	struct _bluez_gatt_char *characteristic;
+	GHashTable *gatt_desc_hash;
 };
 
 struct _bluez_adapter {
@@ -146,6 +167,7 @@ struct _bluez_device {
 	GDBusProxy *hdp_proxy;
 	struct _bluez_object *parent;
 	struct _device_head *head;
+	struct _gatt_service_head *service_head;
 
 	bluez_device_paired_cb_t device_paired_cb;
 	gpointer device_paired_cb_data;
@@ -163,6 +185,38 @@ struct _bluez_device {
 	gpointer input_connected_cb_data;
 };
 
+struct _bluez_gatt_service {
+	char *interface_name;
+	char *object_path;
+	GDBusInterface *interface;
+	GDBusProxy *proxy;
+	GDBusProxy *property_proxy;
+	struct _bluez_object *parent;
+	struct _gatt_service_head *head;
+	struct _gatt_char_head *char_head;
+};
+
+struct _bluez_gatt_char {
+	char *interface_name;
+	char *object_path;
+	GDBusInterface *interface;
+	GDBusProxy *proxy;
+	GDBusProxy *property_proxy;
+	struct _bluez_object *parent;
+	struct _gatt_char_head *head;
+	struct _gatt_desc_head *desc_head;
+};
+
+struct _bluez_gatt_desc {
+	char *interface_name;
+	char *object_path;
+	GDBusInterface *interface;
+	GDBusProxy *proxy;
+	GDBusProxy *property_proxy;
+	struct _bluez_object *parent;
+	struct _gatt_desc_head *head;
+};
+
 static GHashTable *bluez_object_hash;
 
 static GList *bluez_adapter_list;
@@ -170,6 +224,12 @@ static GList *bluez_adapter_list;
 static GHashTable *bluez_adapter_hash;
 
 static GHashTable *bluez_device_hash;
+
+static GHashTable *bluez_gatt_service_hash;
+
+static GHashTable *bluez_gatt_char_hash;
+
+static GHashTable *bluez_gatt_desc_hash;
 
 static bluez_adapter_added_cb_t adapter_added_cb;
 static gpointer adapter_added_cb_data;
@@ -444,7 +504,13 @@ static void parse_bluez_adapter_interfaces(gpointer data, gpointer user_data)
 
 static GList *bluez_object_list;
 
-GList *device_head_list;
+static GList *device_head_list;
+
+static GList *gatt_service_head_list;
+
+static GList *gatt_char_head_list;
+
+static GList *gatt_desc_head_list;
 
 static void free_device_head(struct _device_head *head)
 {
@@ -490,8 +556,7 @@ static void detach_device_head(struct _bluez_adapter *adapter)
 static void unregister_bluez_adapter(struct _bluez_adapter *adapter)
 {
 	DBG("adapter path %s", adapter->object_path);
-	bluez_adapter_list = g_list_remove(bluez_adapter_list,
-						(gpointer) adapter);
+
 	g_hash_table_steal(bluez_adapter_hash,
 				(gpointer) adapter->object_path);
 
@@ -632,6 +697,42 @@ static void device_properties_changed(GDBusProxy *proxy,
 	g_free(properties);
 }
 
+static void gatt_service_properties_changed(GDBusProxy *proxy,
+					GVariant *changed_properties,
+					GStrv *invalidated_properties,
+					gpointer user_data)
+{
+	gchar *properties = g_variant_print(changed_properties, TRUE);
+
+	DBG("properties %s", properties);
+
+	g_free(properties);
+}
+
+static void gatt_char_properties_changed(GDBusProxy *proxy,
+					GVariant *changed_properties,
+					GStrv *invalidated_properties,
+					gpointer user_data)
+{
+	gchar *properties = g_variant_print(changed_properties, TRUE);
+
+	DBG("properties %s", properties);
+
+	g_free(properties);
+}
+
+static void gatt_desc_properties_changed(GDBusProxy *proxy,
+					GVariant *changed_properties,
+					GStrv *invalidated_properties,
+					gpointer user_data)
+{
+	gchar *properties = g_variant_print(changed_properties, TRUE);
+
+	DBG("properties %s", properties);
+
+	g_free(properties);
+}
+
 static struct _bluez_device *create_device(struct _bluez_object *object)
 {
 	struct _bluez_device *device;
@@ -651,6 +752,69 @@ static struct _bluez_device *create_device(struct _bluez_object *object)
 	device->interface_name = g_strdup(DEVICE_INTERFACE);
 
 	return device;
+}
+
+static struct _bluez_gatt_service *create_service(struct _bluez_object *object)
+{
+	struct _bluez_gatt_service *service;
+
+	DBG("");
+
+	service = g_try_new0(struct _bluez_gatt_service, 1);
+	if (!service) {
+		ERROR("no memory");
+		return NULL;
+	}
+
+	service->object_path = g_strdup(object->path_name);
+
+	service->parent = object;
+
+	service->interface_name = g_strdup(GATT_SERVICE_IFACE);
+
+	return service;
+}
+
+static struct _bluez_gatt_char *create_char(struct _bluez_object *object)
+{
+	struct _bluez_gatt_char *characteristic;
+
+	DBG("");
+
+	characteristic = g_try_new0(struct _bluez_gatt_char, 1);
+	if (!characteristic) {
+		ERROR("no memory");
+		return NULL;
+	}
+
+	characteristic->object_path = g_strdup(object->path_name);
+
+	characteristic->parent = object;
+
+	characteristic->interface_name = g_strdup(GATT_CHR_IFACE);
+
+	return characteristic;
+}
+
+static struct _bluez_gatt_desc *create_desc(struct _bluez_object *object)
+{
+	struct _bluez_gatt_desc *descriptor;
+
+	DBG("");
+
+	descriptor = g_try_new0(struct _bluez_gatt_desc, 1);
+	if (!descriptor) {
+		ERROR("no memory");
+		return NULL;
+	}
+
+	descriptor->object_path = g_strdup(object->path_name);
+
+	descriptor->parent = object;
+
+	descriptor->interface_name = g_strdup(GATT_DESCRIPTOR_IFACE);
+
+	return descriptor;
 }
 
 static void control_properties_changed(GDBusProxy *proxy,
@@ -886,17 +1050,153 @@ static void parse_bluez_control_interfaces(gpointer data, gpointer user_data)
 	}
 }
 
+static void parse_bluez_gatt_service_interfaces(gpointer data,
+						gpointer user_data)
+{
+	struct _bluez_gatt_service *service = user_data;
+	GDBusInterface *interface = data;
+	GDBusProxy *proxy = G_DBUS_PROXY(interface);
+	GDBusProxy *property_proxy;
+	const gchar *iface_name, *path;
+
+	if (!service) {
+		WARN("no service");
+		return;
+	}
+
+	path = g_dbus_proxy_get_object_path(proxy);
+
+	iface_name = g_dbus_proxy_get_interface_name(proxy);
+	DBG("%s", iface_name);
+
+	if (g_strcmp0(iface_name, GATT_SERVICE_IFACE) == 0) {
+		property_proxy = g_dbus_proxy_new_for_bus_sync(
+					G_BUS_TYPE_SYSTEM, 0,
+					NULL,
+					BLUEZ_NAME,
+					path,
+					PROPERTIES_INTERFACE,
+					NULL, NULL);
+
+		service->interface = interface;
+		service->proxy = proxy;
+		service->property_proxy = property_proxy;
+		g_signal_connect(proxy, "g-properties-changed",
+			G_CALLBACK(gatt_service_properties_changed), service);
+	}
+
+}
+
+static void parse_bluez_gatt_char_interfaces(gpointer data,
+						gpointer user_data)
+{
+	struct _bluez_gatt_char *characteristic = user_data;
+	GDBusInterface *interface = data;
+	GDBusProxy *proxy = G_DBUS_PROXY(interface);
+	GDBusProxy *property_proxy;
+	const gchar *iface_name, *path;
+
+	if (!characteristic) {
+		WARN("no characteristic");
+		return;
+	}
+
+	path = g_dbus_proxy_get_object_path(proxy);
+
+	iface_name = g_dbus_proxy_get_interface_name(proxy);
+	DBG("%s", iface_name);
+
+	if (g_strcmp0(iface_name, GATT_CHR_IFACE) == 0) {
+		property_proxy = g_dbus_proxy_new_for_bus_sync(
+					G_BUS_TYPE_SYSTEM, 0,
+					NULL,
+					BLUEZ_NAME,
+					path,
+					PROPERTIES_INTERFACE,
+					NULL, NULL);
+
+		characteristic->interface = interface;
+		characteristic->proxy = proxy;
+		characteristic->property_proxy = property_proxy;
+		g_signal_connect(proxy, "g-properties-changed",
+			G_CALLBACK(gatt_char_properties_changed),
+			characteristic);
+	}
+
+}
+
+static void parse_bluez_gatt_desc_interfaces(gpointer data,
+						gpointer user_data)
+{
+	struct _bluez_gatt_desc *descriptor = user_data;
+	GDBusInterface *interface = data;
+	GDBusProxy *proxy = G_DBUS_PROXY(interface);
+	GDBusProxy *property_proxy;
+	const gchar *iface_name, *path;
+
+	if (!descriptor) {
+		WARN("no descriptor");
+		return;
+	}
+
+	path = g_dbus_proxy_get_object_path(proxy);
+
+	iface_name = g_dbus_proxy_get_interface_name(proxy);
+	DBG("%s", iface_name);
+
+	if (g_strcmp0(iface_name, GATT_DESCRIPTOR_IFACE) == 0) {
+		property_proxy = g_dbus_proxy_new_for_bus_sync(
+					G_BUS_TYPE_SYSTEM, 0,
+					NULL,
+					BLUEZ_NAME,
+					path,
+					PROPERTIES_INTERFACE,
+					NULL, NULL);
+
+		descriptor->interface = interface;
+		descriptor->proxy = proxy;
+		descriptor->property_proxy = property_proxy;
+		g_signal_connect(proxy, "g-properties-changed",
+			G_CALLBACK(gatt_desc_properties_changed), descriptor);
+	}
+
+}
+
 char *bluez_device_property_get_adapter(struct _bluez_device *device)
 {
 	return property_get_string(device->property_proxy,
 					DEVICE_INTERFACE, "Adapter");
 }
 
+char *bluez_gatt_service_property_get_device(
+				struct _bluez_gatt_service *service)
+{
+	return property_get_string(service->property_proxy,
+					GATT_SERVICE_IFACE, "Device");
+}
+
+char *bluez_gatt_char_property_get_service(
+				struct _bluez_gatt_char *characteristic)
+{
+	return property_get_string(characteristic->property_proxy,
+					GATT_CHR_IFACE, "Service");
+}
+
+char *bluez_gatt_desc_property_get_char(
+				struct _bluez_gatt_desc *descriptor)
+{
+	return property_get_string(descriptor->property_proxy,
+				GATT_DESCRIPTOR_IFACE, "Characteristic");
+}
+
 static void free_bluez_device(gpointer data)
 {
 	struct _bluez_device *device = data;
+	GList **interface_list = &device->parent->interfaces;
 
 	DBG("%s", device->object_path);
+
+	*interface_list = g_list_remove(*interface_list, data);
 
 	g_free(device->interface_name);
 	g_free(device->object_path);
@@ -924,6 +1224,60 @@ static void free_bluez_device(gpointer data)
 	g_free(device);
 }
 
+static void free_bluez_gatt_service(gpointer data)
+{
+	struct _bluez_gatt_service *service = data;
+	GList **interface_list = &service->parent->interfaces;
+
+	DBG("%s", service->object_path);
+
+	*interface_list = g_list_remove(*interface_list, data);
+
+	g_free(service->interface_name);
+	g_free(service->object_path);
+	g_object_unref(service->interface);
+	g_object_unref(service->proxy);
+	g_object_unref(service->property_proxy);
+
+	g_free(service);
+}
+
+static void free_bluez_gatt_char(gpointer data)
+{
+	struct _bluez_gatt_char *characteristic = data;
+	GList **interface_list = &characteristic->parent->interfaces;
+
+	DBG("%s", characteristic->object_path);
+
+	*interface_list = g_list_remove(*interface_list, data);
+
+	g_free(characteristic->interface_name);
+	g_free(characteristic->object_path);
+	g_object_unref(characteristic->interface);
+	g_object_unref(characteristic->proxy);
+	g_object_unref(characteristic->property_proxy);
+
+	g_free(characteristic);
+}
+
+static void free_bluez_gatt_desc(gpointer data)
+{
+	struct _bluez_gatt_desc *descriptor = data;
+	GList **interface_list = &descriptor->parent->interfaces;
+
+	DBG("%s", descriptor->object_path);
+
+	*interface_list = g_list_remove(*interface_list, data);
+
+	g_free(descriptor->interface_name);
+	g_free(descriptor->object_path);
+	g_object_unref(descriptor->interface);
+	g_object_unref(descriptor->proxy);
+	g_object_unref(descriptor->property_proxy);
+
+	g_free(descriptor);
+}
+
 static void attach_adapter(struct _device_head *new_head)
 {
 	struct _bluez_adapter *adapter;
@@ -935,6 +1289,45 @@ static void attach_adapter(struct _device_head *new_head)
 
 	adapter->device_head = new_head;
 	new_head->adapter = adapter;
+}
+
+static void attach_device(struct _gatt_service_head *new_head)
+{
+	struct _bluez_device *device;
+
+	device = g_hash_table_lookup(bluez_device_hash,
+			(gconstpointer) new_head->device_path);
+	if (device == NULL)
+		return;
+
+	device->service_head = new_head;
+	new_head->device = device;
+}
+
+static void attach_gatt_service(struct _gatt_char_head *new_head)
+{
+	struct _bluez_gatt_service *service;
+
+	service = g_hash_table_lookup(bluez_gatt_service_hash,
+			(gconstpointer) new_head->gatt_service_path);
+	if (service == NULL)
+		return;
+
+	service->char_head = new_head;
+	new_head->service = service;
+}
+
+static void attach_gatt_char(struct _gatt_desc_head *new_head)
+{
+	struct _bluez_gatt_char *characteristic;
+
+	characteristic = g_hash_table_lookup(bluez_gatt_char_hash,
+				(gconstpointer) new_head->gatt_char_path);
+	if (characteristic == NULL)
+		return;
+
+	characteristic->desc_head = new_head;
+	new_head->characteristic = characteristic;
 }
 
 static void add_to_device_head_list(struct _bluez_device *device,
@@ -988,6 +1381,162 @@ static void add_to_device_head_list(struct _bluez_device *device,
 					(gpointer) new_head);
 }
 
+static void add_to_gatt_service_head_list(struct _bluez_gatt_service *service,
+					const char *device_path)
+{
+	struct _gatt_service_head *new_head;
+	GList *list, *next = NULL;
+
+	for (list = g_list_first(gatt_service_head_list); list; list = next) {
+		struct _gatt_service_head *head = list->data;
+
+		next = g_list_next(list);
+
+		if (!g_strcmp0(head->device_path, device_path)) {
+
+			DBG("insert %s into %s", service->object_path,
+							device_path);
+			g_hash_table_insert(head->gatt_service_hash,
+						(gpointer) service->object_path,
+						(gpointer) service);
+			service->head = head;
+			return;
+		} else
+			continue;
+	}
+
+	new_head = g_try_new0(struct _gatt_service_head, 1);
+	if (new_head == NULL) {
+		ERROR("no mem");
+		return;
+	}
+
+	new_head->device_path = g_strdup(device_path);
+
+	DBG("add new service head %s", device_path);
+
+	new_head->gatt_service_hash = g_hash_table_new_full(g_str_hash,
+						g_str_equal,
+						NULL,
+						free_bluez_gatt_service);
+
+	DBG("insert %s into %s", service->object_path, device_path);
+	g_hash_table_insert(new_head->gatt_service_hash,
+					(gpointer) service->object_path,
+					(gpointer) service);
+	service->head = new_head;
+
+	attach_device(new_head);
+
+	gatt_service_head_list = g_list_append(gatt_service_head_list,
+					(gpointer) new_head);
+}
+
+static void add_to_gatt_char_head_list(struct _bluez_gatt_char *characteristic,
+					const char *gatt_service_path)
+{
+	struct _gatt_char_head *new_head;
+	GList *list, *next = NULL;
+
+	for (list = g_list_first(gatt_char_head_list); list; list = next) {
+		struct _gatt_char_head *head = list->data;
+
+		next = g_list_next(list);
+
+		if (!g_strcmp0(head->gatt_service_path, gatt_service_path)) {
+
+			DBG("insert %s into %s", characteristic->object_path,
+							gatt_service_path);
+			g_hash_table_insert(head->gatt_char_hash,
+					(gpointer) characteristic->object_path,
+					(gpointer) characteristic);
+			characteristic->head = head;
+			return;
+		} else
+			continue;
+	}
+
+	new_head = g_try_new0(struct _gatt_char_head, 1);
+	if (new_head == NULL) {
+		ERROR("no mem");
+		return;
+	}
+
+	new_head->gatt_service_path = g_strdup(gatt_service_path);
+
+	DBG("add new characteristic head %s", gatt_service_path);
+
+	new_head->gatt_char_hash = g_hash_table_new_full(g_str_hash,
+						g_str_equal,
+						NULL,
+						free_bluez_gatt_char);
+
+	DBG("insert %s into %s", characteristic->object_path,
+					gatt_service_path);
+
+	g_hash_table_insert(new_head->gatt_char_hash,
+					(gpointer) characteristic->object_path,
+					(gpointer) characteristic);
+	characteristic->head = new_head;
+
+	attach_gatt_service(new_head);
+
+	gatt_char_head_list = g_list_append(gatt_char_head_list,
+					(gpointer) new_head);
+}
+
+static void add_to_gatt_desc_head_list(struct _bluez_gatt_desc *descriptor,
+					const char *gatt_char_path)
+{
+	struct _gatt_desc_head *new_head;
+	GList *list, *next = NULL;
+
+	for (list = g_list_first(gatt_desc_head_list); list; list = next) {
+		struct _gatt_desc_head *head = list->data;
+
+		next = g_list_next(list);
+
+		if (!g_strcmp0(head->gatt_char_path, gatt_char_path)) {
+
+			DBG("insert %s into %s", descriptor->object_path,
+							gatt_char_path);
+
+			g_hash_table_insert(head->gatt_desc_hash,
+					(gpointer) descriptor->object_path,
+					(gpointer) descriptor);
+			descriptor->head = head;
+			return;
+		} else
+			continue;
+	}
+
+	new_head = g_try_new0(struct _gatt_desc_head, 1);
+	if (new_head == NULL) {
+		ERROR("no mem");
+		return;
+	}
+
+	new_head->gatt_char_path = g_strdup(gatt_char_path);
+
+	DBG("add new descriptor head %s", gatt_char_path);
+
+	new_head->gatt_desc_hash = g_hash_table_new_full(g_str_hash,
+						g_str_equal,
+						NULL,
+						free_bluez_gatt_desc);
+
+	DBG("insert %s into %s", descriptor->object_path, gatt_char_path);
+	g_hash_table_insert(new_head->gatt_desc_hash,
+					(gpointer) descriptor->object_path,
+					(gpointer) descriptor);
+	descriptor->head = new_head;
+
+	attach_gatt_char(new_head);
+
+	gatt_desc_head_list = g_list_append(gatt_desc_head_list,
+					(gpointer) new_head);
+}
+
 static void register_bluez_device(struct _bluez_device *device)
 {
 	char *adapter_path;
@@ -1003,6 +1552,10 @@ static void register_bluez_device(struct _bluez_device *device)
 
 	g_free(adapter_path);
 
+	g_hash_table_insert(bluez_device_hash,
+				(gpointer) device->object_path,
+				(gpointer) device);
+
 	*interface_list = g_list_prepend(*interface_list,
 					(gpointer) device);
 
@@ -1017,6 +1570,74 @@ static void register_bluez_device(struct _bluez_device *device)
 	if (adapter->device_created_cb)
 		adapter->device_created_cb(device,
 				adapter->device_created_data);
+}
+
+static void register_bluez_gatt_service(struct _bluez_gatt_service *service)
+{
+	char *device_path;
+
+	GList **interface_list = &service->parent->interfaces;
+
+	device_path = bluez_gatt_service_property_get_device(service);
+	if (device_path == NULL)
+		return;
+
+	add_to_gatt_service_head_list(service, device_path);
+
+	g_free(device_path);
+
+	g_hash_table_insert(bluez_gatt_service_hash,
+				(gpointer) service->object_path,
+				(gpointer) service);
+
+	*interface_list = g_list_prepend(*interface_list,
+					(gpointer) service);
+}
+
+static void register_bluez_gatt_char(struct _bluez_gatt_char *characteristic)
+{
+	char *gatt_service_path;
+
+	GList **interface_list = &characteristic->parent->interfaces;
+
+	gatt_service_path =
+		bluez_gatt_char_property_get_service(characteristic);
+
+	if (gatt_service_path == NULL)
+		return;
+
+	add_to_gatt_char_head_list(characteristic, gatt_service_path);
+
+	g_free(gatt_service_path);
+
+	g_hash_table_insert(bluez_gatt_char_hash,
+				(gpointer) characteristic->object_path,
+				(gpointer) characteristic);
+
+	*interface_list = g_list_prepend(*interface_list,
+				(gpointer) characteristic);
+}
+
+static void register_bluez_gatt_desc(struct _bluez_gatt_desc *descriptor)
+{
+	char *gatt_char_path;
+
+	GList **interface_list = &descriptor->parent->interfaces;
+
+	gatt_char_path = bluez_gatt_desc_property_get_char(descriptor);
+	if (gatt_char_path == NULL)
+		return;
+
+	add_to_gatt_desc_head_list(descriptor, gatt_char_path);
+
+	g_free(gatt_char_path);
+
+	g_hash_table_insert(bluez_gatt_desc_hash,
+				(gpointer) descriptor->object_path,
+				(gpointer) descriptor);
+
+	*interface_list = g_list_prepend(*interface_list,
+					(gpointer) descriptor);
 }
 
 static void bluez_device_interface_added(GDBusObject *object,
@@ -1048,6 +1669,49 @@ static void bluez_control_added(struct _bluez_object *object,
 {
 	DBG("");
 	g_list_foreach(ifaces, parse_bluez_control_interfaces, object);
+}
+
+static void bluez_gatt_service_added(struct _bluez_object *object,
+					GList *ifaces)
+{
+	struct _bluez_gatt_service *service;
+
+	DBG("");
+
+	service = create_service(object);
+
+	g_list_foreach(ifaces, parse_bluez_gatt_service_interfaces, service);
+
+	register_bluez_gatt_service(service);
+}
+
+static void bluez_gatt_char_added(struct _bluez_object *object,
+					GList *ifaces)
+{
+	struct _bluez_gatt_char *characteristic;
+
+	DBG("");
+
+	characteristic = create_char(object);
+
+	g_list_foreach(ifaces, parse_bluez_gatt_char_interfaces,
+						characteristic);
+
+	register_bluez_gatt_char(characteristic);
+}
+
+static void bluez_gatt_desc_added(struct _bluez_object *object,
+					GList *ifaces)
+{
+	struct _bluez_gatt_desc *descriptor;
+
+	DBG("");
+
+	descriptor = create_desc(object);
+
+	g_list_foreach(ifaces, parse_bluez_gatt_desc_interfaces, descriptor);
+
+	register_bluez_gatt_desc(descriptor);
 }
 
 static struct _bluez_agent *create_agent(struct _bluez_object *object)
@@ -1315,9 +1979,14 @@ static void parse_object(gpointer data, gpointer user_data)
 		bluez_adapter_added(object, ifaces);
 	else if (g_dbus_object_get_interface(obj, DEVICE_INTERFACE))
 		bluez_device_added(object, ifaces);
-	else if (g_dbus_object_get_interface(obj,
-						MEDIATRANSPORT_INTERFACE))
+	else if (g_dbus_object_get_interface(obj, MEDIATRANSPORT_INTERFACE))
 		bluez_control_added(object, ifaces);
+	else if (g_dbus_object_get_interface(obj, GATT_SERVICE_IFACE))
+		bluez_gatt_service_added(object, ifaces);
+	else if (g_dbus_object_get_interface(obj, GATT_CHR_IFACE))
+		bluez_gatt_char_added(object, ifaces);
+	else if (g_dbus_object_get_interface(obj, GATT_DESCRIPTOR_IFACE))
+		bluez_gatt_desc_added(object, ifaces);
 	else
 		parse_root_object(object, ifaces);
 
@@ -1372,17 +2041,6 @@ static void destruct_bluez_adapter(gpointer data)
 	g_free(adapter);
 }
 
-static void free_bluez_adapter(struct _bluez_adapter *adapter)
-{
-	DBG("%s", adapter->object_path);
-
-	g_free(adapter->interface_name);
-	g_free(adapter->object_path);
-	g_object_unref(adapter->interface);
-	g_object_unref(adapter->proxy);
-	g_free(adapter);
-}
-
 static void remove_device_from_head(struct _bluez_device *device)
 {
 	struct _device_head *head;
@@ -1403,8 +2061,6 @@ static void remove_device_from_head(struct _bluez_device *device)
 		if (adapter->device_removed_cb)
 			adapter->device_removed_cb(device,
 					adapter->device_removed_data);
-
-		g_hash_table_steal(bluez_device_hash, device->object_path);
 	}
 
 	/*
@@ -1423,11 +2079,255 @@ static void remove_device_from_head(struct _bluez_device *device)
 	free_device_head(head);
 }
 
+static void free_gatt_service_head(struct _gatt_service_head *head)
+{
+	DBG("%s", head->device_path);
+
+	g_free(head->device_path);
+	g_hash_table_destroy(head->gatt_service_hash);
+	g_free(head);
+}
+
+static void detach_gatt_service_head(struct _bluez_device *device)
+{
+	struct _gatt_service_head *head = NULL;
+	GList *list, *next;
+
+	for (list = g_list_first(gatt_service_head_list); list; list = next) {
+		head = list->data;
+
+		next = g_list_next(list);
+
+		if (head->device_path == NULL)
+			continue;
+
+		if (!g_strcmp0(head->device_path, device->object_path)) {
+			device->service_head = NULL;
+			head->device = NULL;
+			break;
+		}
+	}
+
+	if (head == NULL)
+		return;
+
+	if (g_hash_table_size(head->gatt_service_hash) == 0) {
+		gatt_service_head_list = g_list_remove(gatt_service_head_list,
+							(gpointer) head);
+		free_gatt_service_head(head);
+	}
+
+	return;
+}
+
 static void unregister_bluez_device(struct _bluez_device *device)
 {
-	DBG("%p", device);
+	DBG("device path %s", device->object_path);
+
+	g_hash_table_steal(bluez_device_hash, device->object_path);
 
 	remove_device_from_head(device);
+
+	detach_gatt_service_head(device);
+}
+
+static void remove_service_from_head(struct _bluez_gatt_service *service)
+{
+	struct _gatt_service_head *head;
+
+	head = service->head;
+
+	if (head == NULL)
+		return;
+
+	g_hash_table_steal(head->gatt_service_hash,
+				(gpointer) service->object_path);
+
+	service->head = NULL;
+
+	DBG("");
+
+	if (g_hash_table_size(head->gatt_service_hash) != 0)
+		return;
+
+	if (head->device != NULL)
+		return;
+
+	gatt_service_head_list = g_list_remove(gatt_service_head_list,
+					(gpointer) head);
+
+	free_gatt_service_head(head);
+}
+
+static void free_gatt_char_head(struct _gatt_char_head *head)
+{
+	DBG("%s", head->gatt_service_path);
+
+	g_free(head->gatt_service_path);
+	g_hash_table_destroy(head->gatt_char_hash);
+	g_free(head);
+}
+
+static void detach_gatt_char_head(struct _bluez_gatt_service *service)
+{
+	struct _gatt_char_head *head = NULL;
+	GList *list, *next;
+
+	for (list = g_list_first(gatt_char_head_list); list; list = next) {
+		head = list->data;
+
+		next = g_list_next(list);
+
+		if (head->gatt_service_path == NULL)
+			continue;
+
+		if (!g_strcmp0(head->gatt_service_path, service->object_path)) {
+			service->char_head = NULL;
+			head->service = NULL;
+			break;
+		}
+	}
+
+	if (head == NULL)
+		return;
+
+	if (g_hash_table_size(head->gatt_char_hash) == 0) {
+		gatt_char_head_list = g_list_remove(gatt_char_head_list,
+							(gpointer) head);
+		free_gatt_char_head(head);
+	}
+
+	return;
+}
+
+static void unregister_bluez_gatt_service(struct _bluez_gatt_service *service)
+{
+	DBG("service path %s", service->object_path);
+
+	g_hash_table_steal(bluez_gatt_service_hash, service->object_path);
+
+	remove_service_from_head(service);
+
+	detach_gatt_char_head(service);
+
+}
+
+static void remove_char_from_head(struct _bluez_gatt_char *characteristic)
+{
+	struct _gatt_char_head *head;
+
+	head = characteristic->head;
+
+	if (head == NULL)
+		return;
+
+	g_hash_table_steal(head->gatt_char_hash,
+			(gpointer) characteristic->object_path);
+
+	characteristic->head = NULL;
+
+	DBG("");
+
+	if (g_hash_table_size(head->gatt_char_hash) != 0)
+		return;
+
+	if (head->service != NULL)
+		return;
+
+	gatt_char_head_list = g_list_remove(gatt_char_head_list,
+					(gpointer) head);
+
+	free_gatt_char_head(head);
+}
+
+static void free_gatt_desc_head(struct _gatt_desc_head *head)
+{
+	DBG("%s", head->gatt_char_path);
+
+	g_free(head->gatt_char_path);
+	g_hash_table_destroy(head->gatt_desc_hash);
+	g_free(head);
+}
+
+static void detach_gatt_desc_head(struct _bluez_gatt_char *characteristic)
+{
+	struct _gatt_desc_head *head = NULL;
+	GList *list, *next;
+
+	for (list = g_list_first(gatt_desc_head_list); list; list = next) {
+		head = list->data;
+
+		next = g_list_next(list);
+
+		if (head->gatt_char_path == NULL)
+			continue;
+
+		if (!g_strcmp0(head->gatt_char_path,
+			characteristic->object_path)) {
+			characteristic->desc_head = NULL;
+			head->characteristic = NULL;
+			break;
+		}
+	}
+
+	if (head == NULL)
+		return;
+
+	if (g_hash_table_size(head->gatt_desc_hash) == 0) {
+		gatt_desc_head_list = g_list_remove(gatt_desc_head_list,
+							(gpointer) head);
+		free_gatt_desc_head(head);
+	}
+
+	return;
+}
+
+static void unregister_bluez_gatt_char(struct _bluez_gatt_char *characteristic)
+{
+	DBG("characteristic path %s", characteristic->object_path);
+
+	g_hash_table_steal(bluez_gatt_char_hash, characteristic->object_path);
+
+	remove_char_from_head(characteristic);
+
+	detach_gatt_desc_head(characteristic);
+}
+
+static void remove_desc_from_head(struct _bluez_gatt_desc *descriptor)
+{
+	struct _gatt_desc_head *head;
+
+	head = descriptor->head;
+
+	if (head == NULL)
+		return;
+
+	g_hash_table_steal(head->gatt_desc_hash,
+			(gpointer) descriptor->object_path);
+
+	descriptor->head = NULL;
+
+	DBG("");
+
+	if (g_hash_table_size(head->gatt_desc_hash) != 0)
+		return;
+
+	if (head->characteristic != NULL)
+		return;
+
+	gatt_desc_head_list = g_list_remove(gatt_desc_head_list,
+					(gpointer) head);
+
+	free_gatt_desc_head(head);
+}
+
+static void unregister_bluez_gatt_desc(struct _bluez_gatt_desc *descriptor)
+{
+	DBG("descriptor path %s", descriptor->object_path);
+
+	g_hash_table_steal(bluez_gatt_desc_hash, descriptor->object_path);
+
+	remove_desc_from_head(descriptor);
 }
 
 static void destruct_bluez_object_interfaces(struct _bluez_object *object)
@@ -1443,7 +2343,7 @@ static void destruct_bluez_object_interfaces(struct _bluez_object *object)
 		if (!g_strcmp0(*interface_name, ADAPTER_INTERFACE)) {
 			struct _bluez_adapter *adapter = list->data;
 			unregister_bluez_adapter(adapter);
-			free_bluez_adapter(adapter);
+			destruct_bluez_adapter(adapter);
 			list->data = NULL;
 			continue;
 		}
@@ -1452,6 +2352,30 @@ static void destruct_bluez_object_interfaces(struct _bluez_object *object)
 			struct _bluez_device *device = list->data;
 			unregister_bluez_device(device);
 			free_bluez_device(device);
+			list->data = NULL;
+			continue;
+		}
+
+		if (!g_strcmp0(*interface_name, GATT_SERVICE_IFACE)) {
+			struct _bluez_gatt_service *service = list->data;
+			unregister_bluez_gatt_service(service);
+			free_bluez_gatt_service(service);
+			list->data = NULL;
+			continue;
+		}
+
+		if (!g_strcmp0(*interface_name, GATT_CHR_IFACE)) {
+			struct _bluez_gatt_char *characteristic = list->data;
+			unregister_bluez_gatt_char(characteristic);
+			free_bluez_gatt_char(characteristic);
+			list->data = NULL;
+			continue;
+		}
+
+		if (!g_strcmp0(*interface_name, GATT_DESCRIPTOR_IFACE)) {
+			struct _bluez_gatt_desc *descriptor = list->data;
+			unregister_bluez_gatt_desc(descriptor);
+			free_bluez_gatt_desc(descriptor);
 			list->data = NULL;
 			continue;
 		}
@@ -1579,6 +2503,15 @@ int bluez_lib_init(void)
 
 	bluez_device_hash = g_hash_table_new_full(g_str_hash, g_str_equal,
 						NULL, free_bluez_device);
+
+	bluez_gatt_service_hash = g_hash_table_new_full(g_str_hash, g_str_equal,
+						NULL, free_bluez_gatt_service);
+
+	bluez_gatt_char_hash = g_hash_table_new_full(g_str_hash, g_str_equal,
+						NULL, free_bluez_gatt_char);
+
+	bluez_gatt_desc_hash = g_hash_table_new_full(g_str_hash, g_str_equal,
+						NULL, free_bluez_gatt_desc);
 
 	obj_list = g_dbus_object_manager_get_objects(object_manager);
 
