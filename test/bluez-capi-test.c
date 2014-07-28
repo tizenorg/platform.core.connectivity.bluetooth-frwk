@@ -2214,6 +2214,101 @@ static int hdp_unset_data_received_cb(const char *p1, const char *p2)
 	return 0;
 }
 
+static bool gatt_primary_service_callback(bt_gatt_attribute_h service,
+					void *user_data)
+{
+	const char *service_handle = service;
+
+	DBG("Primary service found %s", service_handle);
+
+	return TRUE;
+}
+
+
+static int gatt_foreach_primary_services(const char *p1, const char *p2)
+{
+	int ret;
+
+	if (p1 == NULL) {
+		ERROR("gatt primary service must give the device address");
+		return 0;
+	}
+
+	ret = bt_gatt_foreach_primary_services(p1,
+				gatt_primary_service_callback, NULL);
+
+	DBG("ret = %d", ret);
+
+	return 0;
+}
+
+static int gatt_get_service_uuid(const char *p1, const char *p2)
+{
+	int ret;
+	char *uuid;
+
+	if (p1 == NULL) {
+		ERROR("gatt service uuid must give the service handle");
+		return 0;
+	}
+
+	ret = bt_gatt_get_service_uuid((bt_gatt_attribute_h)p1, &uuid);
+
+	DBG("ret = %d", ret);
+
+	DBG("uuid = %s", uuid);
+
+	return 0;
+}
+
+static bool gatt_include_service_callback(bt_gatt_attribute_h service,
+					void *user_data)
+{
+	const char *service_handle = service;
+
+	DBG("Include service found %s", service_handle);
+
+	return TRUE;
+}
+
+static int gatt_foreach_included_services(const char *p1, const char *p2)
+{
+	int ret;
+
+	if (p1 == NULL) {
+		ERROR("gatt service includes must give the service handle");
+		return 0;
+	}
+
+	ret = bt_gatt_foreach_included_services((bt_gatt_attribute_h)p1,
+				gatt_include_service_callback, NULL);
+
+	DBG("ret = %d", ret);
+
+	return 0;
+}
+
+static int gatt_clone_and_destroy_attribute_handle(const char *p1, const char *p2)
+{
+	int ret;
+	bt_gatt_attribute_h clone;
+
+	if (p1 == NULL) {
+		ERROR("gatt clone must give the attribue handle");
+		return 0;
+	}
+
+	ret = bt_gatt_clone_attribute_handle(&clone, (bt_gatt_attribute_h)p1);
+
+	DBG("Clone handle %s", (char *)clone);
+
+	ret = bt_gatt_destroy_attribute_handle(clone);
+
+	DBG("destroy handle ret = %d", ret);
+
+	return 0;
+}
+
 struct {
 	const char *command;
 	int (*function)(const char *p1, const char *p2);
@@ -2527,10 +2622,22 @@ struct {
 		"Usage: hdp_set_data_rec_cb\n\tset hdp data rec cb"},
 
 	{"hdo_unset_connect_cb", hdp_unset_connection_state_changed_cb,
-		"Usage: hdp_set_connect_cb\n\tset hdp conn cb"},
+		"Usage: hdp_unset_connect_cb\n\tunset hdp conn cb"},
 
 	{"hdp_unset_data_rec_cb", hdp_unset_data_received_cb,
-		"Usage: hdp_set_data_rec_cb\n\tset hdp data rec cb"},
+		"Usage: hdp_unset_data_rec_cb\n\tunset hdp data rec cb"},
+
+	{"gatt_foreach_primary_services", gatt_foreach_primary_services,
+		"Usage: gatt_foreach_primary_services\n\tgatt foreach primary services"},
+
+	{"gatt_get_service_uuid", gatt_get_service_uuid,
+		"Usage: gatt_get_service_uuid\n\tgatt get service uuid"},
+
+	{"gatt_foreach_included_services", gatt_foreach_included_services,
+		"Usage: gatt_foreach_included_services\n\tgatt foreach included services"},
+
+	{"gatt_clone_and_destroy_attribute_handle", gatt_clone_and_destroy_attribute_handle,
+		"Usage: gatt_clone_and_destroy_attribute_handle\n\tgatt clone and destroy attribute handle"},
 
 	{"q", quit,
 		"Usage: q\n\tQuit"},

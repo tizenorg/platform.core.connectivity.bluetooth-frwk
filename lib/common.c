@@ -216,6 +216,31 @@ char **property_get_string_list(GDBusProxy *proxy,
 	return strv;
 }
 
+char **property_get_object_list(GDBusProxy *proxy,
+					const char *interface_name,
+					const char *property)
+{
+	GVariant *objv_v, *objv_vv;
+	char **objv;
+	GError *error = NULL;
+
+	objv_vv = g_dbus_proxy_call_sync(
+			proxy, "Get",
+			g_variant_new("(ss)", interface_name, property),
+			0, -1, NULL, &error);
+
+	if (objv_vv == NULL) {
+		WARN("no cached property %s", property);
+		return NULL;
+	}
+
+	g_variant_get(objv_vv, "(v)", &objv_v);
+
+	objv = g_variant_dup_objv(objv_v, NULL);
+
+	return objv;
+}
+
 void property_set_string(GDBusProxy *proxy,
 					const char *interface_name,
 					const char *property,

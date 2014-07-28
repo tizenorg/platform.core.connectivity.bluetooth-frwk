@@ -5323,3 +5323,151 @@ int bt_device_foreach_connected_profiles(
 
 	return BT_SUCCESS;
 }
+
+int bt_gatt_foreach_primary_services(const char *remote_address,
+				bt_gatt_primary_service_cb callback,
+				void *user_data)
+{
+	bluez_device_t *device;
+	GList *primary_services, *list, *next;
+	char *service_path;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (remote_address == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	device = bluez_adapter_get_device_by_address(default_adapter,
+							remote_address);
+	if (device == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	primary_services = bluez_device_get_primary_services(device);
+
+	if (primary_services == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	for (list = g_list_first(primary_services); list; list = next) {
+		service_path = list->data;
+
+		next = g_list_next(list);
+
+		if (!callback((bt_gatt_attribute_h)service_path, user_data))
+			break;
+	}
+
+	g_list_free(primary_services);
+
+	return BT_SUCCESS;
+}
+
+int bt_gatt_get_service_uuid(bt_gatt_attribute_h service, char **uuid)
+{
+	bluez_gatt_service_t *gatt_service;
+	const char *service_path = service;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (service_path == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	gatt_service = bluez_gatt_get_service_by_path(service_path);
+
+	if (gatt_service == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	*uuid = bluez_gatt_service_get_property_uuid(gatt_service);
+
+	return BT_SUCCESS;
+}
+
+int bt_gatt_foreach_included_services(bt_gatt_attribute_h service,
+				bt_gatt_included_service_cb callback,
+				void *user_data)
+{
+	bluez_gatt_service_t *gatt_service;
+	guint length, index;
+	const char *service_path = service;
+	char **includes;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (service_path == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	gatt_service = bluez_gatt_get_service_by_path(service_path);
+
+	if (gatt_service == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	includes = bluez_gatt_service_get_property_includes(gatt_service);
+
+	if (includes == NULL) {
+		DBG("No include services found in service handle");
+		return BT_SUCCESS;
+	}
+
+	length = g_strv_length(includes);
+
+	for (index = 0; index < length; index++) {
+		if (!callback((bt_gatt_attribute_h)includes[index], user_data))
+			break;
+	}
+
+	return BT_SUCCESS;
+}
+
+int bt_gatt_clone_attribute_handle(bt_gatt_attribute_h *clone,
+				bt_gatt_attribute_h origin)
+{
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (origin == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	*clone = g_strdup((char *)origin);
+
+	return BT_SUCCESS;
+}
+
+int bt_gatt_destroy_attribute_handle(bt_gatt_attribute_h handle)
+{
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (handle == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	g_free(handle);
+
+	return BT_SUCCESS;
+}

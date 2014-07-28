@@ -1175,6 +1175,29 @@ char *bluez_gatt_service_property_get_device(
 					GATT_SERVICE_IFACE, "Device");
 }
 
+int bluez_gatt_service_get_property_primary(
+				struct _bluez_gatt_service *service,
+					gboolean *primary)
+{
+	return property_get_boolean(service->property_proxy,
+					GATT_SERVICE_IFACE,
+					"Primary", primary);
+}
+
+char **bluez_gatt_service_get_property_includes(
+				struct _bluez_gatt_service *service)
+{
+	return property_get_object_list(service->property_proxy,
+					GATT_SERVICE_IFACE, "Includes");
+}
+
+char *bluez_gatt_service_get_property_uuid(
+				struct _bluez_gatt_service *service)
+{
+	return property_get_string(service->property_proxy,
+					GATT_SERVICE_IFACE, "UUID");
+}
+
 char *bluez_gatt_char_property_get_service(
 				struct _bluez_gatt_char *characteristic)
 {
@@ -1188,6 +1211,29 @@ char *bluez_gatt_desc_property_get_char(
 	return property_get_string(descriptor->property_proxy,
 				GATT_DESCRIPTOR_IFACE, "Characteristic");
 }
+
+struct _bluez_gatt_service *bluez_gatt_get_service_by_path(
+				const char *service_path)
+{
+	struct _gatt_service_head *head = NULL;
+	struct _bluez_gatt_service *service = NULL;
+	GList *list, *next;
+
+	for (list = g_list_first(gatt_service_head_list); list; list = next) {
+		head = list->data;
+
+		next = g_list_next(list);
+
+		service = g_hash_table_lookup(head->gatt_service_hash,
+					(gconstpointer) service_path);
+
+		if (service != NULL)
+			break;
+	}
+
+	return service;
+}
+
 
 static void destruct_bluez_device(gpointer data)
 {
@@ -2931,6 +2977,30 @@ int bluez_device_network_disconnect(struct _bluez_device *device)
 				simple_reply_callback, reply_data);
 
 	return 0;
+}
+
+GList *bluez_device_get_primary_services(struct _bluez_device *device)
+{
+	struct _gatt_service_head *service_head = device->service_head;
+	struct _bluez_gatt_service *service;
+	GList *primary_services = NULL;
+	GList *services, *list, *next;
+	int primary;
+
+	services = g_hash_table_get_values(service_head->gatt_service_hash);
+
+	for (list = g_list_first(services); list; list = next) {
+		service = list->data;
+
+		next = g_list_next(list);
+
+		bluez_gatt_service_get_property_primary(service, &primary);
+		if (primary)
+			primary_services = g_list_append(primary_services,
+							service->object_path);
+	}
+
+	return primary_services;
 }
 
 void bluez_device_network_set_connected_changed_cb(

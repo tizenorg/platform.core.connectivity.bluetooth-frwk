@@ -99,6 +99,10 @@ char **property_get_string_list(GDBusProxy *proxy,
 				const char *interface_name,
 				const char *property);
 
+char **property_get_object_list(GDBusProxy *proxy,
+				const char *interface_name,
+				const char *property);
+
 void property_set_string(GDBusProxy *proxy,
 				const char *interface_name,
 				const char *property,

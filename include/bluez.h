@@ -41,6 +41,15 @@ typedef struct _bluez_adapter bluez_adapter_t;
 struct _bluez_device;
 typedef struct _bluez_device bluez_device_t;
 
+struct _bluez_gatt_service;
+typedef struct _bluez_gatt_service bluez_gatt_service_t;
+
+struct _bluez_gatt_char;
+typedef struct _bluez_gatt_char bluez_gatt_char_t;
+
+struct _bluez_gatt_desc;
+typedef struct _bluez_gatt_desc bluez_gatt_desc_t;
+
 struct _bluez_agent;
 typedef struct _bluez_agent bluez_agent_t;
 
@@ -235,6 +244,18 @@ int bluez_adapter_get_property_discovering(
 
 char **bluez_adapter_get_property_uuids(
 				struct _bluez_adapter *adapter);
+
+char *bluez_gatt_service_get_property_uuid(
+				struct _bluez_gatt_service *service);
+
+struct _bluez_gatt_service *bluez_gatt_get_service_by_path(
+				const char *service_path);
+
+GList *bluez_device_get_primary_services(
+				struct _bluez_device *device);
+
+char **bluez_gatt_service_get_property_includes(
+				struct _bluez_gatt_service *service);
 
 /* Returned Glist should not be freed and modified */
 const GList *bluez_adapter_get_devices_path(
