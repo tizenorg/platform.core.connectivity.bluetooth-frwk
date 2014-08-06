@@ -17,6 +17,18 @@ typedef struct {
 	GSList *obj_info;
 } hdp_app_list_t;
 
+struct bluez_hdp_connected_t {
+	const char *app_handle;
+	unsigned int channel_id;
+	enum hdp_channel_type type;
+	char *device_address;
+};
+
+struct bluez_hdp_disconnect_t {
+	unsigned int channel_id;
+	char *device_address;
+};
+
 #define HDP_BUFFER_SIZE 1024
 
 struct _bluez_device {
@@ -152,9 +164,8 @@ static void hdp_internal_handle_disconnect_cb(int sk, const char *path)
 	device_path_to_address(path, address);
 
 	if (device->hdp_state_changed_cb)
-		device->hdp_state_changed_cb(BLUETOOTH_ERROR_NONE,
-				address, NULL, 0, sk,
-				device->hdp_state_changed_cb_data);
+		device->hdp_state_changed_cb(0, address, NULL, 0, sk,
+					device->hdp_state_changed_cb_data);
 
 	DBG(" Removed connection from list\n");
 
@@ -176,11 +187,11 @@ static gboolean hdp_internal_data_received(GIOChannel *gio,
 
 	adapter = bluez_adapter_get_adapter(DEFAULT_ADAPTER_NAME);
 	if (adapter == NULL)
-		return BT_ERROR_OPERATION_FAILED;
+		return FALSE;
 
 	device = bluez_adapter_get_device_by_path(adapter, path);
 	if (device == NULL)
-		return BT_ERROR_OPERATION_FAILED;
+		return FALSE;
 
 	sk = g_io_channel_unix_get_fd(gio);
 
@@ -232,7 +243,7 @@ static int hdp_internal_acquire_fd(struct _bluez_device *device,
 	char *device_name = NULL;
 	char *app_handle = NULL;
 	hdp_app_list_t *list = NULL;
-	bt_hdp_channel_type_e type = HDP_QOS_RELIABLE;
+	enum hdp_channel_type type = HDP_CHANNEL_RELIABLE;
 	hdp_obj_info_t *info;
 	gint fd = 0;
 	GVariant *val;
@@ -247,7 +258,7 @@ static int hdp_internal_acquire_fd(struct _bluez_device *device,
 
 	conn = get_system_lib_dbus_connect();
 	if (conn == NULL) {
-		ret = BT_ERROR_OPERATION_FAILED;
+		ret = -1;
 		goto done;
 	}
 
@@ -261,7 +272,7 @@ static int hdp_internal_acquire_fd(struct _bluez_device *device,
 	if (msg_reply && g_dbus_message_get_message_type(msg_reply)
 				== G_DBUS_MESSAGE_TYPE_ERROR) {
 		DBG(" HDP:****** dbus Can't create application ****");
-		ret = BT_ERROR_OPERATION_FAILED;
+		ret = -1;
 		goto done;
 	}
 
@@ -270,7 +281,7 @@ static int hdp_internal_acquire_fd(struct _bluez_device *device,
 
 	if (fd == 0) {
 		DBG("HDP:dbus Can't get reply arguments");
-		ret = BT_ERROR_OPERATION_FAILED;
+		ret = -1;
 		goto done;
 	}
 
@@ -285,7 +296,7 @@ static int hdp_internal_acquire_fd(struct _bluez_device *device,
 		DBG(" HDP:dbus Can't get the reply");
 		DBG("error %s", error->message);
 		g_error_free(error);
-		ret = BT_ERROR_OPERATION_FAILED;
+		ret = -1;
 		goto done;
 	}
 
@@ -315,18 +326,18 @@ static int hdp_internal_acquire_fd(struct _bluez_device *device,
 
 	if (NULL == type_qos || NULL == app_handle) {
 		DBG("Pasing failed\n");
-		ret = BT_ERROR_OPERATION_FAILED;
+		ret = -1;
 		goto done;
 	}
 
 	type = (g_strcmp0(type_qos, "Reliable") == 0) ?
-		HDP_QOS_RELIABLE : HDP_QOS_STREAMING;
+		HDP_CHANNEL_RELIABLE : HDP_CHANNEL_STREAMING;
 
 	list = hdp_internal_gslist_find_app_handler((void *)app_handle);
 
 	if (NULL == list) {
 		DBG("**** Could not locate the list for %s*****\n", app_handle);
-		ret = BT_ERROR_OPERATION_FAILED;
+		ret = -1;
 		goto done;
 	}
 
@@ -341,26 +352,20 @@ static int hdp_internal_acquire_fd(struct _bluez_device *device,
 
 	DBG("Going to give callback\n");
 
-	if (device)
-		if (device->hdp_state_changed_cb)
-			device->hdp_state_changed_cb(
-				BLUETOOTH_ERROR_NONE,
-				address, app_handle, type, fd,
-				device->hdp_state_changed_cb_data);
+	if (device && device->hdp_state_changed_cb)
+		device->hdp_state_changed_cb(0, address, app_handle, type, fd,
+					device->hdp_state_changed_cb_data);
 
 	DBG("Updated fd in the list*\n");
 	DBG("-\n");
 
-	ret = BT_ERROR_NONE;
+	ret = 0;
 done:
 	DBG("error");
 
-	if (device)
-		if (device->hdp_state_changed_cb)
-			device->hdp_state_changed_cb(
-				BLUETOOTH_ERROR_CONNECTION_ERROR,
-				address, app_handle, type, fd,
-				device->hdp_state_changed_cb_data);
+	if (device && device->hdp_state_changed_cb)
+		device->hdp_state_changed_cb(-1, address, app_handle, type, fd,
+					device->hdp_state_changed_cb_data);
 
 	return ret;
 }
@@ -417,8 +422,8 @@ void hdp_internal_handle_disconnect(gpointer user_data,
 	device_path_to_address(device->object_path, address);
 
 	if (device->hdp_state_changed_cb)
-		device->hdp_state_changed_cb(BLUETOOTH_ERROR_NONE, address,
-			NULL, 0, info->fd, device->hdp_state_changed_cb_data);
+		device->hdp_state_changed_cb(0, address, NULL, 0, info->fd,
+					device->hdp_state_changed_cb_data);
 
 	DBG(" Removed connection from list\n");
 
@@ -427,7 +432,7 @@ void hdp_internal_handle_disconnect(gpointer user_data,
 
 static int hdp_internal_create_application(unsigned int data_type,
 					int role,
-					bt_hdp_qos_type_t channel_type,
+					enum hdp_channel_type channel_type,
 					char **app_handle)
 {
 	GVariantBuilder *opts;
@@ -442,7 +447,7 @@ static int hdp_internal_create_application(unsigned int data_type,
 
 	connection = get_system_lib_dbus_connect();
 	if (connection == NULL) {
-		ret = BT_ERROR_OPERATION_FAILED;
+		ret = -1;
 		goto done;
 	}
 
@@ -460,9 +465,9 @@ static int hdp_internal_create_application(unsigned int data_type,
 				g_variant_new("s", "Health Device"));
 
 	if (role == HDP_ROLE_SOURCE) {
-		if (channel_type == HDP_QOS_RELIABLE)
+		if (channel_type == HDP_CHANNEL_RELIABLE)
 			svalue = "Reliable";
-		else if (channel_type == HDP_QOS_STREAMING)
+		else if (channel_type == HDP_CHANNEL_STREAMING)
 			svalue = "Streaming";
 		else
 			svalue = "";
@@ -482,7 +487,7 @@ static int hdp_internal_create_application(unsigned int data_type,
 	if (error) {
 		DBG("error %s", error->message);
 		g_error_free(error);
-		ret = BT_ERROR_OPERATION_FAILED;
+		ret = -1;
 		goto done;
 	}
 
@@ -496,23 +501,23 @@ static int hdp_internal_create_application(unsigned int data_type,
 
 	g_app_list = g_slist_append(g_app_list, list);
 
-	ret = BT_ERROR_NONE;
+	ret = 0;
 done:
 	return ret;
 }
 
-int bluetooth_hdp_activate(unsigned short data_type,
-					bt_hdp_role_type_t role,
-					bt_hdp_qos_type_t channel_type,
+int bluez_hdp_activate(unsigned short data_type,
+					enum hdp_role_type role,
+					enum hdp_channel_type channel_type,
 					char **app_handle)
 {
-	int result = BT_ERROR_NONE;
+	int result = 0;
 
 	DBG("");
 
-	if (role == HDP_ROLE_SOURCE && channel_type == HDP_QOS_ANY) {
+	if (role == HDP_ROLE_SOURCE && channel_type == HDP_CHANNEL_ANY) {
 		DBG("For source, type is mandatory - Reliable/Streaming");
-		return BT_ERROR_INVALID_PARAMETER;
+		return -1;
 	}
 
 	result = hdp_internal_create_application(data_type, role,
@@ -613,7 +618,7 @@ static int hdp_internal_destroy_application(const char *app_handle)
 
 	connection = get_system_lib_dbus_connect();
 	if (connection == NULL) {
-		ret = BT_ERROR_OPERATION_FAILED;
+		ret = -1;
 		goto done;
 	}
 
@@ -628,7 +633,7 @@ static int hdp_internal_destroy_application(const char *app_handle)
 	if (error) {
 		DBG("error %s", error->message);
 		g_error_free(error);
-		ret = BT_ERROR_OPERATION_FAILED;
+		ret = -1;
 		goto done;
 	}
 
@@ -637,17 +642,17 @@ static int hdp_internal_destroy_application(const char *app_handle)
 	g_idle_add(hdp_internal_destroy_application_cb,
 					(gpointer)app_handle);
 
-	ret = BT_ERROR_NONE;
+	ret = 0;
 done:
 	return ret;
 }
 
-int bluetooth_hdp_deactivate(const char *app_handle)
+int bluez_hdp_deactivate(const char *app_handle)
 {
 	return hdp_internal_destroy_application(app_handle);
 }
 
-int bluetooth_hdp_send_data(unsigned int channel_id,
+int bluez_hdp_send_data(unsigned int channel_id,
 					const char *buffer,
 					unsigned int size)
 {
@@ -658,20 +663,20 @@ int bluetooth_hdp_send_data(unsigned int channel_id,
 
 	if ((channel_id == 0) || (NULL == buffer) || (size == 0)) {
 		DBG("Invalid arguments..\n");
-		return BT_ERROR_INVALID_PARAMETER;
+		return -1;
 	} else {
 		while (wbytes < size) {
 			written = write(channel_id, buffer + wbytes,
 						size - wbytes);
 			if (written <= 0) {
 				DBG("write failed..\n");
-				return BT_ERROR_OPERATION_FAILED;
+				return -1;
 			}
 			wbytes += written;
 		}
 	}
 
-	return BT_ERROR_NONE;
+	return 0;
 }
 
 static void hdp_connect_request_cb(GObject *source_object,
@@ -681,17 +686,14 @@ static void hdp_connect_request_cb(GObject *source_object,
 	GVariant *result;
 	char *obj_connect_path;
 	GDBusConnection *conn;
-	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
-	bt_hdp_connected_t *conn_ind = user_data;
+	struct bluez_hdp_connected_t *conn_ind = user_data;
 	bluez_adapter_t *adapter = NULL;
 	struct _bluez_device *device = NULL;
 
 	conn = get_system_lib_dbus_connect();
 	if (conn == NULL)
 		goto done;
-	result = g_dbus_connection_call_finish(conn,
-							res,
-							&error);
+	result = g_dbus_connection_call_finish(conn, res, &error);
 	if (error) {
 		DBG("HDP connection  Dbus Call Error: %s\n", error->message);
 		g_error_free(error);
@@ -700,19 +702,15 @@ static void hdp_connect_request_cb(GObject *source_object,
 		if (adapter == NULL)
 			goto done;
 
-		convert_addr_type_to_string(address,
-			(unsigned char *)conn_ind->device_address.addr);
-
 		device = bluez_adapter_get_device_by_address(adapter,
-								address);
+						conn_ind->device_address);
 		if (device == NULL)
 			goto done;
 
 		if (device->hdp_state_changed_cb)
-			device->hdp_state_changed_cb(
-				BLUETOOTH_ERROR_CONNECTION_ERROR,
-				address, conn_ind->app_handle,
-				conn_ind->type, 0,
+			device->hdp_state_changed_cb(-1,
+				conn_ind->device_address,
+				conn_ind->app_handle, conn_ind->type, 0,
 				device->hdp_state_changed_cb_data);
 	} else {
 		g_variant_get(result, "(o)", &obj_connect_path);
@@ -724,12 +722,10 @@ done:
 	g_free(conn_ind);
 }
 
-int bluetooth_hdp_connect(const char *app_handle,
-			bt_hdp_qos_type_t channel_type,
-			const bluetooth_device_address_t *device_address)
+int bluez_hdp_connect(const char *app_handle,
+		enum hdp_channel_type channel_type, const char *device_address)
 {
-	bt_hdp_connected_t *param;
-	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
+	struct bluez_hdp_connected_t *param;
 	char *dev_path = NULL;
 	char *role;
 	bluez_adapter_t *adapter = NULL;
@@ -741,36 +737,33 @@ int bluetooth_hdp_connect(const char *app_handle,
 	adapter = bluez_adapter_get_adapter(DEFAULT_ADAPTER_NAME);
 
 	if (adapter == NULL) {
-		ret = BT_ERROR_OPERATION_FAILED;
+		ret = -1;
 		goto done;
 	}
 
-	if (channel_type == HDP_QOS_RELIABLE) {
+	if (channel_type == HDP_CHANNEL_RELIABLE) {
 		role = "Reliable";
-	} else if (channel_type == HDP_QOS_STREAMING) {
+	} else if (channel_type == HDP_CHANNEL_STREAMING) {
 		role = "Streaming";
-	} else if (channel_type == HDP_QOS_ANY) {
+	} else if (channel_type == HDP_CHANNEL_ANY) {
 		role = "Any";
 	} else {
 		DBG("Invalid channel_type %d", channel_type);
-		return BT_ERROR_INVALID_PARAMETER;
+		return -1;
 	}
 
 	conn = get_system_lib_dbus_connect();
 	if (conn == NULL) {
-		ret = BT_ERROR_OPERATION_FAILED;
+		ret = -1;
 		goto done;
 	}
 
-	convert_addr_type_to_string(address,
-			(unsigned char *)device_address->addr);
-
-	DBG("create conection to %s", address);
+	DBG("create conection to %s", device_address);
 
 	dev_path = g_strdup_printf("/org/bluez/%s/dev_%s",
-					DEFAULT_ADAPTER_NAME, address);
+				DEFAULT_ADAPTER_NAME, device_address);
 	if (dev_path == NULL) {
-		ret = BT_ERROR_OPERATION_FAILED;
+		ret = -1;
 		goto done;
 	}
 
@@ -778,10 +771,9 @@ int bluetooth_hdp_connect(const char *app_handle,
 
 	DBG("path: %s", dev_path);
 
-	param = g_new0(bt_hdp_connected_t, 1);
+	param = g_new0(struct bluez_hdp_connected_t, 1);
 	param->app_handle = g_strdup(app_handle);
-	memcpy(&param->device_address, device_address,
-					BLUETOOTH_ADDRESS_LENGTH);
+	param->device_address = g_strdup(device_address);
 	param->type = channel_type;
 
 	g_dbus_connection_call(conn, BLUEZ_NAME,
@@ -794,7 +786,7 @@ int bluetooth_hdp_connect(const char *app_handle,
 
 	g_free(dev_path);
 
-	ret = BT_ERROR_NONE;
+	ret = 0;
 done:
 	return ret;
 }
@@ -802,8 +794,7 @@ done:
 static void hdp_disconnect_request_cb(GObject *source_object,
 			GAsyncResult *res, gpointer user_data)
 {
-	bt_hdp_disconnected_t *disconn_ind = user_data;
-	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
+	struct bluez_hdp_connected_t *disconn_ind = user_data;
 	GError *error;
 	GDBusConnection *conn;
 	bluez_adapter_t *adapter = NULL;
@@ -823,17 +814,14 @@ static void hdp_disconnect_request_cb(GObject *source_object,
 		if (adapter == NULL)
 			goto done;
 
-		convert_addr_type_to_string(address,
-			(unsigned char *)disconn_ind->device_address.addr);
 		device = bluez_adapter_get_device_by_address(adapter,
-								address);
+						disconn_ind->device_address);
 		if (device == NULL)
 			goto done;
 
 		if (device->hdp_state_changed_cb)
-			device->hdp_state_changed_cb(
-					BLUETOOTH_ERROR_CONNECTION_ERROR,
-					address, NULL,
+			device->hdp_state_changed_cb(-1,
+					disconn_ind->device_address, NULL,
 					0, disconn_ind->channel_id,
 					device->hdp_state_changed_cb_data);
 	} else {
@@ -844,11 +832,9 @@ done:
 	g_free(disconn_ind);
 }
 
-int bluetooth_hdp_disconnect(unsigned int channel_id,
-		const bluetooth_device_address_t *device_address)
+int bluez_hdp_disconnect(unsigned int channel_id, const char *device_address)
 {
-	bt_hdp_disconnected_t *param;
-	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
+	struct bluez_hdp_connected_t *param;
 	char *dev_path = NULL;
 	bluez_adapter_t *adapter = NULL;
 	GDBusConnection *conn;
@@ -860,32 +846,29 @@ int bluetooth_hdp_disconnect(unsigned int channel_id,
 	adapter = bluez_adapter_get_adapter(DEFAULT_ADAPTER_NAME);
 
 	if (adapter == NULL) {
-		ret = BT_ERROR_OPERATION_FAILED;
+		ret = -1;
 		goto done;
 	}
 
 	info = hdp_internal_gslist_obj_find_using_fd(channel_id);
 	if (NULL == info) {
 		DBG("*** Could not locate the list for %d*****\n", channel_id);
-		ret = BT_ERROR_INVALID_PARAMETER;
+		ret = -1;
 		goto done;
 	}
 
 	conn = get_system_lib_dbus_connect();
 	if (conn == NULL) {
-		ret = BT_ERROR_OPERATION_FAILED;
+		ret = -1;
 		goto done;
 	}
 
-	convert_addr_type_to_string(address,
-		(unsigned char *)device_address->addr);
-
-	DBG("create conection to %s", address);
+	DBG("create conection to %s", device_address);
 
 	dev_path = g_strdup_printf("/org/bluez/%s/dev_%s",
-					DEFAULT_ADAPTER_NAME, address);
+				DEFAULT_ADAPTER_NAME, device_address);
 	if (dev_path == NULL) {
-		ret = BT_ERROR_OPERATION_FAILED;
+		ret = -1;
 		goto done;
 	}
 
@@ -893,10 +876,9 @@ int bluetooth_hdp_disconnect(unsigned int channel_id,
 
 	DBG("path: %s", dev_path);
 
-	param = g_new0(bt_hdp_disconnected_t, 1);
+	param = g_new0(struct bluez_hdp_connected_t, 1);
 	param->channel_id = channel_id;
-	memcpy(&param->device_address, device_address,
-					BLUETOOTH_ADDRESS_LENGTH);
+	param->device_address = g_strdup(device_address);
 
 	g_dbus_connection_call(conn, BLUEZ_NAME,
 				dev_path,
@@ -908,7 +890,7 @@ int bluetooth_hdp_disconnect(unsigned int channel_id,
 
 	g_free(dev_path);
 
-	ret = BT_ERROR_NONE;
+	ret = 0;
 done:
 	return ret;
 }

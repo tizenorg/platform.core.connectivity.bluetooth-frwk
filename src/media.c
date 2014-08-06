@@ -397,7 +397,7 @@ static gboolean handle_set_property(GDBusConnection *connection,
 
 	if (relay_agent == NULL) {
 		DBG("relay_agent == NULL");
-		return false;
+		return FALSE;
 	}
 
 	if (g_strcmp0(property_name, "LoopStatus") == 0) {

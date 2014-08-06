@@ -74,7 +74,7 @@ static struct player_settinngs_t shuffle_settings[] = {
 
 struct _bluez_object {
 	char *path_name;
-	bt_audio_profile_type_e media_type;
+	enum audio_profile_type media_type;
 	GDBusObject *obj;
 	GList *interfaces;
 	GDBusProxy *properties_proxy;
@@ -375,9 +375,9 @@ static void networkserver_on_signal(GDBusProxy *proxy,
 	DBG("sender_name = %s, signal_name = %s",
 				sender_name, signal_name);
 	if (strcasecmp(signal_name, "PeerConnected"))
-		connected = true;
+		connected = TRUE;
 	else if (strcasecmp(signal_name, "PeerDisconnected"))
-		connected = false;
+		connected = FALSE;
 	else
 		return;
 
@@ -995,7 +995,7 @@ static void parse_bluez_control_interfaces(gpointer data, gpointer user_data)
 	if (g_strcmp0(iface_name, MEDIATRANSPORT_INTERFACE) == 0) {
 		gchar *uuid, *device_address;
 		gchar *device_path;
-		bt_audio_profile_type_e type;
+		enum audio_profile_type type;
 
 		path = g_dbus_proxy_get_object_path(proxy);
 
@@ -1032,7 +1032,7 @@ static void parse_bluez_control_interfaces(gpointer data, gpointer user_data)
 		DBG("uuid = %s", uuid);
 
 		if (g_strcmp0(uuid, BT_A2DP_SINK_UUID) == 0) {
-			type = BT_AUDIO_PROFILE_TYPE_A2DP;
+			type = AUDIO_TYPE_A2DP;
 			object->media_type = type;
 		}
 
@@ -3634,8 +3634,7 @@ static gboolean bluez_set_metadata(struct _bluez_adapter *adapter,
 }
 
 static int bluez_avrcp_set_interal_property(struct _bluez_adapter *adapter,
-			int type,
-			media_player_settings_t *properties)
+				int type, media_player_settings_t *properties)
 {
 	int value;
 	gboolean shuffle;
@@ -3651,7 +3650,7 @@ static int bluez_avrcp_set_interal_property(struct _bluez_adapter *adapter,
 		val = g_variant_new("s", loopstatus_settings[value].property);
 		if (!bluez_set_property(adapter, "LoopStatus", val)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return BT_ERROR_OPERATION_FAILED;
+			return -1;
 		}
 		break;
 	case SHUFFLE:
@@ -3663,7 +3662,7 @@ static int bluez_avrcp_set_interal_property(struct _bluez_adapter *adapter,
 		val = g_variant_new("b", shuffle);
 		if (!bluez_set_property(adapter, "Shuffle", val)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return BT_ERROR_OPERATION_FAILED;
+			return -1;
 		}
 		break;
 	case PLAYBACKSTATUS:
@@ -3671,7 +3670,7 @@ static int bluez_avrcp_set_interal_property(struct _bluez_adapter *adapter,
 		val = g_variant_new("s", playback_status[value].property);
 		if (!bluez_set_property(adapter, "PlaybackStatus", val)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return BT_ERROR_OPERATION_FAILED;
+			return -1;
 		}
 		break;
 	case POSITION:
@@ -3679,15 +3678,15 @@ static int bluez_avrcp_set_interal_property(struct _bluez_adapter *adapter,
 		val = g_variant_new("x", value);
 		if (!bluez_set_property(adapter, "Position", val)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return BT_ERROR_OPERATION_FAILED;
+			return -1;
 		}
 		break;
 	default:
 		DBG("Invalid Type\n");
-		return BT_ERROR_INVALID_PARAMETER;
+		return -1;
 	}
 
-	return BT_SUCCESS;
+	return -1;
 }
 
 int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
@@ -3703,7 +3702,7 @@ int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
 		val = g_variant_new("s", meta_data->title);
 		if (!bluez_set_metadata(adapter, "xesam:title", val)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return BT_ERROR_OPERATION_FAILED;
+			return -1;
 		}
 	}
 
@@ -3716,7 +3715,7 @@ int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
 		if (!bluez_set_metadata(adapter, "xesam:artist",
 							val_array)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return BT_ERROR_OPERATION_FAILED;
+			return -1;
 		}
 	}
 
@@ -3724,7 +3723,7 @@ int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
 		val = g_variant_new("s", meta_data->album);
 		if (!bluez_set_metadata(adapter, "xesam:album", val)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return BT_ERROR_OPERATION_FAILED;
+			return -1;
 		}
 	}
 
@@ -3737,7 +3736,7 @@ int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
 		if (!bluez_set_metadata(adapter, "xesam:genre",
 							val_array)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return BT_ERROR_OPERATION_FAILED;
+			return -1;
 		}
 	}
 
@@ -3746,7 +3745,7 @@ int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
 		if (!bluez_set_metadata(adapter, "xesam:trackNumber",
 								val)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return BT_ERROR_OPERATION_FAILED;
+			return -1;
 		}
 	}
 
@@ -3754,11 +3753,11 @@ int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
 		val = g_variant_new("x", meta_data->duration);
 		if (!bluez_set_metadata(adapter, "mpris:length", val)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return BT_ERROR_OPERATION_FAILED;
+			return -1;
 		}
 	}
 
-	return BT_SUCCESS;
+	return -1;
 }
 
 int bluez_media_player_change_property(struct _bluez_adapter *adapter,
@@ -3785,7 +3784,7 @@ int bluez_media_player_change_property(struct _bluez_adapter *adapter,
 		break;
 	default:
 		DBG("Invalid Type\n");
-		return BT_ERROR_INVALID_PARAMETER;
+		return -1;
 	}
 
 	ret = bluez_avrcp_set_interal_property(adapter,
@@ -3800,27 +3799,22 @@ int bluez_media_player_set_properties(struct _bluez_adapter *adapter,
 {
 
 	if (bluez_avrcp_set_interal_property(adapter,
-		LOOPSTATUS, properties) != 1) {
-		return BT_ERROR_OPERATION_FAILED;
-	}
+				LOOPSTATUS, properties) != 1)
+		return -1;
 
 	if (bluez_avrcp_set_interal_property(adapter,
-		SHUFFLE, properties) != 1) {
-		return BT_ERROR_OPERATION_FAILED;
-	}
+				SHUFFLE, properties) != 1)
+		return -1;
 
 	if (bluez_avrcp_set_interal_property(adapter,
-		PLAYBACKSTATUS,
-			properties) != 1) {
-		return BT_ERROR_OPERATION_FAILED;
-	}
+				PLAYBACKSTATUS, properties) != 1)
+		return -1;
 
 	if (bluez_avrcp_set_interal_property(adapter,
-		POSITION, properties) != 1) {
-		return BT_ERROR_OPERATION_FAILED;
-	}
+				POSITION, properties) != 1)
+		return -1;
 
-	return BT_SUCCESS;
+	return 0;
 }
 
 static void bluez_device_connect_cb(GObject *source_object,
@@ -3953,7 +3947,7 @@ gboolean bluez_get_media_type(const char *remote_address)
 	struct _bluez_object *object;
 	GList *list, *next;
 	int length;
-	gboolean is_type = false;
+	gboolean is_type = FALSE;
 	gchar device_address[BT_ADDRESS_STRING_SIZE];
 
 	DBG("");
@@ -3961,7 +3955,7 @@ gboolean bluez_get_media_type(const char *remote_address)
 	length = g_list_length(bluez_object_list);
 
 	if (length == 0)
-		return false;
+		return FALSE;
 
 	for (list = g_list_first(bluez_object_list); list; list = next) {
 		next = g_list_next(list);
@@ -3971,8 +3965,8 @@ gboolean bluez_get_media_type(const char *remote_address)
 						(gchar *)device_address);
 
 		if (!g_strcmp0(remote_address, device_address) &&
-			object->media_type == BT_AUDIO_PROFILE_TYPE_A2DP) {
-			is_type = true;
+			object->media_type == AUDIO_TYPE_A2DP) {
+			is_type = TRUE;
 			break;
 		}
 	}

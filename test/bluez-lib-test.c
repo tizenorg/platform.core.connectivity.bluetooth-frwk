@@ -491,8 +491,8 @@ static int hdp_activate(void *parameter)
 
 	DBG("");
 
-	result = bluetooth_hdp_activate(1,
-		HDP_ROLE_SINK, HDP_QOS_ANY, &app_id);
+	result = bluez_hdp_activate(1,
+		HDP_ROLE_SINK, HDP_CHANNEL_ANY, &app_id);
 
 	DBG("result = %d app_id = %s", result, app_id);
 
@@ -505,7 +505,7 @@ static int hdp_deactivate(void *parameter)
 
 	DBG("app_id = %s", app_id);
 
-	result = bluetooth_hdp_deactivate((const char *)(app_id));
+	result = bluez_hdp_deactivate((const char *)(app_id));
 
 	DBG("result = %d", result);
 

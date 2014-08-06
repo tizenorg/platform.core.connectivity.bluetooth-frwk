@@ -502,7 +502,7 @@ static void bluez_avrcp_shuffle_changed(gboolean shuffle,
 		data->cb(shuffle_mode, data->user_data);
 }
 
-static void bluez_nap_connection_changed(bool connected,
+static void bluez_nap_connection_changed(gboolean connected,
 				const char *remote_address,
 				const char *interface_name,
 				void *user_data)
@@ -529,26 +529,31 @@ static void bluez_set_data_received_changed(
 				data_node->user_data);
 }
 
-
 static void bluez_hdp_state_changed(int result,
 				const char *remote_address,
 				const char *app_id,
-				bt_hdp_channel_type_e type,
+				enum hdp_channel_type type,
 				unsigned int channel,
 				void *user_data)
 {
-	struct hdp_connection_changed_cb_node *data =
-						user_data;
+	struct hdp_connection_changed_cb_node *data = user_data;
+	bt_hdp_channel_type_e channel_type;
 
-	if (app_id != NULL) {
-		if (data->conn_cb)
-			data->conn_cb(result, remote_address,
-					app_id, type, channel,
-					data->user_data);
-		else if (data->disconn_cb)
-			data->disconn_cb(result, remote_address,
-					channel, data->user_data);
-	}
+	if (app_id == NULL)
+		return;
+
+	if (type == HDP_CHANNEL_RELIABLE)
+		channel_type = BT_HDP_CHANNEL_TYPE_RELIABLE;
+	else
+		channel_type = BT_HDP_CHANNEL_TYPE_STREAMING;
+
+	if (data->conn_cb)
+		data->conn_cb(result, remote_address, app_id,
+				channel_type, channel, data->user_data);
+
+	if (data->disconn_cb)
+		data->disconn_cb(result, remote_address,
+				channel, data->user_data);
 }
 
 static void bluez_avrcp_target_state_changed(const char *remote_address,
@@ -568,7 +573,7 @@ static void bluez_avrcp_target_state_changed(const char *remote_address,
 static void bluez_audio_state_changed(int result,
 					gboolean connected,
 					const char *remote_address,
-					bt_audio_profile_type_e type,
+					enum audio_profile_type type,
 					void *user_data)
 {
 	struct audio_connection_state_changed_cb_node *data =
@@ -4889,8 +4894,8 @@ int bt_hdp_register_sink_app(unsigned short data_type, char **app_id)
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
-	result = bluetooth_hdp_activate(data_type,
-			HDP_ROLE_SINK, HDP_QOS_ANY, app_id);
+	result = bluez_hdp_activate(data_type,
+			HDP_ROLE_SINK, HDP_CHANNEL_ANY, app_id);
 	return result;
 }
 
@@ -4906,7 +4911,7 @@ int bt_hdp_unregister_sink_app(const char *app_id)
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
-	result = bluetooth_hdp_deactivate(app_id);
+	result = bluez_hdp_deactivate(app_id);
 
 	return result;
 }
@@ -4924,16 +4929,14 @@ int bt_hdp_send_data(unsigned int channel, const char *data,
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
-	result = bluetooth_hdp_send_data(channel, data, size);
+	result = bluez_hdp_send_data(channel, data, size);
 
 	return result;
 }
 
-int bt_hdp_connect_to_source(const char *remote_address,
-						const char *app_id)
+int bt_hdp_connect_to_source(const char *remote_address, const char *app_id)
 {
 	int result = BT_ERROR_NONE;
-	bluetooth_device_address_t addr_hex = { {0,} };
 
 	DBG("");
 
@@ -4946,9 +4949,7 @@ int bt_hdp_connect_to_source(const char *remote_address,
 	if (remote_address == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
 
-	convert_address_to_hex(&addr_hex, remote_address);
-
-	result = bluetooth_hdp_connect(app_id, HDP_QOS_ANY, &addr_hex);
+	result = bluez_hdp_connect(app_id, HDP_CHANNEL_ANY, remote_address);
 
 	return result;
 }
@@ -4956,7 +4957,6 @@ int bt_hdp_connect_to_source(const char *remote_address,
 int bt_hdp_disconnect(const char *remote_address, unsigned int channel)
 {
 	int result = BT_ERROR_NONE;
-	bluetooth_device_address_t addr_hex = { {0,} };
 
 	DBG("");
 
@@ -4969,9 +4969,7 @@ int bt_hdp_disconnect(const char *remote_address, unsigned int channel)
 	if (remote_address == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
 
-	convert_address_to_hex(&addr_hex, remote_address);
-
-	result = bluetooth_hdp_disconnect(channel, &addr_hex);
+	result = bluez_hdp_disconnect(channel, remote_address);
 
 	return result;
 }

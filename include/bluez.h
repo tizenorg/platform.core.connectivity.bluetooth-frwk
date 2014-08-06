@@ -23,8 +23,6 @@
 #include <glib.h>
 
 #include "common.h"
-#include "bluetooth.h"
-#include "bluetooth-api.h"
 
 #define BT_GENERIC_AUDIO_UUID      "00001203-0000-1000-8000-00805f9b34fb"
 
@@ -347,10 +345,16 @@ void bluez_set_data_received_changed_cb(
 
 void bluez_unset_data_received_changed_cb(struct _bluez_device *device);
 
+enum hdp_channel_type {
+	HDP_CHANNEL_RELIABLE,
+	HDP_CHANNEL_STREAMING,
+	HDP_CHANNEL_ANY
+};
+
 typedef void (*bluez_hdp_state_changed_t)(int result,
 				const char *remote_address,
 				const char *app_id,
-				bt_hdp_channel_type_e type,
+				enum hdp_channel_type type,
 				unsigned int channel,
 				gpointer user_data);
 
@@ -371,7 +375,7 @@ void bluez_set_avrcp_target_cb(
 				gpointer user_data);
 void bluez_unset_avrcp_target_cb();
 
-typedef void (*bluez_nap_connection_state_cb_t)(bool connected,
+typedef void (*bluez_nap_connection_state_cb_t)(gboolean connected,
 				const char *remote_address,
 				const char *interface_name,
 				gpointer user_data);
@@ -380,10 +384,14 @@ void bluez_set_nap_connection_state_cb(
 				gpointer user_data);
 void bluez_unset_nap_connection_state_cb(void);
 
+enum audio_profile_type {
+	AUDIO_TYPE_A2DP,
+};
+
 typedef void (*bluez_audio_state_cb_t)(int result,
 				gboolean connected,
 				const char *remote_address,
-				bt_audio_profile_type_e type,
+				enum audio_profile_type type,
 				void *user_data);
 
 void bluez_set_audio_state_cb(
@@ -579,23 +587,28 @@ int bluez_media_player_change_property(struct _bluez_adapter *adapter,
 int bluez_media_player_set_properties(struct _bluez_adapter *adapter,
 				media_player_settings_t *properties);
 
-int bluetooth_hdp_activate(unsigned short data_type,
-					bt_hdp_role_type_t role,
-					bt_hdp_qos_type_t channel_type,
-					char **app_handle);
+enum hdp_role_type {
+	HDP_ROLE_SOURCE,
+	HDP_ROLE_SINK
+};
 
-int bluetooth_hdp_deactivate(const char *app_handle);
+int bluez_hdp_activate(unsigned short data_type,
+				enum hdp_role_type role,
+				enum hdp_channel_type channel_type,
+				char **app_handle);
 
-int bluetooth_hdp_send_data(unsigned int channel_id,
-					const char *buffer,
-					unsigned int size);
+int bluez_hdp_deactivate(const char *app_handle);
 
-int bluetooth_hdp_connect(const char *app_handle,
-			bt_hdp_qos_type_t channel_type,
-			const bluetooth_device_address_t *device_address);
+int bluez_hdp_send_data(unsigned int channel_id,
+				const char *buffer,
+				unsigned int size);
 
-int bluetooth_hdp_disconnect(unsigned int channel_id,
-			const bluetooth_device_address_t *device_address);
+int bluez_hdp_connect(const char *app_handle,
+				enum hdp_channel_type channel_type,
+				const char *device_address);
+
+int bluez_hdp_disconnect(unsigned int channel_id,
+				const char *device_address);
 
 void hdp_internal_handle_disconnect(gpointer user_data,
 						GVariant *param);

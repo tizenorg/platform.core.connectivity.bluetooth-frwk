@@ -23,7 +23,6 @@
 #include <stdio.h>
 
 #include <gio/gio.h>
-#include "bluetooth-api.h"
 
 #ifndef TIZEN
 #define DBG(fmt, arg...) printf("%s:%d %s()" fmt "\n", __FILE__, __LINE__, __func__, ## arg)
@@ -123,17 +122,8 @@ void comms_service_plugin_cleanup(void);
 void convert_device_path_to_address(const gchar *device_path,
 					gchar *device_address);
 
-void convert_address_to_hex(bluetooth_device_address_t *addr_hex,
-					const char *addr_str);
-
-void convert_addr_type_to_string(char *address,
-					unsigned char *addr);
-
 void device_path_to_address(const char *device_path,
 					char *device_address);
-
-void convert_addr_string_to_type(unsigned char *addr,
-					const char *address);
 
 GDBusConnection *get_system_lib_dbus_connect(void);
 
