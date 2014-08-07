@@ -5345,6 +5345,7 @@ int bt_gatt_foreach_primary_services(const char *remote_address,
 
 	device = bluez_adapter_get_device_by_address(default_adapter,
 							remote_address);
+
 	if (device == NULL)
 		return BT_ERROR_OPERATION_FAILED;
 
@@ -5365,6 +5366,58 @@ int bt_gatt_foreach_primary_services(const char *remote_address,
 	g_list_free(primary_services);
 
 	return BT_SUCCESS;
+}
+
+int bt_gatt_discover_characteristics(bt_gatt_attribute_h service,
+				bt_gatt_characteristics_discovered_cb callback,
+				void *user_data)
+{
+	bluez_gatt_service_t *gatt_service;
+	GList *characteristics, *list, *next;
+	guint total;
+	const char *service_path = service;
+	char *gatt_char_path;
+	int index = 0;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (service_path == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	gatt_service = bluez_gatt_get_service_by_path(service_path);
+
+	if (gatt_service == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	characteristics = bluez_gatt_service_get_chars(gatt_service);
+
+	if (characteristics == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	total = g_list_length(characteristics);
+
+	for (list = g_list_first(characteristics); list; list = next) {
+		gatt_char_path = list->data;
+
+		next = g_list_next(list);
+
+		if (!callback(0, index, (int)total,
+			(bt_gatt_attribute_h)gatt_char_path, user_data))
+			break;
+
+		index++;
+	}
+
+	g_list_free(characteristics);
+
+	return BT_SUCCESS;
+
 }
 
 int bt_gatt_get_service_uuid(bt_gatt_attribute_h service, char **uuid)
@@ -5431,6 +5484,11 @@ int bt_gatt_foreach_included_services(bt_gatt_attribute_h service,
 		if (!callback((bt_gatt_attribute_h)includes[index], user_data))
 			break;
 	}
+
+	for (index = 0; index < length; index++)
+		g_free(includes[index]);
+
+	g_free(includes);
 
 	return BT_SUCCESS;
 }

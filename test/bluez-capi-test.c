@@ -2242,6 +2242,41 @@ static int gatt_foreach_primary_services(const char *p1, const char *p2)
 	return 0;
 }
 
+
+static bool gatt_characteristics_callback(int result, int index, int total,
+					bt_gatt_attribute_h characteristic,
+					void *user_data)
+{
+	const char *gatt_char_handle = characteristic;
+
+	DBG("CAPI Result is %d", result);
+
+	DBG("The index %d Characteristic found", index);
+
+	DBG("Total characteristic is %d", total);
+
+	DBG("Characteristic found %s", gatt_char_handle);
+
+	return TRUE;
+}
+
+static int gatt_discover_characteristics(const char *p1, const char *p2)
+{
+	int ret;
+
+	if (p1 == NULL) {
+		ERROR("gatt characteristics must give the service_handle");
+		return 0;
+	}
+
+	ret = bt_gatt_discover_characteristics((bt_gatt_attribute_h)p1,
+				gatt_characteristics_callback, NULL);
+
+	DBG("ret = %d", ret);
+
+	return 0;
+}
+
 static int gatt_get_service_uuid(const char *p1, const char *p2)
 {
 	int ret;
@@ -2304,7 +2339,9 @@ static int gatt_clone_and_destroy_attribute_handle(const char *p1, const char *p
 
 	ret = bt_gatt_destroy_attribute_handle(clone);
 
-	DBG("destroy handle ret = %d", ret);
+	DBG("destroy handle %s", p1);
+
+	DBG("ret = %d", ret);
 
 	return 0;
 }
@@ -2629,6 +2666,9 @@ struct {
 
 	{"gatt_foreach_primary_services", gatt_foreach_primary_services,
 		"Usage: gatt_foreach_primary_services\n\tgatt foreach primary services"},
+
+	{"gatt_discover_characteristics", gatt_discover_characteristics,
+		"Usage: gatt_discover_characteristics\n\tgatt_discover_characteristics"},
 
 	{"gatt_get_service_uuid", gatt_get_service_uuid,
 		"Usage: gatt_get_service_uuid\n\tgatt get service uuid"},

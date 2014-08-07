@@ -1234,6 +1234,15 @@ struct _bluez_gatt_service *bluez_gatt_get_service_by_path(
 	return service;
 }
 
+GList *bluez_gatt_service_get_chars(struct _bluez_gatt_service *service)
+{
+	struct _gatt_char_head *char_head = service->char_head;
+	GList *characteristics = NULL;
+
+	characteristics = g_hash_table_get_keys(char_head->gatt_char_hash);
+
+	return characteristics;
+}
 
 static void destruct_bluez_device(gpointer data)
 {

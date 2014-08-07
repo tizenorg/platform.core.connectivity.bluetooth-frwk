@@ -257,6 +257,9 @@ GList *bluez_device_get_primary_services(
 char **bluez_gatt_service_get_property_includes(
 				struct _bluez_gatt_service *service);
 
+GList *bluez_gatt_service_get_chars(
+				struct _bluez_gatt_service *service);
+
 /* Returned Glist should not be freed and modified */
 const GList *bluez_adapter_get_devices_path(
 				struct _bluez_adapter *adapter);
