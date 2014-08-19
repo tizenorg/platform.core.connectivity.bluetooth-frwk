@@ -4126,9 +4126,11 @@ int bt_spp_destroy_rfcomm(const char *uuid)
 
 	spp_ctx_list = g_list_remove(spp_ctx_list, spp_ctx);
 
-	g_io_channel_shutdown(spp_ctx->channel, TRUE, NULL);
 
-	g_io_channel_unref(spp_ctx->channel);
+	if (spp_ctx->channel) {
+	  g_io_channel_shutdown(spp_ctx->channel, TRUE, NULL);
+	  g_io_channel_unref(spp_ctx->channel);
+	}
 
 	free_spp_context(spp_ctx);
 
