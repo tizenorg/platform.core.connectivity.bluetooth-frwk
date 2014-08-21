@@ -53,6 +53,7 @@ static bool bt_service_init;
 static guint bluetooth_agent_id;
 static guint profile_id;
 static GDBusConnection *conn;
+static guint bluetooth_ext_agent_id;
 
 static bluez_adapter_t *default_adapter;
 
@@ -3564,7 +3565,11 @@ static void release_name_on_dbus(const char *name)
 	guint32 request_name_reply;
 	GError *error = NULL;
 
-	if (bluetooth_agent_id || profile_id)
+	if (bluetooth_agent_id || profile_id
+			|| bluetooth_media_agent_id)
+		return;
+
+	if (bluetooth_ext_agent_id)
 		return;
 
 	ret = g_dbus_connection_call_sync(conn,
@@ -3618,7 +3623,8 @@ static int request_name_on_dbus(const char *name)
 	guint32 request_name_reply;
 	GError *error = NULL;
 
-	if (bluetooth_agent_id || profile_id)
+	if (bluetooth_agent_id || profile_id
+			|| bluetooth_media_agent_id)
 		return 0;
 
 	connection = get_system_dbus_connect();
@@ -3648,11 +3654,19 @@ static int request_name_on_dbus(const char *name)
 
 	/* RequestName will return the uint32 value:
 	 * 1: DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER
-	 * 2: BUS_REQUEST_NAME_REPLY_IN_QUEUE
+	 * 2: DBUS_REQUEST_NAME_REPLY_IN_QUEUE
 	 * 3: DBUS_REQUEST_NAME_REPLY_EXISTS
 	 * 4: DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER
 	 * Also see dbus doc
 	 */
+	if (request_name_reply == DBUS_REQUEST_NAME_REPLY_IN_QUEUE
+		|| request_name_reply == DBUS_REQUEST_NAME_REPLY_EXISTS
+		|| request_name_reply ==
+				DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER) {
+		bluetooth_ext_agent_id = 1;
+		return 0;
+	}
+
 	if (request_name_reply != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
 		DBG("Lost name");
 
@@ -3660,6 +3674,9 @@ static int request_name_on_dbus(const char *name)
 
 		goto failed;
 	}
+
+	if (bluetooth_ext_agent_id > 0)
+		bluetooth_ext_agent_id = 0;
 
 	return 0;
 
