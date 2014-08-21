@@ -2876,8 +2876,10 @@ struct _bluez_device *bluez_adapter_get_device_by_path(
 	if (adapter == NULL || path == NULL)
 		return NULL;
 
-	device = g_hash_table_lookup(adapter->device_head->device_hash,
-						(gconstpointer) path);
+	if (adapter->device_head)
+		device = g_hash_table_lookup(
+				adapter->device_head->device_hash,
+					(gconstpointer) path);
 
 	return device;
 }
@@ -2887,7 +2889,7 @@ struct _bluez_device *bluez_adapter_get_device_by_address(
 				const char *address)
 {
 	gchar *device_path;
-	struct _bluez_device *device;
+	struct _bluez_device *device = NULL;
 
 	if (adapter == NULL || address == NULL)
 		return NULL;
@@ -2896,8 +2898,10 @@ struct _bluez_device *bluez_adapter_get_device_by_address(
 	if (device_path == NULL)
 		return NULL;
 
-	device = g_hash_table_lookup(adapter->device_head->device_hash,
-						(gconstpointer) device_path);
+	if (adapter->device_head)
+		device = g_hash_table_lookup(
+				adapter->device_head->device_hash,
+					(gconstpointer) device_path);
 
 	g_free(device_path);
 
