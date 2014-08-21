@@ -61,6 +61,8 @@ struct _bluez_device {
 	gpointer data_received_changed_data;
 	bluez_device_input_connected_cb_t input_connected_cb;
 	gpointer input_connected_cb_data;
+
+	adapter_device_discovery_info_t *device_discovery_info;
 };
 
 static void hdp_obj_info_free(hdp_obj_info_t *info);

@@ -105,6 +105,19 @@ typedef struct {
 	media_metadata_attributes_t metadata;
 } media_player_settings_t;
 
+typedef struct {
+	char *remote_address;
+	char *remote_name;
+	guint32 bt_class;
+	gint16 rssi;
+	gboolean is_bonded;
+	char **service_uuid;
+	int service_count;
+} adapter_device_discovery_info_t;
+
+adapter_device_discovery_info_t *bluez_get_discovery_device_info(
+					bluez_device_t *device);
+
 void bluez_lib_deinit(void);
 int bluez_lib_init(void);
 

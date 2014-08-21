@@ -183,6 +183,8 @@ struct _bluez_device {
 	gpointer data_received_changed_data;
 	bluez_device_input_connected_cb_t input_connected_cb;
 	gpointer input_connected_cb_data;
+
+	adapter_device_discovery_info_t *device_discovery_info;
 };
 
 struct _bluez_gatt_service {
@@ -245,6 +247,130 @@ static device_connect_cb_t dev_connect_cb;
 static gpointer dev_connect_data;
 static device_disconnect_cb_t dev_disconnect_cb;
 static gpointer dev_disconnect_data;
+
+static void free_discovery_device_info(
+		adapter_device_discovery_info_t *discovery_device_info)
+{
+	int i;
+
+	if (discovery_device_info == NULL)
+		return;
+
+	g_free(discovery_device_info->remote_address);
+	g_free(discovery_device_info->remote_name);
+
+	for (i = 0; i < discovery_device_info->service_count; ++i)
+		g_free(discovery_device_info->service_uuid[i]);
+
+	g_free(discovery_device_info->service_uuid);
+	g_free(discovery_device_info);
+}
+
+static void update_device_discovery_info(GVariant *changed_properties,
+		adapter_device_discovery_info_t *device_info)
+{
+	gchar *remote_address, *remote_name;
+	gint16 rssi;
+	gboolean paired;
+	guint32 class;
+	char **uuids;
+
+	if (device_info == NULL)
+		return;
+
+	DBG("+");
+
+	if (g_variant_lookup(changed_properties, "Address",
+					"s", &remote_address)) {
+		if (device_info->remote_address)
+			g_free(device_info->remote_address);
+		device_info->remote_address = remote_address;
+	}
+
+	if (g_variant_lookup(changed_properties, "Alias",
+					"s", &remote_name)) {
+		if (device_info->remote_name)
+			g_free(device_info->remote_name);
+		device_info->remote_name = remote_name;
+	}
+
+	if (g_variant_lookup(changed_properties, "RSSI",
+					"n", &rssi))
+		device_info->rssi = rssi;
+
+	if (g_variant_lookup(changed_properties, "Paired",
+						"b", &paired))
+		device_info->is_bonded = paired;
+
+	if (g_variant_lookup(changed_properties, "UUIDs",
+						"ss", &uuids)) {
+		int i;
+
+		for (i = 0; i < device_info->service_count; i++)
+			g_free(device_info->service_uuid[i]);
+
+		g_free(device_info->service_uuid);
+
+		device_info->service_uuid = uuids;
+		device_info->service_count = g_strv_length(uuids);
+	}
+
+	if (g_variant_lookup(changed_properties, "Class",
+						"u", &class))
+		device_info->bt_class = class;
+
+	DBG("-");
+}
+
+static adapter_device_discovery_info_t *get_discovery_device_info(
+						bluez_device_t *device)
+{
+	guint len;
+	signed short rssi;
+	int paired;
+	char *alias, *address;
+	char **uuids;
+	unsigned int class;
+	adapter_device_discovery_info_t *device_info;
+
+	if (device == NULL)
+		return NULL;
+
+	device_info = g_new0(adapter_device_discovery_info_t, 1);
+	if (device_info == NULL) {
+		ERROR("no memory.");
+		return NULL;
+	}
+
+	address = bluez_device_get_property_address(device);
+	alias = bluez_device_get_property_alias(device);
+	uuids = bluez_device_get_property_uuids(device);
+	bluez_device_get_property_class(device, &class);
+	bluez_device_get_property_rssi(device, &rssi);
+	bluez_device_get_property_paired(device, &paired);
+
+	len = g_strv_length(uuids);
+
+	device_info->service_count = len;
+	device_info->remote_address = address;
+	device_info->remote_name = alias;
+	device_info->rssi = rssi;
+	device_info->is_bonded = paired;
+	device_info->service_uuid = uuids;
+
+	device_info->bt_class = class;
+
+	return device_info;
+}
+
+adapter_device_discovery_info_t *bluez_get_discovery_device_info(
+					bluez_device_t *device)
+{
+	if (device)
+		return device->device_discovery_info;
+
+	return NULL;
+}
 
 static struct _bluez_object *get_object_from_path(const char *path)
 {
@@ -685,6 +811,9 @@ static void device_properties_changed(GDBusProxy *proxy,
 
 	DBG("properties %s", properties);
 
+	update_device_discovery_info(changed_properties,
+					device->device_discovery_info);
+
 	if (device->device_paired_cb)
 		handle_device_paired(changed_properties, user_data);
 
@@ -942,6 +1071,8 @@ static void parse_bluez_device_interfaces(gpointer data, gpointer user_data)
 		device->interface = interface;
 		device->proxy = proxy;
 		device->property_proxy = property_proxy;
+		device->device_discovery_info =
+			get_discovery_device_info(device);
 		g_signal_connect(proxy, "g-properties-changed",
 			G_CALLBACK(device_properties_changed), device);
 	} else if (g_strcmp0(iface_name, MEDIACONTROL_INTERFACE) == 0) {
@@ -1248,6 +1379,10 @@ static void destruct_bluez_device(gpointer data)
 	g_free(device->object_path);
 	g_object_unref(device->interface);
 	g_object_unref(device->proxy);
+
+	if (device->device_discovery_info)
+		free_discovery_device_info(
+			device->device_discovery_info);
 	if (device->control_proxy)
 		g_object_unref(device->control_proxy);
 	if (device->control_interface)
