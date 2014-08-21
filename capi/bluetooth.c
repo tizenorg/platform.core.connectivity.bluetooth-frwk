@@ -4347,6 +4347,7 @@ int bt_socket_create_rfcomm(const char *service_uuid, int *socket_fd)
 		return BT_ERROR_OPERATION_FAILED;
 
 	*socket_fd = spp_ctx->fd;
+	spp_ctx->role = BT_SOCKET_SERVER;
 
 	return BT_SUCCESS;
 }
