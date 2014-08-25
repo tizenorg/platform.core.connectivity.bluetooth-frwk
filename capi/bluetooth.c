@@ -1272,7 +1272,8 @@ int bt_adapter_get_visibility(bt_adapter_visibility_mode_e *mode,
 			BT_ADAPTER_VISIBILITY_MODE_GENERAL_DISCOVERABLE :
 			BT_ADAPTER_VISIBILITY_MODE_LIMITED_DISCOVERABLE;
 
-	if (*mode == BT_ADAPTER_VISIBILITY_MODE_LIMITED_DISCOVERABLE)
+	if (*mode == BT_ADAPTER_VISIBILITY_MODE_LIMITED_DISCOVERABLE
+			&& duration != NULL)
 		*duration = timeout;
 
 	return BT_SUCCESS;
