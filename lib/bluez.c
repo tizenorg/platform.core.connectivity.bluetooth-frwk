@@ -2242,9 +2242,7 @@ static void destruct_bluez_adapter(gpointer data)
 	g_free(adapter->interface_name);
 	g_free(adapter->object_path);
 	g_object_unref(adapter->interface);
-	g_object_unref(adapter->media_proxy);
 	g_object_unref(adapter->media_interface);
-	g_object_unref(adapter->netserver_proxy);
 	g_object_unref(adapter->netserver_interface);
 	g_object_unref(adapter->property_proxy);
 	g_object_unref(adapter->proxy);
