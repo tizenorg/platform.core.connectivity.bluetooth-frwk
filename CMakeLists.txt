@@ -68,7 +68,6 @@ SET(SOURCES_BLUETOOTH_SERVICE
 	src/vertical.c
 	src/pairing.c
 	src/opp.c
-	src/media.c
 	src/map_agent.c
 	src/map_bmessage.c
 	src/bluetooth_map_agent.c
@@ -85,7 +84,6 @@ SET(SOURCES_BLUETOOTH_SERVICE
 	src/vertical.c
 	src/pairing.c
 	src/opp.c
-	src/media.c
 	lib/bluez.c
 	lib/bluez-hdp.c
 	lib/common.c

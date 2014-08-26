@@ -89,10 +89,10 @@ typedef enum {
 } media_player_shuffle_status;
 
 typedef struct {
-	const char *title;
-	const char **artist;
-	const char *album;
-	const char **genre;
+	char *title;
+	char **artist;
+	char *album;
+	char **genre;
 	unsigned int tracknumber;
 	unsigned int duration;
 } media_metadata_attributes_t;
@@ -386,7 +386,25 @@ typedef void (*bluez_avrcp_target_cb_t)(
 void bluez_set_avrcp_target_cb(
 				bluez_avrcp_target_cb_t cb,
 				gpointer user_data);
-void bluez_unset_avrcp_target_cb();
+void bluez_unset_avrcp_target_cb(void);
+
+typedef void (*bluez_avrcp_shuffle_cb_t)(
+				gboolean shuffle,
+				gpointer user_data);
+
+void bluez_set_avrcp_shuffle_cb(
+				bluez_avrcp_shuffle_cb_t cb,
+				gpointer user_data);
+void bluez_unset_avrcp_shuffle_cb(void);
+
+typedef void (*bluez_avrcp_repeat_cb_t)(
+				const char *repeat,
+				gpointer user_data);
+
+void bluez_set_avrcp_repeat_cb(
+				bluez_avrcp_repeat_cb_t cb,
+				gpointer user_data);
+void bluez_unset_avrcp_repeat_cb(void);
 
 typedef void (*bluez_nap_connection_state_cb_t)(gboolean connected,
 				const char *remote_address,
@@ -586,10 +604,6 @@ enum bluez_error_type bluez_profile_register_profile_sync(
 enum bluez_error_type  bluez_profile_unregister_profile_sync(
 				const gchar *path);
 
-void bt_media_register_player(struct _bluez_adapter *adapter);
-
-void bt_media_unregister_player(struct _bluez_adapter *adapter);
-
 int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
 				media_metadata_attributes_t *meta_data);
 
@@ -630,5 +644,9 @@ void hdp_internal_handle_connect(gpointer user_data,
 						GVariant *param);
 
 gboolean bluez_get_media_type(const char *remote_address);
+
+int bluez_media_register_player(struct _bluez_adapter *adapter);
+
+void bluez_media_unregister_player(struct _bluez_adapter *adapter);
 
 #endif

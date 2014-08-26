@@ -239,6 +239,10 @@ static bluez_agent_added_cb_t agent_added_cb;
 static gpointer agent_added_cb_data;
 static bluez_avrcp_target_cb_t avrcp_target_cb;
 static gpointer avrcp_target_cb_data;
+static bluez_avrcp_shuffle_cb_t avrcp_shuffle_cb;
+static gpointer avrcp_shuffle_cb_data;
+static bluez_avrcp_repeat_cb_t avrcp_repeat_cb;
+static gpointer avrcp_repeat_cb_data;
 static bluez_audio_state_cb_t audio_state_cb;
 static gpointer audio_state_cb_data;
 static bluez_nap_connection_state_cb_t nap_connnection_state_cb;
@@ -2036,10 +2040,36 @@ void bluez_set_avrcp_target_cb(bluez_avrcp_target_cb_t cb,
 	avrcp_target_cb_data = user_data;
 }
 
-void bluez_unset_avrcp_target_cb()
+void bluez_unset_avrcp_target_cb(void)
 {
 	avrcp_target_cb = NULL;
 	avrcp_target_cb_data = NULL;
+}
+
+void bluez_set_avrcp_shuffle_cb(bluez_avrcp_shuffle_cb_t cb,
+						gpointer user_data)
+{
+	avrcp_shuffle_cb = cb;
+	avrcp_shuffle_cb_data = user_data;
+}
+
+void bluez_unset_avrcp_shuffle_cb(void)
+{
+	avrcp_shuffle_cb = NULL;
+	avrcp_shuffle_cb_data = NULL;
+}
+
+void bluez_set_avrcp_repeat_cb(bluez_avrcp_repeat_cb_t cb,
+						gpointer user_data)
+{
+	avrcp_repeat_cb = cb;
+	avrcp_repeat_cb_data = user_data;
+}
+
+void bluez_unset_avrcp_repeat_cb(void)
+{
+	avrcp_repeat_cb = NULL;
+	avrcp_repeat_cb_data = NULL;
 }
 
 void bluez_set_nap_connection_state_cb(
@@ -3825,7 +3855,7 @@ static int bluez_avrcp_set_interal_property(struct _bluez_adapter *adapter,
 		return -1;
 	}
 
-	return -1;
+	return 0;
 }
 
 int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
@@ -3896,7 +3926,7 @@ int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
 		}
 	}
 
-	return -1;
+	return 0;
 }
 
 int bluez_media_player_change_property(struct _bluez_adapter *adapter,
@@ -3938,22 +3968,217 @@ int bluez_media_player_set_properties(struct _bluez_adapter *adapter,
 {
 
 	if (bluez_avrcp_set_interal_property(adapter,
-				LOOPSTATUS, properties) != 1)
+				LOOPSTATUS, properties) != 0)
 		return -1;
 
 	if (bluez_avrcp_set_interal_property(adapter,
-				SHUFFLE, properties) != 1)
+				SHUFFLE, properties) != 0)
 		return -1;
 
 	if (bluez_avrcp_set_interal_property(adapter,
-				PLAYBACKSTATUS, properties) != 1)
+				PLAYBACKSTATUS, properties) != 0)
 		return -1;
 
 	if (bluez_avrcp_set_interal_property(adapter,
-				POSITION, properties) != 1)
+				POSITION, properties) != 0)
 		return -1;
 
 	return 0;
+}
+
+static gboolean handle_set_property(GDBusConnection *connection,
+				const gchar *sender,
+				const gchar *object_path,
+				const gchar *interface_name,
+				const gchar *property_name,
+				GVariant *value,
+				GError **error,
+				gpointer user_data)
+{
+	if (g_strcmp0(property_name, "LoopStatus") == 0) {
+		const gchar *loopstatus =
+				g_variant_get_string(value, NULL);
+		DBG("loopstatus = %s", loopstatus);
+
+		if (avrcp_repeat_cb)
+			avrcp_repeat_cb(loopstatus, avrcp_repeat_cb_data);
+	} else if (g_strcmp0(property_name, "Shuffle") == 0) {
+		gboolean shuffle_mode = g_variant_get_boolean(value);
+		if (shuffle_mode == TRUE)
+			DBG("shuffle_mode TRUE");
+		else
+			DBG("shuffle_mode FALSE");
+
+		if (avrcp_shuffle_cb)
+			avrcp_shuffle_cb(shuffle_mode, avrcp_shuffle_cb_data);
+	}
+
+	return *error == NULL;
+}
+
+static const gchar introspection_xml[] =
+	"<node>"
+	"  <interface name='org.mpris.MediaPlayer2.Player'>"
+	"    <property type='b' name='Shuffle' access='readwrite'/>"
+	"    <property type='s' name='LoopStatus' access='readwrite'/>"
+	"  </interface>"
+	"</node>";
+
+static const GDBusInterfaceVTable interface_vtable = {
+	NULL,
+	NULL,
+	handle_set_property
+};
+
+static GDBusNodeInfo *introspection_data;
+
+static guint _bluez_register_avrcp_property(struct _bluez_adapter *adapter)
+{
+	guint rid;
+	GDBusConnection  *conn;
+
+	conn = g_dbus_proxy_get_connection(adapter->media_proxy);
+
+	introspection_data = g_dbus_node_info_new_for_xml(introspection_xml,
+								NULL);
+
+	rid = g_dbus_connection_register_object(conn, BT_MEDIA_OBJECT_PATH,
+					introspection_data->interfaces[0],
+					&interface_vtable,
+					NULL,
+					NULL,
+					NULL);
+
+	return rid;
+}
+
+static void _bluez_unregister_avrcp_property(
+					struct _bluez_adapter *adapter,
+					int avrcp_registration_id)
+{
+	GDBusConnection  *conn;
+
+	conn = g_dbus_proxy_get_connection(adapter->media_proxy);
+
+	g_dbus_connection_unregister_object(conn,
+					avrcp_registration_id);
+}
+
+int bluez_media_register_player(struct _bluez_adapter *adapter)
+{
+	GError *error = NULL;
+	GVariant *str_array[1];
+	GVariant *val_array;
+	GVariant *val_metadata;
+
+	GVariantBuilder *builder;
+	GVariantBuilder *builder_array;
+
+	DBG("+");
+
+	if (adapter == NULL) {
+		ERROR("adapter is NULL");
+		return -1;
+	}
+
+	if (adapter->media_proxy == NULL) {
+		ERROR("adapter->mediaprooxy is NULL");
+		return -1;
+	}
+
+	builder = g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
+	builder_array = g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
+
+	GVariant *val = g_variant_new("s", "None");
+	g_variant_builder_add(builder, "{sv}", "LoopStatus", val);
+
+	val = g_variant_new("b", FALSE);
+	g_variant_builder_add(builder, "{sv}", "Shuffle", val);
+
+	val = g_variant_new("s", "Stopped");
+	g_variant_builder_add(builder, "{sv}", "PlaybackStatus", val);
+
+	val = g_variant_new("x", 0);
+	g_variant_builder_add(builder, "{sv}", "Position", val);
+
+	val = g_variant_new_string("\0");
+	str_array[0] = val;
+	val_array = g_variant_new_array(G_VARIANT_TYPE_STRING, str_array, 1);
+	g_variant_builder_add(builder_array, "{sv}", "xesam:artist", val_array);
+
+	val = g_variant_new_string("\0");
+	str_array[0] = val;
+	val_array = g_variant_new_array(G_VARIANT_TYPE_STRING, str_array, 1);
+	g_variant_builder_add(builder_array, "{sv}", "xesam:genre", val_array);
+
+	val = g_variant_new("s", "\0");
+	g_variant_builder_add(builder_array, "{sv}", "xesam:title", val);
+
+	val = g_variant_new("i", 0);
+	g_variant_builder_add(builder_array, "{sv}", "xesam:trackNumber", val);
+
+	val = g_variant_new("s", "\0");
+	g_variant_builder_add(builder_array, "{sv}", "xesam:album", val);
+
+	val = g_variant_new("x", 0);
+	g_variant_builder_add(builder_array, "{sv}", "mpris:length", val);
+
+	val_metadata = g_variant_new("a{sv}", builder_array);
+	g_variant_builder_add(builder, "{sv}", "Metadata", val_metadata);
+
+	if (adapter->avrcp_registration_id == 0)
+		adapter->avrcp_registration_id =
+			_bluez_register_avrcp_property(adapter);
+
+	g_dbus_proxy_call_sync(adapter->media_proxy,
+			"RegisterPlayer",
+			g_variant_new("(oa{sv})",
+				BT_MEDIA_OBJECT_PATH, builder),
+			0, -1, NULL, &error);
+
+	if (error) {
+		ERROR("%s", error->message);
+		g_error_free(error);
+
+		if (adapter->avrcp_registration_id)
+			_bluez_unregister_avrcp_property(adapter,
+					adapter->avrcp_registration_id);
+
+		adapter->avrcp_registration_id = 0;
+		return -1;
+	}
+
+	DBG("-");
+	return 0;
+}
+
+void bluez_media_unregister_player(struct _bluez_adapter *adapter)
+{
+	DBG("+");
+
+	if (adapter == NULL) {
+		ERROR("adapter is NULL");
+		return;
+	}
+
+	if (adapter->media_proxy == NULL) {
+		ERROR("adapter->mediaprooxy is NULL");
+		return;
+	}
+
+	g_dbus_proxy_call_sync(adapter->media_proxy,
+			"UnregisterPlayer",
+			g_variant_new("(o)", BT_MEDIA_OBJECT_PATH),
+			0, -1, NULL, NULL);
+
+	if (adapter->avrcp_registration_id)
+		_bluez_unregister_avrcp_property(adapter,
+				adapter->avrcp_registration_id);
+
+	adapter->avrcp_registration_id = 0;
+
+	DBG("-");
+	return;
 }
 
 static void bluez_device_connect_cb(GObject *source_object,
