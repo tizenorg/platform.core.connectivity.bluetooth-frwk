@@ -47,6 +47,8 @@
 #define AGENT_INTERFACE "org.bluez.Agent1"
 #define AGENT_OBJECT_PATH "/org/bluezlib/agent"
 
+#define WRITE_REQUEST "write"
+#define WRITE_COMMAND "write-without-response"
 static bool initialized;
 static bool bt_service_init;
 
@@ -204,6 +206,22 @@ struct nap_connection_state_changed_cb_node {
 	void *user_data;
 };
 
+struct char_read_value_cb_node {
+	bt_gatt_characteristic_read_cb cb;
+	void *user_data;
+};
+
+struct char_write_value_cb_node {
+	bt_gatt_characteristic_write_cb cb;
+	void *user_data;
+};
+
+struct char_changed_cb_node {
+	bt_gatt_characteristic_changed_cb cb;
+	char *object_path;
+	void *user_data;
+};
+
 static struct device_connect_cb_node *device_connect_node;
 static struct device_disconnect_cb_node *device_disconnect_node;
 static struct avrcp_repeat_mode_changed_node *avrcp_repeat_node;
@@ -237,8 +255,21 @@ static struct socket_connection_state_changed_cb_node
 static struct hid_host_connection_state_changed_cb_node *hid_host_state_node;
 static struct nap_connection_state_changed_cb_node
 				*nap_connection_state_changed_node;
+static struct char_read_value_cb_node *char_read_value_node;
+static struct char_write_value_cb_node *char_write_value_node;
 
 static gboolean generic_device_removed_set;
+
+static GList *char_changed_node_list;
+
+static int service_by_path_cmp(gconstpointer a, gconstpointer b)
+{
+	const struct char_changed_cb_node *node_data = a;
+	const char *service_path = b;
+	const char *object_path = node_data->object_path;
+
+	return strcmp(service_path, object_path);
+}
 
 static void divide_device_class(bt_class_s *bt_class, unsigned int class)
 {
@@ -492,6 +523,55 @@ static void bluez_nap_connection_changed(gboolean connected,
 			interface_name, data->user_data);
 }
 
+static void bluez_char_read_received_changed(
+				struct _bluez_gatt_char *characteristic,
+				unsigned char *value_array,
+				int value_length,
+				void *user_data)
+{
+	struct char_read_value_cb_node *data = user_data;
+
+	if (data->cb)
+		data->cb(value_array, value_length,
+			data->user_data);
+
+	g_free(char_read_value_node);
+	char_read_value_node = NULL;
+}
+
+static void bluez_char_write_received_changed(
+				struct _bluez_gatt_char *characteristic,
+				void *user_data)
+{
+	struct char_write_value_cb_node *data = user_data;
+	char *gatt_char_path;
+
+	gatt_char_path = bluez_gatt_char_get_object_path(characteristic);
+
+	if (data->cb)
+		data->cb(gatt_char_path);
+
+	g_free(char_write_value_node);
+	char_write_value_node = NULL;
+}
+
+static void bluez_char_value_changed(
+				struct _bluez_gatt_char *characteristic,
+				unsigned char *value_array,
+				int value_length,
+				void *user_data)
+{
+	struct char_changed_cb_node *data = user_data;
+	char *gatt_char_path;
+
+	gatt_char_path = bluez_gatt_char_get_object_path(characteristic);
+
+	if (data->cb)
+		data->cb(gatt_char_path,
+			value_array, value_length,
+			data->user_data);
+}
+
 static void bluez_set_data_received_changed(
 				unsigned int channel,
 				const char *data,
@@ -740,6 +820,30 @@ static void foreach_device_property_callback(GList *list, unsigned int flag)
 		else
 			unset_device_property_changed_callback(device);
 	}
+}
+
+static void foreach_characteristic_property_callback(GList *list,
+						void *user_data)
+{
+	struct char_changed_cb_node *node_data = user_data;
+	bluez_gatt_char_t *characteristic;
+	GList *iter, *next;
+
+	DBG("");
+
+	for (iter = g_list_first(list); iter; iter = next) {
+		next = g_list_next(iter);
+
+		characteristic = iter->data;
+
+		if (node_data)
+			bluez_set_char_value_changed_cb(characteristic,
+						bluez_char_value_changed,
+						node_data);
+		else
+			bluez_unset_char_value_changed_cb(characteristic);
+	}
+
 }
 
 static void bluez_device_created(bluez_device_t *device, void *user_data)
@@ -993,8 +1097,18 @@ static void _bt_update_bluetooth_callbacks(void)
 
 	if (nap_connection_state_changed_node)
 		bluez_set_nap_connection_state_cb(
-				bluez_nap_connection_changed,
-				nap_connection_state_changed_node);
+					bluez_nap_connection_changed,
+					nap_connection_state_changed_node);
+
+	if (char_read_value_node)
+		bluez_set_char_read_value_cb(
+					bluez_char_read_received_changed,
+					char_read_value_node);
+
+	if (char_write_value_node)
+		bluez_set_char_write_value_cb(
+					bluez_char_write_received_changed,
+					char_write_value_node);
 }
 
 static void setup_bluez_lib(void)
@@ -1057,6 +1171,8 @@ int bt_initialize(void)
 				_bt_service_bt_in_service_watch, NULL);
 
 	bt_service_init = TRUE;
+
+	char_changed_node_list = NULL;
 
 	setup_bluez_lib();
 
@@ -2203,7 +2319,7 @@ int bt_device_set_authorization_changed_cb(
 
 	node = g_new0(struct device_auth_cb_node, 1);
 	if (node == NULL) {
-		ERROR("no memeroy");
+		ERROR("no memory");
 		return BT_ERROR_OPERATION_FAILED;
 	}
 
@@ -5309,7 +5425,6 @@ int bt_gatt_foreach_primary_services(const char *remote_address,
 		return BT_ERROR_OPERATION_FAILED;
 
 	primary_services = bluez_device_get_primary_services(device);
-
 	if (primary_services == NULL)
 		return BT_ERROR_OPERATION_FAILED;
 
@@ -5325,6 +5440,56 @@ int bt_gatt_foreach_primary_services(const char *remote_address,
 	g_list_free(primary_services);
 
 	return BT_SUCCESS;
+}
+
+int bt_gatt_discover_characteristics(bt_gatt_attribute_h service,
+				bt_gatt_characteristics_discovered_cb callback,
+				void *user_data)
+{
+	bluez_gatt_service_t *gatt_service;
+	GList *characteristics, *list, *next;
+	guint total;
+	const char *service_path = service;
+	char *gatt_char_path;
+	int index = 0;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (service_path == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	gatt_service = bluez_gatt_get_service_by_path(service_path);
+	if (gatt_service == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	characteristics = bluez_gatt_service_get_char_paths(gatt_service);
+	if (characteristics == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	total = g_list_length(characteristics);
+
+	for (list = g_list_first(characteristics); list; list = next) {
+		gatt_char_path = list->data;
+
+		next = g_list_next(list);
+
+		if (!callback(0, index, (int)total,
+			(bt_gatt_attribute_h)gatt_char_path, user_data))
+			break;
+
+		index++;
+	}
+
+	g_list_free(characteristics);
+
+	return BT_SUCCESS;
+
 }
 
 int bt_gatt_get_service_uuid(bt_gatt_attribute_h service, char **uuid)
@@ -5344,7 +5509,6 @@ int bt_gatt_get_service_uuid(bt_gatt_attribute_h service, char **uuid)
 		return BT_ERROR_INVALID_PARAMETER;
 
 	gatt_service = bluez_gatt_get_service_by_path(service_path);
-
 	if (gatt_service == NULL)
 		return BT_ERROR_OPERATION_FAILED;
 
@@ -5374,14 +5538,12 @@ int bt_gatt_foreach_included_services(bt_gatt_attribute_h service,
 		return BT_ERROR_INVALID_PARAMETER;
 
 	gatt_service = bluez_gatt_get_service_by_path(service_path);
-
 	if (gatt_service == NULL)
 		return BT_ERROR_OPERATION_FAILED;
 
 	includes = bluez_gatt_service_get_property_includes(gatt_service);
-
 	if (includes == NULL) {
-		DBG("No include services found in service handle");
+		DBG("No include services found in this service handle");
 		return BT_SUCCESS;
 	}
 
@@ -5392,7 +5554,232 @@ int bt_gatt_foreach_included_services(bt_gatt_attribute_h service,
 			break;
 	}
 
+	for (index = 0; index < length; index++)
+		g_free(includes[index]);
+
+	g_free(includes);
+
 	return BT_SUCCESS;
+}
+
+int bt_gatt_set_characteristic_changed_cb(bt_gatt_attribute_h service,
+				bt_gatt_characteristic_changed_cb callback,
+				void *user_data)
+{
+	bluez_gatt_service_t *gatt_service;
+	const char *service_path = service;
+	struct char_changed_cb_node *node_data;
+	GList *characteristics;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (service_path == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (char_changed_node_list) {
+		if (g_list_find_custom(char_changed_node_list,
+					service_path,
+					service_by_path_cmp)){
+			DBG("changed callback already set in this service.");
+			return BT_ERROR_ALREADY_DONE;
+		}
+	}
+
+	gatt_service = bluez_gatt_get_service_by_path(service_path);
+	if (gatt_service == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	characteristics = bluez_gatt_service_get_chars(gatt_service);
+	if (characteristics == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	node_data = g_new0(struct char_changed_cb_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->cb = callback;
+	node_data->user_data = user_data;
+	node_data->object_path =
+		bluez_gatt_service_get_object_path(gatt_service);
+
+	char_changed_node_list =
+		g_list_append(char_changed_node_list, node_data);
+
+	foreach_characteristic_property_callback(characteristics, node_data);
+
+	return BT_SUCCESS;
+}
+
+int bt_gatt_unset_characteristic_changed_cb(bt_gatt_attribute_h service)
+{
+	bluez_gatt_service_t *gatt_service;
+	const char *service_path = service;
+	struct char_changed_cb_node *node_data;
+	GList *found, *characteristics;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (service_path == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (char_changed_node_list) {
+		found = g_list_find_custom(char_changed_node_list,
+					service_path,
+					service_by_path_cmp);
+		if (found)
+			node_data = found->data;
+		else {
+			DBG("changed callback already unset in this service.");
+			return BT_ERROR_ALREADY_DONE;
+		}
+
+	} else
+		return BT_ERROR_OPERATION_FAILED;
+
+	gatt_service = bluez_gatt_get_service_by_path(service_path);
+	if (gatt_service == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	characteristics = bluez_gatt_service_get_chars(gatt_service);
+	if (characteristics == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	char_changed_node_list =
+			g_list_remove(char_changed_node_list, found);
+
+	g_free(node_data);
+
+	foreach_characteristic_property_callback(characteristics, NULL);
+
+	return BT_SUCCESS;
+}
+
+int bt_gatt_get_characteristic_declaration(bt_gatt_attribute_h characteristic,
+				char **uuid, unsigned char **value,
+				int *value_length)
+{
+	bluez_gatt_char_t *gatt_char;
+	const char *gatt_char_path = characteristic;
+	GByteArray *gb_array;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (gatt_char_path == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	gatt_char = bluez_gatt_get_char_by_path(gatt_char_path);
+	if (gatt_char == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	*uuid = bluez_gatt_char_get_property_uuid(gatt_char);
+
+	gb_array = bluez_gatt_char_get_property_value(gatt_char);
+	if (gb_array == NULL) {
+		DBG("Characterisitc is not sync with remote device,"
+			" please read value");
+		*value_length = 0;
+
+		return BT_SUCCESS;
+	}
+
+	*value = g_malloc0(gb_array->len * sizeof(unsigned char));
+
+	memcpy(*value, gb_array->data, gb_array->len);
+
+	*value_length = gb_array->len;
+
+	g_byte_array_unref(gb_array);
+
+	return BT_SUCCESS;
+}
+
+int bt_gatt_set_characteristic_value_request(bt_gatt_attribute_h characteristic,
+				const unsigned char *value,
+				int value_length,
+				unsigned char request,
+				bt_gatt_characteristic_write_cb callback)
+{
+	bluez_gatt_char_t *gatt_char;
+	const char *gatt_char_path = characteristic;
+	struct char_write_value_cb_node *node_data;
+	guint length, index;
+	char **flags;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (gatt_char_path == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	gatt_char = bluez_gatt_get_char_by_path(gatt_char_path);
+	if (gatt_char == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	flags = bluez_gatt_char_property_get_flags(gatt_char);
+	length = g_strv_length(flags);
+
+	for (index = 0; index < length; ++index) {
+		if (((strcmp(flags[index], WRITE_REQUEST) == 0) &&
+			request) ||
+			((strcmp(flags[index], WRITE_COMMAND) == 0) &&
+			!request))
+			break;
+
+		if (index == length - 1)
+			return BT_ERROR_OPERATION_FAILED;
+	}
+
+	if (request) {
+		if (char_write_value_node) {
+			DBG("characteristic write callback already set.");
+			return BT_ERROR_ALREADY_DONE;
+		}
+
+		node_data = g_new0(struct char_write_value_cb_node, 1);
+		if (node_data == NULL) {
+			ERROR("no memory");
+			return BT_ERROR_OUT_OF_MEMORY;
+		}
+
+		node_data->cb = callback;
+		node_data->user_data = NULL;
+
+		char_write_value_node = node_data;
+
+		_bt_update_bluetooth_callbacks();
+	}
+
+	bluez_gatt_write_char_value(gatt_char, value, value_length, request);
+
+	g_strfreev(flags);
+
+	return BT_SUCCESS;
+
 }
 
 int bt_gatt_clone_attribute_handle(bt_gatt_attribute_h *clone,
@@ -5431,3 +5818,49 @@ int bt_gatt_destroy_attribute_handle(bt_gatt_attribute_h handle)
 
 	return BT_SUCCESS;
 }
+
+int bt_gatt_read_characteristic_value(bt_gatt_attribute_h characteristic,
+		bt_gatt_characteristic_read_cb callback)
+{
+	bluez_gatt_char_t *gatt_char;
+	const char *gatt_char_path = characteristic;
+	struct char_read_value_cb_node *node_data;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (gatt_char_path == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	gatt_char = bluez_gatt_get_char_by_path(gatt_char_path);
+	if (gatt_char == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	if (char_read_value_node) {
+		DBG("characteristic read callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
+
+	node_data = g_new0(struct char_read_value_cb_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->cb = callback;
+	node_data->user_data = NULL;
+
+	char_read_value_node = node_data;
+
+	_bt_update_bluetooth_callbacks();
+
+	bluez_gatt_read_char_value(gatt_char);
+
+	return BT_SUCCESS;
+}
+

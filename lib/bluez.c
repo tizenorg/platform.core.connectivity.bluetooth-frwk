@@ -207,6 +207,8 @@ struct _bluez_gatt_char {
 	struct _bluez_object *parent;
 	struct _gatt_char_head *head;
 	struct _gatt_desc_head *desc_head;
+	bluez_gatt_char_value_changed_cb_t value_changed_cb;
+	gpointer value_changed_cb_data;
 };
 
 struct _bluez_gatt_desc {
@@ -251,7 +253,20 @@ static device_connect_cb_t dev_connect_cb;
 static gpointer dev_connect_data;
 static device_disconnect_cb_t dev_disconnect_cb;
 static gpointer dev_disconnect_data;
+static char_read_value_cb_t char_read_calue_cb;
+static gpointer char_read_data;
+static char_write_value_cb_t char_write_calue_cb;
+static gpointer char_write_data;
 
+struct gatt_char_read_notify {
+	struct _bluez_gatt_char *characteristic;
+	char_read_value_cb_t cb;
+};
+
+struct gatt_char_write_notify {
+	struct _bluez_gatt_char *characteristic;
+	char_write_value_cb_t cb;
+};
 static void free_discovery_device_info(
 		adapter_device_discovery_info_t *discovery_device_info)
 {
@@ -842,14 +857,57 @@ static void gatt_service_properties_changed(GDBusProxy *proxy,
 	g_free(properties);
 }
 
+static void handle_gatt_char_value_changed(GVariant *changed_properties,
+				struct _bluez_gatt_char *charateristic)
+{
+	GVariant *variant_found;
+	GByteArray *gb_array = NULL;
+	GVariantIter *iter;
+	guchar g_value;
+	unsigned char *value_array;
+	int value_length;
+
+	DBG("");
+
+	variant_found = g_variant_lookup_value(changed_properties,
+						"Value",
+						G_VARIANT_TYPE_BYTESTRING);
+	if (!variant_found)
+		return;
+
+	g_variant_get(variant_found, "ay", &iter);
+
+	gb_array = g_byte_array_new();
+
+	while (g_variant_iter_loop(iter, "y", &g_value)) {
+		g_byte_array_append(gb_array, &g_value,
+					sizeof(unsigned char));
+	}
+
+	value_array = g_malloc0(gb_array->len * sizeof(unsigned char));
+
+	memcpy(value_array, gb_array->data, gb_array->len);
+	value_length = gb_array->len;
+
+	charateristic->value_changed_cb(charateristic,
+				value_array, value_length,
+				charateristic->value_changed_cb_data);
+
+	g_byte_array_unref(gb_array);
+}
+
 static void gatt_char_properties_changed(GDBusProxy *proxy,
 					GVariant *changed_properties,
 					GStrv *invalidated_properties,
 					gpointer user_data)
 {
+	struct _bluez_gatt_char *charateristic = user_data;
 	gchar *properties = g_variant_print(changed_properties, TRUE);
 
 	DBG("properties %s", properties);
+
+	if (charateristic->value_changed_cb)
+		handle_gatt_char_value_changed(changed_properties, user_data);
 
 	g_free(properties);
 }
@@ -1333,6 +1391,29 @@ char *bluez_gatt_service_get_property_uuid(
 					GATT_SERVICE_IFACE, "UUID");
 }
 
+char *bluez_gatt_char_get_property_uuid(
+				struct _bluez_gatt_char *characteristic)
+{
+	return property_get_string(characteristic->property_proxy,
+					GATT_CHR_IFACE, "UUID");
+}
+
+int bluez_gatt_char_get_property_notifying(
+				struct _bluez_gatt_char *characteristic,
+				gboolean *notifying)
+{
+	return property_get_boolean(characteristic->property_proxy,
+					GATT_CHR_IFACE,
+					"Notifying", notifying);
+}
+
+GByteArray *bluez_gatt_char_get_property_value(
+				struct _bluez_gatt_char *characteristic)
+{
+	return property_get_bytestring(characteristic->property_proxy,
+					GATT_CHR_IFACE, "Value");
+}
+
 char *bluez_gatt_char_property_get_service(
 				struct _bluez_gatt_char *characteristic)
 {
@@ -1340,11 +1421,30 @@ char *bluez_gatt_char_property_get_service(
 					GATT_CHR_IFACE, "Service");
 }
 
+char **bluez_gatt_char_property_get_flags(
+				struct _bluez_gatt_char *characteristic)
+{
+	return property_get_string_list(characteristic->property_proxy,
+					GATT_CHR_IFACE, "Flags");
+}
+
 char *bluez_gatt_desc_property_get_char(
 				struct _bluez_gatt_desc *descriptor)
 {
 	return property_get_string(descriptor->property_proxy,
 				GATT_DESCRIPTOR_IFACE, "Characteristic");
+}
+
+char *bluez_gatt_service_get_object_path(
+				struct _bluez_gatt_service *service)
+{
+	return service->object_path;
+}
+
+char *bluez_gatt_char_get_object_path(
+				struct _bluez_gatt_char *characteristic)
+{
+	return characteristic->object_path;
 }
 
 struct _bluez_gatt_service *bluez_gatt_get_service_by_path(
@@ -1369,6 +1469,186 @@ struct _bluez_gatt_service *bluez_gatt_get_service_by_path(
 	return service;
 }
 
+GList *bluez_gatt_service_get_char_paths(struct _bluez_gatt_service *service)
+{
+	struct _gatt_char_head *char_head = service->char_head;
+	GList *characteristics = NULL;
+
+	characteristics = g_hash_table_get_keys(char_head->gatt_char_hash);
+
+	return characteristics;
+}
+
+GList *bluez_gatt_service_get_chars(struct _bluez_gatt_service *service)
+{
+	struct _gatt_char_head *char_head = service->char_head;
+	GList *characteristics = NULL;
+
+	characteristics = g_hash_table_get_values(char_head->gatt_char_hash);
+
+	return characteristics;
+}
+
+struct _bluez_gatt_char *bluez_gatt_get_char_by_path(
+				const char *gatt_char_path)
+{
+	struct _gatt_char_head *head = NULL;
+	struct _bluez_gatt_char *characteristic = NULL;
+	GList *list, *next;
+
+	for (list = g_list_first(gatt_char_head_list); list; list = next) {
+		head = list->data;
+
+		next = g_list_next(list);
+
+		characteristic = g_hash_table_lookup(head->gatt_char_hash,
+					(gconstpointer) gatt_char_path);
+
+		if (characteristic != NULL)
+			break;
+	}
+
+	return characteristic;
+}
+
+static void char_read_value_callback(GObject *source_object,
+						GAsyncResult *res,
+						gpointer user_data)
+{
+	struct gatt_char_read_notify *notify = user_data;
+	struct _bluez_gatt_char *characteristic;
+	GVariant *ret;
+	GByteArray *gb_array = NULL;
+	GError *error = NULL;
+	GVariantIter *iter;
+	guchar g_value;
+	unsigned char *value_array;
+	int value_length;
+
+	DBG("");
+
+	characteristic = notify->characteristic;
+
+	ret = g_dbus_proxy_call_finish(characteristic->proxy,
+					res, &error);
+
+	if (ret == NULL)
+		DBG("error: %s", error->message);
+	else {
+		g_variant_get(ret, "(ay)", &iter);
+
+		gb_array = g_byte_array_new();
+
+		while (g_variant_iter_loop(iter, "y", &g_value)) {
+			g_byte_array_append(gb_array, &g_value,
+						sizeof(unsigned char));
+		}
+
+		value_array = g_malloc0(gb_array->len * sizeof(unsigned char));
+
+		memcpy(value_array, gb_array->data, gb_array->len);
+		value_length = gb_array->len;
+
+		notify->cb(characteristic, value_array,
+				value_length, char_read_data);
+
+		g_byte_array_unref(gb_array);
+		g_variant_unref(ret);
+	}
+
+	g_free(notify);
+}
+
+void bluez_gatt_read_char_value(struct _bluez_gatt_char *characteristic)
+{
+	struct gatt_char_read_notify *notify;
+
+	notify = g_try_new0(struct gatt_char_read_notify, 1);
+	if (notify == NULL) {
+		ERROR("no memory");
+		return;
+	}
+
+	notify->characteristic = characteristic;
+	notify->cb = char_read_calue_cb;
+
+	g_dbus_proxy_call(characteristic->proxy,
+			"ReadValue", NULL,
+			0, -1, NULL,
+			char_read_value_callback, notify);
+}
+
+static void char_write_value_callback(GObject *source_object,
+						GAsyncResult *res,
+						gpointer user_data)
+{
+	struct gatt_char_write_notify *notify = user_data;
+	struct _bluez_gatt_char *characteristic;
+	GVariant *ret;
+	GError *error = NULL;
+
+	DBG("");
+
+	characteristic = notify->characteristic;
+
+	ret = g_dbus_proxy_call_finish(characteristic->proxy,
+					res, &error);
+
+	if (ret == NULL)
+		DBG("error: %s", error->message);
+	else {
+		notify->cb(characteristic, char_write_data);
+
+		g_variant_unref(ret);
+	}
+
+	g_free(notify);
+}
+
+void bluez_gatt_write_char_value(struct _bluez_gatt_char *characteristic,
+				const unsigned char *value,
+				int value_length,
+				unsigned char request)
+{
+	GVariantBuilder *builder;
+	GVariant *parameters;
+	GError *error = NULL;
+	int i;
+
+	DBG("");
+
+	builder = g_variant_builder_new(G_VARIANT_TYPE("ay"));
+
+	for (i = 0; i < value_length; i++)
+		g_variant_builder_add(builder, "y", value[i]);
+
+	parameters = g_variant_new("(ay)", builder);
+
+	if (request) {
+		struct gatt_char_write_notify *notify;
+
+		notify = g_try_new0(struct gatt_char_write_notify, 1);
+		if (notify == NULL) {
+			ERROR("no memory");
+			return;
+		}
+
+		notify->characteristic = characteristic;
+		notify->cb = char_write_calue_cb;
+
+		g_dbus_proxy_call(characteristic->proxy,
+				"WriteValue", parameters,
+				0, -1, NULL,
+				char_write_value_callback, notify);
+
+	} else {
+		g_dbus_proxy_call_sync(characteristic->proxy,
+				"WriteValue", parameters,
+				0, -1, NULL, &error);
+	}
+
+	g_variant_builder_unref(builder);
+}
 
 static void destruct_bluez_device(gpointer data)
 {
@@ -2033,6 +2313,40 @@ void bluez_set_device_disconnect_changed_cb(device_disconnect_cb_t cb,
 	dev_disconnect_data = user_data;
 }
 
+void bluez_set_char_read_value_cb(char_read_value_cb_t cb,
+					gpointer user_data)
+{
+	char_read_calue_cb = cb;
+	char_read_data = user_data;
+}
+
+void bluez_set_char_write_value_cb(char_write_value_cb_t cb,
+					gpointer user_data)
+{
+	char_write_calue_cb = cb;
+	char_write_data = user_data;
+}
+
+void bluez_set_char_value_changed_cb(
+				struct _bluez_gatt_char *characteristic,
+				bluez_gatt_char_value_changed_cb_t cb,
+				gpointer user_data)
+{
+	DBG("");
+
+	characteristic->value_changed_cb = cb;
+	characteristic->value_changed_cb_data = user_data;
+}
+
+void bluez_unset_char_value_changed_cb(
+				struct _bluez_gatt_char *characteristic)
+{
+	DBG("");
+
+	characteristic->value_changed_cb = NULL;
+	characteristic->value_changed_cb_data = NULL;
+}
+
 void bluez_set_avrcp_target_cb(bluez_avrcp_target_cb_t cb,
 						gpointer user_data)
 {
@@ -2242,7 +2556,9 @@ static void destruct_bluez_adapter(gpointer data)
 	g_free(adapter->interface_name);
 	g_free(adapter->object_path);
 	g_object_unref(adapter->interface);
+	g_object_unref(adapter->media_proxy);
 	g_object_unref(adapter->media_interface);
+	g_object_unref(adapter->netserver_proxy);
 	g_object_unref(adapter->netserver_interface);
 	g_object_unref(adapter->property_proxy);
 	g_object_unref(adapter->proxy);

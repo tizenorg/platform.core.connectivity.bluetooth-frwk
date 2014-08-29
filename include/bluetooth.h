@@ -3922,10 +3922,20 @@ int bt_gatt_get_characteristic_declaration(bt_gatt_attribute_h characteristic, c
 
 /**
  * @ingroup  CAPI_NETWORK_BLUETOOTH_GATT_MODULE
+ * @brief  Called when a characteristic value is written.
+ * @param[in]  characteristic  The attribute handle of characteristic
+ * @see bt_gatt_set_characteristic_value_request()
+ */
+typedef void (*bt_gatt_characteristic_write_cb) (bt_gatt_attribute_h handle);
+
+/**
+ * @ingroup  CAPI_NETWORK_BLUETOOTH_GATT_MODULE
  * @brief  Sets the value of characteristic.
  * @param[in]  characteristic  The attribute handle of characteristic
  * @param[in]  value  The value of characteristic (byte array)
  * @param[in]  value_length  The length of value
+ * @param[in]  request  Request type or command type
+ * @param[in]  callback  The result callback
  * @return  0 on success, otherwise a negative error value.
  * @retval  #BT_ERROR_NONE  Successful
  * @retval  #BT_ERROR_NOT_INITIALIZED  Not initialized
@@ -3935,7 +3945,8 @@ int bt_gatt_get_characteristic_declaration(bt_gatt_attribute_h characteristic, c
  * @see  bt_adapter_enable()
  * @see  bt_gatt_get_characteristic_declaration()
  */
-int bt_gatt_set_characteristic_value(bt_gatt_attribute_h characteristic, const unsigned char *value, int value_length);
+int bt_gatt_set_characteristic_value_request(bt_gatt_attribute_h characteristic, const unsigned char *value,
+				int value_length, unsigned char request, bt_gatt_characteristic_write_cb callback);
 
 /**
 * @ingroup  CAPI_NETWORK_BLUETOOTH_GATT_MODULE
@@ -3961,6 +3972,34 @@ int bt_gatt_clone_attribute_handle(bt_gatt_attribute_h* clone, bt_gatt_attribute
 * @see  bt_gatt_clone_attribute_handle()
 */
 int bt_gatt_destroy_attribute_handle(bt_gatt_attribute_h handle);
+
+/**
+ * @ingroup  CAPI_NETWORK_BLUETOOTH_GATT_MODULE
+ * @brief  Called when a characteristic value is read.
+ * @param[in]  value  The value of characteristic (byte array)
+ * @param[in]  value_length  The length of value
+ * @param[in]  user_data  The user data passed from the foreach function
+ * @see bt_gatt_read_characteristic_value()
+ */
+typedef void (*bt_gatt_characteristic_read_cb) (unsigned char *value,
+			int value_length, void *user_data);
+
+/**
+ * @ingroup  CAPI_NETWORK_BLUETOOTH_GATT_MODULE
+ * @brief  Reads the value of characteristic from remote device
+ * @param[in]  characteristic  The attribute handle of characteristic
+ * @param[in]  callback  The result callback
+ * @return	0 on success, otherwise a negative error value.
+ * @retval	#BT_ERROR_NONE	Successful
+ * @retval	#BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval	#BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval	#BT_ERROR_OPERATION_FAILED	Operation failed
+ * @pre  The state of local Bluetooth must be #BT_ADAPTER_ENABLED.
+ * @see  bt_adapter_enable()
+ * @see  bt_gatt_get_characteristic_declaration()
+ */
+int bt_gatt_read_characteristic_value(bt_gatt_attribute_h char_handle,
+		bt_gatt_characteristic_read_cb callback);
 
 /**
  * @ingroup  CAPI_NETWORK_BLUETOOTH_AGENT_MODULE
