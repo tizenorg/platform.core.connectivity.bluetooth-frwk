@@ -2242,6 +2242,41 @@ static int gatt_foreach_primary_services(const char *p1, const char *p2)
 	return 0;
 }
 
+
+static bool gatt_characteristics_callback(int result, int index, int total,
+					bt_gatt_attribute_h characteristic,
+					void *user_data)
+{
+	const char *gatt_char_handle = characteristic;
+
+	DBG("CAPI Result is %d", result);
+
+	DBG("The index %d Characteristic found", index);
+
+	DBG("Total characteristic is %d", total);
+
+	DBG("Characteristic found %s", gatt_char_handle);
+
+	return TRUE;
+}
+
+static int gatt_discover_characteristics(const char *p1, const char *p2)
+{
+	int ret;
+
+	if (p1 == NULL) {
+		ERROR("gatt characteristics must give the service_handle");
+		return 0;
+	}
+
+	ret = bt_gatt_discover_characteristics((bt_gatt_attribute_h)p1,
+				gatt_characteristics_callback, NULL);
+
+	DBG("ret = %d", ret);
+
+	return 0;
+}
+
 static int gatt_get_service_uuid(const char *p1, const char *p2)
 {
 	int ret;
@@ -2288,6 +2323,110 @@ static int gatt_foreach_included_services(const char *p1, const char *p2)
 	return 0;
 }
 
+
+static void bt_gatt_char_changed_cb_test(bt_gatt_attribute_h characteristic,
+					unsigned char *value,
+					int value_length,
+					void *user_data)
+{
+	char *gatt_char_path = characteristic;
+	int i;
+
+	DBG("Characteristic handle %s", gatt_char_path);
+
+	for (i = 0; i < value_length; i++)
+		DBG("value %c", value[i]);
+
+	DBG("Value length %d", value_length);
+}
+
+static int gatt_set_characteristic_changed_cb(const char *p1, const char *p2)
+{
+	int ret;
+
+	if (p1 == NULL) {
+		ERROR("gatt set changed cb must give the service handle");
+		return 0;
+	}
+
+	ret = bt_gatt_set_characteristic_changed_cb(
+				(bt_gatt_attribute_h)p1,
+				bt_gatt_char_changed_cb_test,
+				NULL);
+
+	DBG("ret = %d", ret);
+
+	return 0;
+}
+
+static int gatt_unset_characteristic_changed_cb(const char *p1, const char *p2)
+{
+	int ret;
+
+	if (p1 == NULL) {
+		ERROR("gatt unset changed cb must give the service handle");
+		return 0;
+	}
+
+	ret = bt_gatt_unset_characteristic_changed_cb((bt_gatt_attribute_h)p1);
+
+	DBG("ret = %d", ret);
+
+	return 0;
+}
+
+static int gatt_get_characteristic_declaration(const char *p1, const char *p2)
+{
+	int ret;
+	char *uuid = NULL;
+	unsigned char *value = NULL;
+	int value_length, i;
+
+	if (p1 == NULL) {
+		ERROR("gatt declaration must give the charateristic handle");
+		return 0;
+	}
+
+	ret = bt_gatt_get_characteristic_declaration((bt_gatt_attribute_h)p1,
+				&uuid, &value, &value_length);
+
+	DBG("Characteristic uuid %s", uuid);
+
+	for (i = 0; i < value_length; i++)
+		DBG("value %c", value[i]);
+
+	DBG("Value length %d", value_length);
+
+	DBG("ret = %d", ret);
+
+	return 0;
+}
+
+void gatt_characteristic_write_callback(bt_gatt_attribute_h handle)
+{
+	char *gatt_char_path = handle;
+
+	DBG("Characteristic handle %s written successfully", gatt_char_path);
+}
+
+static int gatt_set_characteristic_value_request(const char *p1, const char *p2)
+{
+	unsigned char value[4] = { 0, 1, 2, 4};
+	int ret;
+
+	if (p1 == NULL) {
+		ERROR("gatt set value must give the charateristic handle");
+		return 0;
+	}
+
+	ret = bt_gatt_set_characteristic_value_request((bt_gatt_attribute_h)p1,
+			value, 4, 1, gatt_characteristic_write_callback);
+
+	DBG("ret = %d", ret);
+
+	return 0;
+}
+
 static int gatt_clone_and_destroy_attribute_handle(const char *p1, const char *p2)
 {
 	int ret;
@@ -2304,7 +2443,37 @@ static int gatt_clone_and_destroy_attribute_handle(const char *p1, const char *p
 
 	ret = bt_gatt_destroy_attribute_handle(clone);
 
-	DBG("destroy handle ret = %d", ret);
+	DBG("destroy handle %s", p1);
+
+	DBG("ret = %d", ret);
+
+	return 0;
+}
+
+static void gatt_characteristic_read_callback(unsigned char *value,
+			int value_length, void *user_data)
+{
+	int i;
+
+	for (i = 0; i < value_length; i++)
+		DBG("value %c", value[i]);
+
+	DBG("Value length %d", value_length);
+}
+
+static int gatt_read_characteristic_value(const char *p1, const char *p2)
+{
+	int ret;
+
+	if (p1 == NULL) {
+		ERROR("gatt read must give the charateristic handle");
+		return 0;
+	}
+
+	ret = bt_gatt_read_characteristic_value((bt_gatt_attribute_h)p1,
+				gatt_characteristic_read_callback);
+
+	DBG("ret = %d", ret);
 
 	return 0;
 }
@@ -2630,14 +2799,32 @@ struct {
 	{"gatt_foreach_primary_services", gatt_foreach_primary_services,
 		"Usage: gatt_foreach_primary_services\n\tgatt foreach primary services"},
 
+	{"gatt_discover_characteristics", gatt_discover_characteristics,
+		"Usage: gatt_discover_characteristics\n\tgatt_discover_characteristics"},
+
 	{"gatt_get_service_uuid", gatt_get_service_uuid,
 		"Usage: gatt_get_service_uuid\n\tgatt get service uuid"},
 
 	{"gatt_foreach_included_services", gatt_foreach_included_services,
 		"Usage: gatt_foreach_included_services\n\tgatt foreach included services"},
 
+	{"gatt_set_characteristic_changed_cb", gatt_set_characteristic_changed_cb,
+		"Usage: gatt_set_characteristic_changed_cb\n\tgatt set characteristic changed cb"},
+
+	{"gatt_unset_characteristic_changed_cb", gatt_unset_characteristic_changed_cb,
+		"Usage: gatt_unset_characteristic_changed_cb\n\tgatt unset characteristic changed cb"},
+
+	{"gatt_get_characteristic_declaration", gatt_get_characteristic_declaration,
+		"Usage: gatt_get_characteristic_declaration\n\tgatt get characteristic declaration"},
+
+	{"gatt_set_characteristic_value_request", gatt_set_characteristic_value_request,
+		"Usage: gatt_set_characteristic_value_request\n\tgatt set characteristic value request"},
+
 	{"gatt_clone_and_destroy_attribute_handle", gatt_clone_and_destroy_attribute_handle,
 		"Usage: gatt_clone_and_destroy_attribute_handle\n\tgatt clone and destroy attribute handle"},
+
+	{"gatt_read_characteristic_value", gatt_read_characteristic_value,
+		"Usage: gatt_read_characteristic_value\n\tgatt read characteristic value"},
 
 	{"q", quit,
 		"Usage: q\n\tQuit"},

@@ -241,6 +241,40 @@ char **property_get_object_list(GDBusProxy *proxy,
 	return objv;
 }
 
+GByteArray *property_get_bytestring(GDBusProxy *proxy,
+					const char *interface_name,
+					const char *property)
+{
+	GVariant *bytv_v, *bytv_vv;
+	GByteArray *gb_array = NULL;
+	GError *error = NULL;
+	GVariantIter *byt_iter;
+	guchar g_value;
+
+	bytv_vv = g_dbus_proxy_call_sync(
+			proxy, "Get",
+			g_variant_new("(ss)", interface_name, property),
+			0, -1, NULL, &error);
+
+	if (bytv_vv == NULL) {
+		WARN("no cached property %s", property);
+		return NULL;
+	}
+
+	g_variant_get(bytv_vv, "(v)", &bytv_v);
+
+	g_variant_get(bytv_v, "ay", &byt_iter);
+
+	gb_array = g_byte_array_new();
+
+	while (g_variant_iter_loop(byt_iter, "y", &g_value)) {
+		g_byte_array_append(gb_array, &g_value,
+					sizeof(unsigned char));
+	}
+
+	return gb_array;
+}
+
 void property_set_string(GDBusProxy *proxy,
 					const char *interface_name,
 					const char *property,
