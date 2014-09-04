@@ -3830,7 +3830,7 @@ static void notify_connection_state(gchar *device_path,
 
 	fd = g_io_channel_unix_get_fd(spp_ctx->channel);
 
-	if (spp_ctx->new_connection)
+	if (spp_ctx->new_connection && state == BT_SOCKET_CONNECTED)
 		spp_ctx->new_connection(spp_ctx->uuid, device_name,
 					fd, spp_ctx->new_connection_data);
 
@@ -3897,10 +3897,10 @@ static void handle_request_disconnection(gchar *device_path,
 
 	DBG("device path %s", device_path);
 
+	notify_connection_state(device_path, BT_SOCKET_DISCONNECTED, spp_ctx);
+
 	g_io_channel_unref(spp_ctx->channel);
 	spp_ctx->channel = NULL;
-
-	notify_connection_state(device_path, BT_SOCKET_DISCONNECTED, spp_ctx);
 
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
@@ -4517,8 +4517,6 @@ int bt_socket_set_connection_state_changed_cb(
 	node_data->user_data = user_data;
 
 	socket_connection_state_node = node_data;
-
-	return BT_SUCCESS;
 
 	return BT_SUCCESS;
 }
