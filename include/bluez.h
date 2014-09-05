@@ -259,14 +259,79 @@ char **bluez_adapter_get_property_uuids(
 char *bluez_gatt_service_get_property_uuid(
 				struct _bluez_gatt_service *service);
 
+char *bluez_gatt_char_get_property_uuid(
+				struct _bluez_gatt_char *characteristic);
+
+char *bluez_gatt_service_get_object_path(
+				struct _bluez_gatt_service *service);
+
+char *bluez_gatt_char_get_object_path(
+				struct _bluez_gatt_char *characteristic);
+
+char **bluez_gatt_char_property_get_flags(
+				struct _bluez_gatt_char *characteristic);
+
+int bluez_gatt_char_get_property_notifying(
+				struct _bluez_gatt_char *characteristic,
+				gboolean *notifying);
+
+GByteArray *bluez_gatt_char_get_property_value(
+				struct _bluez_gatt_char *characteristic);
+
 struct _bluez_gatt_service *bluez_gatt_get_service_by_path(
 				const char *service_path);
+
+struct _bluez_gatt_char *bluez_gatt_get_char_by_path(
+				const char *gatt_char_path);
 
 GList *bluez_device_get_primary_services(
 				struct _bluez_device *device);
 
 char **bluez_gatt_service_get_property_includes(
 				struct _bluez_gatt_service *service);
+
+GList *bluez_gatt_service_get_chars(
+				struct _bluez_gatt_service *service);
+
+GList *bluez_gatt_service_get_char_paths(
+				struct _bluez_gatt_service *service);
+typedef void (*char_read_value_cb_t)(
+				struct _bluez_gatt_char *characteristic,
+				unsigned char *value_array,
+				int value_length,
+				gpointer user_data);
+
+void bluez_set_char_read_value_cb(char_read_value_cb_t cb,
+					gpointer user_data);
+
+void bluez_gatt_read_char_value(struct _bluez_gatt_char *characteristic);
+
+typedef void (*bluez_gatt_char_value_changed_cb_t)(
+				bluez_gatt_char_t *characteristic,
+				unsigned char *value_array,
+				int value_length,
+				gpointer user_data);
+
+void bluez_set_char_value_changed_cb(
+				struct _bluez_gatt_char *characteristic,
+				bluez_gatt_char_value_changed_cb_t cb,
+				gpointer user_data);
+
+void bluez_unset_char_value_changed_cb(
+				struct _bluez_gatt_char *characteristic);
+
+void bluez_gatt_write_char_value(struct _bluez_gatt_char *characteristic,
+				const unsigned char *value,
+				int value_length,
+				unsigned char request);
+
+typedef void (*char_write_value_cb_t)(
+				struct _bluez_gatt_char *characteristic,
+				gpointer user_data);
+
+void bluez_set_char_write_value_cb(char_write_value_cb_t cb,
+					gpointer user_data);
+
 
 /* Returned Glist should not be freed and modified */
 const GList *bluez_adapter_get_devices_path(
