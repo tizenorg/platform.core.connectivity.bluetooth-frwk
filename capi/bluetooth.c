@@ -3432,6 +3432,8 @@ static void handle_spp_authorize_request(bluez_device_t *device,
 
 	spp_ctx->requestion = invocation;
 	spp_ctx->role = BT_SOCKET_SERVER;
+	if (spp_ctx->remote_address)
+		g_free(spp_ctx->remote_address);
 	spp_ctx->remote_address = g_strdup(device_address);
 
 	if (socket_connection_requested_node)
@@ -3946,6 +3948,9 @@ static void notify_connection_state(gchar *device_path,
 
 	device_name = bluez_device_get_property_alias(device);
 	address = bluez_device_get_property_address(device);
+
+	if (spp_ctx->remote_address == NULL)
+		spp_ctx->remote_address = g_strdup(address);
 
 	fd = g_io_channel_unix_get_fd(spp_ctx->channel);
 
