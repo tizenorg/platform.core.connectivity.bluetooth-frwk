@@ -1676,11 +1676,6 @@ static int socket_destroy(const char *p1, const char *p2)
 
 	DBG("");
 
-	if (p1 == NULL) {
-		ERROR("socket create must give the UUID");
-		return 0;
-	}
-
 	ret = bt_socket_destroy_rfcomm(socket_fd);
 	if (ret != BT_SUCCESS)
 		DBG("destroy socket failed");
@@ -2707,7 +2702,7 @@ struct {
 		"Usage: socket_create 00001101-0000-1000-8000-00805f9b34fb\n\tcreate socket with uuid"},
 
 	{"socket_destroy", socket_destroy,
-		"Usage: socket_destroy\n\tdestory spp"},
+		"Usage: socket_destroy\n\tdestroy spp"},
 
 	{"socket_set_connection_state_changed_cb", socket_set_connection_state_changed_cb,
 		"Usage: socket_set_connection_state_changed_cb\n\tset connection state changed callback"},

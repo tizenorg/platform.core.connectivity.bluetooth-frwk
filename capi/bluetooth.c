@@ -3895,6 +3895,9 @@ static gboolean received_data(GIOChannel *channel, GIOCondition con,
 	GIOStatus status;
 	gsize rbytes = 0;
 
+	if (!(con & G_IO_IN))
+		return FALSE;
+
 	spp_ctx = user_data;
 	if (spp_ctx == NULL) {
 		WARN("no spp find");
@@ -4015,8 +4018,11 @@ static void handle_request_disconnection(gchar *device_path,
 
 	notify_connection_state(device_path, BT_SOCKET_DISCONNECTED, spp_ctx);
 
-	g_io_channel_unref(spp_ctx->channel);
-	spp_ctx->channel = NULL;
+	if (spp_ctx->channel) {
+		g_io_channel_shutdown(spp_ctx->channel, TRUE, NULL);
+		g_io_channel_unref(spp_ctx->channel);
+		spp_ctx->channel = NULL;
+	}
 
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
