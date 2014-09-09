@@ -630,6 +630,7 @@ static void free_pairing_context(gpointer user_data)
 	g_free(context);
 }
 
+#ifndef TIZEN_COMMON
 static gboolean relay_agent_timeout_cb(gpointer user_data)
 {
 	ERROR("Relay agent timeout");
@@ -642,11 +643,11 @@ static gboolean relay_agent_timeout_cb(gpointer user_data)
 
 	return FALSE;
 }
+#endif
 
 #ifdef TIZEN_COMMON
 
 #define PASSKEY_SIZE 6
-#define PAIRING_TMEOUT (20 * 1000)
 
 static gchar* get_device_name_from_device_path(gchar* device_path)
 {
@@ -782,19 +783,19 @@ static void handle_pairing_agent_method_call(GDBusConnection *connection,
 		pairing_context = NULL;
 
 #ifdef TIZEN_COMMON
-		bundle* notification_bundle;
-		notification_bundle = fill_notification_bundle(method_name, parameters, relay_agent->object_path);
-		vertical_notify_bt_pairing_agent_on(notification_bundle);
+		bundle* b;
+		b = fill_notification_bundle(method_name, parameters, relay_agent->object_path);
+		vertical_notify_bt_pairing_agent_on(b);
 #endif
 		return;
 	}
 
 #ifndef TIZEN_COMMON
 	vertical_notify_bt_pairing_agent_on();
-#endif
 
-	relay_agent_timeout_id = g_timeout_add(PAIRING_TMEOUT,
+	relay_agent_timeout_id = g_timeout_add(5*1000,
 					relay_agent_timeout_cb, NULL);
+#endif
 }
 
 static const GDBusInterfaceVTable pairing_agent_vtable =
@@ -1167,6 +1168,12 @@ void bt_service_pairing_init(GDBusObjectSkeleton *gdbus_object_skeleton,
 				DISPLAY_YES_NO,
 				register_pairing_agent_cb,
 				connection);
+
+#ifdef TIZEN_COMMON
+	bundle* b = bundle_create();
+	bundle_add(b, "event-type", "RegisterPairingAgent");
+	vertical_notify_bt_pairing_agent_on(b);
+#endif
 }
 
 void bt_service_pairing_deinit(void)

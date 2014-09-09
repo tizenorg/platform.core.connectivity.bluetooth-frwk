@@ -38,6 +38,7 @@
 #define POPUP_TYPE_INFO  "user_info_popup"
 #define POPUP_TYPE_USERCONFIRM "user_confirm_popup"
 #define POPUP_TYPE_USERPROMPT "user_agreement_popup"
+#define REGISTER_PAIRING_AGENT_TITLE "register_pairing_agent"
 
 static int noti_id;
 static notification_h noti = NULL;
@@ -326,6 +327,15 @@ static int bt_pairing_agent_on(bundle* b)
 	notification_set_pkgname(noti, BT_AGENT_APP_NAME);
 
 	notification_set_execute_option(noti, NOTIFICATION_EXECUTE_TYPE_SINGLE_LAUNCH, NULL, NULL, b);
+
+  if (!g_strcmp0(event_type, "RegisterPairingAgent")) {
+    LOGD("Send a notification in order to register a pairing agent");
+    title = g_strdup_printf(REGISTER_PAIRING_AGENT_TITLE);
+    insert_notification(noti, title, NULL, NULL);
+    g_free(title);
+    bundle_free(b);
+    return 0;
+  }
 
 	if (!g_strcmp0(event_type, "RequestPinCode")) {
 		device_name = (gchar*) bundle_get_val(b, "device-name");
