@@ -13,12 +13,11 @@ BuildRequires:  pkgconfig(glib-2.0)
 BuildRequires:  pkgconfig(gio-2.0)
 BuildRequires:  pkgconfig(gio-unix-2.0)
 BuildRequires:  pkgconfig(capi-base-common)
-%if %{profile}!=common || %{profile}!=ivi
+%if "%{tizen_version}"!="3.0"
 BuildRequires:  pkgconfig(aul)
 BuildRequires:  pkgconfig(syspopup-caller)
 %endif
 BuildRequires:  pkgconfig(notification)
-
 BuildRequires:  cmake
 
 %description
@@ -46,13 +45,14 @@ API descriptions files and config file.
 cp %{SOURCE1} %{SOURCE1001} .
 
 %build
-%if %{profile}==common || %{profile}==ivi
-PLUGIN="Common"
-%define plugin_suffix common
-%endif
-%if %{profile}==mobile
-PLUGIN="Mobile"
-%define plugin_suffix %{profile}
+%if "%{tizen_version}"=="3.0"
+  PLUGIN="Tizen3"
+  %define plugin_suffix tizen3
+%else
+  %if "%{profile}"=="mobile"
+    PLUGIN="Mobile"
+    %define plugin_suffix %{profile}
+  %endif
 %endif
 
 MAJORVER=`echo %{version} | awk 'BEGIN {FS="."}{print $1}'`
@@ -78,7 +78,7 @@ install -D -m 0644 %{SOURCE1} %{buildroot}%{_datadir}/icons/default/bt-icon.png
 %config %{_sysconfdir}/dbus-1/system.d/bluetooth-service.conf
 %{_datadir}/dbus-1/system-services/org.tizen.comms.service
 %{_datadir}/icons/default/bt-icon.png
-%if %{profile}
+%if %{plugin_suffix}
 %{_libdir}/bluetooth-service/plugins/bluetooth-%{plugin_suffix}.so
 %endif
 

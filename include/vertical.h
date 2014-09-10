@@ -20,7 +20,7 @@
 #ifndef __VERTICAL_H__
 #define __VERTICAL_H__
 
-#ifdef TIZEN_COMMON
+#ifdef TIZEN_3
 #include <bundle.h>
 #endif
 
@@ -31,7 +31,7 @@ struct bluetooth_vertical_driver {
 	int (*disabled)(void);
 	int (*transfer)(double);
 	int (*opp_agent_on)(void);
-#ifdef TIZEN_COMMON
+#ifdef TIZEN_3
 	int (*pairing_agent_on)(bundle*);
 #else
 	int (*pairing_agent_on)(void);
@@ -49,7 +49,7 @@ int vertical_notify_bt_enabled(void);
 void vertical_notify_bt_disabled(void);
 
 void vertical_notify_bt_transfer(double progress);
-#ifdef TIZEN_COMMON
+#ifdef TIZEN_3
 void vertical_notify_bt_pairing_agent_on(bundle* bundle);
 #else
 void vertical_notify_bt_pairing_agent_on(void);

@@ -3370,7 +3370,7 @@ static void request_confirmation_handler(const gchar *device_path,
 {
   DBG("");
 
-#ifndef TIZEN_COMMON
+#ifndef TIZEN_3
 	gchar *device_name;
 	bluez_device_t *device;
 
@@ -3484,7 +3484,7 @@ static void request_authorize_service_handler(const gchar *device_path,
 		handle_spp_authorize_request(device, spp_ctx, invocation);
 		return;
 	}
-#ifndef TIZEN_COMMON
+#ifndef TIZEN_3
   gchar *device_name;
 
 	/* Other profile Authorize request */
@@ -3861,7 +3861,7 @@ int bt_agent_unregister(void)
 
 	destory_agent();
 
-#ifndef TIZEN_COMMON
+#ifndef TIZEN_3
 	this_agent = NULL;
 #endif
 	return BT_SUCCESS;

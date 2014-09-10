@@ -21,7 +21,7 @@
 #include "common.h"
 #include "vertical.h"
 
-#ifdef TIZEN_COMMON
+#ifdef TIZEN_3
 #define VERTICAL "Common"
 #else
 #define VERTICAL "Mobile"
@@ -83,7 +83,7 @@ void vertical_notify_bt_disabled(void)
 		bluetooth_driver->disabled();
 }
 
-#ifdef TIZEN_COMMON
+#ifdef TIZEN_3
 void vertical_notify_bt_pairing_agent_on(bundle* bundle)
 {
 	if (!bluetooth_driver)
