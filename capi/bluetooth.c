@@ -3287,87 +3287,6 @@ static void handle_display_pincode(const gchar *device_path,
 					const char *pincode,
 					GDBusMethodInvocation *invocation)
 {
-	gchar *device_name;
-	bluez_device_t *device;
-
-	DBG("");
-
-	if (default_adapter == NULL) {
-		ERROR("No default adapter");
-		return;
-	}
-
-	device = bluez_adapter_get_device_by_path(default_adapter,
-							device_path);
-	if (device == NULL) {
-		ERROR("Can't find device %s", device_path);
-		return;
-	}
-
-	device_name = bluez_device_get_property_alias(device);
-
-	if (this_agent && this_agent->display_pincode)
-		this_agent->display_pincode(device_name, pincode, invocation);
-
-	g_dbus_method_invocation_return_value(invocation, NULL);
-}
-
-static void request_pincode_handler(const gchar *device_path,
-					GDBusMethodInvocation *invocation)
-{
-	gchar *device_name;
-	bluez_device_t *device;
-
-	DBG("");
-
-	if (default_adapter == NULL) {
-		ERROR("No default adapter");
-		return;
-	}
-
-	device = bluez_adapter_get_device_by_path(default_adapter,
-							device_path);
-	if (device == NULL) {
-		ERROR("Can't find device %s", device_path);
-		return;
-	}
-
-	device_name = bluez_device_get_property_alias(device);
-
-	if (this_agent && this_agent->request_pincode)
-		this_agent->request_pincode(device_name, invocation);
-}
-
-static void request_passkey_handler(const gchar *device_path,
-					GDBusMethodInvocation *invocation)
-{
-	gchar *device_name;
-	bluez_device_t *device;
-
-	DBG("");
-
-	if (default_adapter == NULL) {
-		ERROR("No default adapter");
-		return;
-	}
-
-	device = bluez_adapter_get_device_by_path(default_adapter,
-							device_path);
-	if (device == NULL) {
-		ERROR("Can't find device %s", device_path);
-		return;
-	}
-
-	device_name = bluez_device_get_property_alias(device);
-
-	if (this_agent && this_agent->request_passkey)
-		this_agent->request_passkey(device_name, invocation);
-}
-
-static void request_confirmation_handler(const gchar *device_path,
-					guint32 passkey,
-					GDBusMethodInvocation *invocation)
-{
   DBG("");
 
 #ifndef TIZEN_3
@@ -3388,14 +3307,101 @@ static void request_confirmation_handler(const gchar *device_path,
 
 	device_name = bluez_device_get_property_alias(device);
 
+	if (this_agent && this_agent->display_pincode)
+		this_agent->display_pincode(device_name, pincode, invocation);
+#endif
+	g_dbus_method_invocation_return_value(invocation, NULL);
+}
+
+static void request_pincode_handler(const gchar *device_path,
+					GDBusMethodInvocation *invocation)
+{
+  DBG("");
+
+#ifdef TIZEN_3
+  reply_invocation = invocation;
+#else
+  gchar *device_name;
+	bluez_device_t *device;
+
+	if (default_adapter == NULL) {
+		ERROR("No default adapter");
+		return;
+	}
+
+	device = bluez_adapter_get_device_by_path(default_adapter,
+							device_path);
+	if (device == NULL) {
+		ERROR("Can't find device %s", device_path);
+		return;
+	}
+
+	device_name = bluez_device_get_property_alias(device);
+
+	if (this_agent && this_agent->request_pincode)
+		this_agent->request_pincode(device_name, invocation);
+#endif
+}
+
+static void request_passkey_handler(const gchar *device_path,
+					GDBusMethodInvocation *invocation)
+{
+	DBG("");
+
+#ifdef TIZEN_3
+  reply_invocation = invocation;
+#else
+  gchar *device_name;
+  bluez_device_t *device;
+
+	if (default_adapter == NULL) {
+		ERROR("No default adapter");
+		return;
+	}
+
+	device = bluez_adapter_get_device_by_path(default_adapter,
+							device_path);
+	if (device == NULL) {
+		ERROR("Can't find device %s", device_path);
+		return;
+	}
+
+	device_name = bluez_device_get_property_alias(device);
+
+	if (this_agent && this_agent->request_passkey)
+		this_agent->request_passkey(device_name, invocation);
+#endif
+}
+
+static void request_confirmation_handler(const gchar *device_path,
+					guint32 passkey,
+					GDBusMethodInvocation *invocation)
+{
+  DBG("");
+
+#ifdef TIZEN_3
+  reply_invocation = invocation;
+#else
+	gchar *device_name;
+	bluez_device_t *device;
+
+	if (default_adapter == NULL) {
+		ERROR("No default adapter");
+		return;
+	}
+
+	device = bluez_adapter_get_device_by_path(default_adapter,
+							device_path);
+	if (device == NULL) {
+		ERROR("Can't find device %s", device_path);
+		return;
+	}
+
+	device_name = bluez_device_get_property_alias(device);
+
 
 	if (this_agent && this_agent->request_confirm)
 		this_agent->request_confirm(device_name, passkey, invocation);
-#else
-	// In case of Tizen Common implementation, we do not call any callback.
-	// Popup display is done by through notification-service and not dbus callback.
-	// We store the invocation in order to make the reply later.
-	reply_invocation = invocation;
 #endif
 }
 
@@ -3484,8 +3490,10 @@ static void request_authorize_service_handler(const gchar *device_path,
 		handle_spp_authorize_request(device, spp_ctx, invocation);
 		return;
 	}
-#ifndef TIZEN_3
-  gchar *device_name;
+#ifdef TIZEN_3
+  reply_invocation = invocation;
+#else
+	gchar *device_name;
 
 	/* Other profile Authorize request */
 	if (!this_agent || !this_agent->authorize_service)
@@ -3496,28 +3504,25 @@ static void request_authorize_service_handler(const gchar *device_path,
 	this_agent->authorize_service(device_name, uuid, invocation);
 
 	g_free(device_name);
-#else
-  // In case of Tizen Common implementation, we do not call any callback.
-  // Popup display is done by through notification-service and not dbus callback.
-  // We store the invocation in order to make the reply later.
-  reply_invocation = invocation;
 #endif
 }
 
 static void request_authorization_handler(const gchar *device_path,
 					GDBusMethodInvocation *invocation)
 {
+#ifndef TIZEN_3
 	if (!this_agent)
 		return;
 
 	if (!this_agent->cancel)
 		return;
-
+#endif
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
 static void cancel_handler(GDBusMethodInvocation *invocation)
 {
+#ifndef TIZEN_3
 	if (!this_agent)
 		return;
 
@@ -3525,7 +3530,7 @@ static void cancel_handler(GDBusMethodInvocation *invocation)
 		return;
 
 	this_agent->cancel();
-
+#endif
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
@@ -3866,7 +3871,6 @@ int bt_agent_unregister(void)
 #endif
 	return BT_SUCCESS;
 }
-
 
 static void bt_agent_simple_accept(GDBusMethodInvocation *invocation)
 {
