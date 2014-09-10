@@ -3891,9 +3891,9 @@ void bt_agent_reply_sync(bt_agent_accept_type_t reply)
 {
   DBG("reply [%d]", reply);
 
-  if (reply == 0)
+  if (reply == BT_AGENT_ACCEPT)
     g_dbus_method_invocation_return_value(reply_invocation, NULL);
-  else if (reply == 1)
+  else if (reply == BT_AGENT_REJECT)
     g_dbus_method_invocation_return_dbus_error(reply_invocation,
           ERROR_INTERFACE ".Rejected",
           "RejectedByUser");
