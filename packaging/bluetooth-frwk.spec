@@ -51,6 +51,10 @@ make %{?jobs:-j%jobs}
 
 %install
 %make_install
+install -D -m 0644 %{SOURCE1} %{buildroot}%{_datadir}/icons/default/bt-icon.png
+
+# also install bluetooth-api.pc file for compatibility with other components
+ln -sf %{_libdir}/pkgconfig/capi-network-bluetooth.pc %{buildroot}%{_libdir}/pkgconfig/bluetooth-api.pc
 
 %post -p /sbin/ldconfig
 
@@ -77,4 +81,5 @@ make %{?jobs:-j%jobs}
 %files devel
 %{_includedir}/network/bluetooth.h
 %{_libdir}/pkgconfig/capi-network-bluetooth.pc
+%{_libdir}/pkgconfig/bluetooth-api.pc
 %{_libdir}/libcapi-network-bluetooth.so
