@@ -70,6 +70,9 @@ static void profile_disconnect_callback(bluez_device_t *device,
 static int request_name_on_dbus(const char *name);
 static void release_name_on_dbus(const char *name);
 
+static gboolean received_data(GIOChannel *channel, GIOCondition con,
+							gpointer user_data);
+
 struct device_connect_cb_node {
 	bt_device_gatt_state_changed_cb cb;
 	void *user_data;
@@ -3122,12 +3125,19 @@ int bt_hid_host_disconnect(const char *remote_address)
 	return BT_SUCCESS;
 }
 
+struct spp_channel {
+	GIOChannel *channel;
+	guint io_watch;
+	gchar *remote_address;
+	gint io_shutdown;
+};
+
 struct spp_context {
 	int fd;
-	gchar *remote_address;
 	gchar *uuid;
 	gchar *spp_path;
 	GIOChannel *channel;
+	GList *chan_list;
 	bt_spp_new_connection_cb new_connection;
 	void *new_connection_data;
 
@@ -3162,6 +3172,23 @@ static struct spp_context *create_spp_context(void)
 	return spp_ctx;
 }
 
+static void free_spp_channel(struct spp_context *spp_ctx,
+					struct spp_channel *spp_chan)
+{
+	if (spp_chan == NULL || spp_ctx == NULL)
+		return;
+
+	spp_ctx->chan_list = g_list_remove(spp_ctx->chan_list, spp_chan);
+
+	if (spp_chan->io_watch)
+		g_source_remove(spp_chan->io_watch);
+
+	if (spp_chan->remote_address)
+		g_free(spp_chan->remote_address);
+
+	g_free(spp_chan);
+}
+
 static void free_spp_context(struct spp_context *spp_ctx)
 {
 	if (spp_ctx == NULL)
@@ -3172,9 +3199,6 @@ static void free_spp_context(struct spp_context *spp_ctx)
 
 	if (spp_ctx->spp_path)
 		g_free(spp_ctx->spp_path);
-
-	if (spp_ctx->remote_address)
-		g_free(spp_ctx->remote_address);
 
 	g_free(spp_ctx);
 }
@@ -3216,7 +3240,9 @@ static struct spp_context *find_spp_context_from_socketfd(int socket_fd)
 static struct spp_context *find_spp_context_from_fd(int fd)
 {
 	struct spp_context *spp_ctx;
+	struct spp_channel *spp_chan;
 	GList *list, *next;
+	GList *list_chan, *next_chan;
 	int spp_fd;
 
 	for (list = g_list_first(spp_ctx_list); list; list = next) {
@@ -3224,13 +3250,99 @@ static struct spp_context *find_spp_context_from_fd(int fd)
 
 		spp_ctx = list->data;
 
-		spp_fd = g_io_channel_unix_get_fd(spp_ctx->channel);
+		for (list_chan = g_list_first(spp_ctx->chan_list);
+				list_chan; list_chan = next_chan) {
+			next_chan = g_list_next(list_chan);
 
-		if (spp_ctx && spp_fd == fd)
-			return spp_ctx;
+			spp_chan = list_chan->data;
+			spp_fd = g_io_channel_unix_get_fd(spp_chan->channel);
+
+			if (spp_ctx && spp_fd == fd) {
+				spp_ctx->channel = spp_chan->channel;
+				return spp_ctx;
+			}
+		}
 	}
 
 	return NULL;
+}
+
+static struct spp_channel *find_spp_channel_from_fd(
+				struct spp_context *spp_ctx, int fd)
+{
+	struct spp_channel *spp_chan;
+	GList *list_chan, *next_chan;
+	int spp_fd;
+
+	for (list_chan = g_list_first(spp_ctx->chan_list);
+				list_chan; list_chan = next_chan) {
+		next_chan = g_list_next(list_chan);
+
+		spp_chan = list_chan->data;
+		spp_fd = g_io_channel_unix_get_fd(spp_chan->channel);
+		if (spp_chan && spp_fd == fd)
+			return spp_chan;
+	}
+
+	return NULL;
+}
+
+static struct spp_channel *find_spp_channel_from_address(
+			struct spp_context *spp_ctx, gchar *address)
+{
+	struct spp_channel *spp_chan;
+	GList *list_chan, *next_chan;
+
+	for (list_chan = g_list_first(spp_ctx->chan_list);
+				list_chan; list_chan = next_chan) {
+		next_chan = g_list_next(list_chan);
+
+		spp_chan = list_chan->data;
+		if (spp_chan)
+			if (g_strcmp0(spp_chan->remote_address,
+							address) == 0)
+				return spp_chan;
+	}
+
+	return NULL;
+}
+
+static struct spp_channel *find_spp_channel_from_channel(
+					struct spp_context *spp_ctx,
+					GIOChannel *channel)
+{
+	struct spp_channel *spp_chan;
+	GList *list_chan, *next_chan;
+
+	for (list_chan = g_list_first(spp_ctx->chan_list);
+				list_chan; list_chan = next_chan) {
+		next_chan = g_list_next(list_chan);
+
+		spp_chan = list_chan->data;
+		if (spp_chan && spp_chan->channel == channel)
+			return spp_chan;
+	}
+
+	return NULL;
+}
+
+static struct spp_channel *create_spp_channel(GIOChannel *channel,
+					guint io_watch, char *address)
+{
+	struct spp_channel *spp_chan;
+
+	spp_chan = g_try_new0(struct spp_channel, 1);
+	if (spp_chan == NULL) {
+		DBG("no memory");
+		return NULL;
+	}
+
+	spp_chan->channel = channel;
+	spp_chan->io_watch = io_watch;
+	if (address)
+		spp_chan->remote_address = g_strdup(address);
+
+	return spp_chan;
 }
 
 /* Agent Function */
@@ -3393,11 +3505,18 @@ static void handle_spp_authorize_request(bluez_device_t *device,
 					GDBusMethodInvocation *invocation)
 {
 	char *device_name, *device_address;
+	struct spp_channel *spp_chan;
+	GIOChannel *channel;
 	GDBusMessage *msg;
 	GUnixFDList *fd_list;
+	guint io;
 	gint fd;
 
-	if (spp_ctx->max_pending == 0) {
+	DBG("");
+
+	if (spp_ctx->max_pending <= 0 ||
+			(g_list_length(spp_ctx->chan_list) >=
+					spp_ctx->max_pending)) {
 		bt_spp_reject(invocation);
 		return;
 	}
@@ -3405,43 +3524,66 @@ static void handle_spp_authorize_request(bluez_device_t *device,
 	msg = g_dbus_method_invocation_get_message(invocation);
 
 	fd_list = g_dbus_message_get_unix_fd_list(msg);
-
 	fd = g_unix_fd_list_get(fd_list, (gint)0, NULL);
+	channel = g_io_channel_unix_new(fd);
 
-	spp_ctx->channel = g_io_channel_unix_new(fd);
+	g_io_channel_set_close_on_unref(channel, TRUE);
+	g_io_channel_set_encoding(channel, NULL, NULL);
+	g_io_channel_set_buffered(channel, FALSE);
+
+	io = g_io_add_watch(channel,
+			G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_NVAL,
+					received_data, (void *)spp_ctx);
 
 	device_name = bluez_device_get_property_alias(device);
 	device_address = bluez_device_get_property_address(device);
 
-	/* New API handler */
+	spp_chan = create_spp_channel(channel, io, device_address);
+
+	if (spp_chan) {
+		spp_ctx->chan_list = g_list_append(spp_ctx->chan_list,
+								spp_chan);
+		spp_ctx->channel = channel;
+	} else {
+		bt_spp_reject(invocation);
+		g_source_remove(io);
+		goto failed;
+	}
+
 	if (spp_connection_requested_node)
 		spp_connection_requested_node->cb(
 				spp_ctx->uuid, device_name, invocation,
 				spp_connection_requested_node->user_data);
 
-	/* Old API handler */
-	if (spp_ctx->max_pending <=0) {
-		bt_spp_reject(invocation);
-		goto done;
-	}
-
-	if (spp_ctx->is_accept) {
-		bt_spp_accept(invocation);
-		goto done;
-	}
-
 	spp_ctx->requestion = invocation;
 	spp_ctx->role = BT_SOCKET_SERVER;
-	if (spp_ctx->remote_address)
-		g_free(spp_ctx->remote_address);
-	spp_ctx->remote_address = g_strdup(device_address);
 
 	if (socket_connection_requested_node)
 		socket_connection_requested_node->cb(
-				spp_ctx->fd, (const char *)device_address,
-				socket_connection_requested_node->user_data);
+			spp_ctx->fd, (const char *)device_address,
+			socket_connection_requested_node->user_data);
 
-done:
+	if (spp_ctx->new_connection)
+		spp_ctx->new_connection(spp_ctx->uuid, device_name,
+			fd, spp_ctx->new_connection_data);
+
+	if (socket_connection_state_node) {
+		bt_socket_connection_s connection;
+
+		connection.socket_fd = fd;
+		connection.remote_address = device_address;
+		connection.service_uuid = spp_ctx->uuid;
+		connection.local_role = spp_ctx->role;
+
+		socket_connection_state_node->cb(
+			BT_SUCCESS, BT_SOCKET_CONNECTED, &connection,
+			socket_connection_state_node->user_data);
+	}
+
+	if (spp_ctx->is_accept)
+		bt_spp_accept(invocation);
+
+failed:
 	if (device_name)
 		g_free(device_name);
 
@@ -3894,11 +4036,11 @@ static gboolean received_data(GIOChannel *channel, GIOCondition con,
 {
 	bt_spp_received_data spp_data;
 	struct spp_context *spp_ctx;
+	struct spp_channel *spp_chan;
 	GIOStatus status;
 	gsize rbytes = 0;
 
-	if (!(con & G_IO_IN))
-		return FALSE;
+	DBG("");
 
 	spp_ctx = user_data;
 	if (spp_ctx == NULL) {
@@ -3906,8 +4048,42 @@ static gboolean received_data(GIOChannel *channel, GIOCondition con,
 		return FALSE;
 	}
 
-	if (!spp_data_received_node)
+	if (con & (G_IO_HUP | G_IO_ERR | G_IO_NVAL)) {
+		spp_chan = find_spp_channel_from_channel(spp_ctx, channel);
+		if (spp_chan) {
+			if (socket_connection_state_node) {
+				bt_socket_connection_s connection;
+				connection.socket_fd =
+					g_io_channel_unix_get_fd(channel);
+				connection.remote_address =
+					spp_chan->remote_address;
+				connection.service_uuid = spp_ctx->uuid;
+				connection.local_role = spp_ctx->role;
+				socket_connection_state_node->cb(
+				BT_SUCCESS, BT_SOCKET_DISCONNECTED, &connection,
+				socket_connection_state_node->user_data);
+			}
+
+			free_spp_channel(spp_ctx, spp_chan);
+
+			if (spp_chan->io_shutdown != 1) {
+				g_io_channel_shutdown(channel,
+							TRUE, NULL);
+				g_io_channel_unref(channel);
+			}
+		}
+		return FALSE;
+	}
+
+	if (!(con & G_IO_IN)) {
+		DBG("not G_IO_IN");
+		return FALSE;
+	}
+
+	if (!spp_data_received_node) {
+		DBG("not spp_data_received_node");
 		goto done;
+	}
 
 	spp_data.socket_fd = g_io_channel_unix_get_fd(channel);
 	spp_data.data = g_try_new0(gchar, BT_SPP_BUFFER_MAX);
@@ -3923,7 +4099,7 @@ static gboolean received_data(GIOChannel *channel, GIOCondition con,
 
 	if (spp_data_received_node->cb)
 		spp_data_received_node->cb(&spp_data,
-				spp_data_received_node->user_data);
+			spp_data_received_node->user_data);
 
 	g_free(spp_data.data);
 
@@ -3931,10 +4107,47 @@ done:
 	return TRUE;
 }
 
+static void notify_disconnection_state(gchar *device_path,
+					struct spp_context *spp_ctx)
+{
+	struct spp_channel *spp_chan;
+	bluez_device_t *device;
+	gchar *device_name, *address;
+
+	DBG("");
+
+	device = bluez_adapter_get_device_by_path(default_adapter,
+							device_path);
+	if (device == NULL) {
+		ERROR("Can't find device %s", device_path);
+		return;
+	}
+
+	device_name = bluez_device_get_property_alias(device);
+	address = bluez_device_get_property_address(device);
+
+	spp_chan = find_spp_channel_from_address(spp_ctx, address);
+
+	if (spp_chan == NULL) {
+		DBG("no find spp_chan");
+		g_free(device_name);
+		g_free(address);
+		return;
+	}
+
+	g_io_channel_shutdown(spp_chan->channel, TRUE, NULL);
+	g_io_channel_unref(spp_chan->channel);
+	spp_chan->io_shutdown = 1;
+
+	g_free(device_name);
+	g_free(address);
+}
+
 static void notify_connection_state(gchar *device_path,
-				bt_socket_connection_state_e state,
+				GIOChannel *channel, guint io,
 				struct spp_context *spp_ctx)
 {
+	struct spp_channel *spp_chan;
 	bluez_device_t *device;
 	gchar *device_name, *address;
 	int fd;
@@ -3949,14 +4162,23 @@ static void notify_connection_state(gchar *device_path,
 	device_name = bluez_device_get_property_alias(device);
 	address = bluez_device_get_property_address(device);
 
-	if (spp_ctx->remote_address == NULL)
-		spp_ctx->remote_address = g_strdup(address);
+	spp_chan = create_spp_channel(channel, io, address);
 
-	fd = g_io_channel_unix_get_fd(spp_ctx->channel);
+	if (spp_chan)
+		spp_ctx->chan_list = g_list_append(spp_ctx->chan_list,
+							spp_chan);
+	else {
+		DBG("no memory");
+		g_free(device_name);
+		g_free(address);
+		return;
+	}
 
-	if (spp_ctx->new_connection && state == BT_SOCKET_CONNECTED)
+	fd = g_io_channel_unix_get_fd(spp_chan->channel);
+
+	if (spp_ctx->new_connection)
 		spp_ctx->new_connection(spp_ctx->uuid, device_name,
-					fd, spp_ctx->new_connection_data);
+			fd, spp_ctx->new_connection_data);
 
 	if (socket_connection_state_node) {
 		bt_socket_connection_s connection;
@@ -3967,8 +4189,8 @@ static void notify_connection_state(gchar *device_path,
 		connection.local_role = spp_ctx->role;
 
 		socket_connection_state_node->cb(
-				BT_SUCCESS, state, &connection,
-				socket_connection_state_node->user_data);
+			BT_SUCCESS, BT_SOCKET_CONNECTED, &connection,
+			socket_connection_state_node->user_data);
 	}
 
 	g_free(device_name);
@@ -3981,6 +4203,9 @@ static void handle_new_connection(gchar *device_path, gint fd,
 {
 	struct spp_context *spp_ctx;
 	GIOChannel *channel;
+	guint io;
+
+	DBG("");
 
 	spp_ctx = user_data;
 	if (spp_ctx == NULL) {
@@ -3988,27 +4213,22 @@ static void handle_new_connection(gchar *device_path, gint fd,
 		return;
 	}
 
-	if (!(spp_ctx->channel)) {
-		channel = g_io_channel_unix_new(fd);
-		if (channel == NULL) {
-			ERROR("Create connection channel error");
-			g_dbus_method_invocation_return_value(invocation, NULL);
-			goto done;
-		}
+	if (spp_ctx->role == BT_SOCKET_SERVER) {
+		g_dbus_method_invocation_return_value(invocation, NULL);
+		return;
+	}
 
-		spp_ctx->channel = channel;
-	} else
-		channel = spp_ctx->channel;
+	channel = g_io_channel_unix_new(fd);
 
 	g_io_channel_set_close_on_unref(channel, TRUE);
 	g_io_channel_set_encoding(channel, NULL, NULL);
 	g_io_channel_set_buffered(channel, FALSE);
 
-	g_io_add_watch(channel, G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_NVAL,
+	io = g_io_add_watch(channel,
+				G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_NVAL,
 						received_data, user_data);
 
-done:
-	notify_connection_state(device_path, BT_SOCKET_CONNECTED, spp_ctx);
+	notify_connection_state(device_path, channel, io, spp_ctx);
 
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
@@ -4021,13 +4241,7 @@ static void handle_request_disconnection(gchar *device_path,
 
 	DBG("device path %s", device_path);
 
-	notify_connection_state(device_path, BT_SOCKET_DISCONNECTED, spp_ctx);
-
-	if (spp_ctx->channel) {
-		g_io_channel_shutdown(spp_ctx->channel, TRUE, NULL);
-		g_io_channel_unref(spp_ctx->channel);
-		spp_ctx->channel = NULL;
-	}
+	notify_disconnection_state(device_path, spp_ctx);
 
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
@@ -4194,6 +4408,8 @@ int bt_spp_create_rfcomm(const char *uuid,
 int bt_spp_destroy_rfcomm(const char *uuid)
 {
 	struct spp_context *spp_ctx;
+	struct spp_channel *spp_chan;
+	GList *list_chan, *next_chan;
 
 	if (uuid == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
@@ -4212,10 +4428,19 @@ int bt_spp_destroy_rfcomm(const char *uuid)
 
 	spp_ctx_list = g_list_remove(spp_ctx_list, spp_ctx);
 
+	for (list_chan = g_list_first(spp_ctx->chan_list);
+				list_chan; list_chan = next_chan) {
+		next_chan = g_list_next(list_chan);
 
-	if (spp_ctx->channel) {
-	  g_io_channel_shutdown(spp_ctx->channel, TRUE, NULL);
-	  g_io_channel_unref(spp_ctx->channel);
+		spp_chan = list_chan->data;
+		if (spp_chan) {
+			if (spp_chan->channel) {
+				g_io_channel_shutdown(spp_chan->channel,
+							TRUE, NULL);
+				g_io_channel_unref(spp_chan->channel);
+				spp_chan->io_shutdown = 1;
+			}
+		}
 	}
 
 	free_spp_context(spp_ctx);
@@ -4474,10 +4699,7 @@ int bt_socket_connect_rfcomm(const char *remote_address,
 		return BT_ERROR_OPERATION_FAILED;
 
 done:
-	if (!spp_ctx->remote_address) {
-		spp_ctx->remote_address = g_strdup(remote_address);
-		spp_ctx->role = BT_SOCKET_CLIENT;
-	}
+	spp_ctx->role = BT_SOCKET_CLIENT;
 
 	return bt_spp_connect_rfcomm(remote_address, service_uuid);
 }
@@ -4485,13 +4707,16 @@ done:
 int bt_socket_disconnect_rfcomm(int socket_fd)
 {
 	struct spp_context *spp_ctx;
+	struct spp_channel *spp_chan;
 
 	spp_ctx = find_spp_context_from_fd(socket_fd);
 	if (!spp_ctx)
 		return BT_ERROR_OPERATION_FAILED;
 
-	return bt_spp_disconnect_rfcomm(spp_ctx->remote_address,
-					spp_ctx->uuid);
+	spp_chan = find_spp_channel_from_fd(spp_ctx, socket_fd);
+
+	return bt_spp_disconnect_rfcomm(spp_chan->remote_address,
+						spp_ctx->uuid);
 }
 
 int bt_socket_listen(int socket_fd, int max_pending_connections)
@@ -4542,9 +4767,6 @@ int bt_socket_accept(int requested_socket_fd, int *connected_socket_fd)
 
 	bt_spp_accept(spp_ctx->requestion);
 
-	if (spp_ctx->max_pending > 0)
-		spp_ctx->max_pending--;
-
 	/* BlueZ 5.x GAP.
 	 * Note: this connected_socket_fd maybe invalid, because
 	 * connected_socket_fd should return by connection_state_changed,
@@ -4567,9 +4789,6 @@ int bt_socket_reject(int socket_fd)
 		return BT_ERROR_OPERATION_FAILED;
 
 	bt_spp_reject(spp_ctx->requestion);
-
-	if (spp_ctx->max_pending >= 0)
-		spp_ctx->max_pending++;
 
 	return BT_SUCCESS;
 }
@@ -5345,9 +5564,8 @@ static gboolean spp_is_device_connected(const char *address)
 
 		spp_ctx = list->data;
 		if (spp_ctx)
-			if (spp_ctx->channel &&
-				g_strcmp0(spp_ctx->remote_address,
-						address) == 0)
+			if (find_spp_channel_from_address(spp_ctx,
+						(gchar *)address))
 				return true;
 	}
 

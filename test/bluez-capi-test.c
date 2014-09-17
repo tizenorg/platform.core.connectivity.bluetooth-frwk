@@ -1689,14 +1689,9 @@ void bt_socket_connection_requested_cb_test(int fd,
 				const char *remote_address,
 				void *user_data)
 {
-	int connected_socket_fd;
 	DBG("socket_fd = %d", socket_fd);
 	DBG("remote_address = %s", remote_address);
-
-	bt_socket_accept(fd, &connected_socket_fd);
-
-	DBG("Connected socket_fd = %d", connected_socket_fd);
-	socket_fd = fd;
+	DBG("fd = %d", fd);
 }
 
 int socket_set_connection_requested_cb(const char *p1, const char *p2)
