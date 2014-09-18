@@ -130,7 +130,7 @@ static int bt_transfer(double progress)
 	return 0;
 }
 
-static int bt_pairing_agent_on(void)
+static int bt_pairing_agent_on(void *data)
 {
 	/*TODO:
 	 * In Geek, it should startup Application that using
