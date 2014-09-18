@@ -675,7 +675,7 @@ static void handle_pairing_agent_method_call(GDBusConnection *connection,
 	}
 
 #ifndef TIZEN_3
-	vertical_notify_bt_pairing_agent_on();
+	vertical_notify_bt_pairing_agent_on(NULL);
 
 	relay_agent_timeout_id = g_timeout_add(5000,
 					relay_agent_timeout_cb, NULL);
