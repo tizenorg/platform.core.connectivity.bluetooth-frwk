@@ -14,7 +14,10 @@ pkg_check_modules(${TEST} REQUIRED
 			glib-2.0
 			dbus-1
 			gio-2.0
-			gio-unix-2.0)
+			gio-unix-2.0
+			contacts-service2
+			capi-media-image-util
+			libexif)
 
 FOREACH(flag ${${TEST}_CFLAGS})
 	SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${flag}")
@@ -99,6 +102,9 @@ SET(SOURCES_BLUETOOTH_SERVICE
 	src/vertical.c
 	src/pairing.c
 	src/opp.c
+	src/pbap_agent.c
+	src/bluetooth_pb_vcard.c
+	src/bluetooth_pb_agent.c
 	lib/bluez.c
 	lib/bluez-hdp.c
 	lib/common.c
