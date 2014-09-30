@@ -19,6 +19,9 @@ BuildRequires:  pkgconfig(syspopup-caller)
 %endif
 BuildRequires:  pkgconfig(vconf)
 BuildRequires:  pkgconfig(notification)
+BuildRequires:  pkgconfig(contacts-service2)
+BuildRequires:  pkgconfig(capi-media-image-util)
+BuildRequires:  pkgconfig(libexif)
 BuildRequires:  cmake
 
 %description

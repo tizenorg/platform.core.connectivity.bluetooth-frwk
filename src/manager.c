@@ -25,6 +25,7 @@
 #include "opp.h"
 #ifdef TIZEN_2_MOBILE
 #include "map_agent.h"
+#include "pbap_agent.h"
 #endif
 #include "bluez.h"
 #include "gdbus.h"
@@ -284,6 +285,7 @@ static void adapter_powered_on(CommsManagerSkeleton *skeleton)
 
 #ifdef TIZEN_2_MOBILE
 	bt_map_agent_init();
+	bt_pbap_agent_init();
 #endif
 
 	g_dbus_object_manager_server_export(manager_server, bt_object);
@@ -308,6 +310,7 @@ static void adapter_powered_off(CommsManagerSkeleton *skeleton)
 
 #ifdef TIZEN_2_MOBILE
 	bt_map_agent_deinit();
+	bt_pbap_agent_deinit();
 #endif
 
 	g_dbus_object_manager_server_unexport(manager_server,
