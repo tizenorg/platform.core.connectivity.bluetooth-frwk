@@ -49,7 +49,9 @@ INCLUDE(FindPkgConfig)
 
 IF(LIBNOTIFY_SUPPORT)
 	pkg_check_modules(service_pkgs REQUIRED vconf aul vconf dbus-glib-1 capi-network-tethering libprivilege-control status alarm-service notification security-server libnotify gdk-pixbuf-2.0 gtk+-3.0)
-ELSE(LIBNOTIFY_SUPPORT)
+ELSEIF(LIBNOTIFICATION_SUPPORT)
+	pkg_check_modules(service_pkgs REQUIRED vconf aul dbus-glib-1 capi-network-tethering libprivilege-control status alarm-service notification security-server)
+ELSE()
 	pkg_check_modules(service_pkgs REQUIRED vconf aul vconf syspopup-caller dbus-glib-1 capi-network-tethering libprivilege-control status alarm-service notification security-server)
 ENDIF(LIBNOTIFY_SUPPORT)
 

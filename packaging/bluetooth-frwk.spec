@@ -13,7 +13,6 @@ Source1001: bluetooth-frwk.manifest
 Source1002: bt-icon.png
 URL:        https://review.tizen.org/git/?p=platform/core/connectivity/bluetooth-frwk.git;a=summary
 Requires: dbus
-Requires: syspopup
 Requires: bluetooth-tools
 BuildRequires:  pkgconfig(aul)
 BuildRequires:  pkgconfig(dbus-glib-1)
@@ -23,8 +22,9 @@ BuildRequires:  pkgconfig(glib-2.0)
 BuildRequires:  pkgconfig(libnotify)
 BuildRequires:  pkgconfig(gdk-pixbuf-2.0)
 BuildRequires:  pkgconfig(gtk+-3.0)
-%else
+%elif %{without bluetooth_frwk_libnotification}
 BuildRequires:  pkgconfig(syspopup-caller)
+Requires:       syspopup
 %endif
 BuildRequires:  pkgconfig(vconf)
 BuildRequires:  pkgconfig(libxml-2.0)

@@ -22,7 +22,7 @@
 #include <glib.h>
 #include <dlog.h>
 #include <string.h>
-#ifndef LIBNOTIFY_SUPPORT
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
 #endif
 
@@ -435,7 +435,7 @@ static void __bt_bond_device_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 	bt_remote_dev_info_t *remote_dev_info;
 
 	/* Terminate ALL system popup */
-#ifndef LIBNOTIFY_SUPPORT
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	syspopup_destroy_all();
 #endif
 

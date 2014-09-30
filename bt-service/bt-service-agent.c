@@ -455,7 +455,7 @@ static gboolean __pairing_cancel_request(GapAgent *agent, const char *address)
 
 	gap_agent_reply_pin_code(agent, GAP_AGENT_CANCEL, "", NULL);
 
-#ifndef LIBNOTIFY_SUPPORT
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	syspopup_destroy_all();
 #endif
 
@@ -655,7 +655,7 @@ static gboolean __authorization_cancel_request(GapAgent *agent,
 
 	gap_agent_reply_authorize(agent, GAP_AGENT_CANCEL, NULL);
 
-#ifndef LIBNOTIFY_SUPPORT
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	syspopup_destroy_all();
 #endif
 
