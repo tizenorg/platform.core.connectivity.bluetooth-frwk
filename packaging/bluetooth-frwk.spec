@@ -117,7 +117,7 @@ mkdir -p %{buildroot}%{_unitdir_user}/tizen-middleware.target.wants
 install -m 0644 bt-service/bluetooth-frwk-service.service %{buildroot}%{_unitdir_user}
 ln -s ../bluetooth-frwk-service.service %{buildroot}%{_unitdir_user}/tizen-middleware.target.wants/bluetooth-frwk-service.service
 
-%if %{with bluetooth_frwk_libnotify}
+%if %{with bluetooth_frwk_libnotify} || %{with bluetooth_frwk_libnotification}
 mkdir -p %{buildroot}%{_datadir}/icons/default
 install -m 0644 %{SOURCE1002} %{buildroot}%{_datadir}/icons/default/bt-icon.png
 %endif
@@ -161,7 +161,7 @@ vconftool set -tf int memory/bluetooth/btsco "0" -g 6520 -i
 %{_unitdir_user}/bluetooth-frwk-service.service
 %attr(0666,-,-) /opt/var/lib/bluetooth/auto-pair-blacklist
 %{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-service.conf
-%if %{with bluetooth_frwk_libnotify}
+%if %{with bluetooth_frwk_libnotify} || %{with bluetooth_frwk_libnotification}
 %{_datadir}/icons/default/bt-icon.png
 %endif
 
