@@ -122,6 +122,11 @@ mkdir -p %{buildroot}%{_datadir}/icons/default
 install -m 0644 %{SOURCE1002} %{buildroot}%{_datadir}/icons/default/bt-icon.png
 %endif
 
+# If user 'app' exists
+%if "%{profile}"=="ivi"
+sed -i 's/guest/app/' %{buildroot}%{_datadir}/dbus-1/system-services/org.projectx.bt.service
+%endif
+
 %post
 /sbin/ldconfig
 vconftool set -tf int db/bluetooth/status "0" -g 6520
