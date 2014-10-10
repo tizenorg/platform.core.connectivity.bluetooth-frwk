@@ -6,7 +6,6 @@ Description=Bluetooth Framework Service
 [Service]
 Type=dbus
 BusName=org.projectx.bt
-Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$UID/dbus/user_bus_socket
 ExecStart=/usr/bin/bt-service
 RemainAfterExit=yes
 
