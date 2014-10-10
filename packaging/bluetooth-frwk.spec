@@ -107,10 +107,6 @@ make
 %install
 rm -rf %{buildroot}
 %make_install
-mkdir -p %{buildroot}%{_sysconfdir}/rc.d/rc3.d/
-mkdir -p %{buildroot}%{_sysconfdir}/rc.d/rc5.d/
-ln -s %{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service %{buildroot}%{_sysconfdir}/rc.d/rc3.d/S80bluetooth-frwk-service
-ln -s %{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service %{buildroot}%{_sysconfdir}/rc.d/rc5.d/S80bluetooth-frwk-service
 
 mkdir -p %{buildroot}%{_unitdir_user}
 mkdir -p %{buildroot}%{_unitdir_user}/tizen-middleware.target.wants
@@ -152,9 +148,6 @@ vconftool set -tf int memory/bluetooth/btsco "0" -g 6520 -i
 %manifest %{name}.manifest
 %defattr(-, root, root)
 %{_datadir}/dbus-1/system-services/org.projectx.bt.service
-%{_sysconfdir}/rc.d/init.d/bluetooth-frwk-service
-%{_sysconfdir}/rc.d/rc3.d/S80bluetooth-frwk-service
-%{_sysconfdir}/rc.d/rc5.d/S80bluetooth-frwk-service
 
 %{_bindir}/bt-service
 %{_unitdir_user}/tizen-middleware.target.wants/bluetooth-frwk-service.service
