@@ -89,8 +89,10 @@ export LDFLAGS+=" -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbol
 export CFLAGS+=" -fpie"
 export LDFLAGS+=" -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs -pie"
 %endif
+
 %cmake . \
 -DTZ_SYS_USER_GROUP=%TZ_SYS_USER_GROUP \
+-DTZ_SYS_DEFAULT_USER=%TZ_SYS_DEFAULT_USER \
 %if %{with bluetooth_frwk_libnotify}
  -DLIBNOTIFY_SUPPORT=On \
 %else
@@ -120,6 +122,11 @@ ln -s ../bluetooth-frwk-service.service %{buildroot}%{_unitdir_user}/tizen-middl
 %if %{with bluetooth_frwk_libnotify} || %{with bluetooth_frwk_libnotification}
 mkdir -p %{buildroot}%{_datadir}/icons/default
 install -m 0644 %{SOURCE1002} %{buildroot}%{_datadir}/icons/default/bt-icon.png
+%endif
+
+# On IVI bt-service needs to be run as 'app' even if there is a 'guest' user.
+%if "%{profile}"=="ivi"
+sed -i 's/%TZ_SYS_DEFAULT_USER/app/' %{buildroot}%{_datadir}/dbus-1/system-services/org.projectx.bt.service
 %endif
 
 %post
