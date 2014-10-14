@@ -1031,8 +1031,10 @@ void _gap_agent_reset_dbus(GapAgent *agent)
 		priv->osp_servers = NULL;
 	}
 
-	g_object_ref(priv->adapter);
-	priv->adapter = NULL;
+	if (priv->adapter) {
+		g_object_unref(priv->adapter);
+		priv->adapter = NULL;
+	}
 
 	g_free(priv->path);
 	priv->path = NULL;
