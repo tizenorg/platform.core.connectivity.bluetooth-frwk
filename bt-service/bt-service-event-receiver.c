@@ -88,14 +88,14 @@ static bt_remote_dev_info_t *__bt_parse_device_properties(DBusMessageIter *item_
 			dev_info->address = g_strdup(address);
 		} else if (strcasecmp(key, "Class") == 0) {
 			dbus_message_iter_get_basic(&iter_dict_val, &dev_info->class);
-		} else if (strcasecmp(key, "name") == 0) {
+		} else if (strcasecmp(key, "Name") == 0) {
 			dbus_message_iter_get_basic(&iter_dict_val, &value);
 			if (dev_info->name == NULL)
 				dev_info->name = g_strdup(value);
 		} else if (strcasecmp(key, "Connected") == 0) {
 			dbus_message_iter_get_basic(&iter_dict_val,
 						&dev_info->connected);
-		} else if (strcasecmp(key, "paired") == 0) {
+		} else if (strcasecmp(key, "Paired") == 0) {
 			dbus_message_iter_get_basic(&iter_dict_val,
 						&dev_info->paired);
 		} else if (strcasecmp(key, "Trusted") == 0) {
