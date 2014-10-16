@@ -723,6 +723,7 @@ int comms_manager_get_property_bt_in_service(gboolean *in_service)
 }
 
 void comms_bluetooth_device_pair(const char *address,
+				const unsigned int uid,
 				bluetooth_simple_callback cb,
 				void *user_data)
 {
@@ -745,7 +746,7 @@ void comms_bluetooth_device_pair(const char *address,
 	async_result_node->user_data = user_data;
 
 	g_dbus_proxy_call(this_bluetooth->pairing.proxy, "Pair",
-					g_variant_new("(s)", address),
+					g_variant_new("(is)", uid, address),
 					0, -1, NULL,
 					bluetooth_simple_async_cb,
 					async_result_node);
@@ -810,13 +811,14 @@ int comms_bluetooth_register_pairing_agent_sync(const char *agent_path,
 						 void *user_data)
 {
 	GError *error = NULL;
+	GVariant *result;
 
 	if (this_bluetooth == NULL) {
 		ERROR("bluetooth not register");
 		return BT_ERROR_OPERATION_FAILED;
 	}
 
-	g_dbus_proxy_call_sync(this_bluetooth->pairing.proxy,
+	result = g_dbus_proxy_call_sync(this_bluetooth->pairing.proxy,
 					"RegisterPairingAgent",
 					g_variant_new("(o)", agent_path),
 					0, -1, NULL, &error);
@@ -826,6 +828,68 @@ int comms_bluetooth_register_pairing_agent_sync(const char *agent_path,
 		g_error_free(error);
 		return BT_ERROR_OPERATION_FAILED;
 	}
+
+	g_variant_unref(result);
+
+	return BT_SUCCESS;
+}
+
+int comms_bluetooth_get_user_privileges_sync(const unsigned int uid,
+							const char *address)
+{
+	GError *error = NULL;
+	GVariant *result;
+	guint privileges = 0;
+
+	DBG("");
+
+	if (this_bluetooth == NULL) {
+		ERROR("bluetooth not register");
+		return 0;
+	}
+
+	result = g_dbus_proxy_call_sync(this_bluetooth->pairing.proxy,
+				"GetUserPrivileges",
+				g_variant_new("(is)", uid, address),
+				0, -1, NULL, &error);
+
+	if (error) {
+		ERROR("%s", error->message);
+		g_error_free(error);
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	g_variant_get(result, "(i)", &privileges);
+	g_variant_unref(result);
+
+	return privileges;
+}
+
+int comms_bluetooth_remove_user_privileges_sync(const unsigned int uid,
+							const char *address)
+{
+	GError *error = NULL;
+	GVariant *result;
+
+	DBG("");
+
+	if (this_bluetooth == NULL) {
+		ERROR("bluetooth not register");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	result = g_dbus_proxy_call_sync(this_bluetooth->pairing.proxy,
+				"RemoveUserPrivileges",
+				g_variant_new("(is)", uid, address),
+				0, -1, NULL, &error);
+
+	if (error) {
+		ERROR("%s", error->message);
+		g_error_free(error);
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	g_variant_unref(result);
 
 	return BT_SUCCESS;
 }
@@ -890,13 +954,14 @@ int comms_bluetooth_register_media_agent_sync(const char *agent_path,
 						void *user_data)
 {
 	GError *error = NULL;
+	GVariant *result;
 
 	if (this_bluetooth == NULL) {
 		ERROR("bluetooth not register");
 		return BT_ERROR_OPERATION_FAILED;
 	}
 
-	g_dbus_proxy_call_sync(this_bluetooth->mediaplayer.proxy,
+	result = g_dbus_proxy_call_sync(this_bluetooth->mediaplayer.proxy,
 					"RegisterMediaAgent",
 					g_variant_new("(o)", agent_path),
 					0, -1, NULL, &error);
@@ -906,6 +971,8 @@ int comms_bluetooth_register_media_agent_sync(const char *agent_path,
 		g_error_free(error);
 		return BT_ERROR_OPERATION_FAILED;
 	}
+
+	g_variant_unref(result);
 
 	return BT_SUCCESS;
 }
@@ -970,13 +1037,14 @@ int comms_bluetooth_register_opp_agent_sync(const char *agent_path,
 						void *user_data)
 {
 	GError *error = NULL;
+	GVariant *result;
 
 	if (this_bluetooth == NULL) {
 		ERROR("bluetooth not register");
 		return BT_ERROR_OPERATION_FAILED;
 	}
 
-	g_dbus_proxy_call_sync(this_bluetooth->opp.proxy,
+	result = g_dbus_proxy_call_sync(this_bluetooth->opp.proxy,
 					"RegisterObexAgent",
 					g_variant_new("(o)", agent_path),
 					0, -1, NULL, &error);
@@ -986,6 +1054,8 @@ int comms_bluetooth_register_opp_agent_sync(const char *agent_path,
 		g_error_free(error);
 		return -1;
 	}
+
+	g_variant_unref(result);
 
 	return BT_SUCCESS;
 }

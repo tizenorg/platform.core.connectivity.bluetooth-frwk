@@ -17,6 +17,12 @@
 *
 */
 
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <sys/param.h>
+#include <stdlib.h>
+#include <string.h>
 #include <gio/gunixfdlist.h>
 #include "common.h"
 #include "gdbus.h"
@@ -31,14 +37,32 @@
 
 #define PAIRING_AGENT_PATH BLUETOOTH_OBJECT "/agent/pairing"
 
+#define FILENAME_LEN 100
+#define ADDRESS_LEN 18
+#define UID_LEN 8
+#define CONTEXT_LEN 28
+
+struct user_privileges {
+	char address[ADDRESS_LEN];
+	char uid[UID_LEN];
+};
+
 static const GDBusMethodInfo *_pairing_method_info_pointers[] =
 {
 	GDBUS_METHOD("RegisterPairingAgent",
 				GDBUS_ARGS(_ARG("agent", "o")), NULL),
 	GDBUS_METHOD("UnregisterPairingAgent",
 				GDBUS_ARGS(_ARG("agent", "o")), NULL),
-	GDBUS_METHOD("Pair", GDBUS_ARGS(_ARG("address", "s")), NULL),
+	GDBUS_METHOD("Pair", GDBUS_ARGS(_ARG("userid", "i"),
+				_ARG("address", "s")), NULL),
 	GDBUS_METHOD("CancelPairing", NULL, NULL),
+	GDBUS_METHOD("GetUserPrivileges",
+				GDBUS_ARGS(_ARG("userid", "i"),
+				_ARG("address", "s")),
+				GDBUS_ARGS(_ARG("privilege_id", "i"))),
+	GDBUS_METHOD("RemoveUserPrivileges",
+				GDBUS_ARGS(_ARG("userid", "i"),
+				_ARG("address", "s")), NULL),
 	NULL
 };
 
@@ -89,6 +113,29 @@ static bluez_agent_t *bluez_agent;
 static guint pairing_agent_dbus_id;
 static GDBusNodeInfo *pairing_introspection_data;
 static gchar *pairing_device_address;
+static guint pairing_device_uid;
+static gboolean isbonding;
+static GList *agent_list;
+
+static struct agent *find_agent(const char *sender, const char *path)
+{
+	struct agent *agent;
+	GList *list, *next;
+
+	DBG("sender = %s, path = %s", sender, path);
+
+	for (list = g_list_first(agent_list); list; list = next) {
+		next = g_list_next(list);
+
+		agent = list->data;
+
+		if (agent && !g_strcmp0(agent->owner, sender)
+			&& !g_strcmp0(agent->object_path, path))
+			return agent;
+	}
+
+	return NULL;
+}
 
 static void bt_pairing_register_dbus_interface(PairingSkeleton *skeleton,
 						GDBusConnection *connection)
@@ -743,14 +790,28 @@ static void free_relay_agent(struct agent *agent)
 static void relay_agent_disconnected(GDBusConnection *connection,
 					const gchar *name, gpointer user_data)
 {
+	struct agent *agent = (struct agent *)user_data;
+
 	DBG("");
 
-	if (!relay_agent)
+	if (agent == NULL)
 		return;
 
-	free_relay_agent(relay_agent);
+	agent_list = g_list_remove(agent_list, agent);
 
-	relay_agent = NULL;
+	if (relay_agent)
+		if (!g_strcmp0(agent->object_path,
+					relay_agent->object_path) &&
+				!g_strcmp0(agent->owner, relay_agent->owner)) {
+			GList *next;
+			next = g_list_last(agent_list);
+			if (next)
+				relay_agent = next->data;
+			else
+				relay_agent = NULL;
+	}
+
+	free_relay_agent(agent);
 }
 
 static void register_relay_agent_handler(
@@ -762,11 +823,9 @@ static void register_relay_agent_handler(
 	const gchar *sender;
 	gchar *agent_path;
 	guint relay_agent_watch_id;
+	struct agent *agent;
 
 	DBG("");
-
-	if (relay_agent)
-		return comms_error_already_exists(invocation);
 
 	g_variant_get(parameters, "(o)", &agent_path);
 	if (agent_path == NULL)
@@ -774,14 +833,21 @@ static void register_relay_agent_handler(
 
 	sender = g_dbus_method_invocation_get_sender(invocation);
 
+	agent = create_relay_agent(sender, agent_path, 0);
+	if (agent == NULL)
+		comms_error_not_available(invocation);
+
 	relay_agent_watch_id =
-			g_bus_watch_name_on_connection(connection,sender,
+			g_bus_watch_name_on_connection(connection, sender,
 					G_BUS_NAME_WATCHER_FLAGS_AUTO_START,
 					NULL, relay_agent_disconnected,
-					NULL, NULL);
+					(gpointer)agent, NULL);
 
-	relay_agent = create_relay_agent(sender, agent_path,
-						relay_agent_watch_id);
+	agent->watch_id = relay_agent_watch_id;
+
+	relay_agent = agent;
+
+	agent_list = g_list_append(agent_list, agent);
 
 	if (relay_agent_timeout_id > 0) {
 		g_source_remove(relay_agent_timeout_id);
@@ -807,25 +873,94 @@ static void unregister_relay_agent_handler(
 					gpointer user_data)
 {
 	gchar *relay_agent_path;
+	const gchar *sender;
+	struct agent *agent;
 
 	DBG("");
 
-	if (relay_agent == NULL)
-		return comms_error_does_not_exist(invocation);
+	sender = g_dbus_method_invocation_get_sender(invocation);
 
 	g_variant_get(parameters, "(o)", &relay_agent_path);
-	if (relay_agent_path == NULL)
+	if (relay_agent_path == NULL) {
+		DBG("path = NULL");
 		return comms_error_invalid_args(invocation);
+	}
 
-	if (g_strcmp0(relay_agent_path, relay_agent->object_path))
+	agent = find_agent(sender, relay_agent_path);
+	if (agent == NULL) {
+		DBG("can not find agent");
 		return comms_error_does_not_exist(invocation);
+	}
+
+	agent_list = g_list_remove(agent_list, agent);
+
+	if (relay_agent)
+		if (!g_strcmp0(relay_agent_path,
+				relay_agent->object_path) &&
+			!g_strcmp0(sender, relay_agent->owner)) {
+			GList *next;
+			next = g_list_last(agent_list);
+			if (next)
+				relay_agent = next->data;
+			else
+				relay_agent = NULL;
+	}
 
 	g_dbus_method_invocation_return_value(invocation, NULL);
 
 	g_free(relay_agent_path);
 
-	free_relay_agent(relay_agent);
-	relay_agent = NULL;
+	free_relay_agent(agent);
+}
+
+static void set_userprivileges(guint uid, gchar *address)
+{
+	char file[FILENAME_LEN];
+	char *path = getenv("HOME");
+	int fd;
+	int i = 0;
+	char uid_tmp[UID_LEN+1];
+	char uid_privileges[UID_LEN+1];
+	char context[CONTEXT_LEN+1];
+	int len, length;
+
+	sprintf(file, "%s/.bt_userprivileges", path);
+
+	fd = open(file, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+
+	if (fd < 0) {
+		DBG("fd = %d", fd);
+		return;
+	}
+
+	memset(uid_tmp, 0, UID_LEN+1);
+	memset(uid_privileges, 0, UID_LEN+1);
+
+	sprintf(uid_tmp, "%d", uid);
+	len = strlen(uid_tmp);
+
+	while (i < UID_LEN) {
+		if (len > i)
+			uid_privileges[i] = uid_tmp[i];
+		else
+			uid_privileges[i] = ' ';
+		i++;
+	}
+
+	memset(context, 0, CONTEXT_LEN+1);
+
+	sprintf(context, "%s:%s\r\n", address, uid_privileges);
+
+	lseek(fd, 0, SEEK_END);
+
+	len = strlen(context);
+	length = write(fd, context, len);
+	if (length <= 0)
+		DBG("write error");
+
+	close(fd);
+
+	return;
 }
 
 static void device_pair_cb(enum bluez_error_type type, void *user_data)
@@ -834,11 +969,17 @@ static void device_pair_cb(enum bluez_error_type type, void *user_data)
 
 	DBG("");
 
+	isbonding = FALSE;
+
 	if (type != ERROR_NONE) {
 		handle_error_message(invocation, type);
 
 		return;
 	}
+
+	if (pairing_device_address)
+		set_userprivileges(pairing_device_uid,
+					pairing_device_address);
 
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
@@ -850,13 +991,24 @@ static void pairing_handler(GDBusConnection *connection,
 {
 	bluez_device_t *device;
 	gchar *address;
+	guint uid;
 
 	DBG("");
 
-	g_variant_get(parameters, "(s)", &address);
+	if (isbonding) {
+		DBG("Pair is in progress");
+		comms_error_busy(invocation);
+		return;
+	}
+
+	isbonding = TRUE;
+
+	g_variant_get(parameters, "(is)", &uid, &address);
 
 	if (pairing_device_address)
 		g_free(pairing_device_address);
+
+	pairing_device_uid = uid;
 
 	pairing_device_address = g_strdup(address);
 
@@ -864,7 +1016,7 @@ static void pairing_handler(GDBusConnection *connection,
 					default_adapter, address);
 	if (device == NULL) {
 		comms_error_does_not_exist(invocation);
-
+		isbonding = FALSE;
 		g_free(address);
 		return;
 	}
@@ -889,6 +1041,94 @@ static void device_cancel_pair_cb(enum bluez_error_type type, void *user_data)
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
+static guint remove_userprivileges(guint uid, gchar *address)
+{
+	char file[FILENAME_LEN];
+	char context[CONTEXT_LEN];
+	char *path = getenv("HOME");
+	int fd;
+	struct user_privileges *privileges = NULL;
+	int len, total_len;
+	struct stat st;
+	int privileges_uid;
+	int ret;
+	int is_find = 0;
+
+	DBG("");
+
+	sprintf(file, "%s/.bt_userprivileges", path);
+
+	fd = open(file, O_RDWR, S_IRUSR | S_IWUSR);
+
+	if (fd < 0) {
+		DBG("error fd = %d", fd);
+		return 0;
+	}
+
+	if (fstat(fd, &st) < 0) {
+		close(fd);
+		DBG("privileges context error");
+		return 0;
+	}
+
+	len = st.st_size;
+	total_len = len;
+	lseek(fd, 0, SEEK_SET);
+
+	while (len >= CONTEXT_LEN) {
+		if (is_find == 0) {
+			memset(context, 0, CONTEXT_LEN);
+			ret = read(fd, context, CONTEXT_LEN-2);
+			if (ret <= 0) {
+				DBG("read error");
+				close(fd);
+				return 0;
+			}
+			privileges = (struct user_privileges *)context;
+			privileges->address[ADDRESS_LEN-1] = 0;
+			privileges_uid = atoi(privileges->uid);
+			if ((strcasecmp(address, privileges->address) == 0)
+				&& uid == privileges_uid) {
+				DBG("find privileges matched user");
+				is_find = 1;
+			}
+			len -= CONTEXT_LEN;
+			lseek(fd, 2, SEEK_CUR);
+		} else {
+			memset(context, 0, CONTEXT_LEN);
+			ret = read(fd, context, CONTEXT_LEN);
+			if (ret <= 0) {
+				DBG("read error");
+				close(fd);
+				return 0;
+			}
+			lseek(fd, -2*CONTEXT_LEN, SEEK_CUR);
+			ret = write(fd, context, CONTEXT_LEN);
+			if (ret <= 0) {
+				DBG("write error");
+				close(fd);
+				return 0;
+			}
+			lseek(fd, CONTEXT_LEN, SEEK_CUR);
+			len -= CONTEXT_LEN;
+		}
+	}
+
+	if (is_find == 1) {
+		DBG("remove unused context");
+		ret = ftruncate(fd, total_len - CONTEXT_LEN);
+		if (ret < 0) {
+			DBG("ftruncate error");
+			close(fd);
+			return 0;
+		}
+	}
+
+	close(fd);
+
+	return 1;
+}
+
 static void cancel_pairing_handler(GDBusConnection *connection,
 					GVariant *parameters,
 					GDBusMethodInvocation *invocation,
@@ -909,6 +1149,124 @@ static void cancel_pairing_handler(GDBusConnection *connection,
 	bluez_device_cancel_pair(device, device_cancel_pair_cb, invocation);
 }
 
+static guint get_userprivileges(guint uid, gchar *address)
+{
+	char file[FILENAME_LEN];
+	char context[CONTEXT_LEN];
+	char *path = getenv("HOME");
+	int fd;
+	struct user_privileges *privileges = NULL;
+	int len;
+	struct stat st;
+	int privileges_uid;
+	int ret;
+
+	DBG("");
+
+	sprintf(file, "%s/.bt_userprivileges", path);
+
+	fd = open(file, O_RDONLY, S_IRUSR | S_IWUSR);
+
+	if (fd < 0) {
+		DBG("fd = %d", fd);
+		return 0;
+	}
+
+	if (fstat(fd, &st) < 0) {
+		close(fd);
+		DBG("privileges context error");
+		return 0;
+	}
+
+	len = st.st_size;
+	lseek(fd, 0, SEEK_SET);
+
+	while (len >= CONTEXT_LEN) {
+		memset(context, 0, CONTEXT_LEN);
+		ret = read(fd, context, CONTEXT_LEN-2);
+		if (ret <= 0) {
+			DBG("read error");
+			close(fd);
+			return 0;
+		}
+		privileges = (struct user_privileges *)context;
+		privileges->address[ADDRESS_LEN-1] = 0;
+		privileges_uid = atoi(privileges->uid);
+		if ((strcasecmp(address, privileges->address) == 0)
+			&& uid == privileges_uid) {
+			DBG("find privileges matched user");
+			close(fd);
+			return 1;
+		}
+		len -= CONTEXT_LEN;
+		lseek(fd, 2, SEEK_CUR);
+	}
+
+	close(fd);
+
+	return 0;
+}
+
+static void get_userprivileges_handler(GDBusConnection *connection,
+					GVariant *parameters,
+					GDBusMethodInvocation *invocation,
+					gpointer user_data)
+{
+	gchar *address;
+	guint uid;
+	GVariant *value;
+	guint retvalue;
+	bluez_device_t *device;
+	gboolean paired;
+	int ret;
+
+	DBG("+");
+
+	g_variant_get(parameters, "(is)", &uid, &address);
+
+	device = bluez_adapter_get_device_by_address(default_adapter,
+								address);
+	if (device == NULL) {
+		DBG("adapter can't find device");
+		comms_error_does_not_exist(invocation);
+		return;
+	}
+
+	ret = bluez_device_get_property_paired(device, &paired);
+	if (ret == -1) {
+		DBG("device can't get paired");
+		comms_error_does_not_exist(invocation);
+		return;
+	}
+
+	if (paired == FALSE)
+		retvalue = 2;
+	else
+		retvalue = get_userprivileges(uid, address);
+
+	value = g_variant_new("(i)", retvalue);
+	g_dbus_method_invocation_return_value(invocation, value);
+
+	DBG("-");
+}
+
+static void remove_userprivileges_handler(GDBusConnection *connection,
+					GVariant *parameters,
+					GDBusMethodInvocation *invocation,
+					gpointer user_data)
+{
+	gchar *address;
+	guint uid;
+
+	DBG("");
+
+	g_variant_get(parameters, "(is)", &uid, &address);
+
+	remove_userprivileges(uid, address);
+
+	g_dbus_method_invocation_return_value(invocation, NULL);
+}
+
 static void pairing_skeleton_handle_method_call(GDBusConnection *connection,
 					const gchar *sender,
 					const gchar *object_path,
@@ -919,7 +1277,7 @@ static void pairing_skeleton_handle_method_call(GDBusConnection *connection,
 					gpointer user_data)
 {
 
-  DBG("method: %s", method_name);
+	DBG("method: %s", method_name);
 
 	if (g_strcmp0(method_name, "RegisterPairingAgent") == 0)
 		register_relay_agent_handler(connection, parameters,
@@ -931,6 +1289,12 @@ static void pairing_skeleton_handle_method_call(GDBusConnection *connection,
 		pairing_handler(connection, parameters, invocation, user_data);
 	else if (g_strcmp0(method_name, "CancelPairing") == 0)
 		cancel_pairing_handler(connection, parameters,
+					invocation, user_data);
+	else if (g_strcmp0(method_name, "GetUserPrivileges") == 0)
+		get_userprivileges_handler(connection, parameters,
+					invocation, user_data);
+	else if (g_strcmp0(method_name, "RemoveUserPrivileges") == 0)
+		remove_userprivileges_handler(connection, parameters,
 					invocation, user_data);
 	else
 		WARN("Unknown method");

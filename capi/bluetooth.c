@@ -50,6 +50,9 @@
 #define WRITE_REQUEST "write"
 #define WRITE_COMMAND "write-without-response"
 
+#define ADDRESS_LEN 20
+static char pairing_address[ADDRESS_LEN];
+
 #ifdef TIZEN_3
 static GDBusMethodInvocation *reply_invocation;
 #endif
@@ -270,6 +273,20 @@ static gboolean generic_device_removed_set;
 
 static GList *char_changed_node_list;
 
+static int bt_device_get_privileges(const char *remote_address)
+{
+	int user_privilieges;
+	int uid;
+
+	uid = getuid();
+	DBG("uid = %d, address = %s", uid, remote_address);
+
+	user_privilieges = comms_bluetooth_get_user_privileges_sync(
+						uid, remote_address);
+
+	return user_privilieges;
+}
+
 static int service_by_path_cmp(gconstpointer a, gconstpointer b)
 {
 	const struct char_changed_cb_node *node_data = a;
@@ -449,6 +466,9 @@ static void bluez_unpaired_device_removed(bluez_device_t *device,
 static void handle_generic_device_removed(bluez_device_t *device, void *user_data)
 {
 	adapter_device_discovery_info_t *device_info;
+	int userid;
+
+	DBG("");
 
 	device_info = bluez_get_discovery_device_info(device);
 
@@ -457,12 +477,21 @@ static void handle_generic_device_removed(bluez_device_t *device, void *user_dat
 
 	if (device_info->is_bonded == false)
 		bluez_unpaired_device_removed(device, unpaired_device_removed_node);
-	else
+	else {
+		if (device_info->remote_address) {
+			userid = getuid();
+			comms_bluetooth_remove_user_privileges_sync(userid,
+						device_info->remote_address);
+		}
 		bluez_paired_device_removed(device, paired_device_removed_node);
+	}
 }
 
 static void set_device_removed_generic_callback(bluez_adapter_t *adapter)
 {
+
+	DBG("");
+
 	bluez_adapter_set_device_removed_cb(adapter,
 				handle_generic_device_removed, NULL);
 
@@ -1967,16 +1996,48 @@ static void bt_device_paired_cb(enum bluez_error_type error,
 
 int bt_device_create_bond(const char *remote_address)
 {
-	comms_bluetooth_device_pair(remote_address,
-				bt_device_paired_cb, strdup(remote_address));
+	int user_privilieges;
 
-	return BT_SUCCESS;
+	if (remote_address == NULL) {
+		DBG("address = NULL");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	memset(pairing_address, 0, ADDRESS_LEN);
+	strcpy(pairing_address, remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		memset(pairing_address, 0, ADDRESS_LEN);
+		return BT_ERROR_NOT_ENABLED;
+	} else if (user_privilieges == 1) {
+		DBG("user has paired with remote and use");
+		memset(pairing_address, 0, ADDRESS_LEN);
+		return BT_SUCCESS;
+	} else if (user_privilieges == 2) {
+		int uid;
+		uid = getuid();
+		DBG("pairing uid = %d", uid);
+		comms_bluetooth_device_pair(remote_address, uid,
+			bt_device_paired_cb, strdup(remote_address));
+
+		return BT_SUCCESS;
+	}
+
+	return BT_ERROR_NOT_ENABLED;
 }
 
 int bt_device_cancel_bonding(void)
 {
 	enum bluez_error_type error_type;
 	int powered;
+	int user_privilieges;
 
 	DBG("");
 
@@ -1985,6 +2046,24 @@ int bt_device_cancel_bonding(void)
 
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (strlen(pairing_address) == 0) {
+		DBG("not need to cancel bonding");
+		return BT_ERROR_NOT_ENABLED;
+	}
+
+	user_privilieges = bt_device_get_privileges(pairing_address);
+
+	memset(pairing_address, 0, ADDRESS_LEN);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	bluez_adapter_get_property_powered(default_adapter, &powered);
 	if (powered == FALSE)
@@ -2002,6 +2081,7 @@ int bt_device_cancel_bonding(void)
 int bt_device_destroy_bond(const char *remote_address)
 {
 	bluez_device_t *device;
+	int user_privilieges;
 
 	DBG("");
 
@@ -2010,6 +2090,24 @@ int bt_device_destroy_bond(const char *remote_address)
 
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (remote_address == NULL) {
+		DBG("address = NULL");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	memset(pairing_address, 0, ADDRESS_LEN);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	device = bluez_adapter_get_device_by_address(default_adapter,
 							remote_address);
@@ -2024,6 +2122,7 @@ int bt_device_destroy_bond(const char *remote_address)
 int bt_device_set_alias(const char *remote_address, const char *alias)
 {
 	bluez_device_t *device;
+	int user_privilieges;
 
 	DBG("");
 
@@ -2033,8 +2132,21 @@ int bt_device_set_alias(const char *remote_address, const char *alias)
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
-	if (!remote_address || !alias)
+	if (!remote_address || !alias) {
+		DBG("address = NULL");
 		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	device = bluez_adapter_get_device_by_address(default_adapter,
 							remote_address);
@@ -2051,6 +2163,7 @@ int bt_device_set_authorization(const char *remote_address,
 {
 	int trusted;
 	bluez_device_t *device;
+	int user_privilieges;
 
 	DBG("");
 
@@ -2060,8 +2173,21 @@ int bt_device_set_authorization(const char *remote_address,
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
-	if (!remote_address)
+	if (remote_address == NULL) {
+		DBG("address = NULL");
 		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	device = bluez_adapter_get_device_by_address(default_adapter,
 							remote_address);
@@ -2123,6 +2249,9 @@ int bt_device_start_service_search(const char *remote_address)
 	int powered, paired;
 	char *address;
 	GList *list, *iter, *next;
+	int user_privilieges;
+
+	DBG("");
 
 	if (initialized == false)
 		return BT_ERROR_NOT_INITIALIZED;
@@ -2130,8 +2259,21 @@ int bt_device_start_service_search(const char *remote_address)
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
-	if (!remote_address)
+	if (remote_address == NULL) {
+		DBG("address = NULL");
 		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	bluez_adapter_get_property_powered(default_adapter, &powered);
 	if (powered == FALSE)
@@ -2502,6 +2644,7 @@ int bt_audio_connect(const char *remote_address,
 {
 	bluez_device_t *device;
 	char *uuid = NULL;
+	int user_privilieges;
 
 	DBG("");
 
@@ -2510,6 +2653,22 @@ int bt_audio_connect(const char *remote_address,
 
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (remote_address == NULL) {
+		DBG("address = NULL");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	switch (type) {
 	case BT_AUDIO_PROFILE_TYPE_HSP_HFP:
@@ -2542,6 +2701,7 @@ int bt_audio_disconnect(const char *remote_address,
 {
 	bluez_device_t *device;
 	char *uuid = NULL;
+	int user_privilieges;
 
 	DBG("");
 
@@ -2550,6 +2710,22 @@ int bt_audio_disconnect(const char *remote_address,
 
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (remote_address == NULL) {
+		DBG("address = NULL");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	switch (type) {
 	case BT_AUDIO_PROFILE_TYPE_HSP_HFP:
@@ -3062,6 +3238,7 @@ static void profile_connect_callback(bluez_device_t *device,
 int bt_hid_host_connect(const char *remote_address)
 {
 	bluez_device_t *device;
+	int user_privilieges;
 
 	DBG("");
 
@@ -3070,6 +3247,22 @@ int bt_hid_host_connect(const char *remote_address)
 
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (remote_address == NULL) {
+		DBG("address = NULL");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	device = bluez_adapter_get_device_by_address(default_adapter,
 							remote_address);
@@ -3110,6 +3303,7 @@ static void profile_disconnect_callback(bluez_device_t *device,
 int bt_hid_host_disconnect(const char *remote_address)
 {
 	bluez_device_t *device;
+	int user_privilieges;
 
 	DBG("");
 
@@ -3118,6 +3312,22 @@ int bt_hid_host_disconnect(const char *remote_address)
 
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (remote_address == NULL) {
+		DBG("address = NULL");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	device = bluez_adapter_get_device_by_address(default_adapter,
 							remote_address);
@@ -4521,16 +4731,16 @@ int bt_spp_connect_rfcomm(const char *remote_address,
 {
 	bluez_device_t *device;
 
-	DBG("");
-
-	if (!remote_address || !service_uuid)
-		return BT_ERROR_INVALID_PARAMETER;
-
 	if (initialized == false)
 		return BT_ERROR_NOT_INITIALIZED;
 
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!remote_address || !service_uuid) {
+		DBG("address = NULL");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
 
 	device = bluez_adapter_get_device_by_address(default_adapter,
 							remote_address);
@@ -4548,16 +4758,16 @@ int bt_spp_disconnect_rfcomm(const char *remote_address,
 {
 	bluez_device_t *device;
 
-	DBG("");
-
-	if (!remote_address || !service_uuid)
-		return BT_ERROR_INVALID_PARAMETER;
-
 	if (initialized == false)
 		return BT_ERROR_NOT_INITIALIZED;
 
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!remote_address || !service_uuid) {
+		DBG("address = NULL");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
 
 	device = bluez_adapter_get_device_by_address(default_adapter,
 							remote_address);
@@ -4747,9 +4957,31 @@ int bt_socket_connect_rfcomm(const char *remote_address,
 {
 	struct spp_context *spp_ctx;
 	int ret;
+	int user_privilieges;
 
-	if (!remote_address || !service_uuid)
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!remote_address || !service_uuid) {
+		DBG("address = NULL");
 		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	spp_ctx = find_spp_context_from_uuid(service_uuid);
 	if (spp_ctx)
@@ -5013,6 +5245,7 @@ int bt_panu_connect(const char *remote_address, bt_panu_service_type_e type)
 	bool is_bonded;
 	GError *error = NULL;
 	int ret;
+	int user_privilieges;
 
 	DBG("");
 
@@ -5022,8 +5255,21 @@ int bt_panu_connect(const char *remote_address, bt_panu_service_type_e type)
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
-	if (!remote_address)
+	if (remote_address == NULL) {
+		DBG("address = NULL");
 		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	device = bluez_adapter_get_device_by_address(default_adapter,
 							remote_address);
@@ -5084,6 +5330,7 @@ int bt_panu_disconnect(const char *remote_address)
 	bluez_device_t *device;
 	int connected, ret;
 	GError *error = NULL;
+	int user_privilieges;
 
 	DBG("");
 
@@ -5093,8 +5340,21 @@ int bt_panu_disconnect(const char *remote_address)
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
-	if (!remote_address)
+	if (remote_address == NULL) {
+		DBG("address = NULL");
 		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	device = bluez_adapter_get_device_by_address(default_adapter,
 							remote_address);
@@ -5311,6 +5571,7 @@ int bt_hdp_send_data(unsigned int channel, const char *data,
 int bt_hdp_connect_to_source(const char *remote_address, const char *app_id)
 {
 	int result = BT_ERROR_NONE;
+	int user_privilieges;
 
 	DBG("");
 
@@ -5320,8 +5581,21 @@ int bt_hdp_connect_to_source(const char *remote_address, const char *app_id)
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
-	if (remote_address == NULL)
+	if (remote_address == NULL) {
+		DBG("address = NULL");
 		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	result = bluez_hdp_connect(app_id, HDP_CHANNEL_ANY, remote_address);
 
@@ -5331,6 +5605,7 @@ int bt_hdp_connect_to_source(const char *remote_address, const char *app_id)
 int bt_hdp_disconnect(const char *remote_address, unsigned int channel)
 {
 	int result = BT_ERROR_NONE;
+	int user_privilieges;
 
 	DBG("");
 
@@ -5340,8 +5615,21 @@ int bt_hdp_disconnect(const char *remote_address, unsigned int channel)
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
-	if (remote_address == NULL)
+	if (remote_address == NULL) {
+		DBG("address = NULL");
 		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	result = bluez_hdp_disconnect(channel, remote_address);
 
@@ -5477,8 +5765,8 @@ int bt_device_connect_le(bt_device_gatt_state_changed_cb callback,
 			const char *remote_address)
 {
 	bluez_device_t *device;
-
 	struct device_connect_cb_node *node_data = NULL;
+	int user_privilieges;
 
 	DBG("");
 
@@ -5487,6 +5775,22 @@ int bt_device_connect_le(bt_device_gatt_state_changed_cb callback,
 
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (remote_address == NULL) {
+		DBG("address = NULL");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	if (callback == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
@@ -5524,8 +5828,8 @@ int bt_device_disconnect_le(bt_device_gatt_state_changed_cb callback,
 			const char *remote_address)
 {
 	bluez_device_t *device;
-
 	struct device_disconnect_cb_node *node_data = NULL;
+	int user_privilieges;
 
 	DBG("");
 
@@ -5534,6 +5838,22 @@ int bt_device_disconnect_le(bt_device_gatt_state_changed_cb callback,
 
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (remote_address == NULL) {
+		DBG("address = NULL");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	if (callback == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
@@ -5650,6 +5970,7 @@ int bt_device_foreach_connected_profiles(
 	gboolean rfcomm_connected;
 	gboolean is_type;
 	gboolean hid_connected = false;
+	int user_privilieges;
 
 	DBG("");
 
@@ -5659,8 +5980,21 @@ int bt_device_foreach_connected_profiles(
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
-	if (!remote_address || !callback)
+	if (!remote_address || !callback) {
+		DBG("address = NULL");
 		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	device = bluez_adapter_get_device_by_address(default_adapter,
 							remote_address);
@@ -5702,6 +6036,7 @@ int bt_gatt_foreach_primary_services(const char *remote_address,
 	bluez_device_t *device;
 	GList *primary_services, *list, *next;
 	char *service_path;
+	int user_privilieges;
 
 	DBG("");
 
@@ -5711,8 +6046,21 @@ int bt_gatt_foreach_primary_services(const char *remote_address,
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
-	if (remote_address == NULL)
+	if (remote_address == NULL) {
+		DBG("address = NULL");
 		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	device = bluez_adapter_get_device_by_address(default_adapter,
 							remote_address);

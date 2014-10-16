@@ -107,6 +107,20 @@ Methods		void RegisterParingAgent(object agent)
 			Possible errors: org.bluez.Error.DoesNotExist
 					 org.bluez.Error.Failed
 
+		int GetUserPrivileges(int userid, string address)
+
+			This method can be used to get user privileges
+			operation by the GetUserPrivileges method.
+
+			Possible errors: org.bluez.Error.DoesNotExist
+
+		void RemoveUserPrivileges(int userid, string address)
+
+			This method can be used to remove user privileges
+			operation by the RemoveUserPrivileges method.
+
+			Possible errors: None
+
 Object Push Manager hierarchy
 =========================
 
@@ -142,47 +156,3 @@ Methods		void RegisterObexAgent(object agent)
 
 			Cancels the transfer process
 
-AVRCP hierarchy
-=========================
-
-Service         org.tizen.comms
-Interface       org.tizen.comms.mediaplayer
-Object path     /org/tizen/comms/bluetooth
-
-Methods		void RegisterMediaAgent(object agent)
-
-		Registers an Media agent handler.
-
-			Object path agent defines the path of the agent
-			that will be called when authorize each received object
-
-			Possible errors: org.bluez.Error.AlreadyExists
-
-		void UnregisterMediaAgent(object agent)
-
-			Unregisters the registiered Media agent.
-
-			Possible errors: org.bluez.Error.DoesNotExist
-
-		void MediaPlayerChangeProperty(uint32 type, uint32 value)
-
-			Set AVRCP property.
-
-			type defines the AVRCP property type
-			value defines the AVRCP property value
-
-			Possible errors: org.bluez.Error.InvalidArguments
-
-		void MediaPlayerChangeProperties(dict properties)
-
-			Set AVRCP multiple properties.
-			properties defines the AVRCP properties array
-
-			Possible errors: org.bluez.Error.InvalidArguments
-
-		void MediaPlayerChangeTrack(dict properties)
-
-			Set AVRCP metadata multiple properties.
-			properties defines the AVRCP metadata properties array
-
-			Possible errors: org.bluez.obex.Error.InvalidArguments
