@@ -597,76 +597,6 @@ static int __bt_get_agent_signal_info(DBusMessage *msg, char **address,
 	return BLUETOOTH_ERROR_NONE;
 }
 
-void _bt_handle_adapter_event(DBusMessage *msg)
-{
-	int result = BLUETOOTH_ERROR_NONE;
-	DBusMessageIter item_iter;
-	const char *member = dbus_message_get_member(msg);
-
-	ret_if(member == NULL);
-
-	if (strcasecmp(member, "DeviceCreated") == 0) {
-		const char *object_path = NULL;
-		char *address;
-		bt_remote_dev_info_t *remote_dev_info;
-
-		ret_if(_bt_is_device_creating() == FALSE);
-
-		/* Bonding from remote device */
-		address = g_malloc0(BT_ADDRESS_STRING_SIZE);
-
-		dbus_message_iter_init(msg, &item_iter);
-		dbus_message_iter_get_basic(&item_iter, &object_path);
-		dbus_message_iter_next(&item_iter);
-
-		_bt_convert_device_path_to_address(object_path, address);
-
-		remote_dev_info = _bt_get_remote_device_info(address);
-		if (remote_dev_info == NULL) {
-			g_free(address);
-			return;
-		}
-
-		_bt_free_device_info(remote_dev_info);
-		g_free(address);
-	} else if (strcasecmp(member, "InterfacesRemoved") == 0) {
-		const char *object_path = NULL;
-		char *address;
-		bt_remote_dev_info_t * dev_info;
-		GList * node;
-
-		/* Bonding from remote device */
-		address = g_malloc0(BT_ADDRESS_STRING_SIZE);
-
-		dbus_message_iter_init(msg, &item_iter);
-		dbus_message_iter_get_basic(&item_iter, &object_path);
-		dbus_message_iter_next(&item_iter);
-
-		_bt_convert_device_path_to_address(object_path, address);
-
-		_bt_send_event(BT_ADAPTER_EVENT,
-			BLUETOOTH_EVENT_BONDED_DEVICE_REMOVED,
-			DBUS_TYPE_INT32, &result,
-			DBUS_TYPE_STRING, &address,
-			DBUS_TYPE_INVALID);
-
-		node = g_list_first(g_list);
-
-		while (node != NULL){
-			dev_info = (bt_remote_dev_info_t *)node->data;
-			if (strcasecmp(dev_info->address,
-							address) == 0) {
-				g_list = g_list_remove(g_list, dev_info);
-				_bt_free_device_info(dev_info);
-				break;
-			}
-			node = g_list_next(node);
-		}
-
-		g_free(address);
-	}
-}
-
 gboolean _bt_stop_discovery_timeout_cb(gpointer user_data)
 {
 	DBusGProxy *adapter_proxy;
@@ -1626,68 +1556,110 @@ static DBusHandlerResult __bt_manager_event_filter(DBusConnection *conn,
 
 	retv_if(member == NULL, DBUS_HANDLER_RESULT_NOT_YET_HANDLED);
 
+	BT_DBG("interface: %s | member: %s", dbus_message_get_interface(msg), member);
+
 	if (strcasecmp(member, "InterfacesAdded") == 0) {
 		char *object_path = NULL;
-
-		BT_DBG("InterfacesAdded");
 
 		if (__bt_get_object_path(msg, &object_path)) {
 			BT_ERR("Fail to get the path");
 			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 		}
 
-		if (strcasecmp(object_path, BT_BLUEZ_HCI_PATH) == 0) {
-			_bt_handle_adapter_added();
-		} else {
-			bt_event = __bt_parse_event(msg);
+		bt_event = __bt_parse_event(msg);
 
-			if (bt_event == BT_DEVICE_EVENT) {
-				bt_remote_dev_info_t *dev_info;
-				int result = BLUETOOTH_ERROR_NONE;
+		if (bt_event == BT_DEVICE_EVENT) {
+			bt_remote_dev_info_t *dev_info;
+			int result = BLUETOOTH_ERROR_NONE;
 
-				retv_if(_bt_is_discovering() == FALSE,
-					DBUS_HANDLER_RESULT_NOT_YET_HANDLED);
+			retv_if(_bt_is_discovering() == FALSE,
+				DBUS_HANDLER_RESULT_NOT_YET_HANDLED);
 
-				dev_info = __bt_parse_interface(msg);
+			dev_info = __bt_parse_interface(msg);
 
-				if (dev_info == NULL) {
-					BT_ERR("Fail to parse the properies");
-					return
-					DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
-				}
-
-				if (dev_info->name == NULL)
-					dev_info->name = g_strdup("");
-
-				_bt_send_event(BT_ADAPTER_EVENT,
-					BLUETOOTH_EVENT_REMOTE_DEVICE_FOUND,
-					DBUS_TYPE_INT32, &result,
-					DBUS_TYPE_STRING, &dev_info->address,
-					DBUS_TYPE_UINT32, &dev_info->class,
-					DBUS_TYPE_INT16, &dev_info->rssi,
-					DBUS_TYPE_STRING, &dev_info->name,
-					DBUS_TYPE_BOOLEAN, &dev_info->paired,
-					DBUS_TYPE_BOOLEAN,
-							&dev_info->connected,
-					DBUS_TYPE_BOOLEAN, &dev_info->trust,
-					DBUS_TYPE_ARRAY, DBUS_TYPE_STRING,
-					&dev_info->uuids, dev_info->uuid_count,
-					DBUS_TYPE_INVALID);
-
-				g_list = g_list_append(g_list, dev_info);
-			}else if (bt_event == BT_MEDIA_TRANSFER_EVENT) {
-				__bt_parse_audio_properties(msg);
+			if (dev_info == NULL) {
+				BT_ERR("Fail to parse the properies");
+				return
+				DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 			}
+
+			if (dev_info->name == NULL)
+				dev_info->name = g_strdup("");
+
+			_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_REMOTE_DEVICE_FOUND,
+				DBUS_TYPE_INT32, &result,
+				DBUS_TYPE_STRING, &dev_info->address,
+				DBUS_TYPE_UINT32, &dev_info->class,
+				DBUS_TYPE_INT16, &dev_info->rssi,
+				DBUS_TYPE_STRING, &dev_info->name,
+				DBUS_TYPE_BOOLEAN, &dev_info->paired,
+				DBUS_TYPE_BOOLEAN,
+						&dev_info->connected,
+				DBUS_TYPE_BOOLEAN, &dev_info->trust,
+				DBUS_TYPE_ARRAY, DBUS_TYPE_STRING,
+				&dev_info->uuids, dev_info->uuid_count,
+				DBUS_TYPE_INVALID);
+
+			g_list = g_list_append(g_list, dev_info);
+		} else if (bt_event == BT_MEDIA_TRANSFER_EVENT) {
+			__bt_parse_audio_properties(msg);
 		}
+
 	} else if (strcasecmp(member, "InterfacesRemoved") == 0) {
-		BT_DBG("InterfacesRemoved");
+
 		bt_event = __bt_parse_remove_event(msg);
 
 		if (bt_event == BT_MEDIA_TRANSFER_EVENT){
 			_bt_parse_audio_remove_properties(msg);
-		}else{
-			_bt_handle_adapter_event(msg);
-                }
+		} else if (bt_event == BT_DEVICE_EVENT) {
+			char *object_path = NULL;
+			if (__bt_get_object_path(msg, &object_path)) {
+				BT_ERR("Fail to get the path");
+				return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+			}
+
+			if (strncasecmp(object_path, BT_BLUEZ_HCI_DEV_PATH, strlen(BT_BLUEZ_HCI_DEV_PATH)) == 0) {
+				int result = BLUETOOTH_ERROR_NONE;
+				char *address;
+				bt_remote_dev_info_t * dev_info;
+				GList * node;
+
+				BT_DBG("device interface removed | path: %s", object_path);
+
+				/* Remove bonding from remote device */
+				address = g_malloc0(BT_ADDRESS_STRING_SIZE);
+
+				_bt_convert_device_path_to_address(object_path, address);
+
+				_bt_send_event(BT_ADAPTER_EVENT,
+					BLUETOOTH_EVENT_BONDED_DEVICE_REMOVED,
+					DBUS_TYPE_INT32, &result,
+					DBUS_TYPE_STRING, &address,
+					DBUS_TYPE_INVALID);
+
+				node = g_list_first(g_list);
+
+				while (node != NULL){
+					dev_info = (bt_remote_dev_info_t *)node->data;
+					if (strcasecmp(dev_info->address,
+									address) == 0) {
+						g_list = g_list_remove(g_list, dev_info);
+						_bt_free_device_info(dev_info);
+						break;
+					}
+					node = g_list_next(node);
+				}
+
+				g_free(address);
+			}
+		} else {
+			char *object_path = NULL;
+			if (__bt_get_object_path(msg, &object_path)) {
+				BT_ERR("Fail to get the path");
+				return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+			}
+		}
 	} else if (strcasecmp(member, "NameOwnerChanged") == 0) {
 		gboolean value;
 		char *name = NULL;
@@ -1725,8 +1697,6 @@ static DBusHandlerResult __bt_manager_event_filter(DBusConnection *conn,
 		}
 	} else	if (dbus_message_has_interface(msg, BT_PROPERTIES_INTERFACE)) {
 		_bt_handle_property_changed_event(msg);
-	} else  if (dbus_message_has_interface(msg, BT_ADAPTER_INTERFACE)) {
-		_bt_handle_adapter_event(msg);
 	} else	if (dbus_message_has_interface(msg, BT_INPUT_INTERFACE)) {
 		_bt_handle_input_event(msg);
 	} else	if (dbus_message_has_interface(msg, BT_NETWORK_SERVER_INTERFACE)) {
