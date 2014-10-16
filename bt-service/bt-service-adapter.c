@@ -244,7 +244,7 @@ static bt_remote_dev_info_t *__bt_parse_remote_device_info(
 		} else if (strcasecmp(key, "Connected") == 0) {
 			dbus_message_iter_get_basic(&iter_dict_val,
 						&dev_info->connected);
-		} else if (strcasecmp(key, "paired") == 0) {
+		} else if (strcasecmp(key, "Paired") == 0) {
 			dbus_message_iter_get_basic(&iter_dict_val,
 						&dev_info->paired);
 		} else if (strcasecmp(key, "Trusted") == 0) {
@@ -1410,7 +1410,7 @@ static bluetooth_device_info_t *__bt_parse_device_info(DBusMessageIter *item_ite
 		} else if (strcasecmp(key, "Connected") == 0) {
 			dbus_message_iter_get_basic(&iter_dict_val,
 						&dev_info->connected);
-		} else if (strcasecmp(key, "paired") == 0) {
+		} else if (strcasecmp(key, "Paired") == 0) {
 			dbus_message_iter_get_basic(&iter_dict_val,
 						&dev_info->paired);
 		} else if (strcasecmp(key, "Trusted") == 0) {
