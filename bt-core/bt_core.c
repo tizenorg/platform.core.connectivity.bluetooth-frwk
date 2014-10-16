@@ -23,10 +23,15 @@
 #include <vconf.h>
 #include <vconf-keys.h>
 
+#include <dbus/dbus-glib.h>
+#include <dbus/dbus.h>
+#include <glib.h>
+
 #include "bt_core.h"
 #include "bt-internal-types.h"
 
 static GMainLoop *main_loop = NULL;
+static DBusGConnection *conn = NULL;
 
 typedef enum {
 	BT_DEACTIVATED,
@@ -109,6 +114,52 @@ static GError *bt_core_error(BtCoreError error, const char *err_msg)
 	return g_error_new(BT_CORE_ERROR, error, err_msg, NULL);
 }
 
+static DBusGProxy *_bt_get_adapter_proxy(void)
+{
+	DBusGProxy *proxy;
+	char *adapter_path = NULL;
+
+	if (conn == NULL) {
+		conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
+		retv_if(conn == NULL, NULL);
+	}
+
+	proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
+			BT_BLUEZ_HCI_PATH, BT_PROPERTIES_INTERFACE);
+	retv_if(proxy == NULL, NULL);
+
+	return proxy;
+}
+
+static int _bt_power_adapter(gboolean powered)
+{
+	GValue state = { 0 };
+	GError *error = NULL;
+	DBusGProxy *proxy;
+
+	proxy = _bt_get_adapter_proxy();
+	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	g_value_init(&state, G_TYPE_BOOLEAN);
+	g_value_set_boolean(&state, powered);
+
+	BT_DBG("send power state: %d to bluez", powered);
+
+	dbus_g_proxy_call(proxy, "Set", &error,
+				G_TYPE_STRING, BT_ADAPTER_INTERFACE,
+				G_TYPE_STRING, "Powered",
+				G_TYPE_VALUE, &state,
+				G_TYPE_INVALID, G_TYPE_INVALID);
+
+	if (error != NULL) {
+		BT_ERR("Powered set err:[%s]", error->message);
+		g_error_free(error);
+		g_value_unset(&state);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+	return BLUETOOTH_ERROR_NONE;
+}
+
 static int __bt_enable_adapter(void)
 {
 	int ret;
@@ -124,13 +175,7 @@ static int __bt_enable_adapter(void)
 
 	__bt_core_set_status(BT_ACTIVATING);
 
-	ret = system("/usr/etc/bluetooth/bt-stack-up.sh &");
-	if (ret < 0) {
-		BT_DBG("running script failed");
-		ret = system("/usr/etc/bluetooth/bt-dev-end.sh &");
-		__bt_core_set_status(BT_DEACTIVATED);
-		return -1;
-	}
+	_bt_power_adapter(TRUE);
 
 	return 0;
 }
@@ -157,14 +202,10 @@ static int __bt_disable_adapter(void)
 #endif
 	__bt_core_set_status(BT_DEACTIVATING);
 
-	if (system("/usr/etc/bluetooth/bt-stack-down.sh &") < 0) {
-			BT_DBG("running script failed");
-			__bt_core_set_status(BT_ACTIVATED);
-			return -1;
-	}
-#ifndef __TIZEN_MOBILE__
+	_bt_power_adapter(FALSE);
+
 	__bt_core_terminate();
-#endif
+
 	return 0;
 }
 
@@ -500,15 +541,12 @@ static void __bt_core_sigterm_handler(int signo)
 
 int main(void)
 {
-	DBusGConnection *conn = NULL;
 	GError *error = NULL;
 	BtCore *bt_core;
 	DBusGProxy *dbus_proxy = NULL;
 	struct sigaction sa;
 
 	BT_DBG("+");
-
-	g_type_init();
 
 	conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, &error);
 	if (error != NULL) {

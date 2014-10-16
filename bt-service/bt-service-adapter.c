@@ -783,34 +783,6 @@ static DBusGProxy *__bt_get_core_proxy(void)
        return (core_proxy) ? core_proxy : _bt_init_core_proxy();
 }
 
-gboolean __bt_enable_timeout_cb(gpointer user_data)
-{
-	DBusGProxy *proxy;
-
-	retv_if(_bt_adapter_get_status() == BT_ACTIVATED, FALSE);
-
-	proxy = __bt_get_core_proxy();
-	if (!proxy)
-		return BLUETOOTH_ERROR_INTERNAL;
-
-	/* Clean up the process */
-	if (dbus_g_proxy_call(proxy, "DisableAdapter", NULL,
-			G_TYPE_INVALID, G_TYPE_INVALID) == FALSE) {
-			BT_ERR("Bt core call failed");
-	}
-
-	__bt_adapter_set_status(BT_DEACTIVATED);
-
-	__bt_set_disabled(BLUETOOTH_ERROR_TIMEOUT);
-
-	/* Display notification */
-	status_message_post(BT_STR_NOT_SUPPORT);
-
-	_bt_terminate_service(NULL);
-
-	return FALSE;
-}
-
 int _bt_enable_adapter(void)
 {
 	DBusGProxy *proxy;
@@ -859,10 +831,6 @@ int _bt_enable_adapter(void)
 		g_idle_add((GSourceFunc)_bt_terminate_service, NULL);
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
-
-	g_timeout_add(BT_ENABLE_TIMEOUT,
-			(GSourceFunc)__bt_enable_timeout_cb,
-			NULL);
 
 	return BLUETOOTH_ERROR_NONE;
 }
