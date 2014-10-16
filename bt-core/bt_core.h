@@ -40,6 +40,19 @@ extern "C" {
 #define BT_ERR(fmt, args...) \
         SLOGE(fmt, ##args)
 
+#define retv_if(expr, val) \
+	do { \
+		if (expr) { \
+			BT_ERR("(%s) return", #expr); \
+			return (val); \
+		} \
+	} while (0)
+
+#define BT_BLUEZ_NAME "org.bluez"
+#define BT_BLUEZ_HCI_PATH "/org/bluez/hci0"
+#define BT_ADAPTER_INTERFACE "org.bluez.Adapter1"
+#define BT_PROPERTIES_INTERFACE "org.freedesktop.DBus.Properties"
+
 #define BT_CORE_NAME "org.projectx.bt_core"
 #define BT_CORE_PATH "/org/projectx/bt_core"
 
