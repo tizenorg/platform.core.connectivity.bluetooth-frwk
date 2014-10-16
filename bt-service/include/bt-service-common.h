@@ -96,7 +96,7 @@ extern "C" {
 
 #define BT_BLUEZ_NAME "org.bluez"
 #define BT_BLUEZ_PATH "/org/bluez"
-#define BT_BLUEZ_HCI_PATH "/org/bluez/hci0"
+#define BT_BLUEZ_HCI_DEV_PATH "/org/bluez/hci0/dev"
 #define BT_AGENT_NAME "org.bluez.frwk_agent"
 #define BT_AGENT_PATH "/org/bluez/agent/frwk_agent"
 #define BT_DEVICE_AGENT_PATH "/org/tizen/device_agent"
