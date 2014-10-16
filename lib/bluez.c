@@ -275,13 +275,18 @@ static void free_discovery_device_info(
 	if (discovery_device_info == NULL)
 		return;
 
-	g_free(discovery_device_info->remote_address);
-	g_free(discovery_device_info->remote_name);
+	if (discovery_device_info->remote_address)
+		g_free(discovery_device_info->remote_address);
+
+	if (discovery_device_info->remote_name)
+		g_free(discovery_device_info->remote_name);
 
 	for (i = 0; i < discovery_device_info->service_count; ++i)
 		g_free(discovery_device_info->service_uuid[i]);
 
-	g_free(discovery_device_info->service_uuid);
+	if (discovery_device_info->service_uuid)
+		g_free(discovery_device_info->service_uuid);
+
 	g_free(discovery_device_info);
 }
 
@@ -1662,29 +1667,43 @@ static void destruct_bluez_device(gpointer data)
 	g_free(device->interface_name);
 	g_free(device->object_path);
 	g_object_unref(device->interface);
-	g_object_unref(device->proxy);
 
 	if (device->device_discovery_info)
 		free_discovery_device_info(
 			device->device_discovery_info);
-	if (device->control_proxy)
-		g_object_unref(device->control_proxy);
 	if (device->control_interface)
 		g_object_unref(device->control_interface);
-	if (device->input_proxy)
-		g_object_unref(device->input_proxy);
 	if (device->input_interface)
 		g_object_unref(device->input_interface);
-	if (device->hdp_proxy)
-		g_object_unref(device->hdp_proxy);
 	if (device->hdp_interface)
 		g_object_unref(device->hdp_interface);
 	if (device->network_interface)
 		g_object_unref(device->network_interface);
-	if (device->network_proxy)
-		g_object_unref(device->network_proxy);
-	if (device->property_proxy)
-		g_object_unref(device->property_proxy);
+
+	g_free(device);
+}
+
+static void destruct_interfaces_bluez_device(gpointer data)
+{
+	struct _bluez_device *device = data;
+
+	DBG("%s", device->object_path);
+
+	g_free(device->interface_name);
+	g_free(device->object_path);
+	g_object_unref(device->interface);
+
+	if (device->device_discovery_info)
+		free_discovery_device_info(
+			device->device_discovery_info);
+	if (device->control_interface)
+		g_object_unref(device->control_interface);
+	if (device->input_interface)
+		g_object_unref(device->input_interface);
+	if (device->hdp_interface)
+		g_object_unref(device->hdp_interface);
+	if (device->network_interface)
+		g_object_unref(device->network_interface);
 
 	g_free(device);
 }
@@ -1701,7 +1720,20 @@ static void destruct_bluez_gatt_service(gpointer data)
 	g_free(service->interface_name);
 	g_free(service->object_path);
 	g_object_unref(service->interface);
-	g_object_unref(service->proxy);
+	g_object_unref(service->property_proxy);
+
+	g_free(service);
+}
+
+static void destruct_interfaces_bluez_gatt_service(gpointer data)
+{
+	struct _bluez_gatt_service *service = data;
+
+	DBG("%s", service->object_path);
+
+	g_free(service->interface_name);
+	g_free(service->object_path);
+	g_object_unref(service->interface);
 	g_object_unref(service->property_proxy);
 
 	g_free(service);
@@ -1719,7 +1751,20 @@ static void destruct_bluez_gatt_char(gpointer data)
 	g_free(characteristic->interface_name);
 	g_free(characteristic->object_path);
 	g_object_unref(characteristic->interface);
-	g_object_unref(characteristic->proxy);
+	g_object_unref(characteristic->property_proxy);
+
+	g_free(characteristic);
+}
+
+static void destruct_interfaces_bluez_gatt_char(gpointer data)
+{
+	struct _bluez_gatt_char *characteristic = data;
+
+	DBG("%s", characteristic->object_path);
+
+	g_free(characteristic->interface_name);
+	g_free(characteristic->object_path);
+	g_object_unref(characteristic->interface);
 	g_object_unref(characteristic->property_proxy);
 
 	g_free(characteristic);
@@ -1737,7 +1782,20 @@ static void destruct_bluez_gatt_desc(gpointer data)
 	g_free(descriptor->interface_name);
 	g_free(descriptor->object_path);
 	g_object_unref(descriptor->interface);
-	g_object_unref(descriptor->proxy);
+	g_object_unref(descriptor->property_proxy);
+
+	g_free(descriptor);
+}
+
+static void destruct_interfaces_bluez_gatt_desc(gpointer data)
+{
+	struct _bluez_gatt_desc *descriptor = data;
+
+	DBG("%s", descriptor->object_path);
+
+	g_free(descriptor->interface_name);
+	g_free(descriptor->object_path);
+	g_object_unref(descriptor->interface);
 	g_object_unref(descriptor->property_proxy);
 
 	g_free(descriptor);
@@ -2556,12 +2614,33 @@ static void destruct_bluez_adapter(gpointer data)
 	g_free(adapter->interface_name);
 	g_free(adapter->object_path);
 	g_object_unref(adapter->interface);
-	g_object_unref(adapter->media_proxy);
-	g_object_unref(adapter->media_interface);
-	g_object_unref(adapter->netserver_proxy);
-	g_object_unref(adapter->netserver_interface);
-	g_object_unref(adapter->property_proxy);
-	g_object_unref(adapter->proxy);
+
+	if (adapter->media_interface)
+		g_object_unref(adapter->media_interface);
+
+	if (adapter->netserver_interface)
+		g_object_unref(adapter->netserver_interface);
+
+	g_free(adapter);
+}
+
+static void destruct_interfaces_bluez_adapter(gpointer data)
+{
+	struct _bluez_adapter *adapter = data;
+
+	DBG("%s", adapter->object_path);
+
+	bluez_adapter_list = g_list_remove(bluez_adapter_list,
+						(gpointer) adapter);
+	g_free(adapter->interface_name);
+	g_free(adapter->object_path);
+	g_object_unref(adapter->interface);
+
+	if (adapter->media_interface)
+		g_object_unref(adapter->media_interface);
+
+	if (adapter->netserver_interface)
+		g_object_unref(adapter->netserver_interface);
 
 	g_free(adapter);
 }
@@ -2868,7 +2947,7 @@ static void destruct_bluez_object_interfaces(struct _bluez_object *object)
 		if (!g_strcmp0(*interface_name, ADAPTER_INTERFACE)) {
 			struct _bluez_adapter *adapter = list->data;
 			unregister_bluez_adapter(adapter);
-			destruct_bluez_adapter(adapter);
+			destruct_interfaces_bluez_adapter(adapter);
 			list->data = NULL;
 			continue;
 		}
@@ -2876,7 +2955,7 @@ static void destruct_bluez_object_interfaces(struct _bluez_object *object)
 		if (!g_strcmp0(*interface_name, DEVICE_INTERFACE)) {
 			struct _bluez_device *device = list->data;
 			unregister_bluez_device(device);
-			destruct_bluez_device(device);
+			destruct_interfaces_bluez_device(device);
 			list->data = NULL;
 			continue;
 		}
@@ -2884,7 +2963,7 @@ static void destruct_bluez_object_interfaces(struct _bluez_object *object)
 		if (!g_strcmp0(*interface_name, GATT_SERVICE_IFACE)) {
 			struct _bluez_gatt_service *service = list->data;
 			unregister_bluez_gatt_service(service);
-			destruct_bluez_gatt_service(service);
+			destruct_interfaces_bluez_gatt_service(service);
 			list->data = NULL;
 			continue;
 		}
@@ -2892,7 +2971,7 @@ static void destruct_bluez_object_interfaces(struct _bluez_object *object)
 		if (!g_strcmp0(*interface_name, GATT_CHR_IFACE)) {
 			struct _bluez_gatt_char *characteristic = list->data;
 			unregister_bluez_gatt_char(characteristic);
-			destruct_bluez_gatt_char(characteristic);
+			destruct_interfaces_bluez_gatt_char(characteristic);
 			list->data = NULL;
 			continue;
 		}
@@ -2900,7 +2979,7 @@ static void destruct_bluez_object_interfaces(struct _bluez_object *object)
 		if (!g_strcmp0(*interface_name, GATT_DESCRIPTOR_IFACE)) {
 			struct _bluez_gatt_desc *descriptor = list->data;
 			unregister_bluez_gatt_desc(descriptor);
-			destruct_bluez_gatt_desc(descriptor);
+			destruct_interfaces_bluez_gatt_desc(descriptor);
 			list->data = NULL;
 			continue;
 		}
@@ -2922,7 +3001,6 @@ static void destruct_bluez_object(gpointer data)
 	bluez_object_list = g_list_remove(bluez_object_list, object);
 
 	destruct_bluez_object_interfaces(object);
-	object->interfaces = NULL;
 
 	g_free(object->path_name);
 	g_object_unref(object->obj);
