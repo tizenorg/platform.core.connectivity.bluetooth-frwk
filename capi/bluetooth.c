@@ -276,13 +276,11 @@ static GList *char_changed_node_list;
 static int bt_device_get_privileges(const char *remote_address)
 {
 	int user_privilieges;
-	int uid;
 
-	uid = getuid();
-	DBG("uid = %d, address = %s", uid, remote_address);
+	DBG("address = %s", remote_address);
 
 	user_privilieges = comms_bluetooth_get_user_privileges_sync(
-						uid, remote_address);
+						remote_address);
 
 	return user_privilieges;
 }
@@ -466,7 +464,6 @@ static void bluez_unpaired_device_removed(bluez_device_t *device,
 static void handle_generic_device_removed(bluez_device_t *device, void *user_data)
 {
 	adapter_device_discovery_info_t *device_info;
-	int userid;
 
 	DBG("");
 
@@ -479,8 +476,7 @@ static void handle_generic_device_removed(bluez_device_t *device, void *user_dat
 		bluez_unpaired_device_removed(device, unpaired_device_removed_node);
 	else {
 		if (device_info->remote_address) {
-			userid = getuid();
-			comms_bluetooth_remove_user_privileges_sync(userid,
+			comms_bluetooth_remove_user_privileges_sync(
 						device_info->remote_address);
 		}
 		bluez_paired_device_removed(device, paired_device_removed_node);
@@ -2021,10 +2017,7 @@ int bt_device_create_bond(const char *remote_address)
 		memset(pairing_address, 0, ADDRESS_LEN);
 		return BT_SUCCESS;
 	} else if (user_privilieges == 2) {
-		int uid;
-		uid = getuid();
-		DBG("pairing uid = %d", uid);
-		comms_bluetooth_device_pair(remote_address, uid,
+		comms_bluetooth_device_pair(remote_address,
 			bt_device_paired_cb, strdup(remote_address));
 
 		return BT_SUCCESS;

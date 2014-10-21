@@ -25,6 +25,7 @@
 #include <dirent.h>
 #include <dbus/dbus.h>
 #include <gio/gunixfdlist.h>
+#include <string.h>
 
 #include "bluetooth.h"
 #include "obex.h"
@@ -939,13 +940,11 @@ static void session_state_changed(const char *session_id,
 static int bt_device_get_privileges(const char *remote_address)
 {
 	int user_privilieges;
-	int uid;
 
-	uid = getuid();
-	DBG("uid = %d, address = %s", uid, remote_address);
+	DBG("address = %s", remote_address);
 
 	user_privilieges = comms_bluetooth_get_user_privileges_sync(
-						uid, remote_address);
+						remote_address);
 
 	return user_privilieges;
 }

@@ -723,7 +723,6 @@ int comms_manager_get_property_bt_in_service(gboolean *in_service)
 }
 
 void comms_bluetooth_device_pair(const char *address,
-				const unsigned int uid,
 				bluetooth_simple_callback cb,
 				void *user_data)
 {
@@ -746,7 +745,7 @@ void comms_bluetooth_device_pair(const char *address,
 	async_result_node->user_data = user_data;
 
 	g_dbus_proxy_call(this_bluetooth->pairing.proxy, "Pair",
-					g_variant_new("(is)", uid, address),
+					g_variant_new("(s)", address),
 					0, -1, NULL,
 					bluetooth_simple_async_cb,
 					async_result_node);
@@ -834,8 +833,7 @@ int comms_bluetooth_register_pairing_agent_sync(const char *agent_path,
 	return BT_SUCCESS;
 }
 
-int comms_bluetooth_get_user_privileges_sync(const unsigned int uid,
-							const char *address)
+int comms_bluetooth_get_user_privileges_sync(const char *address)
 {
 	GError *error = NULL;
 	GVariant *result;
@@ -850,7 +848,7 @@ int comms_bluetooth_get_user_privileges_sync(const unsigned int uid,
 
 	result = g_dbus_proxy_call_sync(this_bluetooth->pairing.proxy,
 				"GetUserPrivileges",
-				g_variant_new("(is)", uid, address),
+				g_variant_new("(s)", address),
 				0, -1, NULL, &error);
 
 	if (error) {
@@ -865,8 +863,7 @@ int comms_bluetooth_get_user_privileges_sync(const unsigned int uid,
 	return privileges;
 }
 
-int comms_bluetooth_remove_user_privileges_sync(const unsigned int uid,
-							const char *address)
+int comms_bluetooth_remove_user_privileges_sync(const char *address)
 {
 	GError *error = NULL;
 	GVariant *result;
@@ -880,7 +877,7 @@ int comms_bluetooth_remove_user_privileges_sync(const unsigned int uid,
 
 	result = g_dbus_proxy_call_sync(this_bluetooth->pairing.proxy,
 				"RemoveUserPrivileges",
-				g_variant_new("(is)", uid, address),
+				g_variant_new("(s)", address),
 				0, -1, NULL, &error);
 
 	if (error) {
