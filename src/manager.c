@@ -26,6 +26,7 @@
 #ifdef TIZEN_2_MOBILE
 #include "map_agent.h"
 #endif
+#include "bluetooth-ag-agent.h"
 #include "bluez.h"
 #include "gdbus.h"
 
@@ -263,7 +264,7 @@ static void adapter_powered_on(CommsManagerSkeleton *skeleton)
 #ifdef TIZEN_2_MOBILE
 	bt_map_agent_init();
 #endif
-
+        bt_ag_agent_init();
 	g_dbus_object_manager_server_export(manager_server, bt_object);
 }
 
@@ -1001,3 +1002,11 @@ CommsManagerSkeleton *comms_service_manager_new(
 				"DefaultAdapter", DEFAULT_ADAPTER,
 				NULL);
 }
+
+int get_adapter_path() {
+	if (default_adapter != NULL)
+		return 1;
+	else
+		return 0;
+}
+
