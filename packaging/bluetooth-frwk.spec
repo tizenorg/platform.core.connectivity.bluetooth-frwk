@@ -13,10 +13,16 @@ BuildRequires:  pkgconfig(glib-2.0)
 BuildRequires:  pkgconfig(gio-2.0)
 BuildRequires:  pkgconfig(gio-unix-2.0)
 BuildRequires:  pkgconfig(capi-base-common)
+BuildRequires:  pkgconfig(vconf)
+BuildRequires:  pkgconfig(tapi)
+BuildRequires:  pkgconfig(appsvc)
+BuildRequires:  pkgconfig(capi-appfw-application)
+BuildRequires:  pkgconfig(capi-system-info)
 %if "%{tizen_version}"!="3.0"
 BuildRequires:  pkgconfig(aul)
 BuildRequires:  pkgconfig(syspopup-caller)
 %endif
+BuildRequires:  pkgconfig(contacts-service2)
 BuildRequires:  pkgconfig(notification)
 BuildRequires:  cmake
 

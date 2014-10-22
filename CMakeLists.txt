@@ -14,7 +14,13 @@ pkg_check_modules(${TEST} REQUIRED
 			glib-2.0
 			dbus-1
 			gio-2.0
-			gio-unix-2.0)
+			gio-unix-2.0
+                        vconf
+                        tapi
+                        capi-appfw-application
+                        appsvc
+                        capi-system-info
+                        contacts-service2)
 
 FOREACH(flag ${${TEST}_CFLAGS})
 	SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${flag}")
@@ -86,6 +92,11 @@ SET(SOURCES_BLUETOOTH_SERVICE
 	src/map_agent.c
 	src/map_bmessage.c
 	src/bluetooth_map_agent.c
+        src/bluetooth-ag-agent.c
+        src/bluetooth-ag-agent.h
+        src/bluetooth-ag-handler.c
+        src/bluetooth-ag-handler.h
+	src/bluetooth-ag-manager.c
 	lib/bluez.c
 	lib/bluez-hdp.c
 	lib/common.c
@@ -99,6 +110,11 @@ SET(SOURCES_BLUETOOTH_SERVICE
 	src/vertical.c
 	src/pairing.c
 	src/opp.c
+        src/bluetooth-ag-agent.c
+        src/bluetooth-ag-agent.h
+        src/bluetooth-ag-handler.c
+        src/bluetooth-ag-handler.h
+        src/bluetooth-ag-manager.c
 	lib/bluez.c
 	lib/bluez-hdp.c
 	lib/common.c

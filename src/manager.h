@@ -62,5 +62,6 @@ GType comms_manager_skeleton_get_type(void) G_GNUC_CONST;
 
 CommsManagerSkeleton *comms_service_manager_new(
 				GDBusObjectManagerServer *server);
+int get_adapter_path();
 
 #endif
