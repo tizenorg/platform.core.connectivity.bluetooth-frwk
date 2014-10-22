@@ -42,7 +42,6 @@
 static DBusGConnection *manager_conn = NULL;
 static DBusGConnection *obexd_conn = NULL;
 static DBusGConnection *opc_obexd_conn = NULL;
-static GList *g_list = NULL;
 
 static guint event_id;
 
@@ -682,7 +681,6 @@ void __bt_adapter_property_changed_event(DBusMessageIter *msg_iter, const char *
 				BLUETOOTH_EVENT_DISCOVERY_STARTED,
 				DBUS_TYPE_INT32, &result,
 				DBUS_TYPE_INVALID);
-			_bt_get_temp_remote_devinfo();
 		} else {
 			if (event_id > 0){
 				g_source_remove(event_id);
@@ -1528,23 +1526,6 @@ static int __bt_get_object_path(DBusMessage *msg, char **path)
 	return BLUETOOTH_ERROR_NONE;
 }
 
-static void __bt_devices_list_free()
-{
-	bt_remote_dev_info_t *dev_info;
-	GList *node;
-
-	node = g_list_first(g_list);
-
-	while (node != NULL){
-		dev_info = (bt_remote_dev_info_t *)node->data;
-
-		g_list = g_list_remove(g_list, dev_info);
-		_bt_free_device_info(dev_info);
-
-		node = g_list_next(node);
-	}
-}
-
 static DBusHandlerResult __bt_manager_event_filter(DBusConnection *conn,
 					   DBusMessage *msg, void *data)
 {
@@ -1601,7 +1582,6 @@ static DBusHandlerResult __bt_manager_event_filter(DBusConnection *conn,
 				&dev_info->uuids, dev_info->uuid_count,
 				DBUS_TYPE_INVALID);
 
-			g_list = g_list_append(g_list, dev_info);
 		} else if (bt_event == BT_MEDIA_TRANSFER_EVENT) {
 			__bt_parse_audio_properties(msg);
 		}
@@ -1638,19 +1618,6 @@ static DBusHandlerResult __bt_manager_event_filter(DBusConnection *conn,
 					DBUS_TYPE_STRING, &address,
 					DBUS_TYPE_INVALID);
 
-				node = g_list_first(g_list);
-
-				while (node != NULL){
-					dev_info = (bt_remote_dev_info_t *)node->data;
-					if (strcasecmp(dev_info->address,
-									address) == 0) {
-						g_list = g_list_remove(g_list, dev_info);
-						_bt_free_device_info(dev_info);
-						break;
-					}
-					node = g_list_next(node);
-				}
-
 				g_free(address);
 			}
 		} else {
@@ -1679,7 +1646,6 @@ static DBusHandlerResult __bt_manager_event_filter(DBusConnection *conn,
 		if (strcasecmp(name, "org.bluez") == 0) {
 			BT_DBG("Bluetoothd is terminated");
 			_bt_handle_adapter_removed();
-			__bt_devices_list_free();
 		}
 
 		_bt_obex_server_check_allocation(&value);
@@ -2241,31 +2207,3 @@ void _bt_opp_client_event_deinit(void)
 	}
 }
 
-void _bt_get_temp_remote_devinfo(void)
-{
-	bt_remote_dev_info_t *dev_info;
-	GList *node;
-	int result = BLUETOOTH_ERROR_NONE;
-
-	node = g_list_first(g_list);
-
-	while (node != NULL){
-		dev_info = (bt_remote_dev_info_t *)node->data;
-
-		_bt_send_event(BT_ADAPTER_EVENT,
-			BLUETOOTH_EVENT_REMOTE_DEVICE_FOUND,
-			DBUS_TYPE_INT32, &result,
-			DBUS_TYPE_STRING, &dev_info->address,
-			DBUS_TYPE_UINT32, &dev_info->class,
-			DBUS_TYPE_INT16, &dev_info->rssi,
-			DBUS_TYPE_STRING, &dev_info->name,
-			DBUS_TYPE_BOOLEAN, &dev_info->paired,
-			DBUS_TYPE_BOOLEAN, &dev_info->connected,
-			DBUS_TYPE_BOOLEAN, &dev_info->trust,
-			DBUS_TYPE_ARRAY, DBUS_TYPE_STRING,
-			&dev_info->uuids, dev_info->uuid_count,
-			DBUS_TYPE_INVALID);
-
-		node = g_list_next(node);
-	}
-}
