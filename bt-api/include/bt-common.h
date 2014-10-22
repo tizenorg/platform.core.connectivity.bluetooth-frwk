@@ -132,13 +132,13 @@ extern "C" {
 #define BT_EVENT_FREEDESKTOP "org.freedesktop.DBus"
 #define BT_FREEDESKTOP_PATH "/org/freedesktop/DBus"
 
-#define BT_EVENT_MANAGER "org.bluez.Manager"
 #define BT_MANAGER_PATH "/"
 #define BT_MANAGER_INTERFACE "org.freedesktop.DBus.ObjectManager"
 #define BT_ADAPTER_INTERFACE "org.bluez.Adapter1"
 #define BT_DEVICE_INTERFACE "org.bluez.Device1"
 
 #define BT_PROPERTIES_INTERFACE "org.freedesktop.DBus.Properties"
+#define BT_BLUEZ_HCI_PATH "/org/bluez/hci0"
 
 #define BT_BLUEZ_NAME "org.bluez"
 #define BT_DBUS_NAME "org.projectx.bt"
