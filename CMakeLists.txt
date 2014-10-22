@@ -86,6 +86,11 @@ SET(SOURCES_BLUETOOTH_SERVICE
 	src/map_agent.c
 	src/map_bmessage.c
 	src/bluetooth_map_agent.c
+        src/bluetooth-ag-agent.c
+        src/bluetooth-ag-agent.h
+        src/bluetooth-ag-handler.c
+        src/bluetooth-ag-handler.h
+	src/bluetooth-ag-manager.c
 	lib/bluez.c
 	lib/bluez-hdp.c
 	lib/common.c

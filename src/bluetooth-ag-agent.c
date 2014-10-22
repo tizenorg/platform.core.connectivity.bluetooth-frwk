@@ -28,6 +28,7 @@
 #include <gio/gunixfdlist.h>
 #include "bluetooth-ag-agent.h"
 #include "bluetooth-ag-handler.h"
+#include "manager.h"
 
 #include <TapiUtility.h>
 #include <ITapiSim.h>
@@ -3371,60 +3372,6 @@ static void __bt_ag_agent_dereg_sim_event (TapiHandle *handle)
 		ERR("event deregister failed(%d)", ret);
 }
 
-static void __bt_ag_agent_filter_cb(GDBusConnection *connection,
-					const gchar *sender_name,
-					const gchar *object_path,
-					const gchar *interface_name,
-					const gchar *signal_name,
-					GVariant *parameters,
-					gpointer user_data)
-{
-	FN_START;
-	char *path = NULL;
-	GVariant *optional_param;
-
-	if (strcasecmp(signal_name, "InterfacesAdded") == 0) {
-
-		g_variant_get(parameters, "(&o@a{sa{sv}})",
-							&path, &optional_param);
-		if (!path) {
-			ERR("Invalid adapter path");
-			return;
-		}
-
-		INFO("Adapter Path = [%s]", path);
-		if (strcasecmp(path, DEFAULT_ADAPTER_OBJECT_PATH) == 0) {
-			gchar *obj_path = g_strdup(BT_AG_AGENT_OBJECT_PATH);
-			__bt_ag_agent_register(obj_path, hfp_ver,
-				 HFP_AG_UUID, "Hands-Free Audio Gateway");
-
-			obj_path =  g_strdup(BT_HS_AG_AGENT_OBJECT_PATH);
-			__bt_ag_agent_register(obj_path, hsp_ver,
-				HSP_AG_UUID, "Headset Audio Gateway");
-		}
-	} else if (strcasecmp(signal_name, "InterfacesRemoved") == 0) {
-		g_variant_get(parameters, "(&o@as)", &path, &optional_param);
-		if (!path) {
-			ERR("Invalid adapter path");
-			return;
-		}
-
-		INFO("Adapter Path = [%s]", path);
-		if (strcasecmp(path, DEFAULT_ADAPTER_OBJECT_PATH) == 0) {
-			gchar *ag_path = g_strdup(BT_AG_AGENT_OBJECT_PATH);
-			__bt_ag_agent_unregister(ag_path);
-
-			gchar *hs_path =  g_strdup(BT_HS_AG_AGENT_OBJECT_PATH);
-			__bt_ag_agent_unregister(hs_path);
-
-			g_free(ag_path);
-			g_free(hs_path);
-		}
-	}
-
-	FN_END;
-}
-
 static void __bt_ag_agent_dbus_deinit(void)
 {
 
@@ -3529,7 +3476,7 @@ static void __bt_ag_agent_dbus_init(void)
 		return;
 	}
 
-	if(!__bt_ag_agent_get_adapter_path(bt_ag_info.conn , NULL)) {
+	if( get_adapter_path() ) {
 
 		gchar *path = g_strdup(BT_AG_AGENT_OBJECT_PATH);
 		__bt_ag_agent_register(path, hfp_ver,
@@ -3539,10 +3486,6 @@ static void __bt_ag_agent_dbus_init(void)
 		__bt_ag_agent_register(path, hsp_ver,
 			HSP_AG_UUID, "Headset Audio Gateway");
 	}
-
-	owner_sig_id = g_dbus_connection_signal_subscribe(bt_ag_info.conn,
-				NULL, BT_MANAGER_INTERFACE, NULL, NULL, NULL, 0,
-				__bt_ag_agent_filter_cb, NULL, NULL);
 
 	FN_END;
 	return;
@@ -3575,18 +3518,15 @@ void bt_ag_agent_deinit() {
        _bt_hfp_deinitialize_telephony_manager();
        __bt_ag_agent_release_vconf_updates();
        if(sco_server_started)
-               __bt_ag_stop_sco_server(&bt_ag_info);		
+               __bt_ag_stop_sco_server(&bt_ag_info);
 
 }
 void bt_ag_agent_init(void)
 {
-	//struct sigaction sa;
 	int tapi_result;
 	uint32_t ag_features;
 
 	DBG("Starting Bluetooth AG agent");
-
-	//g_type_init();
 
 	ag_features = __bt_ag_agent_get_ag_features();
 
@@ -3594,19 +3534,6 @@ void bt_ag_agent_init(void)
 
 	if (hfp_ver == HFP_VERSION_1_6 && wbs_en == TRUE)
 		ag.sdp_features |= BT_AG_FEATURE_SDP_WIDEBAND_SPEECH;
-
-	//memset(&sa, 0, sizeof(sa));
-	//sa.sa_flags = SA_NOCLDSTOP;
-	//sa.sa_handler = __bt_ag_agent_sigterm_handler;
-	//sigaction(SIGTERM, &sa, NULL);
-	//sigaction(SIGSEGV, &sa, NULL);
-	//sigaction(SIGABRT, &sa, NULL);
-	//gmain_loop = g_main_loop_new(NULL, FALSE);
-
-	/*if (gmain_loop == NULL) {
-		ERR("GMainLoop create failed\n");
-		return EXIT_FAILURE;
-	}*/
 
 	tapi_handle = tel_init(NULL);
 	tapi_result = tel_get_sim_msisdn(tapi_handle, __bt_ag_agent_tel_cb,
@@ -3620,19 +3547,4 @@ void bt_ag_agent_init(void)
 	__bt_ag_codec_negotiation_info_reset(TRUE);
 	__bt_ag_agent_subscribe_vconf_updates();
 
-	//g_main_loop_run(gmain_loop);
-
-	/*tel_deinit(tapi_handle);
-
-	__bt_ag_agent_dbus_deinit();
-	_bt_hfp_deinitialize_telephony_manager();
-	__bt_ag_agent_release_vconf_updates();
-	if(sco_server_started)
-		__bt_ag_stop_sco_server(&bt_ag_info);*/
-
-	//if (gmain_loop)
-	//	g_main_loop_unref(gmain_loop);
-
-	//INFO("Terminating Bluetooth AG agent");
-	//return 0;
 }

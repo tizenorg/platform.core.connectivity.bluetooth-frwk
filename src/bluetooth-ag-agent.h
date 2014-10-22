@@ -459,6 +459,8 @@ void __attribute__((format(printf, 3, 4)))
 		_bt_ag_send_foreach_headset(GSList *devices,
 		int (*cmp) (bt_ag_info_t *hs),
 		const char *format, ...);
+void bt_ag_agent_init();
+void bt_ag_agent_deinit();
 void _bt_ag_slconn_complete(bt_ag_info_t *hs);
 int _bt_ag_send_response(bt_ag_info_t *hs, hfp_state_manager_err_t err);
 void _bt_ag_agent_get_imsi(void *device);
