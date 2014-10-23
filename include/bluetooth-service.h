@@ -49,6 +49,7 @@ int comms_manager_get_property_bt_in_service(
 
 void comms_bluetooth_device_pair(
 			const char *address,
+			const unsigned int uid,
 			bluetooth_simple_callback cb,
 			void *user_data);
 
@@ -121,4 +122,13 @@ void comms_bluetooth_unregister_media_agent(
 			const char *agent_path,
 			bluetooth_simple_callback cb,
 			void *user_data);
+
+int comms_bluetooth_get_user_privileges_sync(
+			const unsigned int uid,
+			const char *address);
+
+int comms_bluetooth_remove_user_privileges_sync(
+			const unsigned int uid,
+			const char *address);
+
 #endif
