@@ -63,9 +63,6 @@ static DBusGProxy *__bt_init_adapter_proxy(void)
 {
 	DBusGProxy *manager_proxy;
 	DBusGProxy *proxy;
-	char *adapter_path = NULL;
-
-	g_type_init();
 
 	if (system_conn == NULL) {
 		system_conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
@@ -75,13 +72,8 @@ static DBusGProxy *__bt_init_adapter_proxy(void)
 	manager_proxy = _bt_get_manager_proxy();
 	retv_if(manager_proxy == NULL, NULL);
 
-	adapter_path = _bt_get_adapter_path();
-	retv_if(adapter_path == NULL, NULL);
-
 	proxy = dbus_g_proxy_new_for_name(system_conn, BT_BLUEZ_NAME,
-				adapter_path, BT_ADAPTER_INTERFACE);
-
-	g_free(adapter_path);
+				BT_BLUEZ_HCI_PATH, BT_ADAPTER_INTERFACE);
 
 	retv_if(proxy == NULL, NULL);
 
@@ -94,7 +86,6 @@ static DBusGProxy *__bt_init_adapter_properties_proxy(void)
 {
 	DBusGProxy *manager_proxy;
 	DBusGProxy *proxy;
-	char *adapter_path = NULL;
 
 	g_type_init();
 
@@ -106,13 +97,8 @@ static DBusGProxy *__bt_init_adapter_properties_proxy(void)
 	manager_proxy = _bt_get_manager_proxy();
 	retv_if(manager_proxy == NULL, NULL);
 
-	adapter_path = _bt_get_adapter_path();
-	retv_if(adapter_path == NULL, NULL);
-
 	proxy = dbus_g_proxy_new_for_name(system_conn, BT_BLUEZ_NAME,
-				adapter_path, BT_PROPERTIES_INTERFACE);
-
-	g_free(adapter_path);
+			BT_BLUEZ_HCI_PATH, BT_PROPERTIES_INTERFACE);
 
 	retv_if(proxy == NULL, NULL);
 

@@ -218,8 +218,6 @@ static char *__bt_extract_adapter_path(DBusMessageIter *msg_iter)
 		dbus_message_iter_next(&value_iter);
 	}
 
-	BT_DBG("There is no adapter");
-
 	return NULL;
 }
 
@@ -313,17 +311,11 @@ fail:
 DBusGProxy *_bt_get_adapter_proxy(DBusGConnection *conn)
 {
 	DBusGProxy *adapter_proxy = NULL;
-	char adapter_path[BT_ADAPTER_OBJECT_PATH_MAX] = { 0 };
 
 	retv_if(conn == NULL, NULL);
 
-	if (_bt_get_adapter_path(conn, adapter_path) < 0) {
-		BT_DBG("Could not get adapter path\n");
-		return NULL;
-	}
-
 	adapter_proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
-				adapter_path, BT_PROPERTIES_INTERFACE);
+			BT_BLUEZ_HCI_PATH, BT_PROPERTIES_INTERFACE);
 
 	return adapter_proxy;
 }
@@ -334,8 +326,6 @@ gboolean _bt_get_adapter_power(DBusGConnection *conn)
 	gboolean powered;
 	GValue powered_v = { 0 };
 	GError *err = NULL;
-
-	BT_DBG("+");
 
 	proxy = _bt_get_adapter_proxy(conn);
 	retv_if(proxy == NULL, FALSE);
@@ -356,7 +346,6 @@ gboolean _bt_get_adapter_power(DBusGConnection *conn)
 	powered = (gboolean)g_value_get_boolean(&powered_v);
 
 	BT_DBG("powered = %d", powered);
-	BT_DBG("-");
 
 	return powered;
 }
