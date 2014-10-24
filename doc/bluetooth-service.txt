@@ -107,14 +107,14 @@ Methods		void RegisterParingAgent(object agent)
 			Possible errors: org.bluez.Error.DoesNotExist
 					 org.bluez.Error.Failed
 
-		int GetUserPrivileges(int userid, string address)
+		int GetUserPrivileges(string address)
 
 			This method can be used to get user privileges
 			operation by the GetUserPrivileges method.
 
 			Possible errors: org.bluez.Error.DoesNotExist
 
-		void RemoveUserPrivileges(int userid, string address)
+		void RemoveUserPrivileges(string address)
 
 			This method can be used to remove user privileges
 			operation by the RemoveUserPrivileges method.

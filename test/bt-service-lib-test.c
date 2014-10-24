@@ -111,13 +111,9 @@ static void bt_simple_result_cb(enum bluez_error_type error_type,
 
 static int bt_pair(void *p1, void *p2)
 {
-	int uid;
+	DBG("");
 
-	uid = getuid();
-
-	DBG("uid = %d", uid);
-
-	comms_bluetooth_device_pair(p1, uid, bt_simple_result_cb, NULL);
+	comms_bluetooth_device_pair(p1, bt_simple_result_cb, NULL);
 
 	return 0;
 }

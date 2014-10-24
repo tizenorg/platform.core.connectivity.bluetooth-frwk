@@ -53,16 +53,13 @@ static const GDBusMethodInfo *_pairing_method_info_pointers[] =
 				GDBUS_ARGS(_ARG("agent", "o")), NULL),
 	GDBUS_METHOD("UnregisterPairingAgent",
 				GDBUS_ARGS(_ARG("agent", "o")), NULL),
-	GDBUS_METHOD("Pair", GDBUS_ARGS(_ARG("userid", "i"),
-				_ARG("address", "s")), NULL),
+	GDBUS_METHOD("Pair", GDBUS_ARGS(_ARG("address", "s")), NULL),
 	GDBUS_METHOD("CancelPairing", NULL, NULL),
 	GDBUS_METHOD("GetUserPrivileges",
-				GDBUS_ARGS(_ARG("userid", "i"),
-				_ARG("address", "s")),
+				GDBUS_ARGS(_ARG("address", "s")),
 				GDBUS_ARGS(_ARG("privilege_id", "i"))),
 	GDBUS_METHOD("RemoveUserPrivileges",
-				GDBUS_ARGS(_ARG("userid", "i"),
-				_ARG("address", "s")), NULL),
+				GDBUS_ARGS(_ARG("address", "s")), NULL),
 	NULL
 };
 
@@ -736,6 +733,39 @@ static const GDBusInterfaceVTable pairing_agent_vtable =
 	NULL
 };
 
+static guint32 get_connection_user_id(GDBusConnection *connection,
+					GDBusMethodInvocation *invocation)
+{
+	GError *error = NULL;
+	GVariant *uidvalue;
+	const gchar *sender;
+	guint32 uid;
+
+	DBG("");
+
+	sender = g_dbus_method_invocation_get_sender(invocation);
+	uidvalue = g_dbus_connection_call_sync(connection,
+				"org.freedesktop.DBus",
+				"/org/freedesktop/DBus",
+				"org.freedesktop.DBus",
+				"GetConnectionUnixUser",
+				g_variant_new("(s)", sender),
+				NULL, 0, -1, NULL, &error);
+
+	if (uidvalue == NULL) {
+		DBG("GetConnectionUnixUser: %s", error->message);
+		g_error_free(error);
+		return -1;
+	}
+
+	g_variant_get(uidvalue, "(u)", &uid);
+	g_variant_unref(uidvalue);
+
+	DBG("uid = %d", uid);
+
+	return uid;
+}
+
 static gboolean create_pairing_agent(GDBusConnection *connection)
 {
 	DBG("");
@@ -991,7 +1021,7 @@ static void pairing_handler(GDBusConnection *connection,
 {
 	bluez_device_t *device;
 	gchar *address;
-	guint uid;
+	guint32 uid;
 
 	DBG("");
 
@@ -1003,7 +1033,14 @@ static void pairing_handler(GDBusConnection *connection,
 
 	isbonding = TRUE;
 
-	g_variant_get(parameters, "(is)", &uid, &address);
+	uid = get_connection_user_id(connection, invocation);
+	if (uid == -1) {
+		comms_error_does_not_exist(invocation);
+		isbonding = FALSE;
+		return;
+	}
+
+	g_variant_get(parameters, "(s)", &address);
 
 	if (pairing_device_address)
 		g_free(pairing_device_address);
@@ -1213,7 +1250,7 @@ static void get_userprivileges_handler(GDBusConnection *connection,
 					gpointer user_data)
 {
 	gchar *address;
-	guint uid;
+	guint32 uid;
 	GVariant *value;
 	guint retvalue;
 	bluez_device_t *device;
@@ -1222,7 +1259,13 @@ static void get_userprivileges_handler(GDBusConnection *connection,
 
 	DBG("+");
 
-	g_variant_get(parameters, "(is)", &uid, &address);
+	uid = get_connection_user_id(connection, invocation);
+	if (uid == -1) {
+		comms_error_does_not_exist(invocation);
+		return;
+	}
+
+	g_variant_get(parameters, "(s)", &address);
 
 	device = bluez_adapter_get_device_by_address(default_adapter,
 								address);
@@ -1256,11 +1299,17 @@ static void remove_userprivileges_handler(GDBusConnection *connection,
 					gpointer user_data)
 {
 	gchar *address;
-	guint uid;
+	guint32 uid;
 
 	DBG("");
 
-	g_variant_get(parameters, "(is)", &uid, &address);
+	uid = get_connection_user_id(connection, invocation);
+	if (uid == -1) {
+		comms_error_does_not_exist(invocation);
+		return;
+	}
+
+	g_variant_get(parameters, "(s)", &address);
 
 	remove_userprivileges(uid, address);
 
