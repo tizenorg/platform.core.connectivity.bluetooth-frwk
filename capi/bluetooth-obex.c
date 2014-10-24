@@ -37,6 +37,9 @@
 
 #define OBEX_ERROR_INTERFACE "org.bluez.obex.Error"
 
+#define ADDRESS_LEN 20
+static char pushing_address[ADDRESS_LEN];
+
 static struct {
 	char *root_folder;
 	char *pending_name;
@@ -933,6 +936,20 @@ static void session_state_changed(const char *session_id,
 	}
 }
 
+static int bt_device_get_privileges(const char *remote_address)
+{
+	int user_privilieges;
+	int uid;
+
+	uid = getuid();
+	DBG("uid = %d, address = %s", uid, remote_address);
+
+	user_privilieges = comms_bluetooth_get_user_privileges_sync(
+						uid, remote_address);
+
+	return user_privilieges;
+}
+
 int bt_opp_client_push_files(const char *remote_address,
 				bt_opp_client_push_responded_cb responded_cb,
 				bt_opp_client_push_progress_cb progress_cb,
@@ -941,8 +958,29 @@ int bt_opp_client_push_files(const char *remote_address,
 {
 	char *c_file = NULL;
 	GList *list, *next;
+	int user_privilieges;
+
+	if (remote_address == NULL) {
+		DBG("address = NULL");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
 
 	DBG("");
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	memset(pushing_address, 0, ADDRESS_LEN);
+	strcpy(pushing_address, remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		memset(pushing_address, 0, ADDRESS_LEN);
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	bt_push_request_cb = responded_cb;
 	bt_progress_cb = progress_cb;
@@ -977,6 +1015,24 @@ int bt_opp_client_cancel_push(void)
 {
 	const GList *transfer_list;
 	GList *list, *next;
+	int user_privilieges;
+
+	if (strlen(pushing_address) == 0) {
+		DBG("not need to cancel bonding");
+		return BT_ERROR_NOT_ENABLED;
+	}
+
+	user_privilieges = bt_device_get_privileges(pushing_address);
+	memset(pushing_address, 0, ADDRESS_LEN);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
 
 	transfer_list = obex_transfer_get_pathes();
 
