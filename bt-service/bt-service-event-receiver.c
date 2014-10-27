@@ -869,7 +869,9 @@ void __bt_device_property_changed_event(DBusMessageIter *msg_iter, const char *p
 
 		} else if (strcasecmp(property, "Paired") == 0) {
 			gboolean paired = FALSE;
-			bt_remote_dev_info_t *remote_dev_info;
+
+			GList *node;
+			bt_remote_dev_info_t *dev_info;
 
 			dbus_message_iter_recurse(&dict_iter, &value_iter);
 			dbus_message_iter_get_basic(&value_iter, &paired);
@@ -884,11 +886,6 @@ void __bt_device_property_changed_event(DBusMessageIter *msg_iter, const char *p
 				return;
 			}
 
-			if (_bt_is_device_creating() == TRUE) {
-				BT_DBG("Try to Pair by me");
-				return;
-			}
-
 			address = g_malloc0(BT_ADDRESS_STRING_SIZE);
 
 			_bt_convert_device_path_to_address(path, address);
@@ -899,19 +896,34 @@ void __bt_device_property_changed_event(DBusMessageIter *msg_iter, const char *p
 				return;
 			}
 
-			_bt_send_event(BT_ADAPTER_EVENT,
-				BLUETOOTH_EVENT_BONDING_FINISHED,
-				DBUS_TYPE_INT32, &result,
-				DBUS_TYPE_STRING, &address,
-				DBUS_TYPE_UINT32, &remote_dev_info->class,
-				DBUS_TYPE_INT16, &remote_dev_info->rssi,
-				DBUS_TYPE_STRING, &remote_dev_info->name,
-				DBUS_TYPE_BOOLEAN, &remote_dev_info->paired,
-				DBUS_TYPE_BOOLEAN, &remote_dev_info->connected,
-				DBUS_TYPE_BOOLEAN, &remote_dev_info->trust,
-				DBUS_TYPE_ARRAY, DBUS_TYPE_STRING,
-				&remote_dev_info->uuids, remote_dev_info->uuid_count,
-				DBUS_TYPE_INVALID);
+			node = g_list_first(g_list);
+
+			while (node != NULL) {
+				dev_info = (bt_remote_dev_info_t *)node->data;
+				if (strcasecmp(dev_info->address, address) == 0) {
+					g_list = g_list_remove(g_list, dev_info);
+					_bt_free_device_info(dev_info);
+				}
+				node = g_list_next(node);
+			}
+
+			if (_bt_is_device_creating() == TRUE) {
+				BT_DBG("Try to Pair by me");
+			} else {
+				_bt_send_event(BT_ADAPTER_EVENT,
+					BLUETOOTH_EVENT_BONDING_FINISHED,
+					DBUS_TYPE_INT32, &result,
+					DBUS_TYPE_STRING, &address,
+					DBUS_TYPE_UINT32, &remote_dev_info->class,
+					DBUS_TYPE_INT16, &remote_dev_info->rssi,
+					DBUS_TYPE_STRING, &remote_dev_info->name,
+					DBUS_TYPE_BOOLEAN, &remote_dev_info->paired,
+					DBUS_TYPE_BOOLEAN, &remote_dev_info->connected,
+					DBUS_TYPE_BOOLEAN, &remote_dev_info->trust,
+					DBUS_TYPE_ARRAY, DBUS_TYPE_STRING,
+					&remote_dev_info->uuids, remote_dev_info->uuid_count,
+					DBUS_TYPE_INVALID);
+			}
 
 			_bt_free_device_info(remote_dev_info);
 			g_free(address);
@@ -1600,7 +1612,6 @@ static DBusHandlerResult __bt_manager_event_filter(DBusConnection *conn,
 				DBUS_TYPE_ARRAY, DBUS_TYPE_STRING,
 				&dev_info->uuids, dev_info->uuid_count,
 				DBUS_TYPE_INVALID);
-
 			g_list = g_list_append(g_list, dev_info);
 		} else if (bt_event == BT_MEDIA_TRANSFER_EVENT) {
 			__bt_parse_audio_properties(msg);
