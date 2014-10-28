@@ -97,6 +97,9 @@ int _bt_send_event(int event_type, int event, int type, ...)
 	case BLUETOOTH_EVENT_REMOTE_DEVICE_FOUND:
 		signal = BT_DEVICE_FOUND;
 		break;
+	case BLUETOOTH_EVENT_REMOTE_DEVICE_DISAPPEARED:
+		signal = BT_DEVICE_DISAPPEARED;
+		break;
 	case BLUETOOTH_EVENT_DISCOVERY_FINISHED:
 		signal = BT_DISCOVERY_FINISHED;
 		break;

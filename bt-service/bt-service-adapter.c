@@ -589,7 +589,7 @@ static void __launch_bt_service(int status, int run_type)
 	bundle_free(kb);
 }
 
-static void __bt_adapter_set_status(bt_status_t status)
+void _bt_adapter_set_status(bt_status_t status)
 {
 	adapter_status = status;
 }
@@ -741,12 +741,12 @@ void _bt_handle_adapter_added(void)
 
 	__bt_set_enabled();
 
-	__bt_adapter_set_status(BT_ACTIVATED);
+	_bt_adapter_set_status(BT_ACTIVATED);
 }
 
 void _bt_handle_adapter_removed(void)
 {
-	__bt_adapter_set_status(BT_DEACTIVATED);
+	_bt_adapter_set_status(BT_DEACTIVATED);
 
 	vconf_ignore_key_changed(VCONFKEY_SETAPPL_DEVICE_NAME_STR,
 				(vconf_callback_fn)__bt_phone_name_changed_cb);
@@ -800,7 +800,7 @@ int _bt_enable_adapter(void)
 			return BLUETOOTH_ERROR_DEVICE_ALREADY_ENABLED;
 	}
 
-	__bt_adapter_set_status(BT_ACTIVATING);
+	_bt_adapter_set_status(BT_ACTIVATING);
 
 	proxy = __bt_get_core_proxy();
 	if (!proxy)
@@ -811,7 +811,7 @@ int _bt_enable_adapter(void)
 					G_TYPE_INVALID,
 					G_TYPE_INVALID) == FALSE) {
 
-		__bt_adapter_set_status(BT_DEACTIVATED);
+		_bt_adapter_set_status(BT_DEACTIVATED);
 
 		if (err != NULL) {
 			BT_ERR("Bt core call failed: [%s]", err->message);
@@ -851,7 +851,7 @@ int _bt_disable_adapter(void)
 			return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
 	}
 
-	__bt_adapter_set_status(BT_DEACTIVATING);
+	_bt_adapter_set_status(BT_DEACTIVATING);
 
 	proxy = __bt_get_core_proxy();
 	if (!proxy)
@@ -860,7 +860,7 @@ int _bt_disable_adapter(void)
 	if (dbus_g_proxy_call(proxy, "DisableAdapter", NULL,
 	                               G_TYPE_INVALID, G_TYPE_INVALID) == FALSE) {
 		BT_ERR("Bt core call failed");
-		__bt_adapter_set_status(BT_ACTIVATED);
+		_bt_adapter_set_status(BT_ACTIVATED);
 		return BLUETOOTH_ERROR_INTERNAL;
        }
 

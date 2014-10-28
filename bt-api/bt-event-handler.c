@@ -337,6 +337,17 @@ static DBusHandlerResult __bt_adapter_event_filter(DBusConnection *conn,
 				event_info->cb, event_info->user_data);
 
 		g_free(device_info);
+	} else if (strcasecmp(member, BT_DEVICE_DISAPPEARED) == 0) {
+		bluetooth_device_info_t *device_info;
+
+		device_info = __bt_get_device_info_in_message(msg, &result);
+		retv_if(device_info == NULL, DBUS_HANDLER_RESULT_NOT_YET_HANDLED);
+
+
+		_bt_common_event_cb(BLUETOOTH_EVENT_REMOTE_DEVICE_DISAPPEARED,
+				result, device_info,
+				event_info->cb, event_info->user_data);
+		g_free(device_info);
 	} else if (strcasecmp(member, BT_BOND_CREATED) == 0) {
 		bluetooth_device_info_t *device_info;
 
