@@ -242,6 +242,7 @@ typedef enum {
 	BLUETOOTH_EVENT_DEVICE_AUTHORIZED,	    /**< Bluetooth event authorize device */
 	BLUETOOTH_EVENT_DEVICE_UNAUTHORIZED,	    /**< Bluetooth event unauthorize device */
 	BLUETOOTH_EVENT_DISCOVERABLE_TIMEOUT_CHANGED,  /**< Bluetooth event mode changed */
+	BLUETOOTH_EVENT_REMOTE_DEVICE_DISAPPEARED, /**< Bluetooth event remote device disappeared*/
 
 	BLUETOOTH_EVENT_SERVICE_SEARCHED = BLUETOOTH_EVENT_SDP_BASE,
 						    /**< Bluetooth event serice search base id */

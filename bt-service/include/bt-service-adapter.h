@@ -84,6 +84,8 @@ gboolean _bt_get_discovering_property(void);
 
 unsigned int _bt_get_discoverable_timeout_property(void);
 
+void _bt_adapter_set_status(bt_status_t status);
+
 bt_status_t _bt_adapter_get_status(void);
 
 void _bt_handle_flight_mode_noti(void);
