@@ -57,7 +57,7 @@ GType opp_skeleton_get_type (void) G_GNUC_CONST;
 
 OppSkeleton *bt_service_opp_new(void);
 
-void bt_service_opp_init(GDBusObjectSkeleton *object,
+int bt_service_opp_init(GDBusObjectSkeleton *object,
 				GDBusConnection *connection);
 
 void bt_service_opp_deinit(void);

@@ -27,6 +27,14 @@ Object path	/org/tizen/comms/manager
 			to save power and memory consumption.
 
 
+		void ActiveProfile(uint32 type)
+
+			Active Bluetooth profiles on Bluetooth-Service.
+
+			type can be either one of 0(OPP), 1(HFP)
+
+			Possible errors: org.bluez.Error.Failed
+
 		void SetDefaultAdapter(string adapter)
 
 			Sets the default adapter to operate on.

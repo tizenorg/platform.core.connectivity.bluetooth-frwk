@@ -22,7 +22,7 @@
 #include "comms_error.h"
 
 #include "pairing.h"
-#include "opp.h"
+#include "profile.h"
 #ifdef TIZEN_2_MOBILE
 #include "map_agent.h"
 #endif
@@ -113,6 +113,8 @@ static const GDBusMethodInfo * const _method_info_pointers[] =
 {
 	GDBUS_METHOD("EnableBluetoothService", NULL, NULL),
 	GDBUS_METHOD("DisableBluetoothService", NULL, NULL),
+	GDBUS_METHOD("ActiveProfile",
+			GDBUS_ARGS(_ARG("type", "i")), NULL),
 	GDBUS_METHOD("SetDefaultAdapter",
 			GDBUS_ARGS(_ARG("adapter", "s")), NULL),
 	GDBUS_METHOD("GetAdapterVisibleTime",
@@ -258,7 +260,6 @@ static void adapter_powered_on(CommsManagerSkeleton *skeleton)
 				G_DBUS_INTERFACE_SKELETON(skeleton));
 
 	bt_service_pairing_init(bt_object, connection, default_adapter);
-	bt_service_opp_init(bt_object, connection);
 
 #ifdef TIZEN_2_MOBILE
 	bt_map_agent_init();
@@ -282,7 +283,6 @@ static void adapter_powered_off(CommsManagerSkeleton *skeleton)
 	set_bluetooth_in_service(skeleton, FALSE);
 
 	bt_service_pairing_deinit();
-	bt_service_opp_deinit();
 
 #ifdef TIZEN_2_MOBILE
 	bt_map_agent_deinit();
@@ -549,6 +549,21 @@ static void handle_disable_bluetooth_service(GDBusConnection *connection,
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
+static void handle_active_profile(GDBusConnection *connection,
+					GVariant *parameters,
+					GDBusMethodInvocation *invocation,
+					gpointer user_data)
+{
+	int profile_type;
+
+	g_variant_get(parameters, "(i)", &profile_type);
+
+	if (profile_init(profile_type, bt_object, connection) != 0)
+		return comms_error_failed(invocation, "Active Failed");
+
+	g_dbus_method_invocation_return_value(invocation, NULL);
+}
+
 static void handle_set_default_adapter(GDBusConnection *connection,
 					GVariant *parameters,
 					GDBusMethodInvocation *invocation,
@@ -635,6 +650,9 @@ static void _manager_skeleton_handle_method_call(
 						invocation, user_data);
 	else if (g_strcmp0(method_name, "DisableBluetoothService") == 0)
 		handle_disable_bluetooth_service(connection, parameters,
+						invocation, user_data);
+	else if (g_strcmp0(method_name, "ActiveProfile") == 0)
+		handle_active_profile(connection, parameters,
 						invocation, user_data);
 	else if (g_strcmp0(method_name, "SetDefaultAdapter") == 0)
 		handle_set_default_adapter(connection, parameters,

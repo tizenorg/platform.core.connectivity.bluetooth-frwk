@@ -23,6 +23,7 @@
 #include "gdbus.h"
 #include "opp.h"
 #include "vertical.h"
+#include "profile.h"
 
 #define OPP_OBJECT "/org/tizen/comms/bluetooth"
 #define AGENT_INTERFACE "org.bluez.obex.Agent1"
@@ -930,7 +931,7 @@ static void obex_agent_added_cb(obex_agent_t *agent, void *user_data)
 				connection);
 }
 
-void bt_service_opp_init(GDBusObjectSkeleton *gdbus_object_skeleton,
+int bt_service_opp_init(GDBusObjectSkeleton *gdbus_object_skeleton,
 						GDBusConnection *connection)
 {
 	GError *error = NULL;
@@ -938,7 +939,7 @@ void bt_service_opp_init(GDBusObjectSkeleton *gdbus_object_skeleton,
 	DBG("");
 
 	if (bt_opp)
-		return;
+		return -1;
 
 	bt_object_skeleton = gdbus_object_skeleton;
 
@@ -947,7 +948,7 @@ void bt_service_opp_init(GDBusObjectSkeleton *gdbus_object_skeleton,
 		ERROR("%s", error->message);
 
 		g_error_free(error);
-		return;
+		return -1;
 	}
 
 	bt_opp = bt_service_opp_new();
@@ -957,7 +958,7 @@ void bt_service_opp_init(GDBusObjectSkeleton *gdbus_object_skeleton,
 		obex_agent_set_agent_added(obex_agent_added_cb,
 						connection);
 
-		return;
+		return 0;
 	}
 
 	if (create_opp_agent(session_connection) == FALSE) {
@@ -965,12 +966,14 @@ void bt_service_opp_init(GDBusObjectSkeleton *gdbus_object_skeleton,
 		g_object_unref(bt_opp);
 		bt_opp = NULL;
 
-		return;
+		return -1;
 	}
 
 	obex_agent_register_agent(OPP_AGENT_PATH,
 				register_obex_agent_cb,
 				connection);
+
+	return 0;
 }
 
 void bt_service_opp_deinit(void)
@@ -989,3 +992,6 @@ void bt_service_opp_deinit(void)
 				unregister_obex_agent_cb,
 				connection);
 }
+
+COMMS_BLUETOOTH_PROFILE_DEFINE(opp, "Bluetooth OPP profile",
+				bt_service_opp_init, bt_service_opp_deinit);

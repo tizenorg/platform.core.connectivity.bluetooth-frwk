@@ -3,7 +3,8 @@ PROJECT("Tizen Bluetooth Framework" C)
 
 SET(TEST_INSTALL_DIR "${LIB_INSTALL_DIR}/bluetooth-frwk-test/")
 SET(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/bluetooth-service/plugins/")
-SET(CMAKE_C_FLAGS "-O3 -Wall -Werror -DPLUGINDIR=\\\"${PLUGIN_INSTALL_DIR}\\\"")
+SET(PROFILE_INSTALL_DIR "${LIB_INSTALL_DIR}/bluetooth-service/profiles/")
+SET(CMAKE_C_FLAGS "-O3 -Wall -Werror -DPLUGINDIR=\\\"${PLUGIN_INSTALL_DIR}\\\" -DPROFILEDIR=\\\"${PROFILE_INSTALL_DIR}\\\"")
 
 SET(TEST "test-flags")
 
@@ -80,9 +81,9 @@ SET(SOURCES_BLUETOOTH_SERVICE
 	src/main.c
 	src/manager.c
 	src/plugin.c
+	src/profile.c
 	src/vertical.c
 	src/pairing.c
-	src/opp.c
 	src/map_agent.c
 	src/map_bmessage.c
 	src/bluetooth_map_agent.c
@@ -96,9 +97,9 @@ SET(SOURCES_BLUETOOTH_SERVICE
 	src/main.c
 	src/manager.c
 	src/plugin.c
+	src/profile.c
 	src/vertical.c
 	src/pairing.c
-	src/opp.c
 	lib/bluez.c
 	lib/bluez-hdp.c
 	lib/common.c
@@ -119,6 +120,18 @@ INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/packaging/bluetooth-service.conf
 					DESTINATION /etc/dbus-1/system.d)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/packaging/org.tizen.comms.service
 					DESTINATION share/dbus-1/system-services)
+
+SET(OPP_PROFILE "opp-profile")
+SET(SOURCE_OPP_PROFILE
+	src/opp.c
+   )
+
+ADD_LIBRARY(${OPP_PROFILE} SHARED ${SOURCE_OPP_PROFILE})
+TARGET_LINK_LIBRARIES(${OPP_PROFILE} ${${TEST}_LDFLAGS})
+SET_TARGET_PROPERTIES(${OPP_PROFILE} PROPERTIES PREFIX "")
+SET_TARGET_PROPERTIES(${OPP_PROFILE} PROPERTIES
+		LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/src)
+INSTALL(TARGETS ${OPP_PROFILE} DESTINATION ${PROFILE_INSTALL_DIR})
 
 # BLUEZ-TEST
 SET(BLUEZ-TEST "bluez-lib-test")
