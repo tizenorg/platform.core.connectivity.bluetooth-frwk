@@ -154,7 +154,7 @@ void bluez_adapter_remove_device(
 int bluez_adapter_get_property_powered(
 				struct _bluez_adapter *adapter,
 				gboolean *powered);
-void bluez_adapter_set_powered(struct _bluez_adapter *adapter,
+int bluez_adapter_set_powered(struct _bluez_adapter *adapter,
 				gboolean powered);
 typedef void (*bluez_adapter_powered_cb_t)(
 				bluez_adapter_t *adapter,

@@ -36,6 +36,8 @@
 static GDBusObjectManagerServer *manager_server;
 GDBusObjectSkeleton *bt_object;
 
+static gboolean bt_activate_timeout(gpointer user_data);
+
 G_DEFINE_TYPE(CommsManagerSkeleton, comms_manager_skeleton,
 				G_TYPE_DBUS_INTERFACE_SKELETON);
 
@@ -325,6 +327,7 @@ static void bt_adapter_set_enable(bluez_adapter_t *adapter, void *user_data)
 {
 	struct bt_activate_data *adapter_activate_data = user_data;
 	gboolean powered;
+	int ret = 0;
 
 	bluez_adapter_set_powered_changed_cb(default_adapter,
 						adapter_powered_changed,
@@ -332,14 +335,20 @@ static void bt_adapter_set_enable(bluez_adapter_t *adapter, void *user_data)
 
 	bluez_adapter_get_property_powered(default_adapter, &powered);
 	if (powered == FALSE)
-		bluez_adapter_set_powered(default_adapter, TRUE);
+		ret = bluez_adapter_set_powered(default_adapter, TRUE);
 
-	g_dbus_method_invocation_return_value(
+	if (ret) {
+		bt_activate_timeout(adapter_activate_data);
+		adapter_activate_data = NULL;
+	} else {
+		g_dbus_method_invocation_return_value(
 			adapter_activate_data->invocation, NULL);
-	adapter_activate_data->invocation = NULL;
+		adapter_activate_data->invocation = NULL;
 
-	if (powered == TRUE)
-		adapter_powered_on(adapter_activate_data->skeleton);
+		if (powered == TRUE)
+			adapter_powered_on
+				(adapter_activate_data->skeleton);
+	}
 }
 
 static void discoverable_changed(bluez_adapter_t *adapter,
@@ -418,15 +427,18 @@ static void adapter_added_cb(bluez_adapter_t *adapter, void *user_data)
 		g_source_remove(bt_activate_timeout_id);
 		bt_activate_timeout_id = 0;
 	}
+
+	if (data)
+		g_free(data);
 }
 
-gboolean bt_activate_timeout(gpointer user_data)
+static gboolean bt_activate_timeout(gpointer user_data)
 {
 	struct bt_activate_data *data = user_data;
 
 	DBG("");
 
-	comms_error_failed(data->invocation, "Time out");
+	comms_error_failed(data->invocation, "Activate failed");
 
 	bluez_adapter_unset_adapter_added();
 
@@ -527,6 +539,7 @@ static void handle_disable_bluetooth_service(GDBusConnection *connection,
 {
 	CommsManagerSkeleton *skeleton = user_data;
 	gboolean state;
+	int ret;
 
 	DBG("");
 	state = get_bluetooth_activating(skeleton);
@@ -542,11 +555,15 @@ static void handle_disable_bluetooth_service(GDBusConnection *connection,
 		return;
 	}
 
-	bluez_adapter_set_powered(default_adapter, FALSE);
+	ret = bluez_adapter_set_powered(default_adapter, FALSE);
 
 	default_adapter = NULL;
 
-	g_dbus_method_invocation_return_value(invocation, NULL);
+	if (ret)
+		comms_error_failed(invocation,
+						"set powered off");
+	else
+		g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
 static void handle_set_default_adapter(GDBusConnection *connection,
