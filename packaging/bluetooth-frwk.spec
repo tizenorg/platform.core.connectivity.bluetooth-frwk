@@ -83,7 +83,8 @@ chsmack -a "User" /usr/share/bluetooth-frwk
 %config %{_sysconfdir}/dbus-1/system.d/bluezobex.conf
 %config %{_sysconfdir}/dbus-1/system.d/bluetooth-service.conf
 %{_datadir}/dbus-1/system-services/org.tizen.comms.service
-%dir %attr(-, guest, users) %{_datadir}/bluetooth-frwk
+%{_unitdir}/bluetooth-service.service
+%dir %attr(-, bluetooth, bluetooth) %{_datadir}/bluetooth-frwk
 %{_datadir}/icons/default/bt-icon.png
 %if %{plugin_suffix}
 %{_libdir}/bluetooth-service/plugins/bluetooth-%{plugin_suffix}.so

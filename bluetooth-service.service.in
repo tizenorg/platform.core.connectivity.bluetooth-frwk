@@ -1,0 +1,13 @@
+[Unit]
+Description=Tizen Bluetooth service
+Requires=bluetooth.service
+
+[Service]
+Type=dbus
+BusName=org.tizen.comms
+ExecStart=/bin/bluetooth-service
+User=bluetooth
+SmackExecLabel=User
+
+[Install]
+Alias=dbus-org.tizen.comms.service

@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.tizen.comms
+Exec=/bin/false
+SystemdService=bluetooth-service.service
