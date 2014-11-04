@@ -2816,7 +2816,7 @@ int bt_avrcp_target_initialize(
 
 	ret = bluez_media_register_player(default_adapter);
 
-	if (ret != 0)
+	if (ret != BT_SUCCESS)
 		return BT_ERROR_OPERATION_FAILED;
 
 	node_data =
@@ -2976,8 +2976,10 @@ int bt_avrcp_target_notify_repeat_mode(bt_avrcp_repeat_mode_e mode)
 	ret = bluez_media_player_change_property(default_adapter,
 						LOOPSTATUS, mode);
 
-	if (ret == 0)
+	if (ret == BLUEZ_ERROR_NONE)
 		return BT_ERROR_NONE;
+	else if (ret == BLUEZ_ERROR_INVALID_PARAMETER)
+		return BT_ERROR_INVALID_PARAMETER;
 	else
 		return BT_ERROR_OPERATION_FAILED;
 }
@@ -2996,8 +2998,10 @@ int bt_avrcp_target_notify_shuffle_mode(bt_avrcp_shuffle_mode_e mode)
 	ret = bluez_media_player_change_property(default_adapter,
 						SHUFFLE, mode);
 
-	if (ret == 0)
+	if (ret == BLUEZ_ERROR_NONE)
 		return BT_ERROR_NONE;
+	else if (ret == BLUEZ_ERROR_INVALID_PARAMETER)
+		return BT_ERROR_INVALID_PARAMETER;
 	else
 		return BT_ERROR_OPERATION_FAILED;
 }
@@ -3016,8 +3020,10 @@ int bt_avrcp_target_notify_player_state(bt_avrcp_player_state_e state)
 	ret = bluez_media_player_change_property(default_adapter,
 						PLAYBACKSTATUS, state);
 
-	if (ret == 0)
+	if (ret == BLUEZ_ERROR_NONE)
 		return BT_ERROR_NONE;
+	else if (ret == BLUEZ_ERROR_INVALID_PARAMETER)
+		return BT_ERROR_INVALID_PARAMETER;
 	else
 		return BT_ERROR_OPERATION_FAILED;
 }
@@ -3036,8 +3042,10 @@ int bt_avrcp_target_notify_position(unsigned int position)
 	ret = bluez_media_player_change_property(default_adapter,
 						POSITION, position);
 
-	if (ret == 0)
+	if (ret == BLUEZ_ERROR_NONE)
 		return BT_ERROR_NONE;
+	else if (ret == BLUEZ_ERROR_INVALID_PARAMETER)
+		return BT_ERROR_INVALID_PARAMETER;
 	else
 		return BT_ERROR_OPERATION_FAILED;
 }
@@ -3094,10 +3102,10 @@ int bt_avrcp_target_notify_track(const char *title, const char *artist,
 
 	_bt_avrcp_metadata_free(&metadata);
 
-	if (ret == 0)
+	if (ret == BLUEZ_ERROR_NONE)
 		return BT_ERROR_NONE;
 	else
-	return BT_ERROR_OPERATION_FAILED;
+		return BT_ERROR_OPERATION_FAILED;
 }
 
 int bt_avrcp_target_notify_equalizer_state(bt_avrcp_equalizer_state_e state)
@@ -4055,11 +4063,11 @@ static int request_name_on_dbus(const char *name)
 	GError *error = NULL;
 
 	if (bluetooth_agent_id || profile_id)
-		return 0;
+		return BT_SUCCESS;
 
 	connection = get_system_dbus_connect();
 	if (connection == NULL)
-		return -1;
+		return BT_ERROR_NOT_ENABLED;
 
 	ret = g_dbus_connection_call_sync(connection,
 					"org.freedesktop.DBus",
@@ -4094,7 +4102,7 @@ static int request_name_on_dbus(const char *name)
 		|| request_name_reply ==
 				DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER) {
 		bluetooth_ext_agent_id = 1;
-		return 0;
+		return BT_SUCCESS;
 	}
 
 	if (request_name_reply != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
@@ -4108,15 +4116,15 @@ static int request_name_on_dbus(const char *name)
 	if (bluetooth_ext_agent_id > 0)
 		bluetooth_ext_agent_id = 0;
 
-	return 0;
+	return BT_SUCCESS;
 
 failed:
 	g_object_unref(connection);
 
-	return -1;
+	return BT_ERROR_OPERATION_FAILED;
 }
 
-static int destory_agent(void)
+static void destory_agent(void)
 {
 	if (bluetooth_agent_id > 0) {
 		comms_bluetooth_unregister_pairing_agent(AGENT_OBJECT_PATH,
@@ -4129,7 +4137,7 @@ static int destory_agent(void)
 		release_name_on_dbus(BLUEZ_AGENT_SERVICE);
 	}
 
-	return 0;
+	return;
 }
 
 static int create_agent(void)
@@ -4143,8 +4151,8 @@ static int create_agent(void)
 		g_dbus_node_info_new_for_xml(introspection_xml, NULL);
 
 	ret = request_name_on_dbus(BLUEZ_AGENT_SERVICE);
-	if (ret != 0)
-		return -1;
+	if (ret != BT_SUCCESS)
+		return ret;
 
 	DBG("%s requested success", BLUEZ_AGENT_SERVICE);
 
@@ -4153,14 +4161,14 @@ static int create_agent(void)
 					introspection_data->interfaces[0],
 					&interface_handle, NULL, NULL, NULL);
 	if (bluetooth_agent_id == 0)
-		return -1;
+		return BT_ERROR_OPERATION_FAILED;
 
 	ret = comms_bluetooth_register_pairing_agent_sync(
 					AGENT_OBJECT_PATH, NULL);
 	if (ret != BT_SUCCESS)
 		return BT_ERROR_OPERATION_FAILED;
 
-	return 0;
+	return BT_SUCCESS;
 }
 
 int bt_agent_register(bt_agent *agent)
@@ -4577,7 +4585,7 @@ static int register_profile_agent(const gchar *path,
 		return BT_SUCCESS;
 
 	ret = request_name_on_dbus(BLUEZ_AGENT_SERVICE);
-	if (ret != 0)
+	if (ret != BT_SUCCESS)
 		goto failed;
 
 	profile_xml_data = g_dbus_node_info_new_for_xml(profile_xml, NULL);

@@ -3080,7 +3080,7 @@ int bluez_lib_init(void)
 	DBG("");
 
 	if (object_manager != NULL)
-		return 0;
+		return BLUEZ_ERROR_NONE;
 
 	object_manager = g_dbus_object_manager_client_new_for_bus_sync(
 							G_BUS_TYPE_SYSTEM,
@@ -3092,7 +3092,7 @@ int bluez_lib_init(void)
 	if (object_manager == NULL) {
 		ERROR("create object manager error");
 		/* TODO: define error type */
-		return -1;
+		return BLUEZ_ERROR_OPERATION_FAILED;
 	}
 
 	DBG("object manager %p is created", object_manager);
@@ -3126,7 +3126,7 @@ int bluez_lib_init(void)
 
 	g_list_foreach(obj_list, parse_object, NULL);
 
-	return 0;
+	return BLUEZ_ERROR_NONE;
 }
 
 static void destruct_bluez_objects(void)
@@ -3521,21 +3521,21 @@ int bluez_device_network_connect(struct _bluez_device *device,
 	reply_data = g_try_new0(struct simple_reply_data, 1);
 	if (reply_data == NULL) {
 		ERROR("no memory");
-		return -1;
+		return BLUEZ_ERROR_OUT_OF_MEMORY;
 	}
 
 	reply_data->proxy = device->network_proxy;
 
 	DBG("%p", device->network_proxy);
 	if (!device->network_proxy)
-		return -1;
+		return BLUEZ_ERROR_NOT_ENABLED;
 
 	g_dbus_proxy_call(device->network_proxy, "Connect",
 				g_variant_new("(s)", role),
 				0, -1, NULL,
 				simple_reply_callback, reply_data);
 
-	return 0;
+	return BLUEZ_ERROR_NONE;
 }
 
 int bluez_device_network_disconnect(struct _bluez_device *device)
@@ -3545,20 +3545,20 @@ int bluez_device_network_disconnect(struct _bluez_device *device)
 	reply_data = g_try_new0(struct simple_reply_data, 1);
 	if (reply_data == NULL) {
 		ERROR("no memory");
-		return -1;
+		return BLUEZ_ERROR_OUT_OF_MEMORY;
 	}
 
 	reply_data->proxy = device->network_proxy;
 
 	DBG("%p", device->network_proxy);
 	if (!device->network_proxy)
-		return -1;
+		return BLUEZ_ERROR_NOT_ENABLED;
 
 	g_dbus_proxy_call(device->network_proxy, "Disconnect",
 				NULL, 0, -1, NULL,
 				simple_reply_callback, reply_data);
 
-	return 0;
+	return BLUEZ_ERROR_NONE;
 }
 
 GList *bluez_device_get_primary_services(struct _bluez_device *device)
@@ -4232,7 +4232,7 @@ static int bluez_avrcp_set_interal_property(struct _bluez_adapter *adapter,
 		val = g_variant_new("s", loopstatus_settings[value].property);
 		if (!bluez_set_property(adapter, "LoopStatus", val)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return -1;
+			return BLUEZ_ERROR_OPERATION_FAILED;
 		}
 		break;
 	case SHUFFLE:
@@ -4244,7 +4244,7 @@ static int bluez_avrcp_set_interal_property(struct _bluez_adapter *adapter,
 		val = g_variant_new("b", shuffle);
 		if (!bluez_set_property(adapter, "Shuffle", val)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return -1;
+			return BLUEZ_ERROR_OPERATION_FAILED;
 		}
 		break;
 	case PLAYBACKSTATUS:
@@ -4252,7 +4252,7 @@ static int bluez_avrcp_set_interal_property(struct _bluez_adapter *adapter,
 		val = g_variant_new("s", playback_status[value].property);
 		if (!bluez_set_property(adapter, "PlaybackStatus", val)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return -1;
+			return BLUEZ_ERROR_OPERATION_FAILED;
 		}
 		break;
 	case POSITION:
@@ -4260,15 +4260,15 @@ static int bluez_avrcp_set_interal_property(struct _bluez_adapter *adapter,
 		val = g_variant_new("x", value);
 		if (!bluez_set_property(adapter, "Position", val)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return -1;
+			return BLUEZ_ERROR_OPERATION_FAILED;
 		}
 		break;
 	default:
 		DBG("Invalid Type\n");
-		return -1;
+		return BLUEZ_ERROR_INVALID_PARAMETER;
 	}
 
-	return 0;
+	return BLUEZ_ERROR_NONE;
 }
 
 int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
@@ -4284,7 +4284,7 @@ int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
 		val = g_variant_new("s", meta_data->title);
 		if (!bluez_set_metadata(adapter, "xesam:title", val)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return -1;
+			return BLUEZ_ERROR_OPERATION_FAILED;
 		}
 	}
 
@@ -4297,7 +4297,7 @@ int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
 		if (!bluez_set_metadata(adapter, "xesam:artist",
 							val_array)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return -1;
+			return BLUEZ_ERROR_OPERATION_FAILED;
 		}
 	}
 
@@ -4305,7 +4305,7 @@ int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
 		val = g_variant_new("s", meta_data->album);
 		if (!bluez_set_metadata(adapter, "xesam:album", val)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return -1;
+			return BLUEZ_ERROR_OPERATION_FAILED;
 		}
 	}
 
@@ -4318,7 +4318,7 @@ int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
 		if (!bluez_set_metadata(adapter, "xesam:genre",
 							val_array)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return -1;
+			return BLUEZ_ERROR_OPERATION_FAILED;
 		}
 	}
 
@@ -4327,7 +4327,7 @@ int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
 		if (!bluez_set_metadata(adapter, "xesam:trackNumber",
 								val)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return -1;
+			return BLUEZ_ERROR_OPERATION_FAILED;
 		}
 	}
 
@@ -4335,11 +4335,11 @@ int bluez_media_player_set_track_info(struct _bluez_adapter *adapter,
 		val = g_variant_new("x", meta_data->duration);
 		if (!bluez_set_metadata(adapter, "mpris:length", val)) {
 			DBG("Error sending the PropertyChanged signal\n");
-			return -1;
+			return BLUEZ_ERROR_OPERATION_FAILED;
 		}
 	}
 
-	return 0;
+	return BLUEZ_ERROR_NONE;
 }
 
 int bluez_media_player_change_property(struct _bluez_adapter *adapter,
@@ -4366,7 +4366,7 @@ int bluez_media_player_change_property(struct _bluez_adapter *adapter,
 		break;
 	default:
 		DBG("Invalid Type\n");
-		return -1;
+		return BLUEZ_ERROR_OPERATION_FAILED;
 	}
 
 	ret = bluez_avrcp_set_interal_property(adapter,
@@ -4379,24 +4379,29 @@ int bluez_media_player_change_property(struct _bluez_adapter *adapter,
 int bluez_media_player_set_properties(struct _bluez_adapter *adapter,
 				media_player_settings_t *properties)
 {
+	int ret;
 
-	if (bluez_avrcp_set_interal_property(adapter,
-				LOOPSTATUS, properties) != 0)
-		return -1;
+	ret = bluez_avrcp_set_interal_property(adapter,
+					LOOPSTATUS, properties);
+	if (ret != BLUEZ_ERROR_NONE)
+		return ret;
 
-	if (bluez_avrcp_set_interal_property(adapter,
-				SHUFFLE, properties) != 0)
-		return -1;
+	ret = bluez_avrcp_set_interal_property(adapter,
+					SHUFFLE, properties);
+	if (ret != BLUEZ_ERROR_NONE)
+		return ret;
 
-	if (bluez_avrcp_set_interal_property(adapter,
-				PLAYBACKSTATUS, properties) != 0)
-		return -1;
+	ret = bluez_avrcp_set_interal_property(adapter,
+					PLAYBACKSTATUS, properties);
+	if (ret != BLUEZ_ERROR_NONE)
+		return ret;
 
-	if (bluez_avrcp_set_interal_property(adapter,
-				POSITION, properties) != 0)
-		return -1;
+	ret = bluez_avrcp_set_interal_property(adapter,
+					POSITION, properties);
+	if (ret != BLUEZ_ERROR_NONE)
+		return ret;
 
-	return 0;
+	return BLUEZ_ERROR_NONE;
 }
 
 static gboolean handle_set_property(GDBusConnection *connection,
@@ -4491,12 +4496,12 @@ int bluez_media_register_player(struct _bluez_adapter *adapter)
 
 	if (adapter == NULL) {
 		ERROR("adapter is NULL");
-		return -1;
+		return BLUEZ_ERROR_INVALID_PARAMETER;
 	}
 
 	if (adapter->media_proxy == NULL) {
 		ERROR("adapter->mediaprooxy is NULL");
-		return -1;
+		return BLUEZ_ERROR_INVALID_PARAMETER;
 	}
 
 	builder = g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
@@ -4558,11 +4563,11 @@ int bluez_media_register_player(struct _bluez_adapter *adapter)
 					adapter->avrcp_registration_id);
 
 		adapter->avrcp_registration_id = 0;
-		return -1;
+		return BLUEZ_ERROR_OPERATION_FAILED;
 	}
 
 	DBG("-");
-	return 0;
+	return BLUEZ_ERROR_NONE;
 }
 
 void bluez_media_unregister_player(struct _bluez_adapter *adapter)
