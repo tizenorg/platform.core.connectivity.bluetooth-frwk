@@ -42,6 +42,8 @@
 #define UID_LEN 8
 #define CONTEXT_LEN 28
 
+#define USER_PRIVILEGES_PATH "/usr/share/bluetooth-frwk"
+
 struct user_privileges {
 	char address[ADDRESS_LEN];
 	char uid[UID_LEN];
@@ -985,7 +987,6 @@ static void unregister_relay_agent_handler(
 static void set_userprivileges(guint uid, gchar *address)
 {
 	char file[FILENAME_LEN];
-	char *path = getenv("HOME");
 	int fd;
 	int i = 0;
 	char uid_tmp[UID_LEN+1];
@@ -993,7 +994,7 @@ static void set_userprivileges(guint uid, gchar *address)
 	char context[CONTEXT_LEN+1];
 	int len, length;
 
-	sprintf(file, "%s/.bt_userprivileges", path);
+	sprintf(file, "%s/.bt_userprivileges", USER_PRIVILEGES_PATH);
 
 	fd = open(file, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 
@@ -1142,7 +1143,6 @@ static guint remove_userprivileges(guint uid,
 {
 	char file[FILENAME_LEN];
 	char context[CONTEXT_LEN];
-	char *path = getenv("HOME");
 	int fd;
 	struct user_privileges *privileges = NULL;
 	int len, total_len;
@@ -1153,7 +1153,7 @@ static guint remove_userprivileges(guint uid,
 
 	DBG("");
 
-	sprintf(file, "%s/.bt_userprivileges", path);
+	sprintf(file, "%s/.bt_userprivileges", USER_PRIVILEGES_PATH);
 
 	fd = open(file, O_RDWR, S_IRUSR | S_IWUSR);
 
@@ -1257,7 +1257,6 @@ static guint get_userprivileges(guint uid, gchar *address)
 {
 	char file[FILENAME_LEN];
 	char context[CONTEXT_LEN];
-	char *path = getenv("HOME");
 	int fd;
 	struct user_privileges *privileges = NULL;
 	int len;
@@ -1267,7 +1266,7 @@ static guint get_userprivileges(guint uid, gchar *address)
 
 	DBG("");
 
-	sprintf(file, "%s/.bt_userprivileges", path);
+	sprintf(file, "%s/.bt_userprivileges", USER_PRIVILEGES_PATH);
 
 	fd = open(file, O_RDONLY, S_IRUSR | S_IWUSR);
 

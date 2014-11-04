@@ -64,11 +64,14 @@ make %{?jobs:-j%jobs}
 %install
 %make_install
 install -D -m 0644 %{SOURCE1} %{buildroot}%{_datadir}/icons/default/bt-icon.png
+install -d %{buildroot}%{_datadir}/bluetooth-frwk
 
 # also install bluetooth-api.pc file for compatibility with other components
 ln -sf %{_libdir}/pkgconfig/capi-network-bluetooth.pc %{buildroot}%{_libdir}/pkgconfig/bluetooth-api.pc
 
-%post -p /sbin/ldconfig
+%post
+/sbin/ldconfig
+chsmack -a "User" /usr/share/bluetooth-frwk
 
 %postun -p /sbin/ldconfig
 
@@ -81,6 +84,7 @@ ln -sf %{_libdir}/pkgconfig/capi-network-bluetooth.pc %{buildroot}%{_libdir}/pkg
 %config %{_sysconfdir}/dbus-1/system.d/bluezobex.conf
 %config %{_sysconfdir}/dbus-1/system.d/bluetooth-service.conf
 %{_datadir}/dbus-1/system-services/org.tizen.comms.service
+%dir %attr(-, guest, users) %{_datadir}/bluetooth-frwk
 %{_datadir}/icons/default/bt-icon.png
 %if %{plugin_suffix}
 %{_libdir}/bluetooth-service/plugins/bluetooth-%{plugin_suffix}.so
