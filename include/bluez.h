@@ -33,6 +33,28 @@
 
 #define BT_HID_UUID                "00001124-0000-1000-8000-00805f9b34fb"
 
+typedef enum {
+	BLUEZ_ERROR_NONE = 0x00, /**< Successful*/
+	BLUEZ_ERROR_CANCELLED, /**< Operation cancelled */
+	BLUEZ_ERROR_INVALID_PARAMETER, /**< Invalid parameter */
+	BLUEZ_ERROR_OUT_OF_MEMORY, /**< Out of memory */
+	BLUEZ_ERROR_RESOURCE_BUSY, /**< Device or resource busy */
+	BLUEZ_ERROR_TIMED_OUT, /**< Timeout error */
+	BLUEZ_ERROR_NOW_IN_PROGRESS, /**< Operation now in progress */
+	BLUEZ_ERROR_NOT_INITIALIZED, /**< Local adapter not initialized */
+	BLUEZ_ERROR_NOT_ENABLED, /**< Local adapter not enabled */
+	BLUEZ_ERROR_ALREADY_DONE, /**< Operation already done  */
+	BLUEZ_ERROR_OPERATION_FAILED, /**< Operation failed */
+	BLUEZ_ERROR_NOT_IN_PROGRESS, /**< Operation not in progress */
+	BLUEZ_ERROR_REMOTE_DEVICE_NOT_BONDED, /**< Remote device not bonded */
+	BLUEZ_ERROR_AUTH_REJECTED, /**< Authentication rejected */
+	BLUEZ_ERROR_AUTH_FAILED, /**< Authentication failed */
+	BLUEZ_ERROR_REMOTE_DEVICE_NOT_FOUND, /**< Remote device not found */
+	BLUEZ_ERROR_SERVICE_SEARCH_FAILED, /**< Service search failed */
+	BLUEZ_ERROR_REMOTE_DEVICE_NOT_CONNECTED, /**< Remote device is not connected */
+	BLUEZ_ERROR_ADAPTER_NOT_FOUND, /**< Adapter not found */
+} bluez_error_e;
+
 struct _bluez_adapter;
 typedef struct _bluez_adapter bluez_adapter_t;
 

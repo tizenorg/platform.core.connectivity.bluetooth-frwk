@@ -20,9 +20,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <gio/gio.h>
-#ifdef TIZEN
-#include <tizen_error.h>
-#endif
 #include "common.h"
 #include "bluez.h"
 
@@ -49,52 +46,6 @@
 
 #define BT_MEDIA_OBJECT_PATH "/Musicplayer"
 #define MEDIA_PLAYER_INTERFACE  "org.mpris.MediaPlayer2.Player"
-
-typedef enum {
-#ifdef TIZEN
-	BT_ERROR_NONE = TIZEN_ERROR_NONE, /**< Successful*/
-	BT_ERROR_CANCELLED = TIZEN_ERROR_CANCELED, /**< Operation cancelled */
-	BT_ERROR_INVALID_PARAMETER = TIZEN_ERROR_INVALID_PARAMETER, /**< Invalid parameter */
-	BT_ERROR_OUT_OF_MEMORY = TIZEN_ERROR_OUT_OF_MEMORY, /**< Out of memory */
-	BT_ERROR_RESOURCE_BUSY = TIZEN_ERROR_RESOURCE_BUSY, /**< Device or resource busy */
-	BT_ERROR_TIMED_OUT = TIZEN_ERROR_TIMED_OUT, /**< Timeout error */
-	BT_ERROR_NOW_IN_PROGRESS = TIZEN_ERROR_NOW_IN_PROGRESS, /**< Operation now in progress */
-	BT_ERROR_NOT_INITIALIZED = TIZEN_ERROR_NETWORK_CLASS|0x0101, /**< Local adapter not initialized */
-	BT_ERROR_NOT_ENABLED = TIZEN_ERROR_NETWORK_CLASS|0x0102, /**< Local adapter not enabled */
-	BT_ERROR_ALREADY_DONE = TIZEN_ERROR_NETWORK_CLASS|0x0103, /**< Operation already done  */
-	BT_ERROR_OPERATION_FAILED = TIZEN_ERROR_NETWORK_CLASS|0x0104, /**< Operation failed */
-	BT_ERROR_NOT_IN_PROGRESS = TIZEN_ERROR_NETWORK_CLASS|0x0105, /**< Operation not in progress */
-	BT_ERROR_REMOTE_DEVICE_NOT_BONDED = TIZEN_ERROR_NETWORK_CLASS|0x0106, /**< Remote device not bonded */
-	BT_ERROR_AUTH_REJECTED = TIZEN_ERROR_NETWORK_CLASS|0x0107, /**< Authentication rejected */
-	BT_ERROR_AUTH_FAILED = TIZEN_ERROR_NETWORK_CLASS|0x0108, /**< Authentication failed */
-	BT_ERROR_REMOTE_DEVICE_NOT_FOUND = TIZEN_ERROR_NETWORK_CLASS|0x0109, /**< Remote device not found */
-	BT_ERROR_SERVICE_SEARCH_FAILED = TIZEN_ERROR_NETWORK_CLASS|0x010A, /**< Service search failed */
-	BT_ERROR_REMOTE_DEVICE_NOT_CONNECTED = TIZEN_ERROR_NETWORK_CLASS|0x010B, /**< Remote device is not connected */
-	BT_ERROR_ADAPTER_NOT_FOUND = TIZEN_ERROR_NETWORK_CLASS|0x010C, /**< Adapter not found */
-#else
-	BT_ERROR_NONE = 0x00, /**< Successful*/
-	BT_ERROR_CANCELLED, /**< Operation cancelled */
-	BT_ERROR_INVALID_PARAMETER, /**< Invalid parameter */
-	BT_ERROR_OUT_OF_MEMORY, /**< Out of memory */
-	BT_ERROR_RESOURCE_BUSY, /**< Device or resource busy */
-	BT_ERROR_TIMED_OUT, /**< Timeout error */
-	BT_ERROR_NOW_IN_PROGRESS, /**< Operation now in progress */
-	BT_ERROR_NOT_INITIALIZED, /**< Local adapter not initialized */
-	BT_ERROR_NOT_ENABLED, /**< Local adapter not enabled */
-	BT_ERROR_ALREADY_DONE, /**< Operation already done  */
-	BT_ERROR_OPERATION_FAILED, /**< Operation failed */
-	BT_ERROR_NOT_IN_PROGRESS, /**< Operation not in progress */
-	BT_ERROR_REMOTE_DEVICE_NOT_BONDED, /**< Remote device not bonded */
-	BT_ERROR_AUTH_REJECTED, /**< Authentication rejected */
-	BT_ERROR_AUTH_FAILED, /**< Authentication failed */
-	BT_ERROR_REMOTE_DEVICE_NOT_FOUND, /**< Remote device not found */
-	BT_ERROR_SERVICE_SEARCH_FAILED, /**< Service search failed */
-	BT_ERROR_REMOTE_DEVICE_NOT_CONNECTED, /**< Remote device is not connected */
-	BT_ERROR_ADAPTER_NOT_FOUND, /**< Adapter not found */
-#endif
-} bt_error_e;
-
-#define BT_SUCCESS BT_ERROR_NONE
 
 GDBusObjectManager *object_manager = NULL;
 
@@ -3240,7 +3191,7 @@ int bluez_adapter_set_powered(struct _bluez_adapter *adapter,
 	connection = get_system_lib_dbus_connect();
 
 	if (connection == NULL)
-		return BT_ERROR_OPERATION_FAILED;
+		return BLUEZ_ERROR_OPERATION_FAILED;
 
 	g_dbus_connection_call_sync(connection, CONNMAN_DBUS_NAME,
 				CONNMAN_BLUETOOTH_TECHNOLOGY_PATH,
@@ -3252,10 +3203,10 @@ int bluez_adapter_set_powered(struct _bluez_adapter *adapter,
 	if (error) {
 		DBG("error %s", error->message);
 		g_error_free(error);
-		return BT_ERROR_OPERATION_FAILED;
+		return BLUEZ_ERROR_OPERATION_FAILED;
 	}
 
-	return BT_SUCCESS;
+	return BLUEZ_ERROR_NONE;
 }
 
 void bluez_adapter_set_discoverable(struct _bluez_adapter *adapter,
