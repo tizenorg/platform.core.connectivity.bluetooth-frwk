@@ -25,7 +25,16 @@ SET(MOBILE_FLAGS "mobile-flags")
 pkg_check_modules(${MOBILE_FLAGS} REQUIRED
 			msg-service
 			email-service
-			vconf)
+			appsvc
+			dlog
+			vconf
+			tapi
+			capi-appfw-application
+			appsvc
+			capi-system-info
+			contacts-service2
+			aul)
+
 FOREACH(flag ${${MOBILE_FLAGS}_CFLAGS})
 	SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${flag}")
 ENDFOREACH(flag)
@@ -86,6 +95,11 @@ SET(SOURCES_BLUETOOTH_SERVICE
 	src/map_agent.c
 	src/map_bmessage.c
 	src/bluetooth_map_agent.c
+	src/bluetooth-ag-agent.c
+	src/bluetooth-ag-agent.h
+	src/bluetooth-ag-handler.c
+	src/bluetooth-ag-handler.h
+	src/bluetooth-ag-manager.c
 	lib/bluez.c
 	lib/bluez-hdp.c
 	lib/common.c
