@@ -101,11 +101,14 @@ void vertical_notify_bt_opp_agent_on(void)
 		bluetooth_driver->opp_agent_on();
 }
 
-void vertical_notify_bt_transfer(double progress)
+void vertical_notify_bt_transfer(char *address,
+			char *name, unsigned long long size,
+			unsigned int transfer_id, double progress)
 {
 	if (!bluetooth_driver)
 		return;
 
 	if (bluetooth_driver->transfer)
-		bluetooth_driver->transfer(progress);
+		bluetooth_driver->transfer(address, name,
+				size, transfer_id, progress);
 }

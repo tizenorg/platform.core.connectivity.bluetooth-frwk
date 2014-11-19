@@ -179,7 +179,7 @@ struct _obex_transfer *obex_transfer_get_transfer_from_id(
 
 /* notify specific transfer */
 int obex_transfer_set_notify(
-			struct _obex_transfer *transfer,
+			char *transfer_path,
 			obex_transfer_state_cb cb, void *data);
 
 /* watch all the transfers */
@@ -188,4 +188,8 @@ int obex_transfer_set_watch(
 			void *data);
 
 void obex_transfer_clear_watch(void);
+
+int obex_transfer_client_number(void);
+
+int obex_get_transferid_from_path(int role, const char *path);
 #endif

@@ -299,7 +299,9 @@ static int bt_disabled(void)
 	return 0;
 }
 
-static int bt_transfer(double progress)
+static int bt_transfer(char *address,
+			char *name, unsigned long long size,
+			unsigned int transfer_id, double progress)
 {
 	DBG("progress: %f", progress);
 
