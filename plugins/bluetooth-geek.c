@@ -157,7 +157,7 @@ static struct bluetooth_vertical_driver bt_driver = {
 	.probe = bt_probe,
 	.enabled = bt_enabled,
 	.disabled = bt_disabled,
-	.transfer = bt_transfer,
+	.transfer = NULL,
 	.pairing_agent_on = bt_pairing_agent_on,
 	.opp_agent_on = bt_opp_agent_on,
 };

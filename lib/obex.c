@@ -564,7 +564,7 @@ gchar *obex_session_property_get_source(struct _obex_session *session)
 	if (session == NULL)
 		return NULL;
 
-	return property_get_string(session->session_proxy.property_proxy,
+	return property_get_string(session->parent->properties_proxy,
 			OBEX_TRANSFER_INTERFACE, "Source");
 }
 
@@ -573,7 +573,7 @@ gchar *obex_session_property_get_target_uuid(struct _obex_session *session)
 	if (session == NULL)
 		return NULL;
 
-	return property_get_string(session->session_proxy.property_proxy,
+	return property_get_string(session->parent->properties_proxy,
 			OBEX_TRANSFER_INTERFACE, "Target");
 }
 
@@ -733,6 +733,7 @@ static GList *adopted_transfer_list;
 
 static void unregister_obex_session(struct _obex_session *session)
 {
+
 	g_hash_table_remove(id_session_hash,
 				(gconstpointer) session->identity);
 
@@ -829,7 +830,7 @@ struct _obex_session *obex_session_get_session_from_path(const char *path)
 
 gchar *obex_transfer_property_get_session_path(struct _obex_transfer *transfer)
 {
-	return property_get_string(transfer->proxy.property_proxy,
+	return property_get_string(transfer->parent->properties_proxy,
 					OBEX_TRANSFER_INTERFACE, "Session");
 }
 
@@ -879,6 +880,7 @@ static int obex_transfer_notify_unref(struct _transfer_notify *n)
 
 	return ref;
 }
+
 
 static gboolean remove_transfer_notify(gpointer user_data)
 {
@@ -972,7 +974,7 @@ static enum transfer_state get_transfer_state_from_string(const char *string)
 enum transfer_state obex_transfer_property_get_state(
 				struct _obex_transfer *transfer)
 {
-	char *status = property_get_string(transfer->proxy.property_proxy,
+	char *status = property_get_string(transfer->parent->properties_proxy,
 				OBEX_TRANSFER_INTERFACE, "Status");
 
 	return get_transfer_state_from_string(status);
@@ -982,7 +984,7 @@ int obex_transfer_property_get_transferred(
 				struct _obex_transfer *transfer,
 				guint64 *u64)
 {
-	return property_get_uint64(transfer->proxy.property_proxy,
+	return property_get_uint64(transfer->parent->properties_proxy,
 			OBEX_TRANSFER_INTERFACE, "Transferred", u64);
 }
 
@@ -990,21 +992,21 @@ int obex_transfer_property_get_size(
 				struct _obex_transfer *transfer,
 				guint64 *u64)
 {
-	return property_get_uint64(transfer->proxy.property_proxy,
+	return property_get_uint64(transfer->parent->properties_proxy,
 				OBEX_TRANSFER_INTERFACE, "Size", u64);
 }
 
 void obex_transfer_set_property_name(struct _obex_transfer *transfer,
 							const char *name)
 {
-	property_set_string(transfer->proxy.property_proxy,
+	property_set_string(transfer->parent->properties_proxy,
 				OBEX_TRANSFER_INTERFACE, "Name", name);
 }
 
 void obex_transfer_set_property_size(struct _obex_transfer *transfer,
 							guint64 size)
 {
-	property_set_uint64(transfer->proxy.property_proxy,
+	property_set_uint64(transfer->parent->properties_proxy,
 				OBEX_TRANSFER_INTERFACE, "Size", size);
 }
 
@@ -1047,9 +1049,10 @@ static void _transfer_notify_state(struct _transfer_notify *notify,
 	if ((notify->state == OBEX_TRANSFER_COMPLETE ||
 		notify->state == OBEX_TRANSFER_ERROR ||
 			notify->state == OBEX_TRANSFER_CANCELED) &&
-				!notify->is_watch)
+				!notify->is_watch) {
 		g_idle_add_full(G_PRIORITY_HIGH_IDLE + 30,
 				remove_transfer_notify, notify, NULL);
+	}
 }
 
 static struct _obex_transfer *obex_transfer_ref(
@@ -1156,6 +1159,25 @@ static int get_transfer_id(struct _obex_transfer *transfer)
 	return id;
 }
 
+int obex_get_transferid_from_path(int role, const char *path)
+{
+	int id;
+	char *p = g_strrstr(path, "transfer");
+	if (p == NULL) {
+		ERROR("Can't get transfer id");
+		return -1;
+	}
+
+	id = atoi(8 + p);
+
+	if (role == OBEX_SERVER)
+		id = id + 10000;
+
+	DBG("transfer id %d", id);
+
+	return id;
+}
+
 static struct _obex_transfer *create_transfer(struct _obex_object *object)
 {
 	int err;
@@ -1176,6 +1198,7 @@ static struct _obex_transfer *create_transfer(struct _obex_object *object)
 
 	transfer->parent = object;
 
+
 	err = get_proxy(&transfer->proxy, object, FALSE,
 					OBEX_TRANSFER_INTERFACE);
 	if (err) {
@@ -1187,14 +1210,17 @@ static struct _obex_transfer *create_transfer(struct _obex_object *object)
 	session_path = obex_transfer_property_get_session_path(transfer);
 
 	session = obex_session_get_session_from_path(session_path);
+
 	transfer->session = obex_session_ref(session);
 
 	g_free(session_path);
 
 	transfer->source = obex_session_property_get_source(
 							transfer->session);
+
 	transfer->destination = obex_session_property_get_destination(
 							transfer->session);
+
 	if (transfer->session) {
 		transfer->target = transfer->session->target;
 
@@ -1300,9 +1326,14 @@ static struct _obex_session *create_session(struct _obex_object *object)
 		return NULL;
 	}
 
+	DBG("1");
+
 	session->target = get_session_target(session);
 
+	DBG("2");
+
 	session->identity = get_session_id(session);
+	DBG("3");
 	if (session->identity == NULL) {
 		ERROR("get session identity error");
 		free_session(session);
@@ -1413,11 +1444,11 @@ static void destruct_obex_interfaces(GList *interfaces)
 
 static void destruct_obex_object_interfaces(struct _obex_object *object)
 {
+
 	GList *list, *next, *interfaces;
 
 	interfaces = object->interfaces;
 
-	DBG("interfaces %p", object->interfaces);
 	if (!g_strcmp0(object->path_name, OBJECT_OBEX_PATH)) {
 		destruct_obex_interfaces(interfaces);
 		return;
@@ -1430,7 +1461,6 @@ static void destruct_obex_object_interfaces(struct _obex_object *object)
 		if (!g_strcmp0(*interface_name,
 					OBEX_SESSION_INTERFACE)) {
 			struct _obex_session *session = list->data;
-			DBG("free session %s", session->object_path);
 			if (obex_session_unref(session) == 0)
 				list->data = NULL;
 			continue;
@@ -1450,8 +1480,6 @@ static void destruct_obex_object_interfaces(struct _obex_object *object)
 					state == OBEX_TRANSFER_COMPLETE)
 				continue;
 
-			transfer_notify_state(transfer,
-					OBEX_TRANSFER_CANCELED);
 		}
 
 		WARN("unknown interface name %s", *interface_name);
@@ -1464,6 +1492,7 @@ static void destruct_obex_object_interfaces(struct _obex_object *object)
 
 static void destruct_obex_object(gpointer data)
 {
+
 	struct _obex_object *object = data;
 
 	DBG("");
@@ -1472,6 +1501,7 @@ static void destruct_obex_object(gpointer data)
 
 	destruct_obex_object_interfaces(object);
 	object->interfaces = NULL;
+
 
 	g_free(object->service_name);
 
@@ -1483,6 +1513,7 @@ static void destruct_obex_object(gpointer data)
 		g_object_unref(object->properties_proxy);
 
 	g_free(object);
+
 }
 
 GDBusProxy *manager_proxy;
@@ -1497,11 +1528,7 @@ static void interfaces_removed(GVariant *parameters)
 
 	g_variant_get(parameters, "(oas)", &object_path, &iter);
 
-	DBG("%s", parameters_s);
-
 	g_free(parameters_s);
-
-	DBG("%s", object_path);
 
 	object = get_object_from_path(object_path);
 	if (object == NULL)
@@ -1517,8 +1544,6 @@ static void interfaces_added(GVariant *parameters)
 	GDBusObject *obj;
 
 	g_variant_get(parameters, "(oa{sa{sv}})", &object_path, NULL);
-
-	DBG("object %s", object_path);
 
 	obj = g_dbus_object_manager_get_object(object_manager, object_path);
 
@@ -1699,6 +1724,8 @@ int obex_create_session(const char *destination,
 	const char *target_s;
 	GVariant *target_v;
 
+	DBG("");
+
 	if (this_client == NULL) {
 		WARN("no client to create session");
 		return -1;
@@ -1742,7 +1769,6 @@ int obex_create_session(const char *destination,
 
 void obex_session_remove_session(struct _obex_session *session)
 {
-	DBG("");
 	if (session == NULL)
 		return;
 
@@ -1800,7 +1826,11 @@ static void create_transfer_cb(GObject *object,
 		g_variant_get(transfer_v, "(oa{sv})", &transfer, NULL);
 
 		notify->transfer_path = g_strdup(transfer);
-		transfer_add_notify(notify);
+		notify->transfer =
+			obex_transfer_get_transfer_from_path(transfer);
+
+		_transfer_notify_state(obex_transfer_notify_ref(notify),
+						OBEX_TRANSFER_QUEUED);
 
 		DBG("transfer created %s", transfer);
 
@@ -1833,13 +1863,13 @@ void obex_session_opp_send_file(struct _obex_session *session,
 }
 
 /* notify specific transfer */
-int obex_transfer_set_notify(struct _obex_transfer *transfer,
+int obex_transfer_set_notify(char *transfer_path,
 				obex_transfer_state_cb cb, void *data)
 {
 	struct _transfer_notify *notify;
 
 	notify = create_transfer_notify(cb, FALSE, data);
-	notify->transfer_path = g_strdup(transfer->object_path);
+	notify->transfer_path = g_strdup(transfer_path);
 
 	transfer_add_notify(notify);
 
@@ -1885,6 +1915,30 @@ const GList *obex_transfer_get_pathes(void)
 	return g_hash_table_get_keys(path_transfer_hash);
 }
 
+static int client_transfer_num;
+
+static void get_number(gpointer key, gpointer value, gpointer user_data)
+{
+	struct _obex_transfer *transfer = value;
+
+	DBG("id = %d", transfer->id);
+
+	if (transfer->id < 10000)
+		client_transfer_num++;
+}
+
+int obex_transfer_client_number(void)
+{
+	DBG("");
+
+	client_transfer_num = 0;
+
+	if (g_hash_table_size(path_transfer_hash) > 0)
+		g_hash_table_foreach(path_transfer_hash, get_number, NULL);
+
+	return client_transfer_num;
+}
+
 const GList *obex_transfer_get_ids(void)
 {
 	return g_hash_table_get_keys(id_transfer_hash);
@@ -1913,14 +1967,14 @@ char *obex_transfer_get_property_destination(struct _obex_transfer *transfer)
 
 char *obex_transfer_get_property_file_name(struct _obex_transfer *transfer)
 {
-	return property_get_string(transfer->proxy.property_proxy,
+	return property_get_string(transfer->parent->properties_proxy,
 			OBEX_TRANSFER_INTERFACE, "Filename");
 }
 
 char *obex_transfer_get_property_name(struct _obex_transfer *transfer)
 {
 
-	return property_get_string(transfer->proxy.property_proxy,
+	return property_get_string(transfer->parent->properties_proxy,
 			OBEX_TRANSFER_INTERFACE, "Name");
 }
 

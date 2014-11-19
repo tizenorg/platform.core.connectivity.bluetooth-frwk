@@ -501,7 +501,7 @@ static int bt_opp_agent_off(void *p1, void *p2)
 
 static int bt_send_file(void *p1, void *p2)
 {
-	comms_bluetooth_opp_send_file(p1, p2, bt_simple_result_cb, NULL);
+	comms_bluetooth_opp_send_file(p1, p2, NULL, bt_simple_result_cb, NULL);
 
 	return 0;
 }
