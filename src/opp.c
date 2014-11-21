@@ -460,7 +460,7 @@ static void handle_opp_agent_method_call(GDBusConnection *connection,
 		return;
 	}
 
-	vertical_notify_bt_opp_agent_on();
+	vertical_notify_bt_opp_agent_on(NULL);
 
 	relay_agent_timeout_id = g_timeout_add(500,
 					relay_agent_timeout_cb, NULL);

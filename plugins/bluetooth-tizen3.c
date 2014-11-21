@@ -349,7 +349,7 @@ static gchar* get_device_name_from_device_path(gchar* device_path)
 	return string;
 }
 
-static int bt_pairing_agent_on(void* data)
+static int bt_pairing_agent_on(void *data)
 {
 	struct pairing_context *pairing_data = (struct pairing_context *) data;
 
@@ -473,7 +473,7 @@ static int bt_pairing_agent_on(void* data)
 	return 0;
 }
 
-static int bt_opp_agent_on(void)
+static int bt_opp_agent_on(void *data)
 {
 	DBG("");
 	// TODO: replace syspopup mechanism by one based on notification-service
