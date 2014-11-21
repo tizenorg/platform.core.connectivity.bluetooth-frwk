@@ -971,6 +971,22 @@ void bt_service_opp_init(GDBusObjectSkeleton *gdbus_object_skeleton,
 	obex_agent_register_agent(OPP_AGENT_PATH,
 				register_obex_agent_cb,
 				connection);
+
+#ifdef TIZEN_3
+	ERROR("popups app registers the opp agent here");
+	struct opp_context *context;
+
+	context = g_new0(struct opp_context, 1);
+	if (context == NULL) {
+		ERROR("no memroy");
+		return;
+	}
+	context->method_name = "RegisterOppAgent";
+
+	vertical_notify_bt_opp_agent_on(context);
+
+	g_free(context);
+#endif
 }
 
 void bt_service_opp_deinit(void)

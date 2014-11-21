@@ -37,6 +37,7 @@
 #define POPUP_TYPE_USERPROMPT "user_agreement_popup"
 
 #define REGISTER_PAIRING_AGENT_TITLE "register_pairing_agent"
+#define REGISTER_OPP_AGENT_TITLE "register_opp_agent"
 
 #define PASSKEY_SIZE 6
 
@@ -44,6 +45,13 @@ static int noti_id;
 static notification_h noti = NULL;
 
 struct pairing_context {
+	gchar *method_name;
+	GVariant *parameters;
+	GDBusMethodInvocation *invocation;
+	gpointer user_data;
+};
+
+struct opp_context {
 	gchar *method_name;
 	GVariant *parameters;
 	GDBusMethodInvocation *invocation;
@@ -475,8 +483,24 @@ static int bt_pairing_agent_on(void *data)
 
 static int bt_opp_agent_on(void *data)
 {
-	DBG("");
-	// TODO: replace syspopup mechanism by one based on notification-service
+	struct opp_context *opp_data = (struct opp_context *) data;
+
+	notification_h noti;
+	gchar *event_type = NULL;
+	gchar *title = NULL;
+
+	event_type = opp_data->method_name;
+	LOGD("create notification for [%s] event", event_type);
+
+	noti = notification_create(NOTIFICATION_TYPE_NOTI);
+	notification_set_pkgname(noti, BT_AGENT_APP_NAME);
+
+	if (!g_strcmp0(event_type, "RegisterOppAgent")) {
+		LOGD("Send a notification in order to register an opp agent");
+		title = g_strdup_printf(REGISTER_OPP_AGENT_TITLE);
+		insert_notification(noti, title, NULL, NULL);
+		g_free(title);
+	}
 	return 0;
 }
 
