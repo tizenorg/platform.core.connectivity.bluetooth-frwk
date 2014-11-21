@@ -26,7 +26,7 @@ struct bluetooth_vertical_driver {
 	int (*enabled)(void);
 	int (*disabled)(void);
 	int (*transfer)(double);
-	int (*opp_agent_on)(void);
+	int (*opp_agent_on)(void*);
 	int (*pairing_agent_on)(void*);
 };
 
@@ -44,5 +44,5 @@ void vertical_notify_bt_transfer(double progress);
 
 void vertical_notify_bt_pairing_agent_on(void* data);
 
-void vertical_notify_bt_opp_agent_on(void);
+void vertical_notify_bt_opp_agent_on(void* data);
 #endif

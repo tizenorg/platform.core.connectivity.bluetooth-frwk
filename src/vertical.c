@@ -92,13 +92,13 @@ void vertical_notify_bt_pairing_agent_on(void *data)
 		bluetooth_driver->pairing_agent_on(data);
 }
 
-void vertical_notify_bt_opp_agent_on(void)
+void vertical_notify_bt_opp_agent_on(void *data)
 {
 	if (!bluetooth_driver)
 		return;
 
 	if (bluetooth_driver->opp_agent_on)
-		bluetooth_driver->opp_agent_on();
+		bluetooth_driver->opp_agent_on(data);
 }
 
 void vertical_notify_bt_transfer(double progress)
