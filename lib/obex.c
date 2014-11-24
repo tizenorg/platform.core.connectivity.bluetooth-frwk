@@ -564,7 +564,7 @@ gchar *obex_session_property_get_source(struct _obex_session *session)
 	if (session == NULL)
 		return NULL;
 
-	return property_get_string(session->session_proxy.property_proxy,
+	return property_get_string(session->parent->properties_proxy,
 			OBEX_TRANSFER_INTERFACE, "Source");
 }
 
@@ -573,7 +573,7 @@ gchar *obex_session_property_get_target_uuid(struct _obex_session *session)
 	if (session == NULL)
 		return NULL;
 
-	return property_get_string(session->session_proxy.property_proxy,
+	return property_get_string(session->parent->properties_proxy,
 			OBEX_TRANSFER_INTERFACE, "Target");
 }
 
@@ -829,7 +829,7 @@ struct _obex_session *obex_session_get_session_from_path(const char *path)
 
 gchar *obex_transfer_property_get_session_path(struct _obex_transfer *transfer)
 {
-	return property_get_string(transfer->proxy.property_proxy,
+	return property_get_string(transfer->parent->properties_proxy,
 					OBEX_TRANSFER_INTERFACE, "Session");
 }
 
@@ -972,7 +972,7 @@ static enum transfer_state get_transfer_state_from_string(const char *string)
 enum transfer_state obex_transfer_property_get_state(
 				struct _obex_transfer *transfer)
 {
-	char *status = property_get_string(transfer->proxy.property_proxy,
+	char *status = property_get_string(transfer->parent->properties_proxy,
 				OBEX_TRANSFER_INTERFACE, "Status");
 
 	return get_transfer_state_from_string(status);
@@ -982,7 +982,7 @@ int obex_transfer_property_get_transferred(
 				struct _obex_transfer *transfer,
 				guint64 *u64)
 {
-	return property_get_uint64(transfer->proxy.property_proxy,
+	return property_get_uint64(transfer->parent->properties_proxy,
 			OBEX_TRANSFER_INTERFACE, "Transferred", u64);
 }
 
@@ -990,21 +990,21 @@ int obex_transfer_property_get_size(
 				struct _obex_transfer *transfer,
 				guint64 *u64)
 {
-	return property_get_uint64(transfer->proxy.property_proxy,
+	return property_get_uint64(transfer->parent->properties_proxy,
 				OBEX_TRANSFER_INTERFACE, "Size", u64);
 }
 
 void obex_transfer_set_property_name(struct _obex_transfer *transfer,
 							const char *name)
 {
-	property_set_string(transfer->proxy.property_proxy,
+	property_set_string(transfer->parent->properties_proxy,
 				OBEX_TRANSFER_INTERFACE, "Name", name);
 }
 
 void obex_transfer_set_property_size(struct _obex_transfer *transfer,
 							guint64 size)
 {
-	property_set_uint64(transfer->proxy.property_proxy,
+	property_set_uint64(transfer->parent->properties_proxy,
 				OBEX_TRANSFER_INTERFACE, "Size", size);
 }
 
@@ -1913,14 +1913,14 @@ char *obex_transfer_get_property_destination(struct _obex_transfer *transfer)
 
 char *obex_transfer_get_property_file_name(struct _obex_transfer *transfer)
 {
-	return property_get_string(transfer->proxy.property_proxy,
+	return property_get_string(transfer->parent->properties_proxy,
 			OBEX_TRANSFER_INTERFACE, "Filename");
 }
 
 char *obex_transfer_get_property_name(struct _obex_transfer *transfer)
 {
 
-	return property_get_string(transfer->proxy.property_proxy,
+	return property_get_string(transfer->parent->properties_proxy,
 			OBEX_TRANSFER_INTERFACE, "Name");
 }
 
