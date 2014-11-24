@@ -1156,6 +1156,25 @@ static int get_transfer_id(struct _obex_transfer *transfer)
 	return id;
 }
 
+int obex_get_transferid_from_path(int role, const char *path)
+{
+	int id;
+	char *p = g_strrstr(path, "transfer");
+	if (p == NULL) {
+		ERROR("Can't get transfer id");
+		return -1;
+	}
+
+	id = atoi(8 + p);
+
+	if (role == OBEX_SERVER)
+		id = id + 10000;
+
+	DBG("transfer id %d", id);
+
+	return id;
+}
+
 static struct _obex_transfer *create_transfer(struct _obex_object *object)
 {
 	int err;
@@ -1883,6 +1902,30 @@ struct _obex_transfer *obex_transfer_get_transfer_from_id(int id)
 const GList *obex_transfer_get_pathes(void)
 {
 	return g_hash_table_get_keys(path_transfer_hash);
+}
+
+static int client_transfer_num;
+
+static void get_number(gpointer key, gpointer value, gpointer user_data)
+{
+	struct _obex_transfer *transfer = value;
+
+	DBG("id = %d", transfer->id);
+
+	if (transfer->id < 10000)
+		client_transfer_num++;
+}
+
+int obex_transfer_client_number(void)
+{
+	DBG("");
+
+	client_transfer_num = 0;
+
+	if (g_hash_table_size(path_transfer_hash) > 0)
+		g_hash_table_foreach(path_transfer_hash, get_number, NULL);
+
+	return client_transfer_num;
 }
 
 const GList *obex_transfer_get_ids(void)

@@ -188,4 +188,8 @@ int obex_transfer_set_watch(
 			void *data);
 
 void obex_transfer_clear_watch(void);
+
+int obex_transfer_client_number(void);
+
+int obex_get_transferid_from_path(int role, const char *path);
 #endif
