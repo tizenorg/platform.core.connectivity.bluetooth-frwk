@@ -77,6 +77,9 @@ static GHashTable *comms_object_hash;
 comms_manager_bt_in_service_watch_t manager_bt_in_service_watch;
 void *manager_bt_in_service_watch_data;
 
+opp_manager_service_watch_t manager_opp_service_watch;
+void *manager_opp_service_watch_data;
+
 static struct _comms_object *get_object_from_path(const char *path)
 {
 	return g_hash_table_lookup(comms_object_hash, (gpointer) path);
@@ -699,6 +702,20 @@ int comms_manager_get_bt_adapter_visibale_time(void)
 	g_variant_unref(ret);
 
 	return val;
+}
+
+void opp_manager_set_service_watch(
+				opp_manager_service_watch_t cb,
+				void *user_data)
+{
+	manager_opp_service_watch = cb;
+	manager_opp_service_watch_data = user_data;
+}
+
+void opp_manager_remove_service_watch(void)
+{
+	manager_opp_service_watch = NULL;
+	manager_opp_service_watch_data = NULL;
 }
 
 void comms_manager_set_bt_in_service_watch(

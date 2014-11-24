@@ -81,13 +81,36 @@ typedef void (*bt_opp_client_push_responded_new_cb)(
 static struct {
 	char *root_folder;
 	char *pending_name;
+	char *pending_transfer_path;
 	bt_opp_server_push_file_requested_cb requested_cb;
 	void *user_data;
-	obex_transfer_t *pending_transfer;
+	int pending_transfer_id;
 	GDBusMethodInvocation *pending_invocation;
 } opp_server;
 
-static char *setting_destination;
+struct opp_transfer_state_cb_node {
+	bt_opp_transfer_state_cb cb;
+	void *user_data;
+};
+
+static gboolean is_client_register;
+static gboolean is_server_register;
+static void *opp_client_data;
+
+static guint bluetooth_ext_agent_id;
+
+static struct opp_transfer_state_cb_node *opp_transfer_state_node;
+
+static void bt_opp_server_transfer_state_cb(bt_opp_transfer_state_e state,
+				const char *name, uint64_t size,
+				unsigned char percent, void *user_data);
+
+static void bt_opp_client_transfer_state_cb(unsigned int id,
+			bt_opp_transfer_state_e state, const char *address,
+			const char *name, uint64_t size,
+			unsigned char percent, void *user_data);
+
+static int bt_opp_server_reject_request(void);
 
 static GDBusNodeInfo *introspection_data;
 
@@ -97,7 +120,11 @@ static const gchar introspection_xml[] =
 	"    <method name='Release'>"
 	"    </method>"
 	"    <method name='AuthorizePush'>"
-	"      <arg type='o' name='transfer' direction='in'/>"
+	"      <arg type='s' name='address' direction='in'/>"
+	"      <arg type='s' name='name' direction='in'/>"
+	"      <arg type='s' name='path' direction='in'/>"
+	"      <arg type='t' name='size' direction='in'/>"
+	"      <arg type='i' name='transfer_id' direction='in'/>"
 	"      <arg type='s' direction='out'/>"
 	"    </method>"
 	"    <method name='Cancel'>"
@@ -119,6 +146,22 @@ static void handle_release(GDBusMethodInvocation *invocation)
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
+static void bt_opp_manager_service_watch(
+			gchar *address, gchar *name,
+			guint64 size, guint id,
+			guint state, double percent,
+			void *user_data)
+{
+	DBG("transfer_id = %d, state = %d", id, state);
+
+	if (id >= 10000)
+		bt_opp_server_transfer_state_cb(state, name, size,
+			percent, opp_server.user_data);
+	else
+		bt_opp_client_transfer_state_cb(id, state,
+			address, name, size, percent, opp_client_data);
+}
+
 static void handle_method_call(GDBusConnection *connection,
 				const gchar *sender,
 				const gchar *object_path,
@@ -134,68 +177,38 @@ static void handle_method_call(GDBusConnection *connection,
 	if (g_strcmp0(method_name, "Release") == 0) {
 		handle_release(invocation);
 		return;
-	}
-
-	if (g_strcmp0(method_name, "AuthorizePush") == 0) {
-		gchar *transfer_path, *name, *destination;
+	} else if (g_strcmp0(method_name, "AuthorizePush") == 0) {
+		gchar *address, *name, *transfer_path;
 		gchar *device_name = NULL;
-		obex_transfer_t *transfer;
 		bluez_adapter_t *adapter;
 		bluez_device_t *device;
+		int transfer_id;
 		guint64 size;
 
-		g_variant_get(parameters, "(o)", &transfer_path);
+		opp_server.pending_invocation = invocation;
 
-		DBG("transfer_path %s", transfer_path);
-
-		transfer = obex_transfer_get_transfer_from_path(
-					(const gchar *) transfer_path);
-
-		if (transfer == NULL)
-			return;
-
-		/*
-		 * obexd does not emit size proptery change signal,
-		 * so here needs to get the property from obexd directly
-		 */
-		obex_transfer_get_size(transfer, &size);
-
-		/*
-		 * save the property value to cached property, so next time
-		 * the value can be acquired from cached property, and need not
-		 * to get from obexd
-		 */
-		obex_transfer_set_property_size(transfer, size);
-
-		name = obex_transfer_get_name(transfer);
-		obex_transfer_set_property_name(transfer, (const char *) name);
-
-		destination = obex_transfer_get_property_destination(transfer);
+		g_variant_get(parameters, "(sssti)", &address,
+				&name, &transfer_path, &size, &transfer_id);
 
 		adapter = bluez_adapter_get_adapter(DEFAULT_ADAPTER_NAME);
 		device = bluez_adapter_get_device_by_address(adapter,
-								destination);
+								address);
 		if (device)
 			device_name = bluez_device_get_property_alias(device);
 
 		opp_server.pending_name = g_strdup(name);
-		opp_server.pending_transfer = transfer;
-		opp_server.pending_invocation = invocation;
+		opp_server.pending_transfer_path = g_strdup(transfer_path);
+		opp_server.pending_transfer_id = transfer_id;
 
 		if (opp_server.requested_cb)
 			opp_server.requested_cb((const char *) device_name,
-						(const char *) name, size,
-						opp_server.user_data);
+					(const char *) name,
+					size, opp_server.user_data);
 
-		g_free(destination);
-		g_free(device_name);
 		g_free(name);
-		g_free(transfer_path);
-
+		g_free(address);
 		return;
-	}
-
-	if (g_strcmp0(method_name, "Cancel") == 0) {
+	} else if (g_strcmp0(method_name, "Cancel") == 0) {
 		handle_cancel(invocation);
 
 		return;
@@ -243,6 +256,9 @@ static void release_name_on_dbus(const char *name)
 	GError *error = NULL;
 
 	if (bluetooth_opp_agent_id)
+		return;
+
+	if (bluetooth_ext_agent_id)
 		return;
 
 	ret = g_dbus_connection_call_sync(conn, "org.freedesktop.DBus",
@@ -305,6 +321,13 @@ static int request_name_on_dbus(const char *name)
 	 * 4: DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER
 	 * Also see dbus doc
 	 */
+	if (request_name_reply == DBUS_REQUEST_NAME_REPLY_IN_QUEUE
+		|| request_name_reply == DBUS_REQUEST_NAME_REPLY_EXISTS
+		|| request_name_reply ==
+				DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER) {
+		bluetooth_ext_agent_id = 1;
+		return 0;
+	}
 
 	if (request_name_reply != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
 		DBG("Lost name");
@@ -314,6 +337,9 @@ static int request_name_on_dbus(const char *name)
 		goto failed;
 	}
 
+	if (bluetooth_ext_agent_id > 0)
+		bluetooth_ext_agent_id = 0;
+
 	return 0;
 failed:
 	g_object_unref(connection);
@@ -321,40 +347,50 @@ failed:
 	return -1;
 }
 
-static void destory_opp_agent(void)
+static void destroy_opp_object(void)
 {
 	DBG("bluetooth_opp_agent_id = %d", bluetooth_opp_agent_id);
 
-	if (bluetooth_opp_agent_id > 0) {
-		comms_bluetooth_unregister_opp_agent(
-				AGENT_OBJECT_PATH, NULL, NULL);
+	if (is_client_register || is_server_register)
+		return;
 
+	if (bluetooth_opp_agent_id > 0) {
 		g_dbus_connection_unregister_object(conn,
 					bluetooth_opp_agent_id);
-
 		bluetooth_opp_agent_id = 0;
-
 		release_name_on_dbus(OBEX_LIB_SERVICE);
 	}
 
 	return;
 }
 
-static int register_opp_agent(void)
+static void destroy_opp_agent(void)
+{
+	DBG("bluetooth_opp_agent_id = %d", bluetooth_opp_agent_id);
+
+	destroy_opp_object();
+
+	comms_bluetooth_unregister_opp_agent(
+				AGENT_OBJECT_PATH, NULL, NULL);
+
+	return;
+}
+
+static int register_opp_object(void)
 {
 	int ret;
 
 	DBG("");
 
 	if (bluetooth_opp_agent_id)
-		return BT_ERROR_ALREADY_DONE;
+		return BT_SUCCESS;
 
 	introspection_data =
 		g_dbus_node_info_new_for_xml(introspection_xml, NULL);
 
 	ret = request_name_on_dbus(OBEX_LIB_SERVICE);
 	if (ret != 0)
-		return -1;
+		return BT_ERROR_OPERATION_FAILED;
 
 	DBG("%s requested success", OBEX_LIB_SERVICE);
 
@@ -366,22 +402,40 @@ static int register_opp_agent(void)
 	DBG("bluetooth_opp_agent_id = %d", bluetooth_opp_agent_id);
 
 	if (bluetooth_opp_agent_id == 0)
-		return -1;
+		return BT_ERROR_OPERATION_FAILED;
+
+	return BT_SUCCESS;
+}
+
+static int register_opp_agent(void)
+{
+	int ret;
+
+	DBG("");
+
+	ret = register_opp_object();
+
+	if (ret == BT_SUCCESS) {
+		if (is_server_register)
+			return BT_SUCCESS;
+	} else
+		return BT_ERROR_OPERATION_FAILED;
 
 	ret = comms_bluetooth_register_opp_agent_sync(
-					AGENT_OBJECT_PATH, NULL);
+						AGENT_OBJECT_PATH, NULL);
 
 	DBG("ret = %d", ret);
 
 	if (ret != BT_SUCCESS) {
-		destory_opp_agent();
+		is_server_register = FALSE;
+		destroy_opp_agent();
 		return BT_ERROR_OPERATION_FAILED;
 	}
 
-	return 0;
+	return BT_SUCCESS;
 }
 
-int bt_opp_register_server(const char *dir,
+static int bt_opp_register_server(const char *dir,
 			bt_opp_server_push_file_requested_cb push_requested_cb,
 			void *user_data)
 {
@@ -390,10 +444,6 @@ int bt_opp_register_server(const char *dir,
 	if (dir == NULL || push_requested_cb == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
 
-	if (opp_server.root_folder != NULL) {
-		ERROR("Already registered");
-		return BT_ERROR_OPERATION_FAILED;
-	}
 	if (!g_file_test(dir, G_FILE_TEST_IS_DIR)) {
 		ERROR("%s is not valid directory", dir);
 		return BT_ERROR_INVALID_PARAMETER;
@@ -403,16 +453,21 @@ int bt_opp_register_server(const char *dir,
 	if (ret != BT_SUCCESS)
 		return ret;
 
+	is_server_register = TRUE;
+
+	opp_manager_set_service_watch(bt_opp_manager_service_watch,
+							NULL);
+
 	/* TODO: Do we need to check the dir privilege? */
 
 	opp_server.root_folder = g_strdup(dir);
 	opp_server.requested_cb = push_requested_cb;
 	opp_server.user_data = user_data;
 
-	return 0;
+	return BT_SUCCESS;
 }
 
-int bt_opp_unregister_server(void)
+static int bt_opp_unregister_server(void)
 {
 	/* TODO: unregister agent */
 	g_free(opp_server.root_folder);
@@ -420,138 +475,93 @@ int bt_opp_unregister_server(void)
 
 	opp_server.requested_cb = NULL;
 	opp_server.user_data = NULL;
-	obex_lib_deinit();
 
-	destory_opp_agent();
+	is_server_register = FALSE;
+	destroy_opp_agent();
+
+	if (is_client_register)
+		return 0;
+
+	opp_manager_remove_service_watch();
 
 	return 0;
-}
-
-struct _watch_notify_node {
-	bt_opp_transfer_state_cb cb;
-	void *user_data;
-	gboolean is_watch;
-	obex_session_t *session;
-};
-
-static struct _watch_notify_node *watch_node;
-
-static void transfer_state_cb(
-			const char *transfer_path,
-			struct _obex_transfer *transfer,
-			enum transfer_state state,
-			guint64 transferred,
-			void *data,
-			char *error_msg)
-{
-	struct _watch_notify_node *node = data;
-	guint64 size;
-	unsigned char percent;
-	int id;
-	char *name;
-
-	if (transfer && node->cb) {
-		id = obex_transfer_get_id(transfer);
-		name = obex_transfer_get_property_name(transfer);
-		obex_transfer_property_get_size(transfer, &size);
-
-		DBG("transferred %ju, size %ju", transferred, size);
-		percent = transferred * 100 / size;
-
-		node->cb(id, (bt_opp_transfer_state_e) state,
-				name, size, percent, node->user_data);
-	}
-
-	if (node->is_watch)
-		return;
-
-	if (state == OBEX_TRANSFER_COMPLETE ||
-				state == OBEX_TRANSFER_CANCELED || 
-					state == OBEX_TRANSFER_ERROR) {
-		obex_session_remove_session(node->session);
-		g_free(node);
-	}
 }
 
 int bt_opp_set_transfers_state_cb(bt_opp_transfer_state_cb cb, void *user_data)
 {
-	if (watch_node) {
-		ERROR("transfer_state_cb already be set");
-		return BT_ERROR_OPERATION_FAILED;
-	}
+	struct opp_transfer_state_cb_node *state_node;
+
+	DBG("");
 
 	if (cb == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
 
-	watch_node = g_try_new0(struct _watch_notify_node, 1);
+	if (opp_transfer_state_node) {
+		DBG("transfer state callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
 
-	watch_node->cb = cb;
-	watch_node->user_data = user_data;
-	watch_node->is_watch = TRUE;
+	state_node = g_new0(struct opp_transfer_state_cb_node, 1);
+	if (state_node == NULL) {
+		ERROR("no memory.");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
 
-	obex_transfer_set_watch(transfer_state_cb, (void *) watch_node);
+	state_node->cb = cb;
+	state_node->user_data = user_data;
 
-	return 0;
+	opp_transfer_state_node = state_node;
+
+	return BT_SUCCESS;
 }
 
 void bt_opp_clear_transfers_state_cb(void)
 {
-	obex_transfer_clear_watch();
+	DBG("");
 
-	g_free(watch_node);
-	watch_node = NULL;
+	if (!opp_transfer_state_node)
+		return;
+
+	g_free(opp_transfer_state_node);
+	opp_transfer_state_node = NULL;
 }
 
-int bt_opp_server_accept_request(const char *name, bt_opp_transfer_state_cb cb,
-					void *user_data, int *transfer_id)
+int bt_opp_server_accept_request(const char *name, void *user_data,
+							int *transfer_id)
 {
-	obex_transfer_t *transfer;
-	struct _watch_notify_node *notify_node;
 	GDBusMethodInvocation *invocation;
 	char *n, *file_name;
 
-	transfer = opp_server.pending_transfer;
 	invocation = opp_server.pending_invocation;
-
-	if (transfer == NULL) {
-		ERROR("Can't find transfer");
-		return BT_ERROR_OPERATION_FAILED;
-	}
 
 	if (invocation == NULL) {
 		ERROR("Can't find invocation");
 		return BT_ERROR_OPERATION_FAILED;
 	}
 
-	if (cb) {
-		notify_node = g_try_new0(struct _watch_notify_node, 1);
+	n = (name != NULL) ? (char *) name : opp_server.pending_name;
 
-		notify_node->cb = cb;
-		notify_node->user_data = user_data;
-		notify_node->is_watch = FALSE;
-
-		obex_transfer_set_notify(transfer, transfer_state_cb,
-						(void *) notify_node);
-	}
-
-	if (!setting_destination) {
-		n = (name != NULL) ? (char *) name : opp_server.pending_name;
-
+	if (opp_server.root_folder) {
 		file_name = g_build_filename(opp_server.root_folder, n, NULL);
-
 		g_dbus_method_invocation_return_value(invocation,
 					g_variant_new("(s)", file_name));
-
 		g_free(file_name);
 	} else
 		g_dbus_method_invocation_return_value(invocation,
-				g_variant_new("(s)", setting_destination));
+						g_variant_new("(s)", n));
 
 	opp_server.pending_invocation = NULL;
+	opp_server.user_data = user_data;
 
-	*transfer_id = obex_transfer_get_id(transfer);
+	comms_bluetooth_opp_add_notify(opp_server.pending_transfer_path,
+							NULL, NULL);
 
+	*transfer_id = opp_server.pending_transfer_id;
+
+	g_free(opp_server.pending_transfer_path);
+	opp_server.pending_transfer_path = NULL;
 	g_free(opp_server.pending_name);
+	opp_server.pending_name = NULL;
 
 	return BT_SUCCESS;
 }
@@ -566,6 +576,12 @@ int bt_opp_server_reject_request(void)
 
 		opp_server.pending_invocation = NULL;
 	}
+
+	opp_server.user_data = NULL;
+	g_free(opp_server.pending_transfer_path);
+	opp_server.pending_transfer_path = NULL;
+	g_free(opp_server.pending_name);
+	opp_server.pending_name = NULL;
 
 	return 0;
 }
@@ -582,17 +598,13 @@ int bt_opp_transfer_cancel(int transfer_id)
 	return BT_SUCCESS;
 }
 
-int bt_opp_server_set_directory(const char *dir)
+int bt_opp_server_set_destination(const char *dir)
 {
-	if (opp_server.root_folder == NULL) {
-		ERROR("opp server is not initialized");
-		return BT_ERROR_OPERATION_FAILED;
-	}
-
 	if (dir == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
 
-	g_free(opp_server.root_folder);
+	if (opp_server.root_folder != NULL)
+		g_free(opp_server.root_folder);
 
 	opp_server.root_folder = g_strdup(dir);
 
@@ -607,34 +619,13 @@ struct opp_push_data{
 	void *transfer_data;
 };
 
-int bt_opp_client_push_file(
-			const char *file_name,
-			const char *remote_address,
-			bt_opp_client_push_responded_new_cb responded_cb,
-			void *responded_data,
-			bt_opp_transfer_state_cb transfer_state_cb,
-			void *transfer_data)
+int bt_opp_client_push_file(const char *remote_address)
 {
-	if (file_name == NULL || remote_address == NULL)
+	if (remote_address == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
 
-	comms_bluetooth_opp_send_file(remote_address, file_name, NULL, NULL);
-
-	return 0;
-}
-
-int bt_opp_init(void)
-{
-	obex_lib_init();
-
-	return 0;
-}
-
-int bt_opp_deinit(void)
-{
-	obex_lib_deinit();
-
-	return 0;
+	return comms_bluetooth_opp_send_file(remote_address,
+			AGENT_OBJECT_PATH, NULL, NULL);
 }
 
 /* Deprecate OPP APIs.
@@ -649,15 +640,12 @@ struct opp_server_connection_requested_cb {
 	void *user_data;
 };
 
-static GList *sending_files;
-static int pending_file_count;
-
 struct opp_server_push_cb_node *opp_server_push_node;
 struct opp_server_connection_requested_cb *opp_server_conn_req_node;
 static bt_opp_server_transfer_progress_cb bt_transfer_progress_cb;
 static bt_opp_server_transfer_finished_cb bt_transfer_finished_cb;
 static bt_opp_client_push_progress_cb bt_progress_cb;
-static bt_opp_client_push_responded_cb bt_push_request_cb;
+static bt_opp_client_push_responded_cb bt_push_responded_cb;
 static bt_opp_client_push_finished_cb bt_finished_cb;
 
 void server_push_requested_cb(const char *remote_address, const char *name,
@@ -681,10 +669,6 @@ int bt_opp_server_initialize(const char *destination,
 			void *user_data)
 {
 	int ret;
-
-	ret = bt_opp_init();
-	if (ret != BT_SUCCESS)
-		return ret;
 
 	if (!destination || !push_requested_cb)
 		return BT_ERROR_INVALID_PARAMETER;
@@ -710,8 +694,6 @@ int bt_opp_server_initialize(const char *destination,
 	opp_server_push_node->callback = push_requested_cb;
 	opp_server_push_node->user_data = user_data;
 
-	bt_opp_server_set_destination(destination);
-
 	return ret;
 }
 
@@ -720,10 +702,6 @@ int bt_opp_server_initialize_by_connection_request(const char *destination,
 		void *user_data)
 {
 	int ret;
-
-	ret = bt_opp_init();
-	if (ret != BT_SUCCESS)
-		return ret;
 
 	if (!destination || !connection_requested_cb)
 		return BT_ERROR_INVALID_PARAMETER;
@@ -745,20 +723,17 @@ int bt_opp_server_initialize_by_connection_request(const char *destination,
 	if (ret != BT_SUCCESS) {
 		g_free(opp_server_conn_req_node);
 		opp_server_conn_req_node = NULL;
+		return BT_ERROR_OPERATION_FAILED;
 	}
 
 	opp_server_conn_req_node->callback = connection_requested_cb;
 	opp_server_conn_req_node->user_data = user_data;
-
-	bt_opp_server_set_destination(destination);
 
 	return ret;
 }
 
 int bt_opp_server_deinitialize(void)
 {
-	int ret;
-
 	if (opp_server_push_node) {
 		g_free(opp_server_push_node);
 		opp_server_push_node = NULL;
@@ -772,23 +747,13 @@ int bt_opp_server_deinitialize(void)
 	bt_transfer_progress_cb = NULL;
 	bt_transfer_finished_cb = NULL;
 
-	if (setting_destination)
-		g_free(setting_destination);
-
-	ret = bt_opp_deinit();
-	if (ret != BT_SUCCESS)
-		return ret;
-
 	return bt_opp_unregister_server();
 }
 
-static void bt_opp_server_transfer_state_cb(int transfer_id,
-			bt_opp_transfer_state_e state, const char *name,
-			uint64_t size, unsigned char percent, void *user_data)
+static void bt_opp_server_transfer_state_cb(bt_opp_transfer_state_e state,
+				const char *name, uint64_t size,
+				unsigned char percent, void *user_data)
 {
-	if (transfer_id < 10000)
-		return;
-
 	if (state == BT_OPP_TRANSFER_QUEUED ||
 			state == BT_OPP_TRANSFER_ACTIVE)
 		bt_transfer_progress_cb(name, size, percent, user_data);
@@ -799,6 +764,39 @@ static void bt_opp_server_transfer_state_cb(int transfer_id,
 
 }
 
+static void bt_opp_client_transfer_state_cb(unsigned int id,
+				bt_opp_transfer_state_e state,
+				const char *address, const char *name,
+				uint64_t size, unsigned char percent,
+				void *user_data)
+{
+	DBG("+");
+
+	if (state == BT_OPP_TRANSFER_QUEUED) {
+		if (id == 0 && g_strcmp0(name, "OBEX_TRANSFER_QUEUED")) {
+			if (bt_push_responded_cb)
+				bt_push_responded_cb(BT_ERROR_NONE,
+							address, user_data);
+		} else {
+			if (bt_progress_cb)
+				bt_progress_cb(name, size, percent, user_data);
+		}
+	} else if  (state == BT_OPP_TRANSFER_ACTIVE) {
+		if (bt_progress_cb)
+			bt_progress_cb(name, size, percent, user_data);
+	} else if (state == BT_OPP_TRANSFER_COMPLETED) {
+		if (bt_finished_cb)
+			bt_finished_cb(BT_ERROR_NONE, address, user_data);
+	} else if (state == BT_OPP_TRANSFER_ERROR ||
+			state == BT_OPP_TRANSFER_CANCELED ||
+					state == BT_OPP_TRANSFER_UNKNOWN) {
+		if (bt_finished_cb)
+			bt_finished_cb(BT_ERROR_CANCELLED, address, user_data);
+	}
+
+	DBG("-");
+}
+
 int bt_opp_server_accept(bt_opp_server_transfer_progress_cb progress_cb,
 			bt_opp_server_transfer_finished_cb finished_cb,
 			const char *name, void *user_data, int *transfer_id)
@@ -806,8 +804,7 @@ int bt_opp_server_accept(bt_opp_server_transfer_progress_cb progress_cb,
 	bt_transfer_progress_cb = progress_cb;
 	bt_transfer_finished_cb = finished_cb;
 
-	return bt_opp_server_accept_request(name, bt_opp_server_transfer_state_cb,
-							user_data, transfer_id);
+	return bt_opp_server_accept_request(name, user_data, transfer_id);
 }
 
 int bt_opp_server_reject(void)
@@ -820,158 +817,68 @@ int bt_opp_server_cancel_transfer(int transfer_id)
 	return bt_opp_transfer_cancel(transfer_id);
 }
 
-int bt_opp_server_set_destination(const char *destination)
-{
-	DIR *dp = NULL;
-
-	if (destination == NULL)
-		return BT_ERROR_INVALID_PARAMETER;
-
-	dp = opendir(destination);
-
-	if (dp == NULL) {
-		DBG("The directory does not exist");
-		return BT_ERROR_INVALID_PARAMETER;
-	}
-
-	if (setting_destination)
-		g_free(setting_destination);
-
-	setting_destination = g_strdup(destination);
-	return BT_ERROR_NONE;
-}
-
 int bt_opp_client_initialize(void)
 {
 	int ret;
 
-	DBG("");
+	ret = register_opp_object();
+	if (ret != BT_SUCCESS)
+		return ret;
 
-	ret = bt_opp_init();
+	is_client_register = TRUE;
 
-	return ret;
+	opp_manager_set_service_watch(bt_opp_manager_service_watch,
+							NULL);
+	return BT_SUCCESS;
 }
 
 int bt_opp_client_deinitialize(void)
 {
-	int ret;
+	is_client_register = FALSE;
 
-	DBG("");
+	destroy_opp_object();
 
-	ret = bt_opp_deinit();
+	if (is_server_register)
+		return BT_SUCCESS;
 
-	return ret;
+	opp_manager_remove_service_watch();
+
+	return BT_SUCCESS;
 }
 
 int bt_opp_client_add_file(const char *file)
 {
 	int ret = BT_ERROR_NONE;
 
+	DBG("+");
+
 	if (file == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
 
-	if (access(file, F_OK) == 0) {
-		sending_files = g_list_append(sending_files,
-						g_strdup(file));
-	} else {
+	if (access(file, F_OK) != 0) {
 		ret = BT_ERROR_INVALID_PARAMETER;
 		DBG("ret = %d", ret);
+		return ret;
 	}
 
-	return ret;
-}
+	ret = comms_bluetooth_opp_add_file(file,
+			AGENT_OBJECT_PATH, NULL, NULL);
 
-int bt_opp_client_clear_files(void)
-{
-	int i = 0;
-	int file_num = 0;
-	char *c_file = NULL;
+	if (ret != BT_ERROR_NONE)
+		return BT_ERROR_OPERATION_FAILED;
 
-	if (sending_files) {
-		file_num = g_list_length(sending_files);
-
-		for (i = 0; i < file_num; i++) {
-			c_file = (char *)g_list_nth_data(sending_files, i);
-
-			if (c_file == NULL)
-				continue;
-
-			free(c_file);
-		}
-
-		g_list_free(sending_files);
-		sending_files = NULL;
-	}
+	DBG("-");
 
 	return BT_ERROR_NONE;
 }
 
-static void client_transfer_state_cb(int id, bt_opp_transfer_state_e state,
-				const char *name, uint64_t size,
-				unsigned char percent, void *data)
+int bt_opp_client_clear_files(void)
 {
-	struct _obex_transfer *transfer = NULL;
-	char *remote_address;
-
 	DBG("");
 
-	if (id < 10000 && bt_progress_cb != NULL) {
+	comms_bluetooth_opp_remove_Files(AGENT_OBJECT_PATH, NULL, NULL);
 
-		DBG("state: %d", state);
-
-		if (state == BT_OPP_TRANSFER_QUEUED) {
-			bt_progress_cb(name, size, 0, data);
-			return;
-		}
-
-		if (state == BT_OPP_TRANSFER_ACTIVE) {
-			bt_progress_cb(name, size, percent, data);
-
-			return;
-		}
-
-		if (state == BT_OPP_TRANSFER_COMPLETED) {
-			bt_progress_cb(name, size, 100, data);
-
-			pending_file_count--;
-		}
-
-		if (state == BT_OPP_TRANSFER_CANCELED ||
-				state == BT_OPP_TRANSFER_ERROR)
-			pending_file_count--;
-	}
-
-	transfer = obex_transfer_get_transfer_from_id(id);
-	if (transfer == NULL) {
-		ERROR("invalid transfer");
-		return;
-	}
-
-	remote_address = obex_transfer_get_property_destination(transfer);
-
-	if (pending_file_count == 0) {
-		bt_finished_cb(BT_SUCCESS, remote_address, data);
-
-		bt_push_request_cb = NULL;
-		bt_progress_cb = NULL;
-		bt_finished_cb = NULL;
-	}
-}
-
-static void session_state_changed(const char *session_id,
-				struct _obex_session *session,
-				enum session_state state,
-				void *data, char *error_msg)
-{
-	DBG("session id %s state %d", session_id, state);
-	if (state == OBEX_SESSION_CREATED) {
-		char *remote_address;
-
-		remote_address =
-			obex_session_property_get_destination(session);
-		bt_push_request_cb(BT_SUCCESS, remote_address, data);
-		g_free(remote_address);
-	}
+	return BT_ERROR_NONE;
 }
 
 static int bt_device_get_privileges(const char *remote_address)
@@ -992,9 +899,8 @@ int bt_opp_client_push_files(const char *remote_address,
 				bt_opp_client_push_finished_cb finished_cb,
 				void *user_data)
 {
-	char *c_file = NULL;
-	GList *list, *next;
 	int user_privilieges;
+	int ret;
 
 	if (remote_address == NULL) {
 		DBG("address = NULL");
@@ -1004,12 +910,8 @@ int bt_opp_client_push_files(const char *remote_address,
 	DBG("");
 
 	user_privilieges = bt_device_get_privileges(remote_address);
-
-	memset(pushing_address, 0, ADDRESS_LEN);
-	strcpy(pushing_address, remote_address);
-
 	if (user_privilieges == 0) {
-		DBG("user not privilieges to pair and use");
+		 DBG("user not privilieges to pair and use");
 		/*todo: This point will check if Cynara allow user
 			use the remote device
 			if ok, return BT_SUCCESS.
@@ -1018,39 +920,26 @@ int bt_opp_client_push_files(const char *remote_address,
 		return BT_ERROR_NOT_ENABLED;
 	}
 
-	bt_push_request_cb = responded_cb;
+	memset(pushing_address, 0, ADDRESS_LEN);
+	strcpy(pushing_address, remote_address);
+
+	bt_push_responded_cb = responded_cb;
 	bt_progress_cb = progress_cb;
 	bt_finished_cb = finished_cb;
+	opp_client_data = user_data;
 
-	bt_opp_set_transfers_state_cb(client_transfer_state_cb, user_data);
-	obex_session_set_watch(session_state_changed, user_data);
+	ret = bt_opp_client_push_file(remote_address);
 
-	pending_file_count = g_list_length(sending_files);
-
-	for (list = g_list_first(sending_files); list; list = next) {
-		c_file = list->data;
-
-		next = g_list_next(list);
-
-		if (c_file == NULL)
-			continue;
-
-		bt_opp_client_push_file(c_file, remote_address,
-					NULL, NULL, NULL, NULL);
-
-		sending_files = g_list_remove(sending_files, c_file);
+	if (ret == 1) {
+		DBG("BT_ERROR_NOW_IN_PROGRESS");
+		return BT_ERROR_NOW_IN_PROGRESS;
 	}
 
-	g_list_free_full(sending_files, g_free);
-	sending_files = NULL;
-
-	return BT_ERROR_NONE;
+	return ret;
 }
 
 int bt_opp_client_cancel_push(void)
 {
-	const GList *transfer_list;
-	GList *list, *next;
 	int user_privilieges;
 
 	if (strlen(pushing_address) == 0) {
@@ -1070,22 +959,7 @@ int bt_opp_client_cancel_push(void)
 		return BT_ERROR_NOT_ENABLED;
 	}
 
-	transfer_list = obex_transfer_get_pathes();
-
-	for (list = g_list_first((GList *)transfer_list); list; list = next) {
-		struct _obex_transfer *transfer;
-		int transfer_id;
-
-		next = g_list_next(list);
-
-		transfer = obex_transfer_get_transfer_from_path(list->data);
-		transfer_id = obex_transfer_get_id(transfer);
-
-		/* Only cancel client push */
-		if (transfer_id < 10000)
-			comms_bluetooth_opp_cancel_transfer(
-						transfer_id, NULL, NULL);
-	}
+	comms_bluetooth_opp_cancel_transfers(NULL, NULL);
 
 	return 0;
 }
