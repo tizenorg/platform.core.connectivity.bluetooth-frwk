@@ -588,13 +588,7 @@ int bt_opp_server_reject_request(void)
 
 int bt_opp_transfer_cancel(int transfer_id)
 {
-	obex_transfer_t *transfer =
-		obex_transfer_get_transfer_from_id(transfer_id);
-	if (transfer == NULL)
-		return BT_ERROR_INVALID_PARAMETER;
-
-	obex_transfer_cancel(transfer);
-
+	comms_bluetooth_opp_cancel_transfer(transfer_id, NULL, NULL);
 	return BT_SUCCESS;
 }
 

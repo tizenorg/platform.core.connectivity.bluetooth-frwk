@@ -1468,9 +1468,6 @@ static void destruct_obex_object_interfaces(struct _obex_object *object)
 			if (state == OBEX_TRANSFER_ERROR ||
 					state == OBEX_TRANSFER_COMPLETE)
 				continue;
-
-			transfer_notify_state(transfer,
-					OBEX_TRANSFER_CANCELED);
 		}
 
 		WARN("unknown interface name %s", *interface_name);
@@ -1695,25 +1692,12 @@ static void create_session_cb(GObject *object,
 	}
 }
 
-static struct _obex_session *get_session(const char *id)
-{
-	struct _obex_session *session;
-
-	session = obex_session_get_session(id);
-
-	if (session == NULL)
-		return NULL;
-
-	return session;
-}
-
 int obex_create_session(const char *destination,
 				enum obex_target target,
 				obex_session_state_cb cb,
 				void *data)
 {
 	struct _session_state_notify *notify;
-	struct _obex_session *session;
 	GVariantBuilder *builder;
 	const char *target_s;
 	GVariant *target_v;
@@ -1730,18 +1714,6 @@ int obex_create_session(const char *destination,
 	target_s = get_obex_target_string(target);
 
 	notify->id = g_strconcat("local", destination, target_s, NULL);
-
-	session = get_session(notify->id);
-	if (session) {
-		notify->session = obex_session_ref(session);
-		_session_notify_state(notify, OBEX_SESSION_CREATED);
-		return 0;
-	}
-
-	if (session_creating) {
-		_session_notify_state(notify, OBEX_SESSION_RETRY);
-		return 0;
-	}
 
 	target_v = g_variant_new("s", target_s);
 	builder = g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
@@ -1819,7 +1791,11 @@ static void create_transfer_cb(GObject *object,
 		g_variant_get(transfer_v, "(oa{sv})", &transfer, NULL);
 
 		notify->transfer_path = g_strdup(transfer);
-		transfer_add_notify(notify);
+		notify->transfer =
+			obex_transfer_get_transfer_from_path(transfer);
+
+		_transfer_notify_state(obex_transfer_notify_ref(notify),
+							OBEX_TRANSFER_QUEUED);
 
 		DBG("transfer created %s", transfer);
 
@@ -1852,13 +1828,13 @@ void obex_session_opp_send_file(struct _obex_session *session,
 }
 
 /* notify specific transfer */
-int obex_transfer_set_notify(struct _obex_transfer *transfer,
+int obex_transfer_set_notify(char *transfer_path,
 				obex_transfer_state_cb cb, void *data)
 {
 	struct _transfer_notify *notify;
 
 	notify = create_transfer_notify(cb, FALSE, data);
-	notify->transfer_path = g_strdup(transfer->object_path);
+	notify->transfer_path = g_strdup(transfer_path);
 
 	transfer_add_notify(notify);
 
