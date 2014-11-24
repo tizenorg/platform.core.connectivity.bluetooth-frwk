@@ -41,6 +41,43 @@
 #define ADDRESS_LEN 20
 static char pushing_address[ADDRESS_LEN];
 
+typedef enum {
+	BT_OPP_TRANSFER_UNKNOWN = 0x0,
+	BT_OPP_TRANSFER_QUEUED,
+	BT_OPP_TRANSFER_ACTIVE,
+	BT_OPP_TRANSFER_COMPLETED,
+	BT_OPP_TRANSFER_CANCELED,
+	BT_OPP_TRANSFER_ERROR,
+} bt_opp_transfer_state_e;
+
+typedef void (*bt_opp_server_push_file_requested_cb)(
+			const char *remote_address,
+			const char *name,
+			uint64_t size,
+			void *user_data);
+
+typedef void (*bt_opp_transfer_state_cb)(
+			int transfer_id,
+			bt_opp_transfer_state_e state,
+			const char *name,
+			uint64_t size,
+			unsigned char percent,
+			void *user_data);
+
+typedef enum {
+	BT_OPP_PUSH_ACCETPED = 0,
+	BT_OPP_PUSH_RETRY,
+	BT_OPP_PUSH_FAILED,
+	BT_OPP_PUSH_REFUSED,
+	BT_OPP_PUSH_TIMEOUT,
+	BT_OPP_PUSH_NO_SERVICE
+} push_state_e;
+
+typedef void (*bt_opp_client_push_responded_new_cb)(
+			const char *remote_address,
+			push_state_e state,
+			void *user_data);
+
 static struct {
 	char *root_folder;
 	char *pending_name;
