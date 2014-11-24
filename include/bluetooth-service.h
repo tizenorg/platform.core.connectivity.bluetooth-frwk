@@ -82,13 +82,26 @@ void comms_bluetooth_unregister_opp_agent(
 			bluetooth_simple_callback cb,
 			void *user_data);
 
-void comms_bluetooth_opp_send_file(
+int comms_bluetooth_opp_send_file(
 			const char *address,
-			const char *file_name,
+			const char *agent_path,
+			bluetooth_simple_callback cb,
+			void *user_data);
+
+void comms_bluetooth_opp_remove_Files(
+			const char *agent_path,
 			bluetooth_simple_callback cb,
 			void *user_data);
 
 void comms_bluetooth_opp_cancel_transfer(int transfer_id,
+			bluetooth_simple_callback cb,
+			void *user_data);
+
+void comms_bluetooth_opp_add_notify(char *path,
+			bluetooth_simple_callback cb,
+			void *user_data);
+
+void comms_bluetooth_opp_cancel_transfers(
 			bluetooth_simple_callback cb,
 			void *user_data);
 

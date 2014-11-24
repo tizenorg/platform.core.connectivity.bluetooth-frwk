@@ -49,10 +49,12 @@ static const GDBusMethodInfo * const _method_info_pointers[] =
 {
 	GDBUS_METHOD("RegisterObexAgent", GDBUS_ARGS(_ARG("agent", "o")), NULL),
 	GDBUS_METHOD("UnregisterObexAgent", GDBUS_ARGS(_ARG("agent", "o")), NULL),
-	GDBUS_METHOD("SendFile", GDBUS_ARGS(_ARG("remote_address", "s"),
-						_ARG("sourcefile", "s")),
-				GDBUS_ARGS(_ARG("transfer_id", "i"))),
+	GDBUS_METHOD("SendFile", GDBUS_ARGS(_ARG("sourcefile", "s"),
+						_ARG("agent", "o")), NULL),
 	GDBUS_METHOD("CancelTransfer", GDBUS_ARGS(_ARG("transfer_id", "i")), NULL),
+	GDBUS_METHOD("CancelAllTransfer", NULL, NULL),
+	GDBUS_METHOD("AddNotify", GDBUS_ARGS(_ARG("path", "s")), NULL),
+	GDBUS_METHOD("RemoveFiles", GDBUS_ARGS(_ARG("agent", "o")), NULL),
 	NULL
 };
 
@@ -75,7 +77,16 @@ static GDBusInterfaceInfo *opp_skeleton_get_info(
 struct agent {
 	gchar *owner;
 	gchar *object_path;
+	gchar *address;
+	guint32 pid;
 	guint watch_id;
+	struct _obex_session *session;
+};
+
+struct pending_files {
+	gchar *owner;
+	gchar *object_path;
+	gchar *file_name;
 };
 
 struct opp_context {
@@ -100,7 +111,12 @@ static struct agent *relay_agent;
 static obex_agent_t *obex_agent;
 static GDBusConnection *session_connection;
 
+static GList *agent_list;
+static GList *pending_push_data;
+
 #define OBEX_ERROR_INTERFACE "org.bluez.obex.Error"
+
+static void free_pending_files(struct pending_files *p_file);
 
 static void bt_opp_register_dbus_interface(OppSkeleton *skeleton,
 					GDBusConnection *connection)
@@ -493,6 +509,38 @@ static gboolean create_opp_agent(GDBusConnection *connection)
 	return TRUE;
 }
 
+static struct pending_files *create_pending_files(const gchar *sender,
+				const gchar *path, const gchar *file_name)
+{
+	struct pending_files *p_file;
+
+	DBG("");
+
+	p_file = g_new0(struct pending_files, 1);
+	if (p_file == NULL) {
+		ERROR("no memory");
+		return NULL;
+	}
+
+	p_file->owner = g_strdup(sender);
+	p_file->object_path = g_strdup(path);
+	p_file->file_name = g_strdup(file_name);
+
+	return p_file;
+}
+
+static void free_pending_files(struct pending_files *p_file)
+{
+	DBG("+");
+	g_free(p_file->owner);
+	g_free(p_file->object_path);
+	g_free(p_file->file_name);
+
+	g_free(p_file);
+
+	DBG("-");
+}
+
 static struct agent *create_relay_agent(const gchar *sender,
 					const gchar *path, guint watch_id)
 {
@@ -707,47 +755,6 @@ done:
 	g_free(push_data);
 }
 
-static GList *pending_push_data;
-
-static void send_pending_push_data(struct _obex_session *session)
-{
-	struct opp_push_data *push_data;
-	GList *list, *next;
-
-	for (list = g_list_first(pending_push_data); list; list = next) {
-		next = g_list_next(list);
-
-		push_data = list->data;
-
-		push_data->session = session;
-
-		obex_session_opp_send_file(session, push_data->file_name,
-						transfer_state_cb, push_data);
-	}
-
-	g_list_free(pending_push_data);
-	pending_push_data = NULL;
-}
-
-static void reply_pending_push_data(char *error_msg)
-{
-	struct opp_push_data *push_data;
-	GList *list, *next;
-
-	for (list = g_list_first(pending_push_data); list; list = next) {
-		next = g_list_next(list);
-
-		push_data = list->data;
-
-		handle_error_message(push_data->invocation, error_msg);
-
-		g_free(push_data);
-	}
-
-	g_list_free(pending_push_data);
-	pending_push_data = NULL;
-}
-
 static void session_state_cb(const gchar *session_id,
 				struct _obex_session *session,
 				enum session_state state,
@@ -759,16 +766,6 @@ static void session_state_cb(const gchar *session_id,
 	DBG("%s", error_msg);
 	if (error_msg) {
 		handle_error_message(push_data->invocation, error_msg);
-
-		reply_pending_push_data(error_msg);
-
-		return;
-	}
-
-	if (state == OBEX_SESSION_RETRY) {
-		pending_push_data = g_list_append(pending_push_data,
-							push_data);
-
 		return;
 	}
 
@@ -777,8 +774,82 @@ static void session_state_cb(const gchar *session_id,
 	obex_session_opp_send_file(session, push_data->file_name,
 					transfer_state_cb, push_data);
 
-	if (g_list_length(pending_push_data) > 0)
-		send_pending_push_data(session);
+}
+
+static void remove_file_handler(GDBusConnection *connection,
+				GVariant *parameters,
+				GDBusMethodInvocation *invocation,
+				gpointer user_data)
+{
+	struct agent *agent;
+	const gchar *sender, *path;
+	struct pending_files *p_file;
+	GList *list, *next;
+
+	sender = g_dbus_method_invocation_get_sender(invocation);
+
+	DBG("sender = %s", sender);
+
+	if (agent_list == NULL)
+		return comms_error_failed(invocation, "Failed");
+
+	g_variant_get(parameters, "(o)", &path);
+
+	for (list = g_list_first(agent_list); list; list = next) {
+		next = g_list_next(list);
+		agent = list->data;
+
+		if (agent && !g_strcmp0(agent->owner, sender)
+			&& !g_strcmp0(agent->object_path, path)) {
+			agent_list = g_list_remove(agent_list, agent);
+			free_relay_agent(agent);
+			break;
+		}
+	}
+
+	for (list = g_list_first(pending_push_data); list; list = next) {
+		next = g_list_next(list);
+
+		p_file = list->data;
+		if (p_file && !g_strcmp0(p_file->owner, sender)
+				&& !g_strcmp0(p_file->object_path, path)) {
+			pending_push_data =
+				g_list_remove(pending_push_data, p_file);
+			free_pending_files(p_file);
+		}
+	}
+
+	return g_dbus_method_invocation_return_value(invocation, NULL);
+}
+
+static void add_file_handler(GDBusConnection *connection,
+				GVariant *parameters,
+				GDBusMethodInvocation *invocation,
+				gpointer user_data)
+{
+	const gchar *file_name;
+	const gchar *agent;
+	const gchar *sender;
+	struct pending_files *p_file;
+
+	DBG("");
+
+	sender = g_dbus_method_invocation_get_sender(invocation);
+
+	g_variant_get(parameters, "(so)", &file_name, &agent);
+
+	DBG("file_name = %s, agent = %s", file_name, agent);
+
+	if (agent == NULL || file_name == NULL) {
+		comms_error_invalid_args(invocation);
+		return;
+	}
+
+	p_file = create_pending_files(sender, agent, file_name);
+	if (p_file)
+		pending_push_data = g_list_append(pending_push_data, p_file);
+
+	g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
 static void send_file_handler(GDBusConnection *connection,
@@ -812,6 +883,35 @@ static void send_file_handler(GDBusConnection *connection,
 				session_state_cb, data);
 }
 
+static void add_notify(GDBusConnection *connection,
+				GVariant *parameters,
+				GDBusMethodInvocation *invocation,
+				gpointer user_data)
+{
+	const gchar *sender;
+	gchar *path;
+
+	DBG("+");
+
+	if (!relay_agent) {
+		comms_error_not_available(invocation);
+		return;
+	}
+
+	sender = g_dbus_method_invocation_get_sender(invocation);
+
+	if (g_strcmp0(relay_agent->owner, sender) != 0) {
+		comms_error_not_available(invocation);
+		return;
+	}
+
+	g_variant_get(parameters, "(s)", &path);
+
+	g_dbus_method_invocation_return_value(invocation, NULL);
+
+	DBG("-");
+}
+
 static void cancel_transfer_handler(GDBusConnection *connection,
 				GVariant *parameters,
 				GDBusMethodInvocation *invocation,
@@ -831,6 +931,35 @@ static void cancel_transfer_handler(GDBusConnection *connection,
 	g_dbus_method_invocation_return_value(invocation, NULL);
 
 	DBG("");
+}
+
+static void cancel_all_transfer_handler(GDBusConnection *connection,
+				GVariant *parameters,
+				GDBusMethodInvocation *invocation,
+				gpointer user_data)
+{
+	obex_transfer_t *transfer;
+	guint transfer_id;
+	GList *transfer_list;
+	GList *list, *next;
+
+	DBG("");
+
+	transfer_list = (GList *)obex_transfer_get_pathes();
+
+	for (list = g_list_first(transfer_list); list; list = next) {
+		transfer = list->data;
+		next = g_list_next(list);
+
+		if (transfer == NULL)
+			continue;
+
+		transfer_id = obex_transfer_get_id(transfer);
+		if (transfer_id < 10000)
+			obex_transfer_cancel(transfer);
+	}
+
+	g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
 static void _opp_skeleton_handle_method_call(
@@ -856,8 +985,20 @@ static void _opp_skeleton_handle_method_call(
 	else if (g_strcmp0(method_name, "SendFile") == 0)
 		send_file_handler(connection, parameters,
 					invocation, user_data);
+	else if (g_strcmp0(method_name, "AddFile") == 0)
+		add_file_handler(connection, parameters,
+					invocation, user_data);
+	else if (g_strcmp0(method_name, "RemoveFiles") == 0)
+		remove_file_handler(connection, parameters,
+					invocation, user_data);
 	else if (g_strcmp0(method_name, "CancelTransfer") == 0)
 		cancel_transfer_handler(connection, parameters,
+					invocation, user_data);
+	else if (g_strcmp0(method_name, "CancelAllTransfer") == 0)
+		cancel_all_transfer_handler(connection, parameters,
+					invocation, user_data);
+	else if (g_strcmp0(method_name, "AddNotify") == 0)
+		add_notify(connection, parameters,
 					invocation, user_data);
 	else
 		ERROR("Unknown method");
