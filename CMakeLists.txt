@@ -59,6 +59,7 @@ IF(platform STREQUAL "Tizen3")
 SET(TIZEN3_FLAGS "tizen3-flags")
 pkg_check_modules(${TIZEN3_FLAGS} REQUIRED
 			dlog
+			vconf
 			notification
 			capi-base-common)
 FOREACH(flag ${${TIZEN3_FLAGS}_CFLAGS})

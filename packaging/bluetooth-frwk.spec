@@ -17,6 +17,7 @@ BuildRequires:  pkgconfig(capi-base-common)
 BuildRequires:  pkgconfig(aul)
 BuildRequires:  pkgconfig(syspopup-caller)
 %endif
+BuildRequires:  pkgconfig(vconf)
 BuildRequires:  pkgconfig(notification)
 BuildRequires:  cmake
 
