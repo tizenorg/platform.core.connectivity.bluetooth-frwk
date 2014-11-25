@@ -2520,7 +2520,7 @@ struct {
 	{"nap_unset_connection_state_changed_cb", nap_unset_connection_state_changed_cb,
 		"Usage: nap_unset_connection_state_changed_cb\n\tunset nap conn cb"},
 
-	{"hdo_set_connect_cb", hdp_set_connection_state_changed_cb,
+	{"hdp_set_connect_cb", hdp_set_connection_state_changed_cb,
 		"Usage: hdp_set_connect_cb\n\tset hdp conn cb"},
 
 	{"hdp_set_data_rec_cb", hdp_set_data_received_cb,
