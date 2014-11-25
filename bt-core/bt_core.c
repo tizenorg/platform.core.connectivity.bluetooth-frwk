@@ -114,18 +114,19 @@ static GError *bt_core_error(BtCoreError error, const char *err_msg)
 	return g_error_new(BT_CORE_ERROR, error, err_msg, NULL);
 }
 
-static DBusGProxy *_bt_get_adapter_proxy(void)
+static DBusGProxy *_bt_get_connman_proxy(void)
 {
 	DBusGProxy *proxy;
-	char *adapter_path = NULL;
 
 	if (conn == NULL) {
 		conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
 		retv_if(conn == NULL, NULL);
 	}
 
-	proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
-			BT_BLUEZ_HCI_PATH, BT_PROPERTIES_INTERFACE);
+	proxy = dbus_g_proxy_new_for_name(conn,
+			CONNMAN_DBUS_NAME,
+			CONNMAN_BLUETOOTH_TECHNOLOGY_PATH,
+			CONNMAN_BLUETOTOH_TECHNOLOGY_INTERFACE);
 	retv_if(proxy == NULL, NULL);
 
 	return proxy;
@@ -137,16 +138,15 @@ static int _bt_power_adapter(gboolean powered)
 	GError *error = NULL;
 	DBusGProxy *proxy;
 
-	proxy = _bt_get_adapter_proxy();
+	proxy = _bt_get_connman_proxy();
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	g_value_init(&state, G_TYPE_BOOLEAN);
 	g_value_set_boolean(&state, powered);
 
-	BT_DBG("send power state: %d to bluez", powered);
+	BT_DBG("set power property state: %d to connman", powered);
 
-	dbus_g_proxy_call(proxy, "Set", &error,
-				G_TYPE_STRING, BT_ADAPTER_INTERFACE,
+	dbus_g_proxy_call(proxy, "SetProperty", &error,
 				G_TYPE_STRING, "Powered",
 				G_TYPE_VALUE, &state,
 				G_TYPE_INVALID, G_TYPE_INVALID);

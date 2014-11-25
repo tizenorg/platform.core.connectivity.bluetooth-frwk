@@ -71,6 +71,7 @@ This package is Bluetooth Service daemon to manage BT services.
 Summary:    Bluetooth Core daemon
 Group:      Network & Connectivity/Bluetooth
 Requires:   %{name} = %{version}-%{release}
+Requires:   connman
 
 %description core
 This package is Bluetooth core daemon to manage activation / deactivation.

@@ -48,10 +48,9 @@ extern "C" {
 		} \
 	} while (0)
 
-#define BT_BLUEZ_NAME "org.bluez"
-#define BT_BLUEZ_HCI_PATH "/org/bluez/hci0"
-#define BT_ADAPTER_INTERFACE "org.bluez.Adapter1"
-#define BT_PROPERTIES_INTERFACE "org.freedesktop.DBus.Properties"
+#define CONNMAN_DBUS_NAME "net.connman"
+#define CONNMAN_BLUETOOTH_TECHNOLOGY_PATH "/net/connman/technology/bluetooth"
+#define CONNMAN_BLUETOTOH_TECHNOLOGY_INTERFACE "net.connman.Technology"
 
 #define BT_CORE_NAME "org.projectx.bt_core"
 #define BT_CORE_PATH "/org/projectx/bt_core"
