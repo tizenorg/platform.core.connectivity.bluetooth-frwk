@@ -112,6 +112,18 @@ static void bt_opp_client_transfer_state_cb(unsigned int id,
 
 static int bt_opp_server_reject_request(void);
 
+static int bt_device_get_privileges(const char *remote_address)
+{
+	int user_privilieges;
+
+	DBG("address = %s", remote_address);
+
+	user_privilieges = comms_bluetooth_get_user_privileges_sync(
+							remote_address);
+
+	return user_privilieges;
+}
+
 static GDBusNodeInfo *introspection_data;
 
 static const gchar introspection_xml[] =
@@ -184,11 +196,23 @@ static void handle_method_call(GDBusConnection *connection,
 		bluez_device_t *device;
 		int transfer_id;
 		guint64 size;
+		int privilieges;
 
 		opp_server.pending_invocation = invocation;
 
 		g_variant_get(parameters, "(sssti)", &address,
 				&name, &transfer_path, &size, &transfer_id);
+
+		privilieges = bt_device_get_privileges(address);
+		if (privilieges == 0) {
+			DBG("user not privilieges to pair and use");
+			/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+			*/
+			bt_opp_server_reject_request();
+			return;
+		}
 
 		adapter = bluez_adapter_get_adapter(DEFAULT_ADAPTER_NAME);
 		device = bluez_adapter_get_device_by_address(adapter,
@@ -873,18 +897,6 @@ int bt_opp_client_clear_files(void)
 	comms_bluetooth_opp_remove_Files(AGENT_OBJECT_PATH, NULL, NULL);
 
 	return BT_ERROR_NONE;
-}
-
-static int bt_device_get_privileges(const char *remote_address)
-{
-	int user_privilieges;
-
-	DBG("address = %s", remote_address);
-
-	user_privilieges = comms_bluetooth_get_user_privileges_sync(
-						remote_address);
-
-	return user_privilieges;
 }
 
 int bt_opp_client_push_files(const char *remote_address,
