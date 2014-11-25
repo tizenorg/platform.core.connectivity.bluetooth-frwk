@@ -20,6 +20,13 @@
 #ifndef __VERTICAL_H__
 #define __VERTICAL_H__
 
+enum storage_key {
+	STORAGE_KEY_BT_STATE,
+	STORAGE_KEY_BT_VISIBLE_TIME,
+	STORAGE_KEY_BT_HEADSET_NAME,
+	STORAGE_KEY_BT_PROFILE_STATE
+};
+
 struct bluetooth_vertical_driver {
 	const char *name;
 	int (*probe)(void);
@@ -28,6 +35,8 @@ struct bluetooth_vertical_driver {
 	int (*transfer)(double);
 	int (*opp_agent_on)(void*);
 	int (*pairing_agent_on)(void*);
+	int (*set_value)(enum storage_key, void*);
+	int (*get_value)(enum storage_key, void**);
 };
 
 void comms_service_register_bt_vertical_driver(
