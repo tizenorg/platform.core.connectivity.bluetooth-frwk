@@ -340,14 +340,30 @@ static int bt_probe(void)
 
 static int bt_enabled(void)
 {
+	int bt_status, profile_status;
+
 	DBG("");
+
+	bt_status = VCONFKEY_BT_STATUS_ON;
+	bt_set_storage_value(STORAGE_KEY_BT_STATE, &bt_status);
+
+	profile_status = VCONFKEY_BT_DEVICE_NONE;
+	bt_set_storage_value(STORAGE_KEY_BT_HEADSET_NAME, &profile_status);
 
 	return 0;
 }
 
 static int bt_disabled(void)
 {
+	int bt_status, profile_status;
+
 	DBG("");
+
+	bt_status = VCONFKEY_BT_STATUS_OFF;
+	bt_set_storage_value(STORAGE_KEY_BT_STATE, &bt_status);
+
+	profile_status = VCONFKEY_BT_DEVICE_NONE;
+	bt_set_storage_value(STORAGE_KEY_BT_HEADSET_NAME, &profile_status);
 
 	return 0;
 }
