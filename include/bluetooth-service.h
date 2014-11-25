@@ -154,8 +154,4 @@ void comms_bluetooth_unregister_media_agent(
 
 int comms_bluetooth_get_user_privileges_sync(
 			const char *address);
-
-int comms_bluetooth_remove_user_privileges_sync(
-			const char *address);
-
 #endif

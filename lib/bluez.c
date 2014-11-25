@@ -261,6 +261,8 @@ static char_read_value_cb_t char_read_calue_cb;
 static gpointer char_read_data;
 static char_write_value_cb_t char_write_calue_cb;
 static gpointer char_write_data;
+static bluez_paired_cb_t device_paired_cb;
+static gpointer device_paired_cb_data;
 
 struct gatt_char_read_notify {
 	struct _bluez_gatt_char *characteristic;
@@ -836,11 +838,19 @@ static void device_properties_changed(GDBusProxy *proxy,
 {
 	struct _bluez_device *device = user_data;
 	gchar *properties = g_variant_print(changed_properties, TRUE);
+	gboolean paired;
 
 	DBG("properties %s", properties);
 
 	update_device_discovery_info(changed_properties,
 					device->device_discovery_info);
+
+	if (g_variant_lookup(changed_properties, "Paired", "b", &paired))
+		if (device_paired_cb)
+			device_paired_cb(
+				device->device_discovery_info->remote_address,
+				paired,
+				device_paired_cb_data);
 
 	if (device->device_paired_cb)
 		handle_device_paired(changed_properties, user_data);
@@ -2958,6 +2968,12 @@ static void destruct_bluez_object_interfaces(struct _bluez_object *object)
 
 		if (!g_strcmp0(*interface_name, DEVICE_INTERFACE)) {
 			struct _bluez_device *device = list->data;
+			if (device_paired_cb &&
+				device->device_discovery_info->is_bonded)
+				device_paired_cb(
+				device->device_discovery_info->remote_address,
+				FALSE,
+				device_paired_cb_data);
 			unregister_bluez_device(device);
 			destruct_interfaces_bluez_device(device);
 			list->data = NULL;
@@ -3641,6 +3657,13 @@ void bluez_device_set_paired_changed_cb(struct _bluez_device *device,
 	device->device_paired_cb_data = user_data;
 }
 
+void bluez_set_paired_changed_cb(bluez_paired_cb_t cb,
+					gpointer user_data)
+{
+	device_paired_cb = cb;
+	device_paired_cb_data = user_data;
+}
+
 void bluez_device_set_connected_changed_cb(struct _bluez_device *device,
 					bluez_device_connected_cb_t cb,
 					gpointer user_data)
@@ -3661,6 +3684,12 @@ void bluez_device_unset_paired_changed_cb(struct _bluez_device *device)
 {
 	device->device_paired_cb = NULL;
 	device->device_paired_cb_data = NULL;
+}
+
+void bluez_unset_paired_changed_cb(void)
+{
+	device_paired_cb = NULL;
+	device_paired_cb_data = NULL;
 }
 
 void bluez_device_unset_connected_changed_cb(struct _bluez_device *device)

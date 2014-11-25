@@ -548,13 +548,8 @@ static void handle_generic_device_removed(bluez_device_t *device, void *user_dat
 
 	if (device_info->is_bonded == false)
 		bluez_unpaired_device_removed(device, unpaired_device_removed_node);
-	else {
-		if (device_info->remote_address) {
-			comms_bluetooth_remove_user_privileges_sync(
-						device_info->remote_address);
-		}
+	else
 		bluez_paired_device_removed(device, paired_device_removed_node);
-	}
 }
 
 static void set_device_removed_generic_callback(bluez_adapter_t *adapter)

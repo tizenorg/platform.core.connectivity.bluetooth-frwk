@@ -969,34 +969,6 @@ int comms_bluetooth_get_user_privileges_sync(const char *address)
 	return privileges;
 }
 
-int comms_bluetooth_remove_user_privileges_sync(const char *address)
-{
-	GError *error = NULL;
-	GVariant *result;
-
-	DBG("");
-
-	if (this_bluetooth == NULL) {
-		ERROR("bluetooth not register");
-		return BT_ERROR_INVALID_PARAMETER;
-	}
-
-	result = g_dbus_proxy_call_sync(this_bluetooth->pairing.proxy,
-				"RemoveUserPrivileges",
-				g_variant_new("(s)", address),
-				0, -1, NULL, &error);
-
-	if (error) {
-		ERROR("%s", error->message);
-		g_error_free(error);
-		return BT_ERROR_OPERATION_FAILED;
-	}
-
-	g_variant_unref(result);
-
-	return BT_SUCCESS;
-}
-
 void comms_bluetooth_unregister_pairing_agent(const char *agent_path,
 					bluetooth_simple_callback cb,
 					void *user_data)
