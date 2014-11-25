@@ -760,78 +760,6 @@ static int opp_client_cancel_push(const char *p1, const char *p2)
 	return ret;
 }
 
-static void transfer_state_cb(int transfer_id,
-				bt_opp_transfer_state_e state,
-					const char *file, guint64 size,
-					unsigned char percent, void *user_data)
-{
-	printf("\n\ttransfer %d state %d\n\t", transfer_id, state);
-	printf("\n\t%s size %ju transfered %d\n\t", file, size, percent);
-}
-
-static void server_push_requested_cb(const char *remote_address,
-					const char *file, guint64 size,
-							void *user_data)
-{
-	int id;
-
-	printf("\n\t%s push %s size %ju\n\t", remote_address, file, size);
-	printf("\n\tAccept it...\n\t");
-
-	bt_opp_server_accept_request(NULL, NULL, NULL, &id);
-
-	printf("\n\ttransfer %d accepted\n", id);
-}
-
-static int register_opp_server(const char *p1, const char *p2)
-{
-	bt_opp_init();
-	bt_opp_register_server("/tmp", server_push_requested_cb, NULL);
-	return 0;
-}
-
-static int opp_watch(const char *p1, const char *p2)
-{
-	if (!g_strcmp0(p1, "on"))
-		bt_opp_set_transfers_state_cb(transfer_state_cb, NULL);
-	else if (!g_strcmp0(p1, "off"))
-		bt_opp_clear_transfers_state_cb();
-	else
-		ERROR("Unknown parameter %s", (char *) p1);
-
-	return 0;
-}
-
-static void push_responded_cb(
-			const char *remote_address,
-			push_state_e state,
-			void *user_data)
-{
-	printf("\n\t %s connection state %d\n", remote_address, state);
-}
-
-
-static int opp_send(const char *p1, const char *p2)
-{
-	bt_opp_client_push_file(p1, p2, push_responded_cb, NULL,
-					transfer_state_cb, NULL);
-	return 0;
-}
-
-static int init_opp(const char *p1, const char *p2)
-{
-	bt_opp_init();
-
-	return 0;
-}
-
-static int deinit_opp(const char *p1, const char *p2)
-{
-	bt_opp_deinit();
-
-	return 0;
-}
-
 static void print_bonded_device_info(bt_device_info_s *device_info)
 {
 	int len;
@@ -1862,152 +1790,6 @@ static int socket_unset_data_received_cb(const char *p1, const char *p2)
 	return 0;
 }
 
-static void new_connection(const char *uuid, const char *device_name,
-						int fd, void *user_data)
-{
-	DBG("%s %s comming connect with %d", device_name, uuid, fd);
-}
-
-static int spp_create(const char *p1, const char *p2)
-{
-	int ret;
-
-	if (p1 == NULL) {
-		ERROR("spp create must give the UUID");
-		return 0;
-	}
-
-	ret = bt_spp_create_rfcomm(p1, new_connection, NULL);
-	if (ret != BT_SUCCESS)
-		DBG("spp create failed");
-
-	return 0;
-}
-
-static int spp_destroy(const char *p1, const char *p2)
-{
-	int ret;
-
-	if (p1 == NULL) {
-		ERROR("spp create must give the UUID");
-		return 0;
-	}
-
-	ret = bt_spp_destroy_rfcomm(p1);
-	if (ret != BT_SUCCESS)
-		DBG("destroy spp failed");
-
-	return 0;
-}
-
-static void spp_authorize_cb(const char *uuid, const char *device_name,
-				bt_req_t *requestion, void *user_data)
-{
-	const gchar *confirm_info, *p1, *p2;
-	gchar input_value[32] = { 0 };
-
-	DBG("\n\t%s %s requset connect, Please input(Y/N):\n",
-						device_name, uuid);
-
-	if (fgets(input_value, 32, stdin) == NULL) {
-		ERROR("fgets error.");
-		return;
-	}
-
-	split_input(input_value, &confirm_info, &p1, &p2);
-
-	if (g_ascii_strncasecmp(confirm_info, "y", 1))
-		bt_spp_reject(requestion);
-	else
-		bt_spp_accept(requestion);
-}
-
-static int spp_set_authorize_cb(const char *p1, const char *p2)
-{
-	int ret;
-
-	ret = bt_spp_set_connection_requested_cb(spp_authorize_cb, NULL);
-	if (ret != BT_SUCCESS)
-		DBG("spp set connection requested callback failed");
-
-	return 0;
-}
-
-static void spp_data_received(bt_spp_received_data *data, void *user_data)
-{
-	DBG("received data from %d %s", data->socket_fd, data->data);
-}
-
-static int spp_set_data_receive_cb(const char *p1, const char *p2)
-{
-	int ret;
-
-	ret = bt_spp_set_data_received_cb(spp_data_received, NULL);
-	if (ret != BT_SUCCESS)
-		DBG("set spp data received callback failed");
-
-	return 0;
-}
-
-static int spp_connect(const char *p1, const char *p2)
-{
-	int ret;
-
-	if (p1 == NULL) {
-		ERROR("spp connect must give the device address");
-		return 0;
-	}
-
-	if (p2 == NULL) {
-		ERROR("spp connect must give the UUID");
-		return 0;
-	}
-
-	ret = bt_spp_connect_rfcomm(p1, p2);
-	if (ret != BT_SUCCESS)
-		DBG("spp connect failed");
-
-	return 0;
-}
-
-static int spp_disconnect(const char *p1, const char *p2)
-{
-	int ret;
-
-	if (p1 == NULL) {
-		ERROR("spp disconnect must give the device address");
-		return 0;
-	}
-
-	if (p2 == NULL) {
-		ERROR("spp disconnect must give the UUID");
-		return 0;
-	}
-
-	ret = bt_spp_disconnect_rfcomm(p1, p2);
-	if (ret != BT_SUCCESS)
-		DBG("disconnect spp failed");
-
-	return 0;
-}
-
-static int spp_send(const char *p1, const char *p2)
-{
-	int ret, fd;
-
-	fd = g_ascii_strtoll(p1, NULL, 10);
-	if (fd < 0) {
-		DBG("invalid fd %d", fd);
-		return 0;
-	}
-
-	ret = bt_spp_send_data(fd, p2, strlen(p2));
-	if (ret != BT_SUCCESS)
-		DBG("spp send failed");
-
-	return 0;
-}
-
 static void panu_connected_changed(int result, bool connected,
 					const char *remote_address,
 					bt_panu_service_type_e type,
@@ -2678,21 +2460,6 @@ struct {
 	{"opp_client_cancel_push", opp_client_cancel_push,
 		"Usage: opp_client_cancel_push\n\topp client cancel"},
 
-	{"init_opp", init_opp,
-		"Usage: init_opp\n\tinitialize obex_lib"},
-
-	{"deinit_opp", deinit_opp,
-		"Usage: deinit_opp\n\tdeinitialize obex_lib"},
-
-	{"register_opp_server", register_opp_server,
-		"Usage: register_opp_server\n\tregister opp server"},
-
-	{"opp_send", opp_send,
-		"Usage: opp_send file_name destination\n\tpush file"},
-
-	{"opp_watch", opp_watch,
-		"Usage: opp_watch on/off\n\ton/off opp_watch"},
-
 	{"socket_create", socket_create,
 		"Usage: socket_create 00001101-0000-1000-8000-00805f9b34fb\n\tcreate socket with uuid"},
 
@@ -2729,27 +2496,6 @@ struct {
 	{"socket_unset_connection_requested_cb", socket_unset_connection_requested_cb,
 		"Usage: socket_unset_connection_requested_cb\n\tunset socket connection requested callback"},
 
-	{"spp_create", spp_create,
-		"Usage: spp_create 00001101-0000-1000-8000-00805f9b34fb\n\tcreate spp with uuid"},
-
-	{"spp_destroy", spp_destroy,
-		"Usage: spp_destroy\n\tdestory spp"},
-
-	{"spp_set_authorize_cb", spp_set_authorize_cb,
-		"Usage: spp_set_authorize_cb\n\tset spp authorize callback, accept/reject"},
-
-	{"spp_set_data_receive_cb", spp_set_data_receive_cb,
-		"Usage: spp_set_data_receive_cb\n\tset spp data recieved callback"},
-
-	{"spp_connect", spp_connect,
-		"Usage: spp_connect 70:F9:27:64:DF:65 00001101-0000-1000-8000-00805f9b34fb\n\tconnect spp"},
-
-	{"spp_disconnect", spp_disconnect,
-		"Usage: spp_disconnect 70:F9:27:64:DF:65 00001101-0000-1000-8000-00805f9b34fb\n\tdisconnect spp"},
-
-	{"spp_send", spp_send,
-		"Usage: spp_send fd 'data'\n\tsend spp data to fd"},
-
 	{"panu_set_state_changed", panu_set_state_changed,
 		"Usage: panu_set_state_changed\n\tset panu state changed callback"},
 
@@ -2780,7 +2526,7 @@ struct {
 	{"hdp_set_data_rec_cb", hdp_set_data_received_cb,
 		"Usage: hdp_set_data_rec_cb\n\tset hdp data rec cb"},
 
-	{"hdo_unset_connect_cb", hdp_unset_connection_state_changed_cb,
+	{"hdp_unset_connect_cb", hdp_unset_connection_state_changed_cb,
 		"Usage: hdp_unset_connect_cb\n\tunset hdp conn cb"},
 
 	{"hdp_unset_data_rec_cb", hdp_unset_data_received_cb,

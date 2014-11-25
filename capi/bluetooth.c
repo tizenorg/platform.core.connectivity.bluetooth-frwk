@@ -81,6 +81,80 @@ static void release_name_on_dbus(const char *name);
 static gboolean received_data(GIOChannel *channel, GIOCondition con,
 							gpointer user_data);
 
+typedef void (*bt_spp_new_connection_cb)(
+			const char *uuid,
+			const char *device_name,
+			int fd,
+			void *user_data);
+
+struct spp_channel {
+	GIOChannel *channel;
+	guint io_watch;
+	gchar *remote_address;
+	gint io_shutdown;
+};
+
+struct spp_context {
+	int fd;
+	gchar *uuid;
+	gchar *spp_path;
+	GIOChannel *channel;
+	GList *chan_list;
+	bt_spp_new_connection_cb new_connection;
+	void *new_connection_data;
+
+	int max_pending;
+	void *requestion;
+	gboolean is_accept;
+	bt_socket_role_e role;
+};
+
+typedef void (*bt_spp_connection_requested_cb) (
+			const char *uuid,
+			const char *remote_address,
+			bt_req_t *requestion,
+			void *user_data);
+
+static int bt_spp_create_rfcomm(
+			const char *uuid,
+			bt_spp_new_connection_cb new_connection_cb,
+			void *user_data);
+
+static int bt_spp_destroy_rfcomm(const char *uuid);
+
+static int bt_spp_connect_rfcomm(
+			const char *remote_address,
+			const char *service_uuid);
+
+static int bt_spp_disconnect_rfcomm(
+			const char *remote_address,
+			const char *service_uuid);
+
+static int bt_spp_accept(bt_req_t *requestion);
+
+static int bt_spp_reject(bt_req_t *requestion);
+
+typedef void (*bt_spp_connection_requested_cb) (
+			const char *uuid,
+			const char *remote_address,
+			bt_req_t *requestion,
+			void *user_data);
+
+typedef struct {
+	int socket_fd;  /**< The socket fd */
+	int data_size;  /**< The length of the received data */
+	char *data;     /**< The received data */
+} bt_spp_received_data;
+
+typedef void (*bt_spp_data_received_cb)(bt_spp_received_data *data,
+			void *user_data);
+
+static int bt_spp_set_data_received_cb(
+			bt_spp_data_received_cb callback,
+			void *user_data);
+
+static int bt_spp_unset_data_received_cb(void);
+
 struct device_connect_cb_node {
 	bt_device_gatt_state_changed_cb cb;
 	void *user_data;
@@ -3333,28 +3407,6 @@ int bt_hid_host_disconnect(const char *remote_address)
 	return BT_SUCCESS;
 }
 
-struct spp_channel {
-	GIOChannel *channel;
-	guint io_watch;
-	gchar *remote_address;
-	gint io_shutdown;
-};
-
-struct spp_context {
-	int fd;
-	gchar *uuid;
-	gchar *spp_path;
-	GIOChannel *channel;
-	GList *chan_list;
-	bt_spp_new_connection_cb new_connection;
-	void *new_connection_data;
-
-	int max_pending;
-	void *requestion;
-	gboolean is_accept;
-	bt_socket_role_e role;
-};
-
 GList *spp_ctx_list;
 
 static GDBusNodeInfo *profile_xml_data;
@@ -4623,7 +4675,7 @@ gchar *generate_object_path_from_uuid(const gchar *prefix, const gchar *uuid)
 	return path;
 }
 
-int bt_spp_create_rfcomm(const char *uuid,
+static int bt_spp_create_rfcomm(const char *uuid,
 			bt_spp_new_connection_cb new_connection_cb,
 			void *user_data)
 {
@@ -4676,7 +4728,7 @@ int bt_spp_create_rfcomm(const char *uuid,
 	return BT_SUCCESS;
 }
 
-int bt_spp_destroy_rfcomm(const char *uuid)
+static int bt_spp_destroy_rfcomm(const char *uuid)
 {
 	struct spp_context *spp_ctx;
 	struct spp_channel *spp_chan;
@@ -4719,7 +4771,7 @@ int bt_spp_destroy_rfcomm(const char *uuid)
 	return BT_SUCCESS;
 }
 
-int bt_spp_connect_rfcomm(const char *remote_address,
+static int bt_spp_connect_rfcomm(const char *remote_address,
 					const char *service_uuid)
 {
 	bluez_device_t *device;
@@ -4746,7 +4798,7 @@ int bt_spp_connect_rfcomm(const char *remote_address,
 	return BT_SUCCESS;
 }
 
-int bt_spp_disconnect_rfcomm(const char *remote_address,
+static int bt_spp_disconnect_rfcomm(const char *remote_address,
 					const char *service_uuid)
 {
 	bluez_device_t *device;
@@ -4773,7 +4825,7 @@ int bt_spp_disconnect_rfcomm(const char *remote_address,
 	return BT_SUCCESS;
 }
 
-int bt_spp_accept(bt_req_t *requestion)
+static int bt_spp_accept(bt_req_t *requestion)
 {
 	GDBusMethodInvocation *invocation = requestion;
 
@@ -4782,7 +4834,7 @@ int bt_spp_accept(bt_req_t *requestion)
 	return BT_SUCCESS;
 }
 
-int bt_spp_reject(bt_req_t *requestion)
+static int bt_spp_reject(bt_req_t *requestion)
 {
 	GDBusMethodInvocation *invocation = requestion;
 
@@ -4791,53 +4843,7 @@ int bt_spp_reject(bt_req_t *requestion)
 	return BT_SUCCESS;
 }
 
-int bt_spp_set_connection_requested_cb(bt_spp_connection_requested_cb callback,
-					void *user_data)
-{
-	struct spp_connection_requested_cb_node *node_data;
-
-	if (callback == NULL)
-		return BT_ERROR_INVALID_PARAMETER;
-
-	if (spp_connection_requested_node) {
-		DBG("spp connection requested callback already set.");
-		return BT_ERROR_ALREADY_DONE;
-	}
-
-	node_data = g_new0(struct spp_connection_requested_cb_node, 1);
-	if (node_data == NULL) {
-		ERROR("no memory");
-		return BT_ERROR_OUT_OF_MEMORY;
-	}
-
-	node_data->cb = callback;
-	node_data->user_data = user_data;
-
-	spp_connection_requested_node = node_data;
-
-	return BT_SUCCESS;
-}
-
-int bt_spp_unset_connection_requested_cb(void)
-{
-	DBG("");
-
-	if (initialized == false)
-		return BT_ERROR_NOT_INITIALIZED;
-
-	if (default_adapter == NULL)
-		return BT_ERROR_ADAPTER_NOT_FOUND;
-
-	if (!spp_connection_requested_node)
-		return BT_SUCCESS;
-
-	g_free(spp_connection_requested_node);
-	spp_connection_requested_node = NULL;
-
-	return BT_SUCCESS;
-}
-
-int bt_spp_send_data(int fd, const char *data, int length)
+static int bt_spp_send_data(int fd, const char *data, int length)
 {
 	struct spp_context *spp_ctx;
 	gsize written = 0, count = 0;
@@ -4866,7 +4872,7 @@ int bt_spp_send_data(int fd, const char *data, int length)
 	return BT_SUCCESS;
 }
 
-int bt_spp_set_data_received_cb(bt_spp_data_received_cb callback,
+static int bt_spp_set_data_received_cb(bt_spp_data_received_cb callback,
 						void *user_data)
 {
 	struct spp_data_received_cb_node *node_data;
@@ -4896,7 +4902,7 @@ int bt_spp_set_data_received_cb(bt_spp_data_received_cb callback,
 	return BT_SUCCESS;
 }
 
-int bt_spp_unset_data_received_cb(void)
+static int bt_spp_unset_data_received_cb(void)
 {
 	DBG("");
 
