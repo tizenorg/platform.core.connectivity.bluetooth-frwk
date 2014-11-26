@@ -849,6 +849,28 @@ static void relay_agent_disconnected(GDBusConnection *connection,
 	free_relay_agent(agent);
 }
 
+static struct agent *find_server_agent(guint32 uid)
+{
+	struct agent *agent;
+	GList *list, *next;
+
+	DBG("uid = %d", uid);
+
+	if (agent_list == NULL)
+		return NULL;
+
+	for (list = g_list_first(agent_list);
+				list; list = next) {
+		next = g_list_next(list);
+		agent = list->data;
+
+		if (agent && (agent->uid == uid))
+			return agent;
+	}
+
+	return NULL;
+}
+
 static void register_relay_agent_handler(
 					GDBusConnection *connection,
 					GVariant *parameters,
@@ -858,7 +880,7 @@ static void register_relay_agent_handler(
 	const gchar *sender;
 	gchar *agent_path;
 	guint relay_agent_watch_id;
-	struct agent *agent;
+	struct agent *agent, *used_agent = NULL;
 	guint32 uid;
 
 	DBG("");
@@ -869,6 +891,10 @@ static void register_relay_agent_handler(
 
 	sender = g_dbus_method_invocation_get_sender(invocation);
 	uid = get_connection_user_id(connection, invocation);
+
+	used_agent = find_server_agent(uid);
+	if (used_agent != NULL)
+		return comms_error_already_done(invocation);
 
 	agent = create_relay_agent(sender, agent_path, uid, 0);
 	if (agent == NULL)
