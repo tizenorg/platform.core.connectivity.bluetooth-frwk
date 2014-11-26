@@ -736,4 +736,12 @@ int bluez_media_register_player(struct _bluez_adapter *adapter);
 
 void bluez_media_unregister_player(struct _bluez_adapter *adapter);
 
+typedef void (*bluez_paired_cb_t)(gchar *address,
+				gboolean paired, gpointer user_data);
+
+void bluez_set_paired_changed_cb(bluez_paired_cb_t cb,
+						gpointer user_data);
+
+void bluez_unset_paired_changed_cb(void);
+
 #endif

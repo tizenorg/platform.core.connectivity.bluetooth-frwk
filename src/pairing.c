@@ -85,6 +85,7 @@ static GDBusInterfaceInfo *pairing_skeleton_dbus_interface_get_info(
 struct agent {
 	gchar *owner;
 	gchar *object_path;
+	guint32 uid;
 	guint watch_id;
 };
 
@@ -113,6 +114,9 @@ static gchar *pairing_device_address;
 static guint pairing_device_uid;
 static gboolean isbonding;
 static GList *agent_list;
+
+static guint remove_userprivileges(guint uid,
+				gchar *address, gboolean is_unpair);
 
 static struct agent *find_agent(const char *sender, const char *path)
 {
@@ -791,7 +795,7 @@ static gboolean create_pairing_agent(GDBusConnection *connection)
 }
 
 static struct agent *create_relay_agent(const gchar *sender,
-					const gchar *path,
+					const gchar *path, guint32 uid,
 					guint watch_id)
 {
 	struct agent *agent;
@@ -804,6 +808,7 @@ static struct agent *create_relay_agent(const gchar *sender,
 
 	agent->owner = g_strdup(sender);
 	agent->object_path = g_strdup(path);
+	agent->uid = uid;
 	agent->watch_id = watch_id;
 
 	return agent;
@@ -854,6 +859,7 @@ static void register_relay_agent_handler(
 	gchar *agent_path;
 	guint relay_agent_watch_id;
 	struct agent *agent;
+	guint32 uid;
 
 	DBG("");
 
@@ -862,8 +868,9 @@ static void register_relay_agent_handler(
 		return comms_error_invalid_args(invocation);
 
 	sender = g_dbus_method_invocation_get_sender(invocation);
+	uid = get_connection_user_id(connection, invocation);
 
-	agent = create_relay_agent(sender, agent_path, 0);
+	agent = create_relay_agent(sender, agent_path, uid, 0);
 	if (agent == NULL)
 		comms_error_not_available(invocation);
 
@@ -999,19 +1006,37 @@ static void device_pair_cb(enum bluez_error_type type, void *user_data)
 
 	DBG("");
 
-	isbonding = FALSE;
-
 	if (type != ERROR_NONE) {
 		handle_error_message(invocation, type);
-
+		isbonding = FALSE;
 		return;
 	}
 
-	if (pairing_device_address)
-		set_userprivileges(pairing_device_uid,
-					pairing_device_address);
-
 	g_dbus_method_invocation_return_value(invocation, NULL);
+}
+
+static void pair_cb(gchar *address, gboolean paired, gpointer user_data)
+{
+
+	DBG("address=%s", address);
+	DBG("pairing_device_address=%s", pairing_device_address);
+	DBG("paired = %d", paired);
+
+	if (isbonding) {
+		if (paired && pairing_device_address &&
+			!g_strcmp0(pairing_device_address, address)) {
+			set_userprivileges(pairing_device_uid,
+						pairing_device_address);
+			isbonding = FALSE;
+		}
+	} else {
+		if (paired)
+			if (address && relay_agent)
+				set_userprivileges(relay_agent->uid, address);
+	}
+
+	if (!paired)
+		remove_userprivileges(0, address, FALSE);
 }
 
 static void pairing_handler(GDBusConnection *connection,
@@ -1078,7 +1103,8 @@ static void device_cancel_pair_cb(enum bluez_error_type type, void *user_data)
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
-static guint remove_userprivileges(guint uid, gchar *address)
+static guint remove_userprivileges(guint uid,
+				gchar *address, gboolean is_unpair)
 {
 	char file[FILENAME_LEN];
 	char context[CONTEXT_LEN];
@@ -1123,11 +1149,18 @@ static guint remove_userprivileges(guint uid, gchar *address)
 			}
 			privileges = (struct user_privileges *)context;
 			privileges->address[ADDRESS_LEN-1] = 0;
-			privileges_uid = atoi(privileges->uid);
-			if ((strcasecmp(address, privileges->address) == 0)
-				&& uid == privileges_uid) {
-				DBG("find privileges matched user");
-				is_find = 1;
+			if (is_unpair) {
+				privileges_uid = atoi(privileges->uid);
+				if (!strcasecmp(address, privileges->address)
+						&& uid == privileges_uid) {
+					DBG("find privileges matched user");
+					is_find = 1;
+				}
+			} else {
+				if (!strcasecmp(address, privileges->address)) {
+					DBG("find privileges matched user");
+					is_find = 1;
+				}
 			}
 			len -= CONTEXT_LEN;
 			lseek(fd, 2, SEEK_CUR);
@@ -1311,7 +1344,7 @@ static void remove_userprivileges_handler(GDBusConnection *connection,
 
 	g_variant_get(parameters, "(s)", &address);
 
-	remove_userprivileges(uid, address);
+	remove_userprivileges(uid, address, TRUE);
 
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
@@ -1422,6 +1455,8 @@ static void bluez_agent_added_cb(bluez_agent_t *agent, void *user_data)
 					DISPLAY_YES_NO,
 					register_pairing_agent_cb,
 					connection);
+
+	bluez_set_paired_changed_cb(pair_cb, NULL);
 }
 
 PairingSkeleton *bt_service_pairing_new(void)
@@ -1465,6 +1500,8 @@ void bt_service_pairing_init(GDBusObjectSkeleton *gdbus_object_skeleton,
 				DISPLAY_YES_NO,
 				register_pairing_agent_cb,
 				connection);
+
+	bluez_set_paired_changed_cb(pair_cb, NULL);
 
 #ifdef TIZEN_3
 	DBG("popups app registers the agent here");
