@@ -17,6 +17,13 @@
 *
 */
 
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <sys/param.h>
+#include <stdlib.h>
+#include <string.h>
+#include <gio/gunixfdlist.h>
 #include <string.h>
 #include "obex.h"
 #include "comms_error.h"
@@ -27,6 +34,16 @@
 #define OPP_OBJECT "/org/tizen/comms/bluetooth"
 #define AGENT_INTERFACE "org.bluez.obex.Agent1"
 #define OPP_AGENT_PATH OPP_OBJECT "/agent/opp"
+
+#define FILENAME_LEN 100
+#define ADDRESS_LEN 18
+#define UID_LEN 8
+#define CONTEXT_LEN 28
+
+struct user_privileges {
+	char address[ADDRESS_LEN];
+	char uid[UID_LEN];
+};
 
 G_DEFINE_TYPE(OppSkeleton, opp_skeleton,
 				G_TYPE_DBUS_INTERFACE_SKELETON);
@@ -99,6 +116,7 @@ struct agent {
 	gchar *object_path;
 	gchar *address;
 	guint32 pid;
+	guint32 uid;
 	guint watch_id;
 	struct _obex_session *session;
 };
@@ -139,6 +157,7 @@ static obex_agent_t *obex_agent;
 static GDBusConnection *session_connection;
 
 static GList *agent_list;
+static GList *agent_server_list;
 static GList *pending_push_data;
 
 #define OBEX_ERROR_INTERFACE "org.bluez.obex.Error"
@@ -150,6 +169,8 @@ static void session_state_cb(const gchar *session_id,
 				enum session_state state,
 				void *user_data,
 				char *error_msg);
+static struct agent *find_agent(GList *agent_l,
+			const char *sender, const char *path);
 
 static void bt_opp_register_dbus_interface(OppSkeleton *skeleton,
 					GDBusConnection *connection)
@@ -180,7 +201,7 @@ static void destruct_opp_agent(GDBusConnection *connection)
 	g_dbus_node_info_unref(opp_introspection_data);
 }
 
-static guint32 get_connection_user_id(GDBusConnection *connection,
+static guint32 get_connection_p_id(GDBusConnection *connection,
 						const gchar *sender)
 {
 	GError *error = NULL;
@@ -207,6 +228,35 @@ static guint32 get_connection_user_id(GDBusConnection *connection,
 	g_variant_unref(pidvalue);
 
 	return pid;
+}
+
+static guint32 get_connection_user_id(GDBusConnection *connection,
+						const gchar *sender)
+{
+	GError *error = NULL;
+	GVariant *uidvalue;
+	guint32 uid;
+
+	DBG("");
+
+	uidvalue = g_dbus_connection_call_sync(connection,
+				"org.freedesktop.DBus",
+				"/org/freedesktop/DBus",
+				"org.freedesktop.DBus",
+				"GetConnectionUnixUser",
+				g_variant_new("(s)", sender),
+				NULL, 0, -1, NULL, &error);
+
+	if (uidvalue == NULL) {
+		DBG("GetConnectionUnixUser: %s", error->message);
+		g_error_free(error);
+		return -1;
+	}
+
+	g_variant_get(uidvalue, "(u)", &uid);
+	g_variant_unref(uidvalue);
+
+	return uid;
 }
 
 static void handle_pushstatus(GVariant *parameters)
@@ -287,26 +337,44 @@ static void transfer_watched_cb(
 		state == OBEX_TRANSFER_CANCELED ||
 				state == OBEX_TRANSFER_UNKNOWN) {
 		vertical_notify_bt_transfer(0);
-		send_pushstatus(dest, name, size, transfer_id, state, 0,
-						relay_client_agent->pid);
+		if (transfer_id >= 10000) {
+			if (relay_agent)
+				send_pushstatus(dest, name, size,
+					transfer_id, state, 0,
+					relay_agent->pid);
+		} else {
+			if (relay_client_agent)
+				send_pushstatus(dest, name, size,
+					transfer_id, state, 0,
+					relay_client_agent->pid);
+		}
 		goto done;
 	}
 
 	if (state == OBEX_TRANSFER_QUEUED) {
 		vertical_notify_bt_transfer(0);
-		if (transfer_id >= 10000)
-			send_pushstatus(dest, name,
-					size, transfer_id, state, 0,
+		if (transfer_id >= 10000) {
+			if (relay_agent)
+				send_pushstatus(dest, name, size,
+					transfer_id, state, 0,
+					relay_agent->pid);
+		} else {
+			if (relay_client_agent)
+				send_pushstatus(dest, name, size,
+					transfer_id, state, 0,
 					relay_client_agent->pid);
+		}
 		return;
 	}
 
 	if (state == OBEX_TRANSFER_COMPLETE) {
 		vertical_notify_bt_transfer(100);
-		if (transfer_id >= 10000)
-			send_pushstatus(dest, name,
-					size, transfer_id, state, 0,
-					relay_client_agent->pid);
+		if (transfer_id >= 10000) {
+			if (relay_agent)
+				send_pushstatus(dest, name, size,
+					transfer_id, state, 100,
+					relay_agent->pid);
+		}
 		goto done;
 	}
 
@@ -317,9 +385,17 @@ static void transfer_watched_cb(
 		percent = (double) transferred * 100 / size;
 
 		vertical_notify_bt_transfer(percent);
-		send_pushstatus(dest, name,
-					size, transfer_id, state, percent,
+		if (transfer_id >= 10000) {
+			if (relay_agent)
+				send_pushstatus(dest, name, size,
+					transfer_id, state, percent,
+					relay_agent->pid);
+		} else {
+			if (relay_client_agent)
+				send_pushstatus(dest, name, size,
+					transfer_id, state, 0,
 					relay_client_agent->pid);
+		}
 		return;
 	}
 done:
@@ -497,6 +573,85 @@ static void handle_release(GDBusConnection *connection,
 				reply_data);
 }
 
+static int get_privileges_uid(gchar *address)
+{
+	char file[FILENAME_LEN];
+	char context[CONTEXT_LEN];
+	char *path = getenv("HOME");
+	int fd;
+	struct user_privileges *privileges = NULL;
+	int len;
+	struct stat st;
+	int privileges_uid;
+	int ret;
+
+	DBG("");
+
+	sprintf(file, "%s/.bt_userprivileges", path);
+
+	fd = open(file, O_RDONLY, S_IRUSR | S_IWUSR);
+
+	if (fd < 0) {
+		DBG("fd = %d", fd);
+		return -1;
+	}
+
+	if (fstat(fd, &st) < 0) {
+		close(fd);
+		DBG("privileges context error");
+		return -1;
+	}
+
+	len = st.st_size;
+	lseek(fd, 0, SEEK_SET);
+
+	while (len >= CONTEXT_LEN) {
+		memset(context, 0, CONTEXT_LEN);
+		ret = read(fd, context, CONTEXT_LEN-2);
+		if (ret <= 0) {
+			DBG("read error");
+			close(fd);
+			return -1;
+		}
+		privileges = (struct user_privileges *)context;
+		privileges->address[ADDRESS_LEN-1] = 0;
+		privileges_uid = atoi(privileges->uid);
+		if (!strcasecmp(address, privileges->address)) {
+			DBG("find privileges matched user");
+			close(fd);
+			return privileges_uid;
+		}
+		len -= CONTEXT_LEN;
+		lseek(fd, 2, SEEK_CUR);
+	}
+
+	close(fd);
+
+	return -1;
+}
+
+static struct agent *find_server_agent(guint32 uid)
+{
+	struct agent *agent;
+	GList *list, *next;
+
+	DBG("uid = %d", uid);
+
+	if (agent_server_list == NULL)
+		return NULL;
+
+	for (list = g_list_first(agent_server_list);
+				list; list = next) {
+		next = g_list_next(list);
+		agent = list->data;
+
+		if (agent && (agent->uid == uid))
+			return agent;
+	}
+
+	return NULL;
+}
+
 static void handle_authorize_push(GDBusConnection *connection,
 				GVariant *parameters,
 				GDBusMethodInvocation *invocation,
@@ -509,7 +664,9 @@ static void handle_authorize_push(GDBusConnection *connection,
 	gchar *name = NULL;
 	guint64 size = 0;
 	guint transfer_id = 0;
+	int uid;
 	GVariant *param;
+	struct agent *agent = NULL;
 
 	DBG("");
 
@@ -529,6 +686,15 @@ static void handle_authorize_push(GDBusConnection *connection,
 		destination = obex_transfer_get_property_destination(transfer);
 		transfer_id = obex_transfer_get_id(transfer);
 	}
+
+	uid = get_privileges_uid(destination);
+	DBG("destination = %s, uid = %d", destination, uid);
+
+	if (uid > -1)
+		agent = find_server_agent(uid);
+
+	if (agent)
+		relay_agent = agent;
 
 	param = g_variant_new("(sssti)",
 			destination, name, transfer_path, size, transfer_id);
@@ -735,7 +901,7 @@ static void free_pending_files(struct pending_files *p_file)
 
 static struct agent *create_relay_agent(const gchar *sender,
 				const gchar *path, const gchar *address,
-				guint32 pid, guint watch_id)
+				guint32 pid, guint32 uid, guint watch_id)
 {
 	struct agent *agent;
 
@@ -750,6 +916,7 @@ static struct agent *create_relay_agent(const gchar *sender,
 	agent->address = g_strdup(address);
 	agent->watch_id = watch_id;
 	agent->pid = pid;
+	agent->uid = uid;
 
 	return agent;
 }
@@ -765,14 +932,27 @@ static void free_relay_agent(struct agent *agent)
 static void relay_agent_disconnected(GDBusConnection *connection,
 					const gchar *name, gpointer user_data)
 {
+	struct agent *agent = (struct agent *)user_data;
+
 	DBG("");
 
-	if (!relay_agent)
+	if (agent == NULL)
 		return;
 
-	free_relay_agent(relay_agent);
+	agent_server_list = g_list_remove(agent_server_list, agent);
 
-	relay_agent = NULL;
+	if (relay_agent)
+		if (!g_strcmp0(agent->object_path, relay_agent->object_path) &&
+				!g_strcmp0(agent->owner, relay_agent->owner)) {
+			GList *next;
+			next = g_list_last(agent_server_list);
+			if (next)
+				relay_agent = next->data;
+			else
+				relay_agent = NULL;
+	}
+
+	free_relay_agent(agent);
 }
 
 static void relay_client_agent_disconnected(GDBusConnection *connection,
@@ -796,17 +976,23 @@ static void register_relay_agent_handler(GDBusConnection *connection,
 	const gchar *sender;
 	gchar *agent_path;
 	guint relay_agent_watch_id;
+	guint32 uid, pid;
+	struct agent *agent = NULL;
 
 	DBG("");
-
-	if (relay_agent)
-		return comms_error_already_exists(invocation);
 
 	g_variant_get(parameters, "(o)", &agent_path);
 	if (agent_path == NULL)
 		return comms_error_invalid_args(invocation);
 
 	sender = g_dbus_method_invocation_get_sender(invocation);
+	uid = get_connection_user_id(connection, sender);
+
+	agent = find_server_agent(uid);
+	if (agent != NULL)
+		return comms_error_already_done(invocation);
+
+	pid = get_connection_p_id(connection, sender);
 
 	relay_agent_watch_id =
 			g_bus_watch_name_on_connection(connection, sender,
@@ -814,8 +1000,10 @@ static void register_relay_agent_handler(GDBusConnection *connection,
 					NULL, relay_agent_disconnected,
 					NULL, NULL);
 
-	relay_agent = create_relay_agent(sender, agent_path, NULL, 0,
-						relay_agent_watch_id);
+	relay_agent = create_relay_agent(sender, agent_path, NULL, pid,
+					uid, relay_agent_watch_id);
+
+	agent_server_list = g_list_append(agent_list, relay_agent);
 
 	if (relay_agent_timeout_id > 0) {
 		g_source_remove(relay_agent_timeout_id);
@@ -841,25 +1029,44 @@ static void unregister_relay_agent_handler(GDBusConnection *connection,
 					gpointer user_data)
 {
 	gchar *agent_path;
+	const gchar *sender;
+	struct agent *agent;
 
 	DBG("");
 
 	if (relay_agent == NULL)
 		return comms_error_does_not_exist(invocation);
 
+	sender = g_dbus_method_invocation_get_sender(invocation);
+
 	g_variant_get(parameters, "(o)", &agent_path);
 	if (agent_path == NULL)
 		return comms_error_invalid_args(invocation);
 
-	if (g_strcmp0(relay_agent->object_path, agent_path))
-		return comms_error_invalid_args(invocation);
+	agent = find_agent(agent_server_list, sender, agent_path);
+	if (agent == NULL) {
+		DBG("can not find agent");
+		return comms_error_does_not_exist(invocation);
+	}
+
+	agent_server_list = g_list_remove(agent_server_list, agent);
+
+	if (relay_agent)
+		if (!g_strcmp0(agent_path, relay_agent->object_path) &&
+			!g_strcmp0(sender, relay_agent->owner)) {
+			GList *next;
+			next = g_list_last(agent_server_list);
+			if (next)
+				relay_agent = next->data;
+			else
+				relay_agent = NULL;
+	}
 
 	g_dbus_method_invocation_return_value(invocation, NULL);
 
 	g_free(agent_path);
 
-	free_relay_agent(relay_agent);
-	relay_agent = NULL;
+	free_relay_agent(agent);
 }
 
 char *get_failed_content(const gchar *error_message)
@@ -1016,17 +1223,18 @@ static void session_state_cb(const gchar *session_id,
 	}
 }
 
-static struct agent *find_agent(const char *sender, const char *path)
+static struct agent *find_agent(GList *agent_l,
+			const char *sender, const char *path)
 {
 	struct agent *agent;
 	GList *list, *next;
 
 	DBG("sender = %s, path = %s", sender, path);
 
-	if (agent_list == NULL)
+	if (agent_l == NULL)
 		return NULL;
 
-	for (list = g_list_first(agent_list); list; list = next) {
+	for (list = g_list_first(agent_l); list; list = next) {
 		next = g_list_next(list);
 
 		agent = list->data;
@@ -1075,7 +1283,7 @@ static struct agent *create_relay_client_agent(GDBusConnection *connection,
 					NULL, relay_client_agent_disconnected,
 					NULL, NULL);
 
-	client_agent = create_relay_agent(sender, agent, address, pid,
+	client_agent = create_relay_agent(sender, agent, address, pid, 0,
 							relay_agent_watch_id);
 
 	return client_agent;
@@ -1177,7 +1385,7 @@ static void send_file_handler(GDBusConnection *connection,
 
 	DBG("sender = %s", sender);
 
-	pid = get_connection_user_id(connection, sender);
+	pid = get_connection_p_id(connection, sender);
 
 	if (address == NULL) {
 		DBG("address == NULL");
@@ -1197,7 +1405,7 @@ static void send_file_handler(GDBusConnection *connection,
 		if (!relay_client_agent)
 			return comms_error_not_available(invocation);
 	} else if (g_strcmp0(relay_client_agent->owner, sender) != 0) {
-		client_agent = find_agent(sender, agent);
+		client_agent = find_agent(agent_list, sender, agent);
 		if (!client_agent) {
 			client_agent =
 				create_relay_client_agent(connection, sender,
