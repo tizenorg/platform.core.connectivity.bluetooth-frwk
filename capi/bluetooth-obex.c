@@ -707,6 +707,7 @@ int bt_opp_server_initialize(const char *destination,
 	if (ret != BT_SUCCESS) {
 		g_free(opp_server_push_node);
 		opp_server_push_node = NULL;
+		return BT_ERROR_OPERATION_FAILED;
 	}
 
 	opp_server_push_node->callback = push_requested_cb;
