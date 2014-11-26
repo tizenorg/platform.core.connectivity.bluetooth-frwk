@@ -4188,12 +4188,18 @@ static int create_agent(void)
 	if (bluetooth_agent_id)
 		return BT_ERROR_ALREADY_DONE;
 
+	ret = comms_bluetooth_register_pairing_agent_sync(
+					AGENT_OBJECT_PATH, NULL);
+
+	if (ret != BT_SUCCESS)
+		return BT_ERROR_OPERATION_FAILED;
+
 	introspection_data =
 		g_dbus_node_info_new_for_xml(introspection_xml, NULL);
 
 	ret = request_name_on_dbus(BLUEZ_AGENT_SERVICE);
 	if (ret != 0)
-		return -1;
+		goto done;
 
 	DBG("%s requested success", BLUEZ_AGENT_SERVICE);
 
@@ -4201,15 +4207,15 @@ static int create_agent(void)
 					AGENT_OBJECT_PATH,
 					introspection_data->interfaces[0],
 					&interface_handle, NULL, NULL, NULL);
-	if (bluetooth_agent_id == 0)
-		return -1;
 
-	ret = comms_bluetooth_register_pairing_agent_sync(
-					AGENT_OBJECT_PATH, NULL);
-	if (ret != BT_SUCCESS)
-		return BT_ERROR_OPERATION_FAILED;
+	if (bluetooth_agent_id == 0)
+		goto done;
 
 	return 0;
+done:
+	comms_bluetooth_unregister_pairing_agent(AGENT_OBJECT_PATH,
+							NULL, NULL);
+	return -1;
 }
 
 int bt_agent_register(bt_agent *agent)
