@@ -393,7 +393,7 @@ static void transfer_watched_cb(
 		} else {
 			if (relay_client_agent)
 				send_pushstatus(dest, name, size,
-					transfer_id, state, 0,
+					transfer_id, state, percent,
 					relay_client_agent->pid);
 		}
 		return;
