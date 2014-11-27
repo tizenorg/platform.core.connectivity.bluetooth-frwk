@@ -215,6 +215,8 @@ DBusGProxy *_bt_get_adapter_properties_proxy(void);
 
 char *_bt_get_adapter_path(void);
 
+gboolean _bt_get_adapter_power(void);
+
 void _bt_deinit_proxys(void);
 
 void _bt_convert_device_path_to_address(const char *device_path,

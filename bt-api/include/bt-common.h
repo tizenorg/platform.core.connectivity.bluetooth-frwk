@@ -218,8 +218,6 @@ int _bt_copy_utf8_string(char *dest, const char *src, unsigned int length);
 
 int _bt_get_adapter_path(DBusGConnection *g_conn, char *path);
 
-gboolean _bt_get_adapter_power(DBusGConnection *conn);
-
 DBusGProxy *_bt_get_adapter_proxy(DBusGConnection *conn);
 
 void _bt_device_path_to_address(const char *device_path, char *device_address);

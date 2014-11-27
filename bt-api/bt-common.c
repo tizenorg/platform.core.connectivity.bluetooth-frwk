@@ -320,36 +320,6 @@ DBusGProxy *_bt_get_adapter_proxy(DBusGConnection *conn)
 	return adapter_proxy;
 }
 
-gboolean _bt_get_adapter_power(DBusGConnection *conn)
-{
-	DBusGProxy *proxy = NULL;
-	gboolean powered;
-	GValue powered_v = { 0 };
-	GError *err = NULL;
-
-	proxy = _bt_get_adapter_proxy(conn);
-	retv_if(proxy == NULL, FALSE);
-
-	if (!dbus_g_proxy_call(proxy, "Get", &err,
-			G_TYPE_STRING, BT_ADAPTER_INTERFACE,
-			G_TYPE_STRING, "Powered",
-			G_TYPE_INVALID,
-			G_TYPE_VALUE, &powered_v,
-			G_TYPE_INVALID)) {
-		if (err != NULL) {
-			BT_ERR("Getting property failed: [%s]\n", err->message);
-			g_error_free(err);
-		}
-		return FALSE;
-	}
-
-	powered = (gboolean)g_value_get_boolean(&powered_v);
-
-	BT_DBG("powered = %d", powered);
-
-	return powered;
-}
-
 void _bt_device_path_to_address(const char *device_path, char *device_address)
 {
 	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
