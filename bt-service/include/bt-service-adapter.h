@@ -47,6 +47,10 @@ void _bt_handle_adapter_removed(void);
 
 int _bt_check_adapter(int *status);
 
+void _bt_set_enabled(void);
+
+void _bt_set_disabled(void);
+
 void *_bt_get_adapter_agent(void);
 
 void _bt_set_discovery_status(gboolean mode);
