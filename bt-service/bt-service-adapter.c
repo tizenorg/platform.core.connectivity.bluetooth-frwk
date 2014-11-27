@@ -28,8 +28,9 @@
 #if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
 #endif
+#ifdef __TIZEN_MOBILE__
 #include <aul.h>
-
+#endif
 #include "alarm.h"
 
 #include "bluetooth-api.h"
@@ -567,6 +568,7 @@ static void __bt_flight_mode_cb(keynode_t *node, void *data)
 	}
 }
 
+#ifdef __TIZEN_MOBILE__
 static void __launch_bt_service(int status, int run_type)
 {
 	bundle *kb;
@@ -588,6 +590,7 @@ static void __launch_bt_service(int status, int run_type)
 
 	bundle_free(kb);
 }
+#endif
 
 void _bt_adapter_set_status(bt_status_t status)
 {
@@ -725,6 +728,9 @@ void _bt_handle_adapter_added(void)
 	}
 
 #ifdef __TIZEN_MOBILE__
+	if (!aul_app_is_running("com.samsung.bluetooth"))
+			__launch_bt_service(0, 0);
+
 	if (_bt_register_media_player() != BLUETOOTH_ERROR_NONE)
 		BT_ERR("Fail to register media player");
 #endif
