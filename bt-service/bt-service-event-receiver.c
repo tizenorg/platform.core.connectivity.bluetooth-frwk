@@ -352,11 +352,11 @@ static int __bt_parse_remove_event(DBusMessage *msg)
 			continue;
 		}
 
-		BT_DBG("key = %s", key);
-
 		if (g_strcmp0(key, "org.bluez.MediaTransport1") == 0) {
+			BT_DBG("key = %s", key);
 			return BT_MEDIA_TRANSFER_EVENT;
 		}else if (g_strcmp0(key, "org.bluez.Device1") == 0) {
+			BT_DBG("key = %s", key);
 			return BT_DEVICE_EVENT;
 		}
 		dbus_message_iter_next(&value_iter);
@@ -480,7 +480,7 @@ static bt_remote_dev_info_t *__bt_parse_interface(DBusMessage *msg)
 		retv_if(dbus_message_iter_get_arg_type(&interface_iter) !=
 			DBUS_TYPE_ARRAY, NULL);
 
-		BT_DBG("interface: %s", interface_name);
+		// BT_DBG("interface: %s", interface_name);
 
 		if (g_strcmp0(interface_name, "org.bluez.Device1") == 0) {
 			BT_DBG("Found a device: %s", object_path);
@@ -1290,7 +1290,7 @@ void _bt_handle_property_changed_event(DBusMessage *msg)
 
 	ret_if(interface_name == NULL);
 
-	BT_DBG("interface: %s", interface_name);
+	// BT_DBG("interface: %s", interface_name);
 
 	ret_if(dbus_message_iter_next(&item_iter) == FALSE);
 
@@ -1314,8 +1314,6 @@ void _bt_handle_property_changed_event(DBusMessage *msg)
 					BT_NETWORK_CLIENT_INTERFACE) == 0) {
 		__bt_handle_network_client_event(&item_iter,
 					dbus_message_get_path(msg));
-	} else {
-		BT_DBG("No bluez interface");
 	}
 }
 
@@ -1573,8 +1571,6 @@ static DBusHandlerResult __bt_manager_event_filter(DBusConnection *conn,
 
 	retv_if(member == NULL, DBUS_HANDLER_RESULT_NOT_YET_HANDLED);
 
-	BT_DBG("interface: %s | member: %s", dbus_message_get_interface(msg), member);
-
 	if (strcasecmp(member, "InterfacesAdded") == 0) {
 		char *object_path = NULL;
 
@@ -1697,8 +1693,6 @@ static DBusHandlerResult __bt_manager_event_filter(DBusConnection *conn,
 		char *name = NULL;
 		char *previous = NULL;
 		char *current = NULL;
-
-		BT_DBG("NameOwnerChanged");
 
 		if (__bt_get_owner_info(msg, &name, &previous, &current)) {
 			BT_ERR("Fail to get the owner info");
@@ -1857,8 +1851,6 @@ void _bt_opc_property_changed_event(DBusMessage *msg)
 	if (strcasecmp(interface_name, BT_OBEX_TRANSFER_INTERFACE) == 0) {
 		__bt_opc_property_changed_event(&item_iter,
 					dbus_message_get_path(msg));
-	} else {
-		BT_DBG("No bluez interface");
 	}
 }
 
