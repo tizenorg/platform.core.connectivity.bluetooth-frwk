@@ -33,6 +33,7 @@
 static GMainLoop *main_loop = NULL;
 static DBusGConnection *conn = NULL;
 
+#ifdef __TIZEN_MOBILE__
 typedef enum {
 	BT_DEACTIVATED,
 	BT_ACTIVATED,
@@ -42,16 +43,6 @@ typedef enum {
 
 static bt_status_t adapter_status = BT_DEACTIVATED;
 
-static void __bt_core_terminate(void)
-{
-	if (main_loop) {
-		g_main_loop_quit(main_loop);
-	} else {
-		BT_DBG("Terminating bt-core daemon");
-		exit(0);
-	}
-}
-
 static void __bt_core_set_status(bt_status_t status)
 {
 	adapter_status = status;
@@ -60,6 +51,17 @@ static void __bt_core_set_status(bt_status_t status)
 static bt_status_t __bt_core_get_status(void)
 {
 	return adapter_status;
+}
+#endif
+
+static void __bt_core_terminate(void)
+{
+	if (main_loop) {
+		g_main_loop_quit(main_loop);
+	} else {
+		BT_DBG("Terminating bt-core daemon");
+		exit(0);
+	}
 }
 
 static gboolean bt_core_enable_adapter(BtCore *agent,
@@ -162,50 +164,41 @@ static int _bt_power_adapter(gboolean powered)
 
 static int __bt_enable_adapter(void)
 {
-	int ret;
-	bt_status_t status;
-
 	BT_DBG("");
-
-	status = __bt_core_get_status();
-	if (status != BT_DEACTIVATED) {
-		BT_DBG("Invalid state %d", status);
-		return -1;
-	}
+#ifdef __TIZEN_MOBILE__
+	int ret;
 
 	__bt_core_set_status(BT_ACTIVATING);
 
+	ret = system("/usr/etc/bluetooth/bt-stack-up.sh &");
+	if (ret < 0) {
+		BT_DBG("running script failed");
+		ret = system("/usr/etc/bluetooth/bt-dev-end.sh &");
+		__bt_core_set_status(BT_DEACTIVATED);
+		return -1;
+	}
+#else
 	_bt_power_adapter(TRUE);
-
+#endif
 	return 0;
 }
 
 static int __bt_disable_adapter(void)
 {
-	bt_status_t status;
-
 	BT_DBG("");
 
 #ifdef __TIZEN_MOBILE__
-	status = __bt_core_get_status();
-	if (status == BT_ACTIVATING) {
-		/* Forcely terminate */
-		if (system("/usr/etc/bluetooth/bt-stack-down.sh &") < 0) {
-			BT_DBG("running script failed");
-		}
-		__bt_core_terminate();
-		return 0;
-	} else if (status != BT_ACTIVATED) {
-		BT_DBG("Invalid state %d", status);
-		return -1;
-	}
-#endif
 	__bt_core_set_status(BT_DEACTIVATING);
 
+	if (system("/usr/etc/bluetooth/bt-stack-down.sh &") < 0) {
+		BT_DBG("running script failed");
+		__bt_core_set_status(BT_ACTIVATED);
+		return -1;
+	}
+#else
 	_bt_power_adapter(FALSE);
-
+#endif
 	__bt_core_terminate();
-
 	return 0;
 }
 
@@ -378,10 +371,11 @@ static DBusHandlerResult __bt_core_event_filter(DBusConnection *conn,
 			BT_ERR("Fail to get the path");
 			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 		}
-
+#ifdef __TIZEN_MOBILE__
 		if (strcasecmp(object_path, "/org/bluez/hci0") == 0) {
 			__bt_core_set_status(BT_ACTIVATED);
 		}
+#endif
 	} else if (strcasecmp(member, "InterfacesRemoved") == 0) {
 		if (__bt_core_get_object_path(msg, &object_path)) {
 			BT_ERR("Fail to get the path");
@@ -389,7 +383,9 @@ static DBusHandlerResult __bt_core_event_filter(DBusConnection *conn,
 		}
 
 		if (strcasecmp(object_path, "/org/bluez/hci0") == 0) {
+#ifdef __TIZEN_MOBILE__
 			__bt_core_set_status(BT_DEACTIVATED);
+#endif
 			__bt_core_terminate();
 		}
 	} else if (strcasecmp(member, "NameOwnerChanged") == 0) {
@@ -589,3 +585,4 @@ fail:
 	BT_DBG("-");
 	return FALSE;
 }
+
