@@ -655,16 +655,16 @@ static void __bt_set_local_name(void)
 	free(phone_name);
 }
 
-static int __bt_set_enabled(void)
+void _bt_set_enabled(void)
 {
-	int enabled = FALSE;
 	int result = BLUETOOTH_ERROR_NONE;
 
-	_bt_check_adapter(&enabled);
+	_bt_adapter_set_status(BT_ACTIVATED);
 
-	if (enabled == FALSE) {
-		BT_ERR("Bluetoothd is not running");
-		return BLUETOOTH_ERROR_INTERNAL;
+	// register agent if it was not previously done.
+	if (!adapter_agent) {
+		BT_DBG("");
+		_bt_handle_adapter_added();
 	}
 
 	__bt_set_visible_mode();
@@ -681,12 +681,14 @@ static int __bt_set_enabled(void)
 	/* Send enabled event to API */
 	_bt_send_event(BT_ADAPTER_EVENT, BLUETOOTH_EVENT_ENABLED,
 				DBUS_TYPE_INT32, &result, DBUS_TYPE_INVALID);
-
-	return BLUETOOTH_ERROR_NONE;
 }
 
-static void __bt_set_disabled(int result)
+void _bt_set_disabled(void)
 {
+	int result = BLUETOOTH_ERROR_NONE;
+
+	_bt_adapter_set_status(BT_DEACTIVATED);
+
 	/* Update Bluetooth Status to notify other modules */
 	if (vconf_set_int(VCONFKEY_BT_STATUS, VCONFKEY_BT_STATUS_OFF) != 0)
 		BT_ERR("Set vconf failed\n");
@@ -714,11 +716,13 @@ void _bt_handle_flight_mode_noti(void)
 
 void _bt_handle_adapter_added(void)
 {
-	 adapter_agent = _bt_create_agent(BT_ADAPTER_AGENT_PATH, TRUE);
-	 if (!adapter_agent) {
+	BT_DBG("");
+
+	adapter_agent = _bt_create_agent(BT_ADAPTER_AGENT_PATH, TRUE);
+	if (!adapter_agent) {
 		BT_ERR("Fail to register agent");
 		return;
-	 }
+	}
 
 #ifdef __TIZEN_MOBILE__
 	if (_bt_register_media_player() != BLUETOOTH_ERROR_NONE)
@@ -738,15 +742,11 @@ void _bt_handle_adapter_added(void)
 
 	vconf_notify_key_changed(VCONFKEY_TELEPHONY_FLIGHT_MODE,
 			__bt_flight_mode_cb, NULL);
-
-	__bt_set_enabled();
-
-	_bt_adapter_set_status(BT_ACTIVATED);
 }
 
 void _bt_handle_adapter_removed(void)
 {
-	_bt_adapter_set_status(BT_DEACTIVATED);
+	BT_DBG("");
 
 	vconf_ignore_key_changed(VCONFKEY_SETAPPL_DEVICE_NAME_STR,
 				(vconf_callback_fn)__bt_phone_name_changed_cb);
@@ -754,33 +754,31 @@ void _bt_handle_adapter_removed(void)
 	_bt_destroy_agent(adapter_agent);
 	adapter_agent = NULL;
 
-	__bt_set_disabled(BLUETOOTH_ERROR_NONE);
-
 	_bt_terminate_service(NULL);
 }
 
 DBusGProxy *_bt_init_core_proxy(void)
 {
-       DBusGProxy *proxy;
+	DBusGProxy *proxy;
 	DBusGConnection *conn;
 
 	conn = _bt_get_system_gconn();
 	if (!conn)
 		return NULL;
 
-       proxy = dbus_g_proxy_new_for_name(conn, BT_CORE_NAME,
+	proxy = dbus_g_proxy_new_for_name(conn, BT_CORE_NAME,
                        BT_CORE_PATH, BT_CORE_INTERFACE);
 	if (!proxy)
 		return NULL;
 
-       core_proxy = proxy;
+	core_proxy = proxy;
 
-       return proxy;
+	return proxy;
 }
 
 static DBusGProxy *__bt_get_core_proxy(void)
 {
-       return (core_proxy) ? core_proxy : _bt_init_core_proxy();
+	return (core_proxy) ? core_proxy : _bt_init_core_proxy();
 }
 
 int _bt_enable_adapter(void)
@@ -825,7 +823,7 @@ int _bt_enable_adapter(void)
 		}
 
 		/* Display notification */
-		status_message_post(BT_STR_NOT_SUPPORT);
+		notification_status_message_post(BT_STR_NOT_SUPPORT);
 
 		/* Terminate myself */
 		g_idle_add((GSourceFunc)_bt_terminate_service, NULL);
@@ -862,7 +860,7 @@ int _bt_disable_adapter(void)
 		BT_ERR("Bt core call failed");
 		_bt_adapter_set_status(BT_ACTIVATED);
 		return BLUETOOTH_ERROR_INTERNAL;
-       }
+	}
 
 	return BLUETOOTH_ERROR_NONE;
 }

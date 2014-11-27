@@ -83,43 +83,44 @@ gboolean _bt_terminate_service(gpointer user_data)
 	return FALSE;
 }
 
+/* align bt-service state (adapter_status and vconf keys) on BlueZ state */
 static gboolean __bt_check_bt_service(void *data)
 {
 	int bt_status = VCONFKEY_BT_STATUS_OFF;
 	int flight_mode_deactivation = 0;
+
+	int adapter_enabled = 0;
 
 	if (vconf_get_int(VCONFKEY_BT_STATUS, &bt_status) < 0) {
 		BT_DBG("no bluetooth device info, so BT was disabled at previous session");
 	}
 
 	if (vconf_get_int(BT_OFF_DUE_TO_FLIGHT_MODE, &flight_mode_deactivation) != 0)
-			BT_ERR("Fail to get the flight_mode_deactivated value");
+		BT_ERR("Fail to get the flight_mode_deactivated value");
 
-	if (bt_status != VCONFKEY_BT_STATUS_OFF) {
-		BT_DBG("Previous session was enabled.");
+	_bt_check_adapter(&adapter_enabled);
 
-		/* Enable the BT */
-		_bt_enable_adapter();
-	} else if (bt_status == VCONFKEY_BT_STATUS_OFF &&
-					flight_mode_deactivation == 1) {
+	BT_DBG("get bt adapter status: %d when starting bt-service ", adapter_enabled);
+
+	_bt_adapter_set_status(adapter_enabled);
+
+	if (adapter_enabled != bt_status) {
+		BT_DBG("align vconf bt status key with real bluetooth status");
+		if (vconf_set_int(VCONFKEY_BT_STATUS, adapter_enabled) != 0)
+			BT_ERR("Set vconf key %s failed", VCONFKEY_BT_STATUS);
+
+		bt_status = adapter_enabled;
+	}
+
+	if (bt_status == VCONFKEY_BT_STATUS_OFF && flight_mode_deactivation == 1) {
+		BT_ERR("call _bt_handle_flight_mode_noti()");
 		_bt_handle_flight_mode_noti();
-	} else {
-		bt_status_t status = _bt_adapter_get_status();
-		int adapter_enabled = 0;
+		return FALSE;
+	}
 
-		_bt_check_adapter(&adapter_enabled);
-
-		BT_DBG("State: %d", status);
-		BT_DBG("Adapter enabled: %d", adapter_enabled);
-
-		if (adapter_enabled == 1) {
-			_bt_handle_adapter_added();
-			return FALSE;
-		}
-
-		if (status != BT_ACTIVATING && status != BT_ACTIVATED) {
-			_bt_terminate_service(NULL);
-		}
+	if (adapter_enabled == TRUE) {
+		BT_DBG("");
+		_bt_handle_adapter_added();
 	}
 
 	return FALSE;
@@ -134,8 +135,6 @@ int main(void)
 	sa.sa_handler = __bt_sigterm_handler;
 	sigaction(SIGINT, &sa, NULL);
 	sigaction(SIGTERM, &sa, NULL);
-
-	g_type_init();
 
 	if (perm_app_set_privilege("bluetooth-frwk-service", NULL, NULL) !=
 								PC_OPERATION_SUCCESS)

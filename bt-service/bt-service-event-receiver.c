@@ -704,25 +704,17 @@ void __bt_adapter_property_changed_event(DBusMessageIter *msg_iter, const char *
 				DBUS_TYPE_INVALID);
 	} else if (strcasecmp(property, "Powered") == 0) {
 		gboolean power = FALSE;
-		int power_event;
 
 		dbus_message_iter_recurse(&dict_iter, &value_iter);
 		dbus_message_iter_get_basic(&value_iter, &power);
 
-		if (power == TRUE) {
-			power_event = BLUETOOTH_EVENT_ENABLED;
-			_bt_adapter_set_status(BT_ACTIVATED);
-		} else {
-			power_event = BLUETOOTH_EVENT_DISABLED;
-			_bt_adapter_set_status(BT_DEACTIVATED);
-		}
+		BT_DBG("power state changed: %d", power);
 
-		BT_ERR("send power state: %d", power);
-		/* Send event to application */
-		_bt_send_event(BT_ADAPTER_EVENT,
-					power_event,
-					DBUS_TYPE_INT32, &result,
-					DBUS_TYPE_INVALID);
+		if (power == TRUE)
+			_bt_set_enabled();
+		else
+			_bt_set_disabled();
+
 	} else if (strcasecmp(property, "Discoverable") == 0) {
 		gboolean discoverable = FALSE;
 
