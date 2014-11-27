@@ -1051,14 +1051,17 @@ static void pair_cb(gchar *address, gboolean paired, gpointer user_data)
 	if (isbonding) {
 		if (paired && pairing_device_address &&
 			!g_strcmp0(pairing_device_address, address)) {
+			remove_userprivileges(0, address, FALSE);
 			set_userprivileges(pairing_device_uid,
 						pairing_device_address);
 			isbonding = FALSE;
 		}
 	} else {
 		if (paired)
-			if (address && relay_agent)
+			if (address && relay_agent) {
+				remove_userprivileges(0, address, FALSE);
 				set_userprivileges(relay_agent->uid, address);
+			}
 	}
 
 	if (!paired)
