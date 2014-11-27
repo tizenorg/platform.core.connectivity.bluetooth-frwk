@@ -1,0 +1,8 @@
+Verified+1: Corentin Lecouvey <corentin.lecouvey@open.eurogiciel.org>
+Code-Review+1: José Bollo <jose.bollo@open.eurogiciel.org>
+Code-Review+2: wu zheng <wu.zheng@intel.com>
+Submitted-by: wu zheng <wu.zheng@intel.com>
+Submitted-at: Thu, 27 Nov 2014 03:00:31 -0800
+Reviewed-on: https://review.tizen.org/gerrit/30897
+Project: platform/core/connectivity/bluetooth-frwk
+Branch: refs/heads/tizen
