@@ -33,15 +33,6 @@
 static GMainLoop *main_loop = NULL;
 static DBusGConnection *conn = NULL;
 
-typedef enum {
-	BT_DEACTIVATED,
-	BT_ACTIVATED,
-	BT_ACTIVATING,
-	BT_DEACTIVATING,
-} bt_status_t;
-
-static bt_status_t adapter_status = BT_DEACTIVATED;
-
 static void __bt_core_terminate(void)
 {
 	if (main_loop) {
@@ -50,16 +41,6 @@ static void __bt_core_terminate(void)
 		BT_DBG("Terminating bt-core daemon");
 		exit(0);
 	}
-}
-
-static void __bt_core_set_status(bt_status_t status)
-{
-	adapter_status = status;
-}
-
-static bt_status_t __bt_core_get_status(void)
-{
-	return adapter_status;
 }
 
 static gboolean bt_core_enable_adapter(BtCore *agent,
@@ -162,18 +143,7 @@ static int _bt_power_adapter(gboolean powered)
 
 static int __bt_enable_adapter(void)
 {
-	int ret;
-	bt_status_t status;
-
 	BT_DBG("");
-
-	status = __bt_core_get_status();
-	if (status != BT_DEACTIVATED) {
-		BT_DBG("Invalid state %d", status);
-		return -1;
-	}
-
-	__bt_core_set_status(BT_ACTIVATING);
 
 	_bt_power_adapter(TRUE);
 
@@ -182,25 +152,7 @@ static int __bt_enable_adapter(void)
 
 static int __bt_disable_adapter(void)
 {
-	bt_status_t status;
-
 	BT_DBG("");
-
-#ifdef __TIZEN_MOBILE__
-	status = __bt_core_get_status();
-	if (status == BT_ACTIVATING) {
-		/* Forcely terminate */
-		if (system("/usr/etc/bluetooth/bt-stack-down.sh &") < 0) {
-			BT_DBG("running script failed");
-		}
-		__bt_core_terminate();
-		return 0;
-	} else if (status != BT_ACTIVATED) {
-		BT_DBG("Invalid state %d", status);
-		return -1;
-	}
-#endif
-	__bt_core_set_status(BT_DEACTIVATING);
 
 	_bt_power_adapter(FALSE);
 
@@ -379,9 +331,6 @@ static DBusHandlerResult __bt_core_event_filter(DBusConnection *conn,
 			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 		}
 
-		if (strcasecmp(object_path, "/org/bluez/hci0") == 0) {
-			__bt_core_set_status(BT_ACTIVATED);
-		}
 	} else if (strcasecmp(member, "InterfacesRemoved") == 0) {
 		if (__bt_core_get_object_path(msg, &object_path)) {
 			BT_ERR("Fail to get the path");
@@ -389,7 +338,6 @@ static DBusHandlerResult __bt_core_event_filter(DBusConnection *conn,
 		}
 
 		if (strcasecmp(object_path, "/org/bluez/hci0") == 0) {
-			__bt_core_set_status(BT_DEACTIVATED);
 			__bt_core_terminate();
 		}
 	} else if (strcasecmp(member, "NameOwnerChanged") == 0) {
