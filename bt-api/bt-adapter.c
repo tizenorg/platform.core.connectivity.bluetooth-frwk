@@ -17,7 +17,6 @@
  *
  */
 
-
 #include <vconf.h>
 #if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
@@ -62,21 +61,22 @@ static int __bt_fill_device_list(GArray *out_param2, GPtrArray **dev_list)
 
 BT_EXPORT_API int bluetooth_check_adapter(void)
 {
-#ifdef __TIZEN_MOBILE__
-	int ret;
+	int result;
+	bluetooth_adapter_state_t state;
 
-	ret = _bt_get_adapter_path(_bt_get_system_gconn(), NULL);
+	BT_INIT_PARAMS();
+	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
-	return ret == BLUETOOTH_ERROR_NONE ? BLUETOOTH_ADAPTER_ENABLED :
-						BLUETOOTH_ADAPTER_DISABLED;
-#else
-	gboolean powered;
+	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_CHECK_ADAPTER,
+		in_param1, in_param2, in_param3, in_param4, &out_param);
 
-	powered = _bt_get_adapter_power(_bt_get_system_gconn());
+	if (result == BLUETOOTH_ERROR_NONE) {
+		state = g_array_index(out_param, bluetooth_adapter_state_t, 0);
+	}
 
-	return powered == TRUE ? BLUETOOTH_ADAPTER_ENABLED :
-						BLUETOOTH_ADAPTER_DISABLED;
-#endif
+	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	return state ? BLUETOOTH_ADAPTER_ENABLED : BLUETOOTH_ADAPTER_DISABLED;
 }
 
 BT_EXPORT_API int bluetooth_enable_adapter(void)

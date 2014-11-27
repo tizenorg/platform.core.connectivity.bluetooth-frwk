@@ -166,6 +166,36 @@ DBusGProxy *_bt_get_adapter_properties_proxy(void)
 					__bt_init_adapter_properties_proxy();
 }
 
+gboolean _bt_get_adapter_power(void)
+{
+	DBusGProxy *proxy = NULL;
+	gboolean powered;
+	GValue powered_v = { 0 };
+	GError *err = NULL;
+
+	proxy = _bt_get_adapter_properties_proxy();
+	retv_if(proxy == NULL, FALSE);
+
+	if (!dbus_g_proxy_call(proxy, "Get", &err,
+			G_TYPE_STRING, BT_ADAPTER_INTERFACE,
+			G_TYPE_STRING, "Powered",
+			G_TYPE_INVALID,
+			G_TYPE_VALUE, &powered_v,
+			G_TYPE_INVALID)) {
+		if (err != NULL) {
+			BT_ERR("Getting property failed: [%s]\n", err->message);
+			g_error_free(err);
+		}
+		return FALSE;
+	}
+
+	powered = (gboolean)g_value_get_boolean(&powered_v);
+
+	BT_DBG("powered = %d", powered);
+
+	return powered;
+}
+
 static char *__bt_extract_adapter_path(DBusMessageIter *msg_iter)
 {
 	char *object_path = NULL;

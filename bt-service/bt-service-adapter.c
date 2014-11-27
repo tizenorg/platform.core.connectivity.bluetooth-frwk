@@ -893,18 +893,13 @@ int _bt_reset_adapter(void)
 
 int _bt_check_adapter(int *status)
 {
-	char *adapter_path = NULL;
-
 	BT_CHECK_PARAMETER(status, return);
 
 	*status = 0; /* 0: disabled */
 
-	adapter_path = _bt_get_adapter_path();
-
-	if (adapter_path != NULL)
+	if (_bt_get_adapter_power())
 		*status = 1; /* 1: enabled */
 
-	g_free(adapter_path);
 	return BLUETOOTH_ERROR_NONE;
 }
 
