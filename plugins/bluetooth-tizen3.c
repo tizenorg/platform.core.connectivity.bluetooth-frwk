@@ -18,6 +18,7 @@
 */
 
 #include <notification.h>
+#include <vconf.h>
 
 #include "plugin.h"
 #include "common.h"
@@ -286,6 +287,43 @@ static void complete_notification_on_plane(void)
 	noti = NULL;
 }
 
+static int bt_set_storage_value(enum storage_key key, void *value)
+{
+	if (key == STORAGE_KEY_BT_STATE)
+		vconf_set_int(VCONFKEY_BT_STATUS, *(int *)value);
+	else if (key == STORAGE_KEY_BT_HEADSET_NAME)
+		vconf_set_str(VCONFKEY_BT_HEADSET_NAME, (char *)value);
+	else if (key == STORAGE_KEY_BT_PROFILE_STATE)
+		vconf_set_int(VCONFKEY_BT_DEVICE, *(int *)value);
+	else
+		return -1;
+
+	return 0;
+}
+
+static int bt_get_storage_value(enum storage_key key, void **value)
+{
+	int *temp;
+
+	if (!value)
+		return -1;
+
+	if (key == STORAGE_KEY_BT_STATE) {
+		temp = g_try_new0(int, 1);
+		vconf_get_int(VCONFKEY_BT_STATUS, temp);
+		*value = temp;
+	} else if (key == STORAGE_KEY_BT_PROFILE_STATE) {
+		temp = g_try_new0(int, 1);
+		vconf_get_int(VCONFKEY_BT_DEVICE, temp);
+		*value = temp;
+	} else if (key == STORAGE_KEY_BT_HEADSET_NAME)
+		*value = vconf_get_str(VCONFKEY_BT_HEADSET_NAME);
+	else
+		return -1;
+
+	return 0;
+}
+
 static int bt_probe(void)
 {
 	DBG("");
@@ -295,14 +333,30 @@ static int bt_probe(void)
 
 static int bt_enabled(void)
 {
+	int bt_status, profile_status;
+
 	DBG("");
+
+	bt_status = VCONFKEY_BT_STATUS_ON;
+	bt_set_storage_value(STORAGE_KEY_BT_STATE, &bt_status);
+
+	profile_status = VCONFKEY_BT_DEVICE_NONE;
+	bt_set_storage_value(STORAGE_KEY_BT_HEADSET_NAME, &profile_status);
 
 	return 0;
 }
 
 static int bt_disabled(void)
 {
+	int bt_status, profile_status;
+
 	DBG("");
+
+	bt_status = VCONFKEY_BT_STATUS_OFF;
+	bt_set_storage_value(STORAGE_KEY_BT_STATE, &bt_status);
+
+	profile_status = VCONFKEY_BT_DEVICE_NONE;
+	bt_set_storage_value(STORAGE_KEY_BT_HEADSET_NAME, &profile_status);
 
 	return 0;
 }
@@ -509,6 +563,8 @@ static struct bluetooth_vertical_driver bt_driver = {
 	.probe = bt_probe,
 	.enabled = bt_enabled,
 	.disabled = bt_disabled,
+	.set_value = bt_set_storage_value,
+	.get_value = bt_get_storage_value,
 	.transfer = bt_transfer,
 	.pairing_agent_on = bt_pairing_agent_on,
 	.opp_agent_on = bt_opp_agent_on,
