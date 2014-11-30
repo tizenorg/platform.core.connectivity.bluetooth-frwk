@@ -792,7 +792,8 @@ static void bt_opp_client_transfer_state_cb(unsigned int id,
 	DBG("+");
 
 	if (state == BT_OPP_TRANSFER_QUEUED) {
-		if (id == 0 && g_strcmp0(name, "OBEX_TRANSFER_QUEUED")) {
+		DBG("id = %d, name = %s", id, name);
+		if (id == 0 && !g_strcmp0(name, "OBEX_TRANSFER_QUEUED")) {
 			if (bt_push_responded_cb)
 				bt_push_responded_cb(BT_ERROR_NONE,
 							address, user_data);
