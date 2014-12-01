@@ -82,109 +82,30 @@ static void transfer_address(char *address)
 	}
 }
 
-static void session_state_cb(const char *session_id,
-			struct _obex_session *session,
-			enum session_state state,
-			void *data,
-			char *error_msg)
-{
-	printf("Session %p id %s state %d\n",
-			session, session_id, state);
-
-	if (error_msg)
-		printf("Error messag: %s\n", error_msg);
-}
-
 static int create_session(void *p1, void *p2)
 {
 	transfer_address(p1);
-
-	obex_create_session((const char *)p1,
-				OBEX_OPP,
-				session_state_cb,
-				NULL);
 	return 0;
-}
-
-static void transfer_state_cb(
-			const char *transfer_path,
-			struct _obex_transfer *transfer,
-			enum transfer_state state,
-			guint64 transferred,
-			void *data,
-			char *error_msg)
-{
-
-	printf("\ttransfer path %s\n", transfer_path);
-	printf("\ttransfer %p\n", transfer);
-	printf("\tstate %d\n", state);
-	printf("\ttransferred %lu\n", (unsigned long) transferred);
-
-	if (error_msg)
-		printf("\terror message %s\n", error_msg);
-
 }
 
 static int opp_send(void *p1, void *p2)
 {
-	struct _obex_session *session;
-
-	session = obex_session_get_session((const char *)p1);
-	if (session == NULL) {
-		ERROR("Can't find session %s", (char *)p2);
-		return -1;
-	}
-
-	obex_session_opp_send_file(session, (const char *)p2,
-					transfer_state_cb, NULL);
 	return 0;
 }
 
 static int list_transfer(void *p1, void *p2)
 {
-	GList *list, *next;
-	const GList *path_list = obex_transfer_get_pathes();
-
-	for (list = g_list_first((GList *)path_list); list; list = next) {
-		next = g_list_next(list);
-		printf("%s\n", (gchar *)list->data);
-	}
-
 	return 0;
 }
 
 static int list_active_transfer(void *p1, void *p2)
 {
-	GList *list, *next;
-	const GList *path_list = obex_transfer_get_pathes();
-
-	for (list = g_list_first((GList *)path_list); list; list = next) {
-		struct _obex_transfer *t;
-
-		next = g_list_next(list);
-
-		t = obex_transfer_get_transfer_from_path(
-					(const char *) list->data);
-		if (t == NULL)
-			continue;
-
-		if (obex_transfer_property_get_state(t) ==
-						OBEX_TRANSFER_ACTIVE)
-			printf("\tActive Transfer %s \n", (const char *) list->data);
-	}
-
 	return 0;
 }
 
 
 static int stop_transfer(void *p1, void *p2)
 {
-	struct _obex_transfer *t;
-
-	t = obex_transfer_get_transfer_from_path(p1);
-
-	obex_transfer_cancel(t);
-
 	return 0;
 }
 
@@ -222,25 +143,6 @@ static void handle_release(GDBusMethodInvocation *invocation)
 	g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
-static void request_confirmation_handler(const char *cmd,
-					const char *p1,
-					const char *p2,
-					void *user_data)
-{
-	GDBusMethodInvocation *invocation = user_data;
-
-	if (!g_strcmp0(cmd, "Y") ||
-			!g_strcmp0(cmd, "y") ||
-					!g_strcmp0(cmd, "")) {
-		if (p1 == NULL)
-			p1 = "/tmp/test";
-		g_dbus_method_invocation_return_value(invocation,
-					g_variant_new("(s)", p1));
-	}
-
-	restore_handler();
-}
-
 static void handle_cancel(GDBusMethodInvocation *invocation)
 {
 	DBG("");
@@ -267,36 +169,6 @@ static void handle_method_call(GDBusConnection *connection,
 	}
 
 	if (g_strcmp0(method_name, "AuthorizePush") == 0) {
-		gchar *transfer_path, *name, *source;
-		obex_transfer_t *transfer;
-		guint64 size;
-		int id;
-
-		g_variant_get(parameters, "(o)", &transfer_path);
-
-		DBG("transfer_path %s", transfer_path);
-
-		transfer = obex_transfer_get_transfer_from_path(
-					(const gchar *) transfer_path);
-
-		if (transfer == NULL)
-			return;
-
-		name = obex_transfer_get_name(transfer);
-		source = obex_transfer_get_property_source(transfer);
-		obex_transfer_get_size(transfer, &size);
-		id = obex_transfer_get_id(transfer);
-
-		printf("\n\t transfer_%d %s requests to push file %s size %lu",
-				id, source, name, (unsigned long) size);
-		printf("\n\tPlease Confirm(Y/n)\n");
-
-		switch_handler(request_confirmation_handler, invocation);
-
-		g_free(source);
-		g_free(name);
-		g_free(transfer_path);
-
 		return;
 	}
 
@@ -366,11 +238,6 @@ static void name_lost(GDBusConnection *connection,
 
 static int transfer_watch(void *p1, void *p2)
 {
-	if (!g_strcmp0(p1, "on"))
-		obex_transfer_set_watch(transfer_state_cb, NULL);
-	if (!g_strcmp0(p1, "off"))
-		obex_transfer_clear_watch();
-
 	return 0;
 }
 
