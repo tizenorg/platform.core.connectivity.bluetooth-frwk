@@ -272,9 +272,11 @@ static void parse_object(gpointer data, gpointer user_data)
 	DBG("object path name %s", path);
 
 	if (!g_strcmp0(path, OBJECT_OBEX_PATH)) {
-		if (g_opp_startup == 0 && obex_agent_added_cb)
+		if (g_opp_startup == 1)
+			return;
+		g_opp_startup = 1;
+		if (obex_agent_added_cb)
 			obex_agent_added_cb(obex_agent_added_cb_data);
-		g_opp_startup = 0;
 	}
 
 	return;
@@ -657,6 +659,7 @@ struct obex_watch_result {
 	obex_transfer_state_cb cb;
 	void *user_data;
 	char *path;
+	unsigned int proxy_id;
 	GDBusProxy *proxy;
 };
 
@@ -699,7 +702,7 @@ static void transfer_properties_changed(GDBusProxy *proxy,
 	DBG("properties %s", properties);
 	g_free(properties);
 
-	if (!async_node)
+	if (!async_node || !async_node->path)
 		return;
 
 	p_proxy = g_dbus_proxy_new_for_bus_sync(
@@ -715,8 +718,6 @@ static void transfer_properties_changed(GDBusProxy *proxy,
 
 	variant_found = g_variant_lookup(changed_properties,
 					"Status", "s", &status);
-
-	DBG("transfer_path = %s", async_node->path);
 
 	if (variant_found) {
 		DBG("status = %s", status);
@@ -758,10 +759,13 @@ done:
 	async_node->cb(async_node->path, state, name, size, transferred,
 				async_node->user_data, NULL);
 
+	g_signal_handler_disconnect(async_node->proxy,
+						async_node->proxy_id);
 	g_object_unref(p_proxy);
 	g_object_unref(async_node->proxy);
 	if (async_node->path)
 		g_free(async_node->path);
+	async_node->path = NULL;
 	g_free(async_node);
 	async_node = NULL;
 }
@@ -801,7 +805,7 @@ int obex_transfer_set_notify(char *transfer_path,
 	async_node->proxy = g_object_ref(proxy);
 	async_node->path = g_strdup(transfer_path);
 
-	g_signal_connect(async_node->proxy,
+	async_node->proxy_id = g_signal_connect(async_node->proxy,
 			"g-properties-changed",
 			G_CALLBACK(transfer_properties_changed),
 			async_node);
