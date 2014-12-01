@@ -165,6 +165,7 @@ static GList *pending_p_list;
 
 #define OBEX_ERROR_INTERFACE "org.bluez.obex.Error"
 
+static void free_remove_relay_agent(void);
 static void free_pending_files(struct pending_files *p_file);
 static void free_relay_agent(struct agent *agent);
 static void session_state_cb(const gchar *session_id,
@@ -381,22 +382,8 @@ done:
 			send_pushstatus(relay_client_agent->address,
 					name, size, transfer_id, state,
 					100, relay_client_agent->pid);
-		if (relay_client_agent->number == 0) {
-			GList *list;
-			obex_session_remove_session(
-					relay_client_agent->session);
-			free_relay_agent(relay_client_agent);
-			relay_client_agent = NULL;
-			if (g_list_length(agent_list) > 0) {
-				list = g_list_first(agent_list);
-				relay_client_agent = list->data;
-				agent_list = g_list_remove(agent_list,
-						relay_client_agent);
-				obex_create_session(
-					relay_client_agent->address,
-					OBEX_OPP, session_state_cb, NULL);
-			}
-		}
+		if (!relay_client_agent->number)
+			free_remove_relay_agent();
 	}
 
 	if (p_file) {
@@ -972,6 +959,29 @@ static void free_all_pending_files(void)
 	DBG("-");
 }
 
+static void free_remove_relay_agent(void)
+{
+	GList *list;
+
+	DBG("");
+
+	if (relay_client_agent) {
+		obex_session_remove_session(
+			relay_client_agent->session);
+		free_relay_agent(relay_client_agent);
+	}
+	relay_client_agent = NULL;
+
+	if (g_list_length(agent_list) > 0) {
+		list = g_list_first(agent_list);
+		relay_client_agent = list->data;
+		agent_list = g_list_remove(
+			agent_list, relay_client_agent);
+		obex_create_session(relay_client_agent->address,
+			OBEX_OPP, session_state_cb, NULL);
+	}
+}
+
 static struct agent *create_relay_agent(const gchar *sender,
 				const gchar *path, const gchar *address,
 				guint32 pid, guint32 uid, guint watch_id)
@@ -1185,7 +1195,6 @@ static void transfer_state_cb(
 			char *error_msg)
 {
 	struct pending_files *p_file = data;
-	GList *list;
 
 	DBG("transfer path %s", transfer_path);
 	DBG("state %d", state);
@@ -1193,21 +1202,7 @@ static void transfer_state_cb(
 	if (error_msg) {
 		DBG("error = %s", error_msg);
 		free_all_pending_files();
-
-		if (relay_client_agent) {
-			obex_session_remove_session(
-				relay_client_agent->session);
-			free_relay_agent(relay_client_agent);
-		}
-		relay_client_agent = NULL;
-		if (g_list_length(agent_list) > 0) {
-			list = g_list_first(agent_list);
-			relay_client_agent = list->data;
-			agent_list = g_list_remove(
-				agent_list, relay_client_agent);
-			obex_create_session(relay_client_agent->address,
-				OBEX_OPP, session_state_cb, NULL);
-		}
+		free_remove_relay_agent();
 		return;
 	}
 
@@ -1224,8 +1219,8 @@ static void transfer_state_cb(
 static void send_pending_push_data(void)
 {
 	struct pending_files *p_file;
-	GList *list, *next;
 	gboolean is_send = FALSE;
+	GList *list, *next;
 
 	DBG("");
 
@@ -1243,29 +1238,15 @@ static void send_pending_push_data(void)
 			relay_client_agent->number++;
 			obex_session_opp_send_file(relay_client_agent->session,
 						p_file->file_name,
-						transfer_state_cb, NULL);
+						transfer_state_cb, p_file);
 			pending_push_data =
 				g_list_remove(pending_push_data, p_file);
 			is_send = TRUE;
 		}
 	}
 
-	if (is_send == FALSE) {
-		if (relay_client_agent) {
-			obex_session_remove_session(
-					relay_client_agent->session);
-			free_relay_agent(relay_client_agent);
-		}
-		relay_client_agent = NULL;
-		if (g_list_length(agent_list) > 0) {
-			list = g_list_first(agent_list);
-			relay_client_agent = list->data;
-			agent_list = g_list_remove(
-					agent_list, relay_client_agent);
-			obex_create_session(relay_client_agent->address,
-					OBEX_OPP, session_state_cb, NULL);
-		}
-	}
+	if (is_send == FALSE)
+		free_remove_relay_agent();
 }
 
 static void session_state_cb(const gchar *session_id,
@@ -1277,7 +1258,6 @@ static void session_state_cb(const gchar *session_id,
 	gchar *name = "OBEX_TRANSFER_QUEUED";
 	guint64 size = 0;
 	guint transfer_id = 0;
-	GList *list;
 	struct opp_push_data *push_data = user_data;
 
 	DBG("%s", error_msg);
@@ -1289,18 +1269,7 @@ static void session_state_cb(const gchar *session_id,
 				push_data->invocation, error_msg);
 			g_free(push_data);
 		}
-		if (relay_client_agent)
-			free_relay_agent(relay_client_agent);
-		relay_client_agent = NULL;
-		if (g_list_length(agent_list) > 0) {
-			list = g_list_first(agent_list);
-			relay_client_agent = list->data;
-			agent_list = g_list_remove(
-					agent_list, relay_client_agent);
-			obex_create_session(
-				relay_client_agent->address, OBEX_OPP,
-				session_state_cb, NULL);
-		}
+		free_remove_relay_agent();
 		return;
 	}
 
@@ -1606,12 +1575,25 @@ static void cancel_all_transfer_handler(GDBusConnection *connection,
 				GDBusMethodInvocation *invocation,
 				gpointer user_data)
 {
+	const gchar *sender;
 	struct pending_files *p_file;
 	GList *list, *next;
 
 	DBG("+");
 
-	if (!pending_p_list || g_list_length(pending_p_list) == 0)
+	if (!relay_client_agent) {
+		comms_error_not_available(invocation);
+		return;
+	}
+
+	sender = g_dbus_method_invocation_get_sender(invocation);
+
+	if (g_strcmp0(relay_client_agent->owner, sender) != 0) {
+		comms_error_not_available(invocation);
+		return;
+	}
+
+	if (!pending_p_list || !g_list_length(pending_p_list))
 		return g_dbus_method_invocation_return_value(
 						invocation, NULL);
 
@@ -1627,6 +1609,8 @@ static void cancel_all_transfer_handler(GDBusConnection *connection,
 	}
 
 	free_all_pending_files();
+	free_remove_relay_agent();
+
 	g_dbus_method_invocation_return_value(invocation, NULL);
 
 	DBG("-");

@@ -845,7 +845,7 @@ void obex_transfer_cancel(const char *path)
 		return;
 
 	g_dbus_connection_call(connection, "org.bluez.obex",
-				"/org/bluez/obex",
+				path,
 				"org.bluez.obex.Transfer1",
 				"Cancel",
 				NULL,
