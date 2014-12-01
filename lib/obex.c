@@ -272,9 +272,11 @@ static void parse_object(gpointer data, gpointer user_data)
 	DBG("object path name %s", path);
 
 	if (!g_strcmp0(path, OBJECT_OBEX_PATH)) {
-		if (g_opp_startup == 0 && obex_agent_added_cb)
+		if (g_opp_startup == 1)
+			return;
+		g_opp_startup = 1;
+		if (obex_agent_added_cb)
 			obex_agent_added_cb(obex_agent_added_cb_data);
-		g_opp_startup = 0;
 	}
 
 	return;
@@ -699,7 +701,7 @@ static void transfer_properties_changed(GDBusProxy *proxy,
 	DBG("properties %s", properties);
 	g_free(properties);
 
-	if (!async_node)
+	if (!async_node || !async_node->path)
 		return;
 
 	p_proxy = g_dbus_proxy_new_for_bus_sync(
@@ -762,6 +764,7 @@ done:
 	g_object_unref(async_node->proxy);
 	if (async_node->path)
 		g_free(async_node->path);
+	async_node->path = NULL;
 	g_free(async_node);
 	async_node = NULL;
 }
