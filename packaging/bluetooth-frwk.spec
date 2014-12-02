@@ -5,7 +5,7 @@
 Name:       bluetooth-frwk
 Summary:    Bluetooth framework for BlueZ and Obexd
 Version:    0.2.55
-Release:    2
+Release:    0
 Group:      Network & Connectivity/Bluetooth
 License:    Apache-2.0
 Source0:    %{name}-%{version}.tar.gz
@@ -84,11 +84,11 @@ cp %{SOURCE1001} .
 %build
 
 %ifarch x86_64
-export CFLAGS+="   -Wall -g -fvisibility=hidden -fPIC"
-export LDFLAGS+=" -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs"
+export CFLAGS="${CFLAGS}   -Wall -g -fvisibility=hidden -fPIC"
+export LDFLAGS="${LDFLAGS} -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs"
 %else
-export CFLAGS+=" -fpie"
-export LDFLAGS+=" -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs -pie"
+export CFLAGS="${CFLAGS} -fpie"
+export LDFLAGS="${LDFLAGS} -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs -pie"
 %endif
 
 %cmake . \
@@ -105,7 +105,7 @@ export LDFLAGS+=" -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbol
  -DLIBNOTIFICATION_SUPPORT=Off
 %endif
 
-make
+%__make
 
 %install
 rm -rf %{buildroot}
