@@ -1205,6 +1205,10 @@ static void transfer_state_cb(
 
 	if (error_msg) {
 		DBG("error = %s", error_msg);
+		if (relay_client_agent)
+			send_pushstatus(relay_client_agent->address,
+				"", 0, 0, OBEX_TRANSFER_ERROR, 0,
+				relay_client_agent->pid);
 		free_all_pending_files();
 		free_remove_relay_agent();
 		return;
@@ -1273,6 +1277,10 @@ static void session_state_cb(const gchar *session_id,
 				push_data->invocation, error_msg);
 			g_free(push_data);
 		}
+		if (relay_client_agent)
+			send_pushstatus(relay_client_agent->address,
+				"", 0, 0, OBEX_TRANSFER_ERROR, 0,
+				relay_client_agent->pid);
 		free_remove_relay_agent();
 		return;
 	}
