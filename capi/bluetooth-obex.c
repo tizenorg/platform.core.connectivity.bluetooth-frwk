@@ -493,6 +493,7 @@ static int bt_opp_register_server(const char *dir,
 
 static int bt_opp_unregister_server(void)
 {
+	DBG("");
 	/* TODO: unregister agent */
 	g_free(opp_server.root_folder);
 	opp_server.root_folder = NULL;
@@ -753,6 +754,8 @@ int bt_opp_server_initialize_by_connection_request(const char *destination,
 
 int bt_opp_server_deinitialize(void)
 {
+	DBG("");
+
 	if (opp_server_push_node) {
 		g_free(opp_server_push_node);
 		opp_server_push_node = NULL;

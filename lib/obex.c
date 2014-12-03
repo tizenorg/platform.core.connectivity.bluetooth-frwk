@@ -47,6 +47,7 @@ static GDBusObjectManager *object_manager;
 
 static obex_agent_added_cb_t obex_agent_added_cb;
 static void *obex_agent_added_cb_data;
+static GList *transfer_watched_list;
 
 static GDBusConnection *_obex_get_session_dbus(void)
 {
@@ -683,6 +684,29 @@ int obex_get_transfer_id(const char *transfer_path, enum obex_role role)
 	return id;
 }
 
+static struct obex_watch_result *find_watch_node(const char *path)
+{
+	struct obex_watch_result *node;
+	GList *list, *next;
+
+	DBG("path = %s", path);
+
+	if (!transfer_watched_list ||
+			!g_list_length(transfer_watched_list))
+		return NULL;
+
+	for (list = g_list_first(transfer_watched_list);
+					list; list = next) {
+		next = g_list_next(list);
+		node = list->data;
+
+		if (node && !g_strcmp0(node->path, path))
+			return node;
+	}
+
+	return NULL;
+}
+
 static void transfer_properties_changed(GDBusProxy *proxy,
 					GVariant *changed_properties,
 					GStrv *invalidated_properties,
@@ -761,6 +785,9 @@ done:
 
 	g_signal_handler_disconnect(async_node->proxy,
 						async_node->proxy_id);
+
+	transfer_watched_list = g_list_remove(transfer_watched_list,
+							async_node);
 	g_object_unref(p_proxy);
 	g_object_unref(async_node->proxy);
 	if (async_node->path)
@@ -810,7 +837,35 @@ int obex_transfer_set_notify(char *transfer_path,
 			G_CALLBACK(transfer_properties_changed),
 			async_node);
 
+	transfer_watched_list = g_list_append(transfer_watched_list,
+							async_node);
+
 	return 0;
+}
+
+void obex_transfer_clear_notify(char *transfer_path)
+{
+	struct obex_watch_result *async_node;
+
+	DBG("transfer_path = %s", transfer_path);
+
+	if (!transfer_path)
+		return;
+
+	async_node = find_watch_node(transfer_path);
+	if (!async_node)
+		return;
+
+	g_signal_handler_disconnect(async_node->proxy,
+					async_node->proxy_id);
+
+	transfer_watched_list = g_list_remove(transfer_watched_list,
+							async_node);
+
+	g_object_unref(async_node->proxy);
+	if (async_node->path)
+		g_free(async_node->path);
+	g_free(async_node);
 }
 
 static void simple_cancle_cb(GObject *object,
@@ -843,6 +898,8 @@ void obex_transfer_cancel(const char *path)
 
 	if (path == NULL)
 		return;
+
+	DBG("path = %s", path);
 
 	g_dbus_connection_call(connection, "org.bluez.obex",
 				path,

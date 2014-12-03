@@ -115,6 +115,8 @@ int obex_transfer_set_notify(
 			char *transfer_path,
 			obex_transfer_state_cb cb, void *data);
 
+void obex_transfer_clear_notify(char *transfer_path);
+
 enum transfer_state obex_transfer_get_property_state(const char *path);
 
 enum transfer_state obex_transfer_get_property_state(const char *path);

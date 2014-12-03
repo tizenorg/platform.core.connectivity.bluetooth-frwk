@@ -1095,7 +1095,7 @@ static void register_relay_agent_handler(GDBusConnection *connection,
 	relay_agent = create_relay_agent(sender, agent_path, NULL, pid,
 					uid, relay_agent_watch_id);
 
-	agent_server_list = g_list_append(agent_list, relay_agent);
+	agent_server_list = g_list_append(agent_server_list, relay_agent);
 
 	if (relay_agent_timeout_id > 0) {
 		g_source_remove(relay_agent_timeout_id);
@@ -1534,6 +1534,7 @@ static void cancel_transfer_handler(GDBusConnection *connection,
 				gpointer user_data)
 {
 	const gchar *sender;
+	gchar *name;
 	guint transfer_id, agent_id = 0;
 
 	DBG("");
@@ -1560,9 +1561,17 @@ static void cancel_transfer_handler(GDBusConnection *connection,
 		return;
 	}
 
-	if (transfer_id == agent_id)
+	if (transfer_id == agent_id) {
+		name = obex_transfer_get_property_name(
+					relay_agent->transfer_path);
+		if (!name)
+			name = "";
 		obex_transfer_cancel(relay_agent->transfer_path);
-	else {
+		send_pushstatus(relay_agent->address,
+			name, 0, transfer_id, OBEX_TRANSFER_CANCELED,
+			0, relay_agent->pid);
+		obex_transfer_clear_notify(relay_agent->transfer_path);
+	} else {
 		comms_error_not_available(invocation);
 		return;
 	}
@@ -1577,6 +1586,7 @@ static void cancel_all_transfer_handler(GDBusConnection *connection,
 {
 	const gchar *sender;
 	struct pending_files *p_file;
+	guint transfer_id;
 	GList *list, *next;
 
 	DBG("+");
@@ -1608,8 +1618,40 @@ static void cancel_all_transfer_handler(GDBusConnection *connection,
 			obex_transfer_cancel(p_file->path);
 	}
 
-	free_all_pending_files();
-	free_remove_relay_agent();
+	if (relay_client_agent) {
+		obex_session_remove_session(
+					relay_client_agent->session);
+
+		for (list = g_list_first(pending_p_list); list; list = next) {
+			p_file = list->data;
+			next = g_list_next(list);
+
+			if (p_file == NULL)
+				continue;
+
+			if (p_file->path) {
+				transfer_id = obex_get_transfer_id(
+						p_file->path, OBEX_CLIENT);
+				send_pushstatus(relay_client_agent->address,
+					p_file->file_name, 0, transfer_id,
+					OBEX_TRANSFER_CANCELED, 0,
+					relay_client_agent->pid);
+				obex_transfer_clear_notify(p_file->path);
+			}
+			free_pending_files(p_file);
+		}
+
+		free_relay_agent(relay_client_agent);
+		relay_client_agent = NULL;
+	}
+
+	if (g_list_length(agent_list) > 0) {
+		list = g_list_first(agent_list);
+		relay_client_agent = list->data;
+		agent_list = g_list_remove(agent_list, relay_client_agent);
+		obex_create_session(relay_client_agent->address,
+					OBEX_OPP, session_state_cb, NULL);
+	}
 
 	g_dbus_method_invocation_return_value(invocation, NULL);
 
