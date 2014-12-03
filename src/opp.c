@@ -966,11 +966,15 @@ static void free_remove_relay_agent(void)
 	DBG("");
 
 	if (relay_client_agent) {
-		obex_session_remove_session(
-			relay_client_agent->session);
+		if (relay_client_agent->session)
+			obex_session_remove_session(
+				relay_client_agent->session);
 		free_relay_agent(relay_client_agent);
 	}
 	relay_client_agent = NULL;
+
+	if (!agent_list)
+		return;
 
 	if (g_list_length(agent_list) > 0) {
 		list = g_list_first(agent_list);
