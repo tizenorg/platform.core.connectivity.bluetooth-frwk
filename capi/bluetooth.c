@@ -1536,9 +1536,9 @@ int bt_adapter_set_visibility(bt_adapter_visibility_mode_e discoverable_mode,
 		return BT_ERROR_INVALID_PARAMETER;
 	}
 
-	bluez_adapter_set_discoverable(default_adapter, discoverable);
-
 	bluez_adapter_set_discoverable_timeout(default_adapter, duration);
+
+	bluez_adapter_set_discoverable(default_adapter, discoverable);
 
 	return BT_SUCCESS;
 }
