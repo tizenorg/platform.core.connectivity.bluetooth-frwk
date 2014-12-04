@@ -109,3 +109,37 @@ void vertical_notify_bt_transfer(double progress)
 	if (bluetooth_driver->transfer)
 		bluetooth_driver->transfer(progress);
 }
+
+void vertical_notify_bt_set_flight_mode_cb(
+		bluetooth_flight_cb cb, void *user_data)
+{
+	if (!bluetooth_driver)
+		return;
+
+	if (bluetooth_driver->set_flight_mode_cb)
+		bluetooth_driver->set_flight_mode_cb(cb, user_data);
+}
+
+int vertical_notify_bt_get_flight_mode(
+			enum storage_key key, void **value)
+{
+	if (!bluetooth_driver)
+		return -1;
+
+	if (bluetooth_driver->get_value)
+		return bluetooth_driver->get_value(key, value);
+	else
+		return -1;
+}
+
+int vertical_notify_bt_set_flight_mode(
+			enum storage_key key, void *value)
+{
+	if (!bluetooth_driver)
+		return -1;
+
+	if (bluetooth_driver->get_value)
+		return bluetooth_driver->set_value(key, value);
+	else
+		return -1;
+}

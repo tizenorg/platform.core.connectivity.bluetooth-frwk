@@ -59,6 +59,9 @@ struct opp_context {
 	gpointer user_data;
 };
 
+bluetooth_flight_cb flight_mode_callback;
+void *flight_mode_data;
+
 const char* error_to_string(notification_error_e error)
 {
     if (error == NOTIFICATION_ERROR_INVALID_DATA)
@@ -325,12 +328,19 @@ static int bt_get_storage_value(enum storage_key key, void **value)
 		*value = temp;
 	} else if (key == STORAGE_KEY_TELEPHONE_FLIGHT_MODE) {
 		temp = g_try_new0(int, 1);
-		vconf_get_int(VCONFKEY_TELEPHONY_FLIGHT_MODE, temp);
+		vconf_get_bool(VCONFKEY_TELEPHONY_FLIGHT_MODE,
+						(gboolean *)temp);
 		*value = temp;
 	} else
 		return -1;
 
 	return 0;
+}
+
+void bt_set_flight_mode_cb(bluetooth_flight_cb cb, void *user_data)
+{
+	flight_mode_callback = cb;
+	flight_mode_data = user_data;
 }
 
 static int bt_probe(void)
@@ -343,8 +353,24 @@ static int bt_probe(void)
 static int bt_enabled(void)
 {
 	int bt_status, profile_status;
+	gboolean flight_mode;
 
 	DBG("");
+
+	vconf_get_bool(VCONFKEY_TELEPHONY_FLIGHT_MODE, &flight_mode);
+
+	DBG("flight_mode = %d", flight_mode);
+	if (flight_mode) {
+		vconf_set_int(BT_OFF_DUE_TO_FLIGHT_MODE, 1);
+		/*Not sure that the value can be used in Tizen common*/
+		/*Todo not return -1, if it is used, return -1*/
+		/*
+		bt_status = VCONFKEY_BT_STATUS_OFF;
+		bt_set_storage_value(STORAGE_KEY_BT_STATE, &bt_status);
+		return -1
+		*/
+	} else
+		vconf_set_int(BT_OFF_DUE_TO_FLIGHT_MODE, 0);
 
 	bt_status = VCONFKEY_BT_STATUS_ON;
 	bt_set_storage_value(STORAGE_KEY_BT_STATE, &bt_status);
@@ -567,6 +593,39 @@ static int bt_opp_agent_on(void *data)
 	return 0;
 }
 
+static void bt_flight_mode_cb(keynode_t *node, void *data)
+{
+	gboolean flight_mode = FALSE;
+	int bt_status;
+
+	DBG("key=%s", vconf_keynode_get_name(node));
+
+	if (vconf_keynode_get_type(node) == VCONF_TYPE_BOOL) {
+		flight_mode = vconf_keynode_get_bool(node);
+		vconf_get_int(VCONFKEY_BT_STATUS, &bt_status);
+
+		DBG("value=%d, status = %d", flight_mode, bt_status);
+
+		if (flight_mode == TRUE) {
+			DBG("Deactivate Bluetooth Service");
+			if (vconf_set_int(BT_OFF_DUE_TO_FLIGHT_MODE, 1))
+				DBG("Set vconf failed");
+		} else {
+			DBG("Activate Bluetooth Service");
+			if (vconf_set_int(BT_OFF_DUE_TO_FLIGHT_MODE, 0))
+				DBG("Set vconf failed");
+		}
+
+		if (bt_status == VCONFKEY_BT_STATUS_ON && !flight_mode)
+			flight_mode = FALSE;
+		else
+			flight_mode = TRUE;
+
+		if (flight_mode_callback)
+			flight_mode_callback(flight_mode, flight_mode_data);
+	}
+}
+
 static struct bluetooth_vertical_driver bt_driver = {
 	.name = "Common",
 	.probe = bt_probe,
@@ -574,6 +633,7 @@ static struct bluetooth_vertical_driver bt_driver = {
 	.disabled = bt_disabled,
 	.set_value = bt_set_storage_value,
 	.get_value = bt_get_storage_value,
+	.set_flight_mode_cb = bt_set_flight_mode_cb,
 	.transfer = bt_transfer,
 	.pairing_agent_on = bt_pairing_agent_on,
 	.opp_agent_on = bt_opp_agent_on,
@@ -582,8 +642,10 @@ static struct bluetooth_vertical_driver bt_driver = {
 static int bt_init(void)
 {
 	DBG("");
-
 	comms_service_register_bt_vertical_driver(&bt_driver);
+
+	vconf_notify_key_changed(VCONFKEY_TELEPHONY_FLIGHT_MODE,
+					bt_flight_mode_cb, NULL);
 	return 0;
 }
 

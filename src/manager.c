@@ -341,8 +341,9 @@ static void bt_adapter_set_enable(bluez_adapter_t *adapter, void *user_data)
 		bt_activate_timeout(adapter_activate_data);
 		adapter_activate_data = NULL;
 	} else {
-		g_dbus_method_invocation_return_value(
-			adapter_activate_data->invocation, NULL);
+		if (adapter_activate_data->invocation)
+			g_dbus_method_invocation_return_value(
+				adapter_activate_data->invocation, NULL);
 		adapter_activate_data->invocation = NULL;
 
 		if (powered == TRUE)
@@ -942,6 +943,83 @@ static void manager_skeleton_get_property(GObject *object, guint prop_id,
 	g_value_copy(&skeleton->priv->properties[prop_id - 1], value);
 }
 
+static void bluetooth_flight_mode_cb(gboolean flight_mode, void *user_data)
+{
+	gboolean powered = FALSE;
+	gboolean state;
+	gchar *default_adapter_name;
+	struct bt_activate_data *adapter_activate_data;
+	CommsManagerSkeleton *skeleton = user_data;
+
+	DBG("+");
+
+	if (!skeleton)
+		return;
+
+	if (default_adapter == NULL) {
+		default_adapter_name = get_default_adapter(skeleton);
+		DBG("adapter: %s", default_adapter_name);
+
+		default_adapter = bluez_adapter_get_adapter(
+						default_adapter_name);
+		if (default_adapter_name)
+			g_free(default_adapter_name);
+		if (default_adapter)
+			bluez_adapter_get_property_powered(
+					default_adapter, &powered);
+	} else {
+		bluez_adapter_get_property_powered(
+					default_adapter, &powered);
+	}
+
+	if (!flight_mode) {
+		if (!powered) {
+			set_bluetooth_activating(skeleton, TRUE);
+
+			if (bluez_lib_init())
+				return;
+
+			adapter_activate_data =
+				g_new0(struct bt_activate_data, 1);
+			if (adapter_activate_data == NULL) {
+				ERROR("no memory");
+				return;
+			}
+			adapter_activate_data->skeleton = skeleton;
+			if (!default_adapter) {
+				bluez_adapter_set_adapter_added(
+						adapter_added_cb,
+						adapter_activate_data);
+
+				bt_activate_timeout_id = g_timeout_add(500,
+						bt_activate_timeout,
+						adapter_activate_data);
+				return;
+			}
+
+			set_discoverable_timer();
+
+			bt_adapter_set_enable(default_adapter,
+						adapter_activate_data);
+		}
+	} else {
+		if (powered) {
+			state = get_bluetooth_activating(skeleton);
+			DBG("state = %d", state);
+			if (state == TRUE)
+				return;
+
+			if (!default_adapter)
+				return;
+
+			bluez_adapter_set_powered(default_adapter, FALSE);
+			default_adapter = NULL;
+		}
+	}
+
+	DBG("-");
+}
+
 static void manager_skeleton_finalize(GObject *object)
 {
 	CommsManagerSkeleton *skeleton = COMMS_MANAGER_SKELETON(object);
@@ -963,6 +1041,8 @@ static void manager_skeleton_finalize(GObject *object)
 		g_source_remove(skeleton->priv->changed_properties_idle);
 
 	G_OBJECT_CLASS(comms_manager_skeleton_parent_class)->finalize(object);
+
+	vertical_notify_bt_set_flight_mode_cb(NULL, NULL);
 }
 
 static void comms_manager_skeleton_class_init(CommsManagerSkeletonClass *klass)
@@ -1003,18 +1083,23 @@ static void comms_manager_skeleton_class_init(CommsManagerSkeletonClass *klass)
 						"DefaultAdapter",
 						"DefaultAdapter",
 						"hci0", G_PARAM_READWRITE));
-
-
 }
 
 CommsManagerSkeleton *comms_service_manager_new(
 				GDBusObjectManagerServer *server)
 {
+	CommsManagerSkeleton *object;
+
 	manager_server = server;
 
-	return g_object_new(COMMS_TYPE_MANAGER_SKELETON, 
+	object = g_object_new(COMMS_TYPE_MANAGER_SKELETON,
 				"BluetoothInService", FALSE,
 				"BluetoothActivating", FALSE,
 				"DefaultAdapter", DEFAULT_ADAPTER,
 				NULL);
+
+	vertical_notify_bt_set_flight_mode_cb(bluetooth_flight_mode_cb,
+							object);
+
+	return object;
 }
