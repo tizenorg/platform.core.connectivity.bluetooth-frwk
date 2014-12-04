@@ -56,9 +56,6 @@ enum transfer_state {
 	OBEX_TRANSFER_ERROR
 };
 
-struct _obex_agent;
-typedef struct _obex_agent obex_agent_t;
-
 int obex_lib_init(void);
 void obex_lib_deinit(void);
 
@@ -75,121 +72,67 @@ void obex_agent_unregister_agent(
 			void *user_data);
 
 typedef void (*obex_agent_added_cb_t)(
-			obex_agent_t *obex_agent,
 			void *user_data);
 void obex_agent_set_agent_added(
 			obex_agent_added_cb_t cb,
 			void *user_data);
 void obex_agent_unset_agent_added(void);
 
-obex_agent_t *obex_agent_get_agent(void);
-
-struct _obex_session;
-typedef struct _obex_session obex_session_t;
-
 typedef void (*obex_session_state_cb)(
 			const char *session_id,
-			struct _obex_session *session,
+			const char *session,
 			enum session_state state,
 			void *data,
 			char *error_msg);
 
-int obex_create_session(
-			const char *destination,
+int obex_create_session(const char *destination,
 			enum obex_target target,
 			obex_session_state_cb cb,
 			void *data);
 
-void obex_session_remove_session(
-			struct _obex_session *session);
-
-int obex_session_set_watch(
-			obex_session_state_cb cb,
-			void *data);
-
-struct _obex_session *obex_session_get_session(
-			const char *id);
-
-gchar *obex_session_property_get_destination(
-			struct _obex_session *session);
-
-struct _obex_transfer;
-typedef struct _obex_transfer obex_transfer_t;
+void obex_session_remove_session(const char *object_path);
 
 typedef void (*obex_transfer_state_cb)(
 			const char *transfer_path,
-			struct _obex_transfer *transfer,
 			enum transfer_state state,
+			const char *name,
+			guint64 size,
 			guint64 transferred,
 			void *data,
 			char *error_msg);
 
-void obex_session_opp_send_file(
-			struct _obex_session *session,
+void obex_session_opp_send_file(const char *session,
 			const char *file,
 			obex_transfer_state_cb cb,
 			void *data);
 
-struct _obex_transfer *obex_transfer_get_transfer_from_path(
-			const char *path);
-
 /* Returned Glist should not be freed and modified */
-const GList *obex_transfer_get_pathes(void);
 
-void obex_transfer_cancel(
-			struct _obex_transfer *transfer);
-
-enum transfer_state obex_transfer_property_get_state(
-			struct _obex_transfer *transfer);
-
-char *obex_transfer_get_property_source(
-			struct _obex_transfer *transfer);
-
-char *obex_transfer_get_property_destination(
-			struct _obex_transfer *transfer);
-
-char *obex_transfer_get_property_file_name(
-			struct _obex_transfer *transfer);
-
-char *obex_transfer_get_property_name(
-			struct _obex_transfer *transfer);
-
-/* get transfer propterty Name directly from obexd synchonized */
-char *obex_transfer_get_name(
-			struct _obex_transfer *transfer);
-
-int obex_transfer_get_size(struct _obex_transfer *transfer, guint64 *size);
-
-int obex_transfer_property_get_size(
-			struct _obex_transfer *transfer,
-			guint64 *size);
-
-void obex_transfer_set_property_name(
-			struct _obex_transfer *transfer,
-			const char *name);
-
-void obex_transfer_set_property_size(
-			struct _obex_transfer *transfer,
-			guint64 size);
-
-int obex_transfer_get_id(struct _obex_transfer *transfer);
-
-struct _obex_transfer *obex_transfer_get_transfer_from_id(
-			int id);
+void obex_transfer_cancel(const char *path);
 
 /* notify specific transfer */
 int obex_transfer_set_notify(
 			char *transfer_path,
 			obex_transfer_state_cb cb, void *data);
 
-/* watch all the transfers */
-int obex_transfer_set_watch(
-			obex_transfer_state_cb cb,
-			void *data);
+void obex_transfer_clear_notify(char *transfer_path);
 
-void obex_transfer_clear_watch(void);
+enum transfer_state obex_transfer_get_property_state(const char *path);
 
-int obex_transfer_client_number(void);
+enum transfer_state obex_transfer_get_property_state(const char *path);
 
-int obex_get_transferid_from_path(int role, const char *path);
+char *obex_transfer_get_property_source(const char *path);
+
+char *obex_transfer_get_property_destination(const char *path);
+
+char *obex_transfer_get_property_file_name(const char *path);
+
+char *obex_transfer_get_property_name(const char *path);
+
+int obex_transfer_get_property_size(const char *path, guint64 *size);
+
+int obex_get_transfer_id(const char *transfer_path,
+			enum obex_role role);
+
+int obex_agent_get_agent(void);
 #endif
