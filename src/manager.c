@@ -1069,6 +1069,7 @@ static void manager_skeleton_finalize(GObject *object)
 	G_OBJECT_CLASS(comms_manager_skeleton_parent_class)->finalize(object);
 
 	vertical_notify_bt_set_flight_mode_cb(NULL, NULL);
+	vertical_notify_bt_set_name_cb(NULL, NULL);
 }
 
 static void comms_manager_skeleton_class_init(CommsManagerSkeletonClass *klass)
