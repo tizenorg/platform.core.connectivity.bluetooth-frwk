@@ -295,7 +295,8 @@ static int bt_set_storage_value(enum storage_key key, void *value)
 		vconf_set_str(VCONFKEY_BT_HEADSET_NAME, (char *)value);
 	else if (key == STORAGE_KEY_BT_PROFILE_STATE)
 		vconf_set_int(VCONFKEY_BT_DEVICE, *(int *)value);
-	else
+	else if (key == STORAGE_KEY_BT_FLIGHT_MODE)
+		vconf_set_int(BT_OFF_DUE_TO_FLIGHT_MODE, *(int *)value);
 		return -1;
 
 	return 0;
@@ -316,9 +317,17 @@ static int bt_get_storage_value(enum storage_key key, void **value)
 		temp = g_try_new0(int, 1);
 		vconf_get_int(VCONFKEY_BT_DEVICE, temp);
 		*value = temp;
-	} else if (key == STORAGE_KEY_BT_HEADSET_NAME)
+	} else if (key == STORAGE_KEY_BT_HEADSET_NAME) {
 		*value = vconf_get_str(VCONFKEY_BT_HEADSET_NAME);
-	else
+	} else if (key == STORAGE_KEY_BT_FLIGHT_MODE) {
+		temp = g_try_new0(int, 1);
+		vconf_get_int(BT_OFF_DUE_TO_FLIGHT_MODE, temp);
+		*value = temp;
+	} else if (key == STORAGE_KEY_TELEPHONE_FLIGHT_MODE) {
+		temp = g_try_new0(int, 1);
+		vconf_get_int(VCONFKEY_TELEPHONY_FLIGHT_MODE, temp);
+		*value = temp;
+	} else
 		return -1;
 
 	return 0;
