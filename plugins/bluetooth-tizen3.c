@@ -62,6 +62,9 @@ struct opp_context {
 bluetooth_flight_cb flight_mode_callback;
 void *flight_mode_data;
 
+bluetooth_name_cb bt_set_name_callback;
+void *bt_set_name_data;
+
 const char* error_to_string(notification_error_e error)
 {
     if (error == NOTIFICATION_ERROR_INVALID_DATA)
@@ -343,6 +346,12 @@ void bt_set_flight_mode_cb(bluetooth_flight_cb cb, void *user_data)
 	flight_mode_data = user_data;
 }
 
+void bt_set_name_cb(bluetooth_name_cb cb, void *user_data)
+{
+	bt_set_name_callback = cb;
+	bt_set_name_data = user_data;
+}
+
 static int bt_probe(void)
 {
 	DBG("");
@@ -593,6 +602,27 @@ static int bt_opp_agent_on(void *data)
 	return 0;
 }
 
+static void bt_name_cb(keynode_t *node, void *data)
+{
+	char *phone_name = NULL;
+	char *ptr = NULL;
+
+	if (node == NULL)
+		return;
+
+	if (vconf_keynode_get_type(node) == VCONF_TYPE_STRING) {
+		phone_name = vconf_keynode_get_str(node);
+		if (phone_name && strlen(phone_name) != 0) {
+			if (!g_utf8_validate(phone_name, -1,
+						(const char **)&ptr))
+				*ptr = '\0';
+			if (bt_set_name_callback)
+				bt_set_name_callback(phone_name,
+						bt_set_name_data);
+		}
+	}
+}
+
 static void bt_flight_mode_cb(keynode_t *node, void *data)
 {
 	gboolean flight_mode = FALSE;
@@ -634,6 +664,7 @@ static struct bluetooth_vertical_driver bt_driver = {
 	.set_value = bt_set_storage_value,
 	.get_value = bt_get_storage_value,
 	.set_flight_mode_cb = bt_set_flight_mode_cb,
+	.set_name_cb = bt_set_name_cb,
 	.transfer = bt_transfer,
 	.pairing_agent_on = bt_pairing_agent_on,
 	.opp_agent_on = bt_opp_agent_on,
@@ -646,6 +677,9 @@ static int bt_init(void)
 
 	vconf_notify_key_changed(VCONFKEY_TELEPHONY_FLIGHT_MODE,
 					bt_flight_mode_cb, NULL);
+
+	vconf_notify_key_changed(VCONFKEY_SETAPPL_DEVICE_NAME_STR,
+					bt_name_cb, NULL);
 	return 0;
 }
 

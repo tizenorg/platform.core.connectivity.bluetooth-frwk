@@ -1020,6 +1020,32 @@ static void bluetooth_flight_mode_cb(gboolean flight_mode, void *user_data)
 	DBG("-");
 }
 
+static void bluetooth_set_name_cb(char *name, void *user_data)
+{
+	gchar *default_adapter_name;
+	CommsManagerSkeleton *skeleton = user_data;
+
+	DBG("+");
+
+	if (!skeleton)
+		return;
+
+	if (default_adapter == NULL) {
+		default_adapter_name = get_default_adapter(skeleton);
+		DBG("adapter: %s", default_adapter_name);
+
+		default_adapter = bluez_adapter_get_adapter(
+						default_adapter_name);
+		if (default_adapter_name)
+			g_free(default_adapter_name);
+		if (default_adapter)
+			bluez_adapter_set_alias(default_adapter, name);
+	} else
+		bluez_adapter_set_alias(default_adapter, name);
+
+	return;
+}
+
 static void manager_skeleton_finalize(GObject *object)
 {
 	CommsManagerSkeleton *skeleton = COMMS_MANAGER_SKELETON(object);
@@ -1100,6 +1126,7 @@ CommsManagerSkeleton *comms_service_manager_new(
 
 	vertical_notify_bt_set_flight_mode_cb(bluetooth_flight_mode_cb,
 							object);
+	vertical_notify_bt_set_name_cb(bluetooth_set_name_cb, object);
 
 	return object;
 }

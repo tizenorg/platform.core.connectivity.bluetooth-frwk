@@ -120,6 +120,16 @@ void vertical_notify_bt_set_flight_mode_cb(
 		bluetooth_driver->set_flight_mode_cb(cb, user_data);
 }
 
+void vertical_notify_bt_set_name_cb(
+		bluetooth_name_cb cb, void *user_data)
+{
+	if (!bluetooth_driver)
+		return;
+
+	if (bluetooth_driver->set_name_cb)
+		bluetooth_driver->set_name_cb(cb, user_data);
+}
+
 int vertical_notify_bt_get_flight_mode(
 			enum storage_key key, void **value)
 {
