@@ -689,6 +689,11 @@ int bt_opp_server_initialize(const char *destination,
 {
 	int ret;
 
+	if (is_server_register) {
+		DBG("opp server has init");
+		return BT_SUCCESS;
+	}
+
 	if (!destination || !push_requested_cb)
 		return BT_ERROR_INVALID_PARAMETER;
 
@@ -723,6 +728,11 @@ int bt_opp_server_initialize_by_connection_request(const char *destination,
 {
 	int ret;
 
+	if (is_server_register) {
+		DBG("opp server has init");
+		return BT_SUCCESS;
+	}
+
 	if (!destination || !connection_requested_cb)
 		return BT_ERROR_INVALID_PARAMETER;
 
@@ -755,6 +765,11 @@ int bt_opp_server_initialize_by_connection_request(const char *destination,
 int bt_opp_server_deinitialize(void)
 {
 	DBG("");
+
+	if (!is_server_register) {
+		DBG("opp server not init");
+		return BT_SUCCESS;
+	}
 
 	if (opp_server_push_node) {
 		g_free(opp_server_push_node);
@@ -824,6 +839,13 @@ int bt_opp_server_accept(bt_opp_server_transfer_progress_cb progress_cb,
 			bt_opp_server_transfer_finished_cb finished_cb,
 			const char *name, void *user_data, int *transfer_id)
 {
+	DBG("");
+
+	if (!is_server_register) {
+		DBG("opp server not init");
+		return BT_ERROR_NOT_INITIALIZED;
+	}
+
 	bt_transfer_progress_cb = progress_cb;
 	bt_transfer_finished_cb = finished_cb;
 
@@ -832,17 +854,38 @@ int bt_opp_server_accept(bt_opp_server_transfer_progress_cb progress_cb,
 
 int bt_opp_server_reject(void)
 {
+	DBG("");
+
+	if (!is_server_register) {
+		DBG("opp server not init");
+		return BT_ERROR_NOT_INITIALIZED;
+	}
+
 	return bt_opp_server_reject_request();
 }
 
 int bt_opp_server_cancel_transfer(int transfer_id)
 {
+	DBG("");
+
+	if (!is_server_register) {
+		DBG("opp server not init");
+		return BT_ERROR_NOT_INITIALIZED;
+	}
+
 	return bt_opp_transfer_cancel(transfer_id);
 }
 
 int bt_opp_client_initialize(void)
 {
 	int ret;
+
+	DBG("");
+
+	if (is_client_register) {
+		DBG("opp client has init");
+		return BT_SUCCESS;
+	}
 
 	ret = register_opp_object();
 	if (ret != BT_SUCCESS)
@@ -857,6 +900,13 @@ int bt_opp_client_initialize(void)
 
 int bt_opp_client_deinitialize(void)
 {
+	DBG("");
+
+	if (!is_client_register) {
+		DBG("opp client not init");
+		return BT_SUCCESS;
+	}
+
 	is_client_register = FALSE;
 
 	destroy_opp_object();
@@ -874,6 +924,11 @@ int bt_opp_client_add_file(const char *file)
 	int ret = BT_ERROR_NONE;
 
 	DBG("+");
+
+	if (!is_client_register) {
+		DBG("opp client not init");
+		return BT_ERROR_NOT_INITIALIZED;
+	}
 
 	if (file == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
@@ -899,6 +954,11 @@ int bt_opp_client_clear_files(void)
 {
 	DBG("");
 
+	if (!is_client_register) {
+		DBG("opp client not init");
+		return BT_ERROR_NOT_INITIALIZED;
+	}
+
 	comms_bluetooth_opp_remove_Files(AGENT_OBJECT_PATH, NULL, NULL);
 
 	return BT_ERROR_NONE;
@@ -912,6 +972,11 @@ int bt_opp_client_push_files(const char *remote_address,
 {
 	int user_privilieges;
 	int ret;
+
+	if (!is_client_register) {
+		DBG("opp client not init");
+		return BT_ERROR_NOT_INITIALIZED;
+	}
 
 	if (remote_address == NULL) {
 		DBG("address = NULL");
@@ -952,6 +1017,11 @@ int bt_opp_client_push_files(const char *remote_address,
 int bt_opp_client_cancel_push(void)
 {
 	int user_privilieges;
+
+	if (!is_client_register) {
+		DBG("opp client not init");
+		return BT_ERROR_NOT_INITIALIZED;
+	}
 
 	if (strlen(pushing_address) == 0) {
 		DBG("not need to cancel bonding");
