@@ -27,9 +27,12 @@
 #define BT_GENERIC_AUDIO_UUID      "00001203-0000-1000-8000-00805f9b34fb"
 
 #define BT_HFP_HS_UUID             "0000111e-0000-1000-8000-00805f9b34fb"
+#define BT_HFP_AG_UUID             "0000111f-0000-1000-8000-00805f9b34fb"
 #define BT_ADVANCED_AUDIO_UUID     "0000110d-0000-1000-8000-00805f9b34fb"
 #define BT_A2DP_SOURCE_UUID        "0000110a-0000-1000-8000-00805f9b34fb"
 #define BT_A2DP_SINK_UUID          "0000110b-0000-1000-8000-00805f9b34fb"
+#define BT_HSP_HS_UUID             "00001108-0000-1000-8000-00805f9b34fb"
+#define BT_HSP_AG_UUID             "00001112-0000-1000-8000-00805f9b34fb"
 
 #define BT_HID_UUID                "00001124-0000-1000-8000-00805f9b34fb"
 
@@ -582,12 +585,19 @@ void bluez_device_connect_profile(
 				const gchar *uuid,
 				profile_connect_cb_t pf_connect_cb);
 
+void bluez_device_connect_all(struct _bluez_device *device,
+				profile_connect_cb_t pf_connect_cb);
+
 typedef void (*profile_disconnect_cb_t)(
 				struct _bluez_device *device,
 				enum device_profile_state state);
 void bluez_device_disconnect_profile(
 				struct _bluez_device *device,
 				const gchar *uuid,
+				profile_disconnect_cb_t pf_disconnect_cb);
+
+void bluez_device_disconnect_all(
+				struct _bluez_device *device,
 				profile_disconnect_cb_t pf_disconnect_cb);
 
 char *bluez_device_property_get_adapter(

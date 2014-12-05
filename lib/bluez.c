@@ -3924,6 +3924,13 @@ void bluez_device_connect_profile(struct _bluez_device *device,
 {
 	struct profile_connect_state_notify *notify;
 
+	if (!uuid) {
+		DBG("uuid is null");
+		return;
+	}
+
+	DBG("uuid = %s", uuid);
+
 	notify = g_try_new0(struct profile_connect_state_notify, 1);
 	if (notify == NULL) {
 		ERROR("no memory");
@@ -3936,6 +3943,27 @@ void bluez_device_connect_profile(struct _bluez_device *device,
 	g_dbus_proxy_call(device->proxy,
 			"ConnectProfile", g_variant_new("(s)", uuid),
 			0, -1, NULL,
+			device_profile_connect_cb, notify);
+}
+
+void bluez_device_connect_all(struct _bluez_device *device,
+				profile_connect_cb_t pf_connect_cb)
+{
+	struct profile_connect_state_notify *notify;
+
+	DBG("");
+
+	notify = g_try_new0(struct profile_connect_state_notify, 1);
+	if (notify == NULL) {
+		ERROR("no memory");
+		return;
+	}
+
+	notify->device = device;
+	notify->cb = pf_connect_cb;
+
+	g_dbus_proxy_call(device->proxy,
+			"Connect", NULL, 0, -1, NULL,
 			device_profile_connect_cb, notify);
 }
 
@@ -3984,11 +4012,39 @@ static void device_profile_disconnect_cb(GObject *source_object,
 	g_free(notify);
 }
 
+void bluez_device_disconnect_all(struct _bluez_device *device,
+				profile_disconnect_cb_t pf_disconnect_cb)
+{
+	struct profile_disconnect_state_notify *notify;
+
+	DBG("");
+
+	notify = g_try_new0(struct profile_disconnect_state_notify, 1);
+	if (notify == NULL) {
+		ERROR("no memory");
+		return;
+	}
+
+	notify->device = device;
+	notify->cb = pf_disconnect_cb;
+
+	g_dbus_proxy_call(device->proxy,
+			"Disconnect", NULL, 0, -1, NULL,
+			device_profile_disconnect_cb, notify);
+}
+
 void bluez_device_disconnect_profile(struct _bluez_device *device,
 				const char *uuid,
 				profile_disconnect_cb_t pf_disconnect_cb)
 {
 	struct profile_disconnect_state_notify *notify;
+
+	if (!uuid) {
+		DBG("uuid is null");
+		return;
+	}
+
+	DBG("uuid = %s", uuid);
 
 	notify = g_try_new0(struct profile_disconnect_state_notify, 1);
 	if (notify == NULL) {

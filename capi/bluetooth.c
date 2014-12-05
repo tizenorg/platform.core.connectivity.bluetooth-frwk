@@ -2708,7 +2708,8 @@ int bt_audio_connect(const char *remote_address,
 {
 	bluez_device_t *device;
 	char *uuid = NULL;
-	int user_privilieges;
+	int user_privilieges, len;
+	adapter_device_discovery_info_t *device_info;
 
 	DBG("");
 
@@ -2754,8 +2755,39 @@ int bt_audio_connect(const char *remote_address,
 	if (device == NULL)
 		return BT_ERROR_OPERATION_FAILED;
 
-	bluez_device_connect_profile(device, uuid,
-				profile_connect_callback);
+	if (type != BT_AUDIO_PROFILE_TYPE_ALL)
+		bluez_device_connect_profile(device, uuid,
+					profile_connect_callback);
+	else
+		goto done;
+
+	return BT_SUCCESS;
+
+done:
+	device_info = bluez_get_discovery_device_info(device);
+	if (!device_info || !device_info->service_uuid) {
+		DBG("device info = NULL");
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	for (len = 0; len < device_info->service_count; len++) {
+		if (!g_strcmp0(device_info->service_uuid[len],
+						BT_HFP_HS_UUID)
+			|| !g_strcmp0(device_info->service_uuid[len],
+						BT_A2DP_SINK_UUID)
+			|| !g_strcmp0(device_info->service_uuid[len],
+						BT_A2DP_SOURCE_UUID)
+			|| !g_strcmp0(device_info->service_uuid[len],
+						BT_HFP_AG_UUID)
+			|| !g_strcmp0(device_info->service_uuid[len],
+						BT_HSP_AG_UUID)
+			|| !g_strcmp0(device_info->service_uuid[len],
+						BT_HSP_HS_UUID)) {
+			bluez_device_connect_profile(device,
+					device_info->service_uuid[len],
+					profile_connect_callback);
+		}
+	}
 
 	return BT_SUCCESS;
 }
@@ -2765,7 +2797,8 @@ int bt_audio_disconnect(const char *remote_address,
 {
 	bluez_device_t *device;
 	char *uuid = NULL;
-	int user_privilieges;
+	int user_privilieges, len;
+	adapter_device_discovery_info_t *device_info;
 
 	DBG("");
 
@@ -2811,8 +2844,39 @@ int bt_audio_disconnect(const char *remote_address,
 	if (device == NULL)
 		return BT_ERROR_OPERATION_FAILED;
 
-	bluez_device_disconnect_profile(device, uuid,
+	if (type != BT_AUDIO_PROFILE_TYPE_ALL)
+		bluez_device_disconnect_profile(device, uuid,
 				profile_disconnect_callback);
+	else
+		goto done;
+
+	return BT_SUCCESS;
+
+done:
+	device_info = bluez_get_discovery_device_info(device);
+	if (!device_info || !device_info->service_uuid) {
+		DBG("device info = NULL");
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	for (len = 0; len < device_info->service_count; len++) {
+		if (!g_strcmp0(device_info->service_uuid[len],
+						BT_HFP_HS_UUID)
+			|| !g_strcmp0(device_info->service_uuid[len],
+						BT_A2DP_SINK_UUID)
+			|| !g_strcmp0(device_info->service_uuid[len],
+						BT_A2DP_SOURCE_UUID)
+			|| !g_strcmp0(device_info->service_uuid[len],
+						BT_HFP_AG_UUID)
+			|| !g_strcmp0(device_info->service_uuid[len],
+						BT_HSP_AG_UUID)
+			|| !g_strcmp0(device_info->service_uuid[len],
+						BT_HSP_HS_UUID)) {
+			bluez_device_disconnect_profile(device,
+					device_info->service_uuid[len],
+					profile_disconnect_callback);
+		}
+	}
 
 	return BT_SUCCESS;
 }
