@@ -30,6 +30,7 @@
 #define NOTIFICATION_MAX_LEN 	50
 
 #define BLUETOOTH_ICON_PATH	"/usr/share/icons/default/bt-icon.png"
+#define BT_OFF_DUE_TO_FLIGHT_MODE "file/private/bt-service/flight_mode_deactivated"
 
 // distinguish different popups types using below strings.
 // use NOTIFICATION_TEXT_TYPE_INFO_1 arg type to transport such information.
@@ -59,11 +60,11 @@ struct opp_context {
 	gpointer user_data;
 };
 
-bluetooth_flight_cb flight_mode_callback;
-void *flight_mode_data;
+static bluetooth_flight_cb flight_mode_callback;
+static void *flight_mode_data;
 
-bluetooth_name_cb bt_set_name_callback;
-void *bt_set_name_data;
+static bluetooth_name_cb bt_set_name_callback;
+static void *bt_set_name_data;
 
 const char* error_to_string(notification_error_e error)
 {
@@ -303,6 +304,7 @@ static int bt_set_storage_value(enum storage_key key, void *value)
 		vconf_set_int(VCONFKEY_BT_DEVICE, *(int *)value);
 	else if (key == STORAGE_KEY_BT_FLIGHT_MODE)
 		vconf_set_int(BT_OFF_DUE_TO_FLIGHT_MODE, *(int *)value);
+	else
 		return -1;
 
 	return 0;
