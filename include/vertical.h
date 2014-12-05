@@ -23,7 +23,9 @@
 enum storage_key {
 	STORAGE_KEY_BT_STATE,
 	STORAGE_KEY_BT_HEADSET_NAME,
-	STORAGE_KEY_BT_PROFILE_STATE
+	STORAGE_KEY_BT_PROFILE_STATE,
+	STORAGE_KEY_BT_FLIGHT_MODE,
+	STORAGE_KEY_TELEPHONE_FLIGHT_MODE
 };
 
 struct bluetooth_vertical_driver {
@@ -37,6 +39,8 @@ struct bluetooth_vertical_driver {
 	int (*set_value)(enum storage_key, void*);
 	int (*get_value)(enum storage_key, void**);
 };
+
+#define BT_OFF_DUE_TO_FLIGHT_MODE "file/private/bt-service/flight_mode_deactivated"
 
 void comms_service_register_bt_vertical_driver(
 			struct bluetooth_vertical_driver *driver);
