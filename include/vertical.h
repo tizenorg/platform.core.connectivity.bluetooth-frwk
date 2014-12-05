@@ -48,8 +48,6 @@ struct bluetooth_vertical_driver {
 	void (*set_name_cb)(bluetooth_name_cb, void*);
 };
 
-#define BT_OFF_DUE_TO_FLIGHT_MODE "file/private/bt-service/flight_mode_deactivated"
-
 void comms_service_register_bt_vertical_driver(
 			struct bluetooth_vertical_driver *driver);
 
