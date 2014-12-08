@@ -343,6 +343,7 @@ notify_launch(bundle * user_data)
 	if (!notify_is_initted())
 		if (!notify_init("Tizen Bluetooth-frwk")){
 			BT_ERR("notification init failed\n");
+			free(ad);
 			return BT_FAILED;
 		}
 
