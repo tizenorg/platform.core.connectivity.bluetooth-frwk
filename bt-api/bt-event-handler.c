@@ -148,7 +148,7 @@ static void __bt_get_uuid_info(bluetooth_device_info_t *dev_info,
 
 	dev_info->service_index = uuid_count;
 
-	for (i = 0; uuids[i] != NULL && i < uuid_count; i++) {
+	for (i = 0; i < uuid_count && uuids[i] != NULL; i++) {
 		g_strlcpy(dev_info->uuids[i], uuids[i], BLUETOOTH_UUID_STRING_MAX);
 
 		parts = g_strsplit(uuids[i], "-", -1);
