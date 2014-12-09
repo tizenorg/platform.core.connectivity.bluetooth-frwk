@@ -135,7 +135,6 @@ static char *__bt_get_audio_path(bluetooth_device_address_t *address)
 	DBusGProxy *audio_proxy;
 	DBusGProxy *adapter_proxy;
 	DBusGConnection *g_conn;
-	GError *error = NULL;
 
 	retv_if(address == NULL, NULL);
 
@@ -180,7 +179,6 @@ static char *__bt_get_connected_audio_path(void)
 		return NULL;
 	}
 
-	size = device_list->len;
 	size = (device_list->len) / sizeof(bluetooth_device_info_t);
 
 	for (i = 0; i < size; i++) {
