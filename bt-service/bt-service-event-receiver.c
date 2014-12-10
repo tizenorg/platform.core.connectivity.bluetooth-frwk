@@ -869,7 +869,6 @@ void __bt_device_property_changed_event(DBusMessageIter *msg_iter, const char *p
 
 			GList *node;
 			bt_remote_dev_info_t *dev_info;
-			bt_remote_dev_info_t *new_dev_info;
 
 			dbus_message_iter_recurse(&dict_iter, &value_iter);
 			dbus_message_iter_get_basic(&value_iter, &paired);
@@ -901,13 +900,6 @@ void __bt_device_property_changed_event(DBusMessageIter *msg_iter, const char *p
 				if (strcasecmp(dev_info->address, address) == 0) {
 					g_list = g_list_remove(g_list, dev_info);
 					_bt_free_device_info(dev_info);
-
-					new_dev_info =  _bt_get_remote_device_info(address);
-					if (new_dev_info == NULL) {
-						g_free(address);
-						return;
-					}
-					g_list = g_list_append(g_list, new_dev_info);
 				}
 				node = g_list_next(node);
 			}
@@ -1638,8 +1630,9 @@ static DBusHandlerResult __bt_manager_event_filter(DBusConnection *conn,
 			if (strncasecmp(object_path, BT_BLUEZ_HCI_DEV_PATH, strlen(BT_BLUEZ_HCI_DEV_PATH)) == 0) {
 				int result = BLUETOOTH_ERROR_NONE;
 				char *address;
-				bt_remote_dev_info_t * dev_info;
+				bt_remote_dev_info_t *dev_info;
 				GList * node;
+				gboolean is_in_glist = FALSE;
 
 				BT_DBG("device interface removed | path: %s", object_path);
 
@@ -1650,39 +1643,41 @@ static DBusHandlerResult __bt_manager_event_filter(DBusConnection *conn,
 
 				node = g_list_first(g_list);
 
-				while (node != NULL){
+				while (node != NULL) {
 					dev_info = (bt_remote_dev_info_t *)node->data;
 					if (strcasecmp(dev_info->address, address) == 0) {
-						if (dev_info->paired) {
-							BT_DBG("send bt bond destroy event");
-							_bt_send_event(BT_ADAPTER_EVENT,
-								BLUETOOTH_EVENT_BONDED_DEVICE_REMOVED,
-								DBUS_TYPE_INT32, &result,
-								DBUS_TYPE_STRING, &address,
-								DBUS_TYPE_INVALID);
-						} else {
-							BT_DBG("Bluez removes device %s, send device disappear event", dev_info->name);
-							_bt_send_event(BT_ADAPTER_EVENT,
-								BLUETOOTH_EVENT_REMOTE_DEVICE_DISAPPEARED,
-								DBUS_TYPE_INT32, &result,
-								DBUS_TYPE_STRING, &dev_info->address,
-								DBUS_TYPE_UINT32, &dev_info->class,
-								DBUS_TYPE_INT16, &dev_info->rssi,
-								DBUS_TYPE_STRING, &dev_info->name,
-								DBUS_TYPE_BOOLEAN, &dev_info->paired,
-								DBUS_TYPE_BOOLEAN, &dev_info->connected,
-								DBUS_TYPE_BOOLEAN, &dev_info->trust,
-								DBUS_TYPE_ARRAY, DBUS_TYPE_STRING,
-								&dev_info->uuids, dev_info->uuid_count,
-								DBUS_TYPE_INVALID);
-						}
+						is_in_glist = TRUE;
+
+						BT_DBG("Bluez removes device %s, send device disappear event", dev_info->name);
+						_bt_send_event(BT_ADAPTER_EVENT,
+							BLUETOOTH_EVENT_REMOTE_DEVICE_DISAPPEARED,
+							DBUS_TYPE_INT32, &result,
+							DBUS_TYPE_STRING, &dev_info->address,
+							DBUS_TYPE_UINT32, &dev_info->class,
+							DBUS_TYPE_INT16, &dev_info->rssi,
+							DBUS_TYPE_STRING, &dev_info->name,
+							DBUS_TYPE_BOOLEAN, &dev_info->paired,
+							DBUS_TYPE_BOOLEAN, &dev_info->connected,
+							DBUS_TYPE_BOOLEAN, &dev_info->trust,
+							DBUS_TYPE_ARRAY, DBUS_TYPE_STRING,
+							&dev_info->uuids, dev_info->uuid_count,
+							DBUS_TYPE_INVALID);
+
 						g_list = g_list_remove(g_list, dev_info);
 						_bt_free_device_info(dev_info);
 						break;
 					}
 					node = g_list_next(node);
 				}
-
+				/* if device is not in glist, we need to trig destroy bonding event */
+				if (!is_in_glist) {
+					BT_DBG("send bt bond destroy event");
+					_bt_send_event(BT_ADAPTER_EVENT,
+						BLUETOOTH_EVENT_BONDED_DEVICE_REMOVED,
+						DBUS_TYPE_INT32, &result,
+						DBUS_TYPE_STRING, &address,
+						DBUS_TYPE_INVALID);
+				}
 				g_free(address);
 			}
 		} else {
@@ -2283,24 +2278,21 @@ void _bt_get_temp_remote_devinfo(void)
 
 	while (node != NULL) {
 		dev_info = (bt_remote_dev_info_t *)node->data;
-		/* do not search paired devices.
-		 * Paired devices are in g_list in order to trig device disappear
-		 * or remove bonding events */
-		if (!dev_info->paired) {
-			_bt_send_event(BT_ADAPTER_EVENT,
-				BLUETOOTH_EVENT_REMOTE_DEVICE_FOUND,
-				DBUS_TYPE_INT32, &result,
-				DBUS_TYPE_STRING, &dev_info->address,
-				DBUS_TYPE_UINT32, &dev_info->class,
-				DBUS_TYPE_INT16, &dev_info->rssi,
-				DBUS_TYPE_STRING, &dev_info->name,
-				DBUS_TYPE_BOOLEAN, &dev_info->paired,
-				DBUS_TYPE_BOOLEAN, &dev_info->connected,
-				DBUS_TYPE_BOOLEAN, &dev_info->trust,
-				DBUS_TYPE_ARRAY, DBUS_TYPE_STRING,
-				&dev_info->uuids, dev_info->uuid_count,
-				DBUS_TYPE_INVALID);
-		}
+
+		_bt_send_event(BT_ADAPTER_EVENT,
+			BLUETOOTH_EVENT_REMOTE_DEVICE_FOUND,
+			DBUS_TYPE_INT32, &result,
+			DBUS_TYPE_STRING, &dev_info->address,
+			DBUS_TYPE_UINT32, &dev_info->class,
+			DBUS_TYPE_INT16, &dev_info->rssi,
+			DBUS_TYPE_STRING, &dev_info->name,
+			DBUS_TYPE_BOOLEAN, &dev_info->paired,
+			DBUS_TYPE_BOOLEAN, &dev_info->connected,
+			DBUS_TYPE_BOOLEAN, &dev_info->trust,
+			DBUS_TYPE_ARRAY, DBUS_TYPE_STRING,
+			&dev_info->uuids, dev_info->uuid_count,
+			DBUS_TYPE_INVALID);
+
 		node = g_list_next(node);
 	}
 }
