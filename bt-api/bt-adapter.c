@@ -134,7 +134,6 @@ BT_EXPORT_API int bluetooth_get_local_address(bluetooth_device_address_t *local_
 	int result;
 
 	BT_CHECK_PARAMETER(local_address, return);
-	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -157,7 +156,6 @@ BT_EXPORT_API int bluetooth_get_local_name(bluetooth_device_name_t *local_name)
 	int result;
 
 	BT_CHECK_PARAMETER(local_name, return);
-	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -230,22 +228,6 @@ BT_EXPORT_API int bluetooth_get_discoverable_mode(bluetooth_discoverable_mode_t 
 	int timeout = 0;
 
 	BT_CHECK_PARAMETER(discoverable_mode_ptr, return);
-
-	/* Requirement in OSP */
-	if (bluetooth_check_adapter() == BLUETOOTH_ADAPTER_DISABLED) {
-		if (vconf_get_int(BT_FILE_VISIBLE_TIME, &timeout) != 0) {
-			BT_ERR("Fail to get the timeout value");
-			return BLUETOOTH_ERROR_INTERNAL;
-		}
-
-		if (timeout == -1) {
-			*discoverable_mode_ptr = BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE;
-		} else {
-			*discoverable_mode_ptr = BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE;
-		}
-
-		return BLUETOOTH_ERROR_NONE;
-	}
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
