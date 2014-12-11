@@ -103,9 +103,10 @@ static void agent_callback(GObject *source_object,
 		g_free(error);
 	}
 
-	agent_data->cb(error_type, agent_data->user_data);
-
-	g_free(agent_data);
+	if (agent_data && agent_data->cb) {
+		agent_data->cb(error_type, agent_data->user_data);
+		g_free(agent_data);
+	}
 
 	DBG("-");
 }
@@ -158,6 +159,7 @@ void obex_agent_unregister_agent(const char *agent_path,
 
 	unregister_data->cb = cb;
 	unregister_data->user_data = user_data;
+	unregister_data->conn = connection;
 
 	if (g_opp_startup)
 		g_dbus_connection_call(connection, "org.bluez.obex",

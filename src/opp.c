@@ -481,6 +481,8 @@ static void register_obex_agent_cb(enum bluez_error_type type, void *user_data)
 
 static void unregister_obex_agent_cb(enum bluez_error_type type, void *user_data)
 {
+	DBG("");
+
 	if (type != ERROR_NONE)
 		ERROR("unregister obex agent failed :%d", type);
 
