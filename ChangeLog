@@ -1,3 +1,30 @@
+ver 0.3:
+	Implemented AVRCP AG
+	Implemented Audio BT CAPIs
+	Implemented Socket BT CAPIs
+	Implemented NAP/PANU BT CAPIs
+	Add the MAP agent to NTB
+	Implemented the current Socket CAPIs in NTB
+	Add the plugin for Greek
+	Implemented the missed Adapter/Devices CAPIs
+	Implemented HDP in NTB
+	Implemented OPP CAPIs
+	Implemented OPP server/client CAPIs to match current BT-FRWK
+	Modified HID CAPIs bugs and issues in NTB
+	Implemented device LE CAPIs
+	Add the plugin for Tizen3
+	Support the notification of Tizen3
+	Fixed the unstable bugs of NTB
+	Implemented the multi-user phase1 passive paired
+	Implemented the multi-user phase1 active paired
+	Implemented the multi-user phase1 opp client
+	Implemented the multi-user phase1 opp server
+	Implemented the multi-user phase1 for BT connection
+	To stable OPP and rewrite obex interfaces
+	Add the support of VCONF
+	Fixed the crash bugs in the process of stress testing
+	Fixed the bugs and issues in the process of Tizen TCT test
+
 ver 0.2:
 	Add copyright and license
 	Implemented HID disconnection
