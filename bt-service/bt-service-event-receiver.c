@@ -645,7 +645,6 @@ static gboolean __bt_discovery_finished()
 
 void __bt_adapter_property_changed_event(DBusMessageIter *msg_iter, const char *path)
 {
-	DBusGProxy *adapter_proxy;
 	int mode = 0;
 	int result = BLUETOOTH_ERROR_NONE;
 	DBusMessageIter value_iter;
@@ -723,6 +722,7 @@ void __bt_adapter_property_changed_event(DBusMessageIter *msg_iter, const char *
 
 		if (discoverable == FALSE) {
 			if (_bt_get_discoverable_timeout_property() > 0) {
+				DBusGProxy *adapter_proxy;
 				g_value_init(&timeout, G_TYPE_UINT);
 				g_value_set_uint(&timeout, 0);
 
@@ -779,17 +779,14 @@ static void __bt_device_remote_connected_properties(
 				char *address, gboolean connected)
 {
 	int result = BLUETOOTH_ERROR_NONE;
-	int i;
 
 	BT_DBG("+");
 
 	if (remote_dev_info->uuid_count > 0 ) {
-		for (i = 0; i<remote_dev_info->uuid_count; i++) {
+		for (int i = 0; i<remote_dev_info->uuid_count; i++) {
 			char *uuid = remote_dev_info->uuids[i];
 			if (strcasecmp(uuid, HID_UUID) == 0){
-				int event = BLUETOOTH_EVENT_NONE;
-
-				event = (connected == TRUE) ?
+				int event = (connected == TRUE) ?
 					BLUETOOTH_HID_CONNECTED :
 					BLUETOOTH_HID_DISCONNECTED;
 
@@ -868,7 +865,6 @@ void __bt_device_property_changed_event(DBusMessageIter *msg_iter, const char *p
 			gboolean paired = FALSE;
 
 			GList *node;
-			bt_remote_dev_info_t *dev_info;
 			bt_remote_dev_info_t *new_dev_info;
 
 			dbus_message_iter_recurse(&dict_iter, &value_iter);
@@ -897,6 +893,7 @@ void __bt_device_property_changed_event(DBusMessageIter *msg_iter, const char *p
 			node = g_list_first(g_list);
 
 			while (node != NULL) {
+				bt_remote_dev_info_t *dev_info;
 				dev_info = (bt_remote_dev_info_t *)node->data;
 				if (strcasecmp(dev_info->address, address) == 0) {
 					g_list = g_list_remove(g_list, dev_info);
@@ -1004,7 +1001,7 @@ void _bt_handle_input_event(DBusMessage *msg)
 	ret_if(property == NULL);
 
 	if (strcasecmp(property, "Connected") == 0) {
-		int event = BLUETOOTH_EVENT_NONE;
+		int event;
 		char *address;
 
 		dbus_message_iter_next(&item_iter);
@@ -1120,7 +1117,6 @@ void __bt_handle_network_client_event(DBusMessageIter *msg_iter, const char *pat
 
 void _bt_handle_device_event(DBusMessage *msg)
 {
-	int event;
 	int result = BLUETOOTH_ERROR_NONE;
 	DBusMessageIter item_iter;
 	DBusMessageIter value_iter;
@@ -1146,6 +1142,7 @@ void _bt_handle_device_event(DBusMessage *msg)
 		ret_if(property == NULL);
 
 		if (strcasecmp(property, "Connected") == 0) {
+			int event;
 			gboolean connected = FALSE;
 			dbus_message_iter_next(&item_iter);
 			dbus_message_iter_recurse(&item_iter, &value_iter);
@@ -1247,7 +1244,7 @@ void __bt_handle_media_control_event(DBusMessageIter *msg_iter,
 	ret_if(!dbus_message_iter_next(&dict_iter));
 
 	if (strcasecmp(property, "Connected") == 0) {
-		int event = BLUETOOTH_EVENT_NONE;
+		int event;
 		char *address;
 
 		dbus_message_iter_recurse(&dict_iter, &value_iter);
@@ -1547,12 +1544,12 @@ static int __bt_get_object_path(DBusMessage *msg, char **path)
 
 static void __bt_devices_list_free()
 {
-	bt_remote_dev_info_t *dev_info;
 	GList *node;
 
 	node = g_list_first(g_list);
 
 	while (node != NULL){
+		bt_remote_dev_info_t *dev_info;
 		dev_info = (bt_remote_dev_info_t *)node->data;
 
 		g_list = g_list_remove(g_list, dev_info);
