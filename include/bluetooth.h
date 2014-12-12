@@ -566,7 +566,8 @@ typedef struct
 	void (*request_passkey)(const char *device_name,
 				bt_req_t *requestion);
 	void (*display_passkey)(const char *device_name,
-				const char *passkey,
+				guint32 passkey,
+				guint16 entered,
 				bt_req_t *requestion);
 	void (*request_confirm)(const char *device_name,
 				unsigned int confirm_num,
