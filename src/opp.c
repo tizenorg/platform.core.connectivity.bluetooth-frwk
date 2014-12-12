@@ -1073,7 +1073,7 @@ static void register_relay_agent_handler(GDBusConnection *connection,
 {
 	const gchar *sender;
 	gchar *agent_path;
-	guint relay_agent_watch_id;
+	guint relay_agent_watch_id = 0;
 	guint32 uid, pid;
 	struct agent *agent = NULL;
 
@@ -1092,16 +1092,18 @@ static void register_relay_agent_handler(GDBusConnection *connection,
 
 	pid = get_connection_p_id(connection, sender);
 
-	relay_agent_watch_id =
-			g_bus_watch_name_on_connection(connection, sender,
-					G_BUS_NAME_WATCHER_FLAGS_AUTO_START,
-					NULL, relay_agent_disconnected,
-					NULL, NULL);
-
 	relay_agent = create_relay_agent(sender, agent_path, NULL, pid,
 					uid, relay_agent_watch_id);
 
 	agent_server_list = g_list_append(agent_server_list, relay_agent);
+
+	relay_agent_watch_id =
+			g_bus_watch_name_on_connection(connection, sender,
+					G_BUS_NAME_WATCHER_FLAGS_AUTO_START,
+					NULL, relay_agent_disconnected,
+					(gpointer)relay_agent, NULL);
+
+	relay_agent->watch_id = relay_agent_watch_id;
 
 	if (relay_agent_timeout_id > 0) {
 		g_source_remove(relay_agent_timeout_id);
