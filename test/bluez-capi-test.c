@@ -1499,9 +1499,9 @@ void request_passkey(const char *device_name, void *user_data)
 }
 
 void display_passkey(const char *device_name,
-			const char *passkey, void *user_data)
+			guint32 passkey, guint16 entered, void *user_data)
 {
-	DBG("");
+	DBG("Device %s passkey %d entered %d", device_name, passkey, entered);
 }
 
 void request_confirm(const char *device_name,

@@ -3689,6 +3689,11 @@ static const gchar introspection_xml[] =
 	"      <arg type='o' name='device' direction='in'/>"
 	"      <arg type='u' direction='out'/>"
 	"    </method>"
+	"    <method name='DisplayPasskey'>"
+	"      <arg type='o' name='device' direction='in'/>"
+	"      <arg type='u' name='passkey' direction='in'/>"
+	"      <arg type='q' name='entered' direction='in'/>"
+	"    </method>"
 	"    <method name='RequestConfirmation'>"
 	"      <arg type='o' name='device' direction='in'/>"
 	"      <arg type='u' name='passkey' direction='in'/>"
@@ -3801,6 +3806,37 @@ static void request_passkey_handler(const gchar *device_path,
 	if (this_agent && this_agent->request_passkey)
 		this_agent->request_passkey(device_name, invocation);
 #endif
+}
+
+static void handle_display_passkey(const gchar *device_path,
+					guint32 passkey,
+					guint16 entered,
+					GDBusMethodInvocation *invocation)
+{
+  DBG("");
+
+#ifndef TIZEN_3
+	gchar *device_name;
+	bluez_device_t *device;
+
+	if (default_adapter == NULL) {
+		ERROR("No default adapter");
+		return;
+	}
+
+	device = bluez_adapter_get_device_by_path(default_adapter,
+							device_path);
+	if (device == NULL) {
+		ERROR("Can't find device %s", device_path);
+		return;
+	}
+
+	device_name = bluez_device_get_property_alias(device);
+
+	if (this_agent && this_agent->display_passkey)
+		this_agent->display_passkey(device_name, passkey, entered, invocation);
+#endif
+	g_dbus_method_invocation_return_value(invocation, NULL);
 }
 
 static void request_confirmation_handler(const gchar *device_path,
@@ -4039,6 +4075,19 @@ static void handle_method_call(GDBusConnection *connection,
 		g_variant_get(parameters, "(o)", &device_path);
 
 		request_passkey_handler(device_path, invocation);
+
+		g_free(device_path);
+
+		return;
+	}
+	
+	if (g_strcmp0(method_name, "DisplayPasskey") == 0) {
+		gchar *device_path = NULL;
+		guint32 passkey = 0;
+		guint16 entered = 0;
+
+		g_variant_get(parameters, "(ouq)", &device_path, &passkey, &entered);
+		handle_display_passkey(device_path, passkey, entered, invocation);
 
 		g_free(device_path);
 
