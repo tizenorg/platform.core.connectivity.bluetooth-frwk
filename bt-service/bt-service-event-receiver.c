@@ -779,11 +779,12 @@ static void __bt_device_remote_connected_properties(
 				char *address, gboolean connected)
 {
 	int result = BLUETOOTH_ERROR_NONE;
+	int i;
 
 	BT_DBG("+");
 
 	if (remote_dev_info->uuid_count > 0 ) {
-		for (int i = 0; i<remote_dev_info->uuid_count; i++) {
+		for (i = 0; i<remote_dev_info->uuid_count; i++) {
 			char *uuid = remote_dev_info->uuids[i];
 			if (strcasecmp(uuid, HID_UUID) == 0){
 				int event = (connected == TRUE) ?
@@ -863,9 +864,7 @@ void __bt_device_property_changed_event(DBusMessageIter *msg_iter, const char *p
 
 		} else if (strcasecmp(property, "Paired") == 0) {
 			gboolean paired = FALSE;
-
 			GList *node;
-			bt_remote_dev_info_t *dev_info;
 
 			dbus_message_iter_recurse(&dict_iter, &value_iter);
 			dbus_message_iter_get_basic(&value_iter, &paired);
