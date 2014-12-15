@@ -24,3 +24,96 @@ General
 
   Priority: low
   Complexity: C2
+
+- PBAP client: the current CAPIs doesn't exist the PBAP client interfaces.
+  The related CAPIs of PBAP client need to be defined.
+  NTB need to implement it.
+
+  Priority: Medium
+  Complexity: C2
+
+- MAP client: the current CAPIs doesn't exist the MAP client interfaces.
+  The related CAPIs of MAP client need to be defined.
+  NTB need to implement it.
+
+  Priority: Medium
+  Complexity: C2
+
+- NTB will intergate to mobile product: To replace the current BT-FRWK in TIZEN,
+  NTB need to be intergated to mobile product.Then, NTB will be tested in the mobile products.
+
+  Priority: Medium
+  Complexity: C4
+
+- Optimized code: NTB source code need to be checked and optimized.
+  Some redundant code will be removed. It will make NTB more efficient.
+
+  Priority: Medium
+  Complexity: C4
+
+- Change to use g_dbus lib to use basic dbus lib: basic dbus is more efficient.
+  To match more product requirements, the task will be done.
+
+  Priority: Medium
+  Complexity: C8
+
+- Finish the CAPIS of Bluetooth LE: the BT LE CAPIs need to be finished.
+  All the BT LE features should be done.
+
+  Priority: Medium
+  Complexity: C8
+
+- Stress testing: To make NTB more stable. The stress testing and test cases need to be developed.
+  The related bugs need to be fixed.
+
+  Priority: Medium
+  Complexity: C4
+
+- Internal produce testing: To match product requirements, Internal produce testing need to be done.
+  The related bugs need to be fixed.
+  The goal is to match product quality.
+
+  Priority: Medium
+  Complexity: C8
+
+- HFP HF : The HFP CAPIs should be implemented in telephony CAPIs.
+  It should not be in the scope of NTB.
+  However, NTB need to monitor the implementation of telephony CAPIs.
+
+  Priority: Medium
+  Complexity: C8
+
+- Multi-user phase2: NTB need to match the requirement of multi-user phase2.
+  Phase 2: shared-pairing with exclusive connection.
+  If userA is a Privilege user and requests to pair with deviceR.
+  userA can decide to share the pairing link with userB.
+  userB can NOT connect to deviceR whatever the profile.
+  Please check https://wiki.tizen.org/wiki/Multi-user_Bluetooth for the detail info.
+
+  Priority: Medium
+  Complexity: C4
+
+- Multi-user phase3: NTB need to match the requirement of multi-user phase3.
+  Phase 3: shared-pairing with parallel connections.
+  userA and userB shares the pairing link and userA is connected to a deviceR's profile.
+  userB can NOT benefit from the userA's opened connection.
+  userB can connect to other profiles.
+
+  Priority: Medium
+  Complexity: C4
+
+- Multi-user phase4: NTB need to match the requirement of multi-user phase4.
+  Phase 4: local adapter control
+  If userB is a Privilege user, he can do some local adapter property changes (i.e. turn off bluetooth or modify adapter name).
+  If userB is a common user, he can NOT do such actions on local adapter.
+
+  Priority: Medium
+  Complexity: C2
+
+- Multi-user phase4: NTB need to match the requirement of multi-user phase5.
+  Phase 5: sharing devices
+  We can imagine that some shared devices could be used by every users or be considered as a system device.
+  For example, a bluetooth remote control could be associated to the system.
+
+  Priority: Medium
+  Complexity: C2
