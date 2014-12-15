@@ -36,6 +36,7 @@ typedef struct {
 	int event_type;
 	DBusConnection *conn;
 	DBusHandleMessageFunction func;
+	char *match_rule;
 	void *cb;
 	void *user_data;
 } bt_event_info_t;

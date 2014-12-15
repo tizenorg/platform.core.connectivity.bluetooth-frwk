@@ -1768,6 +1768,7 @@ int _bt_register_event(int event_type, void *event_cb, void *user_data)
 	cb_data->event_type = event_type;
 	cb_data->conn = connection_type;
 	cb_data->func = event_func;
+	cb_data->match_rule = match;
 	cb_data->cb = event_cb;
 	cb_data->user_data = user_data;
 
@@ -1788,8 +1789,6 @@ int _bt_register_event(int event_type, void *event_cb, void *user_data)
 		goto fail;
 	}
 
-	g_free(match);
-
 	event_list = g_slist_append(event_list, cb_data);
 
 	return BLUETOOTH_ERROR_NONE;
@@ -1807,6 +1806,8 @@ int _bt_unregister_event(int event_type)
 	DBusConnection *connection_type;
 	DBusHandleMessageFunction event_func;
 	bt_event_info_t *cb_data;
+	char *match;
+	DBusError dbus_error;
 
 	if (is_initialized == FALSE) {
 		BT_ERR("Event is not registered");
@@ -1827,14 +1828,25 @@ int _bt_unregister_event(int event_type)
 
 	connection_type = cb_data->conn;
 	event_func = cb_data->func;
+	match = cb_data->match_rule;
 
 	event_list = g_slist_remove(event_list, (void *)cb_data);
 
 	retv_if(connection_type == NULL, BLUETOOTH_ERROR_INTERNAL);
 	retv_if(event_func == NULL, BLUETOOTH_ERROR_INTERNAL);
 
+	dbus_error_init(&dbus_error);
+
+	dbus_bus_remove_match (connection_type, match, &dbus_error);
+
+	if (dbus_error_is_set(&dbus_error)) {
+		BT_ERR("Fail to remove match: %s\n", dbus_error.message);
+		dbus_error_free(&dbus_error);
+	}
+
 	dbus_connection_remove_filter(connection_type, event_func,
 					(void *)cb_data);
 
+	g_free(match);
 	return BLUETOOTH_ERROR_NONE;
 }
