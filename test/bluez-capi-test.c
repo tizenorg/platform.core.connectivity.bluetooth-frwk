@@ -119,6 +119,19 @@ static int disable(const char *p1, const char *p2)
 	return 0;
 }
 
+static int recover(const char *p1, const char *p2)
+{
+	int err;
+
+	err = bt_adapter_recover();
+	if (err != BT_SUCCESS) {
+		ERROR("bt_adapter_enable error: %d", err);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int get_adapter_state(const char *p1, const char *p2)
 {
 	int err;
@@ -2265,6 +2278,9 @@ struct {
 		"Usage: deinit\n\tDe-initialize bluez-lib"},
 
 	{"enable", enable,
+		"Usage: enable\n\tEnable the local adapter"},
+
+	{"recover", recover,
 		"Usage: enable\n\tEnable the local adapter"},
 
 	{"disable", disable,
