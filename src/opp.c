@@ -1034,20 +1034,19 @@ static void relay_agent_disconnected(GDBusConnection *connection,
 
 	DBG("");
 
-	if (agent == NULL)
+	if (agent == NULL || relay_agent == NULL)
 		return;
 
 	agent_server_list = g_list_remove(agent_server_list, agent);
 
-	if (relay_agent)
-		if (!g_strcmp0(agent->object_path, relay_agent->object_path) &&
-				!g_strcmp0(agent->owner, relay_agent->owner)) {
-			GList *next;
-			next = g_list_last(agent_server_list);
-			if (next)
-				relay_agent = next->data;
-			else
-				relay_agent = NULL;
+	if (!g_strcmp0(agent->object_path, relay_agent->object_path) &&
+			!g_strcmp0(agent->owner, relay_agent->owner)) {
+		GList *next;
+		next = g_list_last(agent_server_list);
+		if (next)
+			relay_agent = next->data;
+		else
+			relay_agent = NULL;
 	}
 
 	free_relay_agent(agent);
@@ -1151,15 +1150,14 @@ static void unregister_relay_agent_handler(GDBusConnection *connection,
 
 	agent_server_list = g_list_remove(agent_server_list, agent);
 
-	if (relay_agent)
-		if (!g_strcmp0(agent_path, relay_agent->object_path) &&
-			!g_strcmp0(sender, relay_agent->owner)) {
-			GList *next;
-			next = g_list_last(agent_server_list);
-			if (next)
-				relay_agent = next->data;
-			else
-				relay_agent = NULL;
+	if (!g_strcmp0(agent_path, relay_agent->object_path) &&
+		!g_strcmp0(sender, relay_agent->owner)) {
+		GList *next;
+		next = g_list_last(agent_server_list);
+		if (next)
+			relay_agent = next->data;
+		else
+			relay_agent = NULL;
 	}
 
 	g_dbus_method_invocation_return_value(invocation, NULL);
