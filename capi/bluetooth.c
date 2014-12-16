@@ -5172,12 +5172,9 @@ int bt_socket_listen_and_accept_rfcomm(int socket_fd,
 	return BT_SUCCESS;
 }
 
-int bt_socket_accept(int requested_socket_fd, int *connected_socket_fd)
+int bt_socket_accept(int requested_socket_fd)
 {
 	struct spp_context *spp_ctx;
-
-	if (connected_socket_fd == NULL)
-		return BT_ERROR_INVALID_PARAMETER;
 
 	spp_ctx = find_spp_context_from_socketfd(requested_socket_fd);
 	if (spp_ctx == NULL)
@@ -5189,12 +5186,6 @@ int bt_socket_accept(int requested_socket_fd, int *connected_socket_fd)
 	 * Note: this connected_socket_fd maybe invalid, because
 	 * connected_socket_fd should return by connection_state_changed,
 	 */
-	if (spp_ctx->channel == NULL)
-		*connected_socket_fd = -1;
-	else
-		*connected_socket_fd =
-				g_io_channel_unix_get_fd(spp_ctx->channel);
-
 	return BT_SUCCESS;
 }
 
