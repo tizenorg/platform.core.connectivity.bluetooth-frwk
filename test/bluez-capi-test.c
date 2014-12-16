@@ -538,7 +538,7 @@ static void service_search_cb(int result, bt_device_sdp_info_s *sdp_info,
 	int i;
 
 	if (result != BT_SUCCESS) {
-		DBG("device service serach failed %d", result);
+		DBG("device service search failed %d", result);
 		return;
 	}
 
@@ -547,7 +547,7 @@ static void service_search_cb(int result, bt_device_sdp_info_s *sdp_info,
 		DBG("\t%s", sdp_info->service_uuid[i]);
 }
 
-static int set_device_service_serach_callback(const char *p1, const char *p2)
+static int set_device_service_search_callback(const char *p1, const char *p2)
 {
 	int ret;
 
@@ -560,7 +560,7 @@ static int set_device_service_serach_callback(const char *p1, const char *p2)
 	return 0;
 }
 
-static int unset_device_service_serach_callback(const char *p1,
+static int unset_device_service_search_callback(const char *p1,
 						const char *p2)
 {
 	int ret;
@@ -2318,11 +2318,11 @@ struct {
 	{"unset_device_connected_callback", unset_device_connected_callback,
 		"Usage: unset_device_connected_callback\n\tUnSet device connected callback"},
 
-	{"set_device_service_serach_callback", set_device_service_serach_callback,
-		"Usage: set_device_service_serach_callback\n\tSet service serach callback"},
+	{"set_device_service_search_callback", set_device_service_search_callback,
+		"Usage: set_device_service_search_callback\n\tSet service search callback"},
 
-	{"unset_device_service_serach_callback", unset_device_service_serach_callback,
-		"Usage: unset_device_service_serach_callback\n\tUnset service serach callback"},
+	{"unset_device_service_search_callback", unset_device_service_search_callback,
+		"Usage: unset_device_service_search_callback\n\tUnset service search callback"},
 
 	{"start_discovery", start_discovery,
 		"Usage: start_discovery\n\tStart to discovery devices"},
