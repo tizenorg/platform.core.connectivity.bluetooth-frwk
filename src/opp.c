@@ -972,8 +972,8 @@ static void free_remove_relay_agent(void)
 			obex_session_remove_session(
 				relay_client_agent->session);
 		free_relay_agent(relay_client_agent);
+		relay_client_agent = NULL;
 	}
-	relay_client_agent = NULL;
 
 	if (!agent_list)
 		return;
@@ -1034,23 +1034,24 @@ static void relay_agent_disconnected(GDBusConnection *connection,
 
 	DBG("");
 
-	if (agent == NULL)
+	if (agent == NULL || relay_agent == NULL)
 		return;
 
 	agent_server_list = g_list_remove(agent_server_list, agent);
 
-	if (relay_agent)
-		if (!g_strcmp0(agent->object_path, relay_agent->object_path) &&
-				!g_strcmp0(agent->owner, relay_agent->owner)) {
-			GList *next;
-			next = g_list_last(agent_server_list);
-			if (next)
-				relay_agent = next->data;
-			else
-				relay_agent = NULL;
+	if (!g_strcmp0(agent->object_path, relay_agent->object_path) &&
+			!g_strcmp0(agent->owner, relay_agent->owner)) {
+		GList *next;
+		next = g_list_last(agent_server_list);
+		if (next)
+			relay_agent = next->data;
+		else
+			relay_agent = NULL;
 	}
 
 	free_relay_agent(agent);
+
+	agent = NULL;
 }
 
 static void relay_client_agent_disconnected(GDBusConnection *connection,
@@ -1151,15 +1152,15 @@ static void unregister_relay_agent_handler(GDBusConnection *connection,
 
 	agent_server_list = g_list_remove(agent_server_list, agent);
 
-	if (relay_agent)
-		if (!g_strcmp0(agent_path, relay_agent->object_path) &&
-			!g_strcmp0(sender, relay_agent->owner)) {
-			GList *next;
-			next = g_list_last(agent_server_list);
-			if (next)
-				relay_agent = next->data;
-			else
-				relay_agent = NULL;
+	if (!g_strcmp0(agent_path, relay_agent->object_path) &&
+		!g_strcmp0(sender, relay_agent->owner)) {
+		GList *next;
+		g_bus_unwatch_name(relay_agent->watch_id);
+		next = g_list_last(agent_server_list);
+		if (next)
+			relay_agent = next->data;
+		else
+			relay_agent = NULL;
 	}
 
 	g_dbus_method_invocation_return_value(invocation, NULL);
@@ -1167,6 +1168,8 @@ static void unregister_relay_agent_handler(GDBusConnection *connection,
 	g_free(agent_path);
 
 	free_relay_agent(agent);
+
+	agent = NULL;
 }
 
 char *get_failed_content(const gchar *error_message)
@@ -1402,6 +1405,7 @@ static void remove_file_handler(GDBusConnection *connection,
 			&& !g_strcmp0(agent->object_path, path)) {
 			agent_list = g_list_remove(agent_list, agent);
 			free_relay_agent(agent);
+			agent = NULL;
 			break;
 		}
 	}
