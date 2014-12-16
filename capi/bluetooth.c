@@ -2058,6 +2058,13 @@ int bt_adapter_recover(void)
 
 /* Device Function */
 
+int bt_device_create_bond_by_type(const char *remote_address,
+				bt_device_connection_link_type_e conn_type)
+{
+	/*at current, bluez doesn't support the feature*/
+	return BT_ERROR_NOT_SUPPORTED;
+}
+
 static void bt_device_paired_cb(enum bluez_error_type error,
                                        void *user_data)
 {
