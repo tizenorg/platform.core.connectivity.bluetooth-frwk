@@ -829,24 +829,25 @@ static void relay_agent_disconnected(GDBusConnection *connection,
 
 	DBG("");
 
-	if (agent == NULL)
+	if (agent == NULL || relay_agent == NULL)
 		return;
 
 	agent_list = g_list_remove(agent_list, agent);
 
-	if (relay_agent)
-		if (!g_strcmp0(agent->object_path,
-					relay_agent->object_path) &&
-				!g_strcmp0(agent->owner, relay_agent->owner)) {
-			GList *next;
-			next = g_list_last(agent_list);
-			if (next)
-				relay_agent = next->data;
-			else
-				relay_agent = NULL;
+	if (!g_strcmp0(agent->object_path,
+				relay_agent->object_path) &&
+			!g_strcmp0(agent->owner, relay_agent->owner)) {
+		GList *next;
+		next = g_list_last(agent_list);
+		if (next)
+			relay_agent = next->data;
+		else
+			relay_agent = NULL;
 	}
 
 	free_relay_agent(agent);
+
+	agent = NULL;
 }
 
 static struct agent *find_server_agent(guint32 uid)
@@ -941,6 +942,9 @@ static void unregister_relay_agent_handler(
 
 	DBG("");
 
+	if (relay_agent == NULL)
+		return comms_error_does_not_exist(invocation);
+
 	sender = g_dbus_method_invocation_get_sender(invocation);
 
 	g_variant_get(parameters, "(o)", &relay_agent_path);
@@ -957,16 +961,16 @@ static void unregister_relay_agent_handler(
 
 	agent_list = g_list_remove(agent_list, agent);
 
-	if (relay_agent)
-		if (!g_strcmp0(relay_agent_path,
-				relay_agent->object_path) &&
-			!g_strcmp0(sender, relay_agent->owner)) {
-			GList *next;
-			next = g_list_last(agent_list);
-			if (next)
-				relay_agent = next->data;
-			else
-				relay_agent = NULL;
+	if (!g_strcmp0(relay_agent_path,
+			relay_agent->object_path) &&
+		!g_strcmp0(sender, relay_agent->owner)) {
+		GList *next;
+		g_bus_unwatch_name(relay_agent->watch_id);
+		next = g_list_last(agent_list);
+		if (next)
+			relay_agent = next->data;
+		else
+			relay_agent = NULL;
 	}
 
 	g_dbus_method_invocation_return_value(invocation, NULL);
@@ -974,6 +978,8 @@ static void unregister_relay_agent_handler(
 	g_free(relay_agent_path);
 
 	free_relay_agent(agent);
+
+	agent = NULL;
 }
 
 static void set_userprivileges(guint uid, gchar *address)
