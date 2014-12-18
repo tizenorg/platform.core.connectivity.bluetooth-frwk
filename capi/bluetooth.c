@@ -64,6 +64,7 @@ static guint bluetooth_agent_id;
 static guint profile_id;
 static GDBusConnection *conn;
 static guint bluetooth_ext_agent_id;
+static guint adapter_recover_timeout_id;
 
 static bluez_adapter_t *default_adapter;
 
@@ -1302,6 +1303,9 @@ int bt_adapter_enable(void)
 	if (bt_service_init == false)
 		return BT_ERROR_NOT_INITIALIZED;
 
+	if (adapter_recover_timeout_id)
+		return BT_ERROR_NOW_IN_PROGRESS;
+
 	comms_manager_enable_bluetooth();
 
 	return BT_SUCCESS;
@@ -1313,6 +1317,11 @@ int bt_adapter_disable(void)
 
 	if (bt_service_init == false)
 		return BT_ERROR_NOT_INITIALIZED;
+
+	if (adapter_recover_timeout_id > 0) {
+		g_source_remove(adapter_recover_timeout_id);
+		adapter_recover_timeout_id = 0;
+	}
 
 	comms_manager_disable_bluetooth();
 
@@ -2019,6 +2028,32 @@ int bt_device_get_service_mask_from_uuid_list(char **uuids,
 					bt_service_class_t *service_mask_list)
 {
 	return BT_ERROR_NOT_SUPPORTED;
+}
+
+static gboolean adapter_recover_timeout_cb(gpointer user_data)
+{
+	DBG("");
+
+	adapter_recover_timeout_id = 0;
+	bt_adapter_enable();
+
+	return FALSE;
+}
+
+int bt_adapter_recover(void)
+{
+	DBG("");
+
+	if (adapter_recover_timeout_id != 0)
+		return BT_ERROR_NOW_IN_PROGRESS;
+
+	if (bt_adapter_disable() == BT_SUCCESS) {
+		adapter_recover_timeout_id = g_timeout_add(2000,
+					adapter_recover_timeout_cb, NULL);
+	} else
+		return BT_ERROR_INVALID_PARAMETER;
+
+	return BT_SUCCESS;
 }
 
 /* Device Function */

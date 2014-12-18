@@ -1506,6 +1506,35 @@ int bt_device_get_service_mask_from_uuid_list(char **uuids,
 					bt_service_class_t *service_mask_list);
 
 /**
+ * @internal
+ * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
+ * @brief Recover the local Bluetooth adapter, asynchronously.
+ * @since_tizen 2.3
+ * @privlevel platform
+ * @privilege %http://tizen.org/privilege/bluetooth.admin
+ *
+ * @details This function does recovery logic, disables Bluetooth protocol stack and hardware, then enables after a few seconds.
+ *
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_NOW_IN_PROGRESS  Operation now in progress
+ * @retval #BT_ERROR_PERMISSION_DENIED  Permission denied
+ * @retval #BT_ERROR_NOT_SUPPORTED  Not supported
+ *
+ * @pre The state of local Bluetooth must be #BT_ADAPTER_ENABLED
+ * @post This function invokes bt_adapter_state_changed_cb().
+ *
+ * @see bt_adapter_get_state()
+ * @see bt_adapter_state_changed_cb()
+ * @see bt_adapter_set_state_changed_cb()
+ * @see bt_adapter_unset_state_changed_cb ()
+ *
+ */
+int bt_adapter_recover(void);
+
+/**
  * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE
  * @brief Creates a bond with a remote Bluetooth device, asynchronously.
  *
