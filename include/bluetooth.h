@@ -1883,7 +1883,7 @@ int bt_socket_listen(int socket_fd, int max_pending_connections);
  * @see bt_socket_listen()
  * @see bt_socket_reject()
 */
-int bt_socket_accept(int requested_socket_fd, int *connected_socket_fd);
+int bt_socket_accept(int requested_socket_fd);
 
 /**
  * @ingroup  CAPI_NETWORK_BLUETOOTH_SOCKET_MODULE
