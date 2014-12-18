@@ -69,6 +69,7 @@ typedef enum
 	BT_ERROR_RESOURCE_BUSY = TIZEN_ERROR_RESOURCE_BUSY, /**< Device or resource busy */
 	BT_ERROR_TIMED_OUT = TIZEN_ERROR_TIMED_OUT, /**< Timeout error */
 	BT_ERROR_NOW_IN_PROGRESS = TIZEN_ERROR_NOW_IN_PROGRESS, /**< Operation now in progress */
+	BT_ERROR_NOT_SUPPORTED = TIZEN_ERROR_NETWORK_CLASS|0x111, /**< Not Supported */
 	BT_ERROR_NOT_INITIALIZED = TIZEN_ERROR_NETWORK_CLASS|0x0101, /**< Local adapter not initialized */
 	BT_ERROR_NOT_ENABLED = TIZEN_ERROR_NETWORK_CLASS|0x0102, /**< Local adapter not enabled */
 	BT_ERROR_ALREADY_DONE = TIZEN_ERROR_NETWORK_CLASS|0x0103, /**< Operation already done  */
@@ -89,6 +90,7 @@ typedef enum
 	BT_ERROR_RESOURCE_BUSY, /**< Device or resource busy */
 	BT_ERROR_TIMED_OUT, /**< Timeout error */
 	BT_ERROR_NOW_IN_PROGRESS, /**< Operation now in progress */
+	BT_ERROR_NOT_SUPPORTED, /**< Not Supported */
 	BT_ERROR_NOT_INITIALIZED, /**< Local adapter not initialized */
 	BT_ERROR_NOT_ENABLED, /**< Local adapter not enabled */
 	BT_ERROR_ALREADY_DONE, /**< Operation already done  */
@@ -461,6 +463,39 @@ typedef struct
 	int major_service_class_mask;	/**< Major service class mask.
 	This value can be a combination of #bt_major_service_class_e like #BT_MAJOR_SERVICE_CLASS_RENDERING | #BT_MAJOR_SERVICE_CLASS_AUDIO */
 } bt_class_s;
+
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE
+ * @brief  Enumerations of service class.
+ * @since_tizen 2.3
+ */
+typedef enum {
+	BT_SC_NONE = 0, /**< No service class */
+	BT_SC_RES_SERVICE_MASK = 0x00000001, /**< RES service class */
+	BT_SC_SPP_SERVICE_MASK = 0x00000002, /**< SPP service class */
+	BT_SC_DUN_SERVICE_MASK = 0x00000004, /**< DUN service class */
+	BT_SC_FAX_SERVICE_MASK = 0x00000008, /**< FAX service class */
+	BT_SC_LAP_SERVICE_MASK = 0x00000010, /**< LAP service class */
+	BT_SC_HSP_SERVICE_MASK = 0x00000020, /**< HSP service class */
+	BT_SC_HFP_SERVICE_MASK = 0x00000040, /**< HFP service class */
+	BT_SC_OPP_SERVICE_MASK = 0x00000080, /**< OPP service class */
+	BT_SC_FTP_SERVICE_MASK = 0x00000100, /**< FTP service class */
+	BT_SC_CTP_SERVICE_MASK = 0x00000200, /**< CTP service class */
+	BT_SC_ICP_SERVICE_MASK = 0x00000400, /**< ICP service class */
+	BT_SC_SYNC_SERVICE_MASK = 0x00000800, /**< SYNC service class */
+	BT_SC_BPP_SERVICE_MASK = 0x00001000, /**< BPP service class */
+	BT_SC_BIP_SERVICE_MASK = 0x00002000, /**< BIP service class */
+	BT_SC_PANU_SERVICE_MASK = 0x00004000, /**< PANU service class */
+	BT_SC_NAP_SERVICE_MASK = 0x00008000, /**< NAP service class */
+	BT_SC_GN_SERVICE_MASK = 0x00010000, /**< GN service class */
+	BT_SC_SAP_SERVICE_MASK = 0x00020000, /**< SAP service class */
+	BT_SC_A2DP_SERVICE_MASK = 0x00040000, /**< A2DP service class */
+	BT_SC_AVRCP_SERVICE_MASK = 0x00080000, /**< AVRCP service class */
+	BT_SC_PBAP_SERVICE_MASK = 0x00100000, /**< PBAP service class */
+	BT_SC_HID_SERVICE_MASK = 0x00200000, /**< HID service class */
+	BT_SC_ALL_SERVICE_MASK = 0x00FFFFFF, /**< ALL service class */
+	BT_SC_MAX /**< MAX service class */
+} bt_service_class_t;
 
 /**
  * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
@@ -1403,6 +1438,72 @@ int bt_adapter_set_device_discovery_state_changed_cb(bt_adapter_device_discovery
  */
 int bt_adapter_unset_device_discovery_state_changed_cb(void);
 
+/**
+ * @internal
+ * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
+ * @brief Gets the version of local Bluetooth adapter.
+ * @since_tizen 2.3
+ * @remarks The @a local_version must be released with free() by you.
+ *
+ * @param[out] local_version The version of local Bluetooth adapter
+ *
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_OUT_OF_MEMORY  Out of memory
+ * @retval #BT_ERROR_OPERATION_FAILED Operation failed
+ * @retval #BT_ERROR_NOT_SUPPORTED  Not supported
+ *
+ * @pre The state of local Bluetooth must be #BT_ADAPTER_ENABLED.
+ */
+int bt_adapter_get_version(char **local_version);
+
+/**
+ * @internal
+ * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
+ * @brief Gets the information regarding local Bluetooth adapter.
+ * @since_tizen 2.3
+ * @remarks The @a all parameters must be released with free() by you.
+ *
+ * @param[out] chipset Chipset name of local Bluetooth adapter
+ * @param[out] firmware Firmware info. of local Bluetooth adapter
+ * @param[out] stack_version Bluetooth stack version
+ * @param[out] profiles The profile list of local Bluetooth adapter
+ *
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_OUT_OF_MEMORY  Out of memory
+ * @retval #BT_ERROR_OPERATION_FAILED Operation failed
+ * @retval #BT_ERROR_NOT_SUPPORTED  Not supported
+ *
+ * @pre The state of local Bluetooth must be #BT_ADAPTER_ENABLED.
+ */
+int bt_adapter_get_local_info(char **chipset, char **firmware, char **stack_version, char **profiles);
+
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE
+ * @brief Get the service mask from the uuid list.
+ * @since_tizen 2.3
+ *
+ * @param[in] uuids The UUID list of the device.
+ * @param[in] no_of_service The number of the UUID list count.
+ * @param[out] service_mask_list Service mask list converted from the given UUID list.
+ *
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_NOT_SUPPORTED  Not supported
+ *
+ * @see bt_service_class_t
+ */
+int bt_device_get_service_mask_from_uuid_list(char **uuids,
+					int no_of_service,
+					bt_service_class_t *service_mask_list);
 
 /**
  * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE

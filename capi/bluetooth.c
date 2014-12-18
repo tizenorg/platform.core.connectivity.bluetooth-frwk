@@ -2003,6 +2003,24 @@ int bt_adapter_free_device_info(bt_device_info_s *device_info)
 	return BT_SUCCESS;
 }
 
+int bt_adapter_get_version(char **version)
+{
+	return BT_ERROR_NOT_SUPPORTED;
+}
+
+int bt_adapter_get_local_info(char **chipset, char **firmware,
+				char **stack_version, char **profiles)
+{
+	return BT_ERROR_NOT_SUPPORTED;
+}
+
+int bt_device_get_service_mask_from_uuid_list(char **uuids,
+					int no_of_service,
+					bt_service_class_t *service_mask_list)
+{
+	return BT_ERROR_NOT_SUPPORTED;
+}
+
 /* Device Function */
 
 static void bt_device_paired_cb(enum bluez_error_type error,
