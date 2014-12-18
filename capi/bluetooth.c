@@ -4006,6 +4006,10 @@ static void handle_spp_authorize_request(bluez_device_t *device,
 		connection.remote_address = device_address;
 		connection.service_uuid = spp_ctx->uuid;
 		connection.local_role = spp_ctx->role;
+		if (spp_ctx->role == BT_SOCKET_CLIENT)
+			connection.server_fd = -1;
+		else
+			connection.server_fd = spp_ctx->fd;
 
 		socket_connection_state_node->cb(
 			BT_SUCCESS, BT_SOCKET_CONNECTED, &connection,
@@ -4561,6 +4565,10 @@ static gboolean received_data(GIOChannel *channel, GIOCondition con,
 					spp_chan->remote_address;
 				connection.service_uuid = spp_ctx->uuid;
 				connection.local_role = spp_ctx->role;
+				if (spp_ctx->role == BT_SOCKET_CLIENT)
+					connection.server_fd = -1;
+				else
+					connection.server_fd = spp_ctx->fd;
 				socket_connection_state_node->cb(
 				BT_SUCCESS, BT_SOCKET_DISCONNECTED, &connection,
 				socket_connection_state_node->user_data);
@@ -4689,6 +4697,10 @@ static void notify_connection_state(gchar *device_path,
 		connection.remote_address = address;
 		connection.service_uuid = spp_ctx->uuid;
 		connection.local_role = spp_ctx->role;
+		if (spp_ctx->role == BT_SOCKET_CLIENT)
+			connection.server_fd = -1;
+		else
+			connection.server_fd = spp_ctx->fd;
 
 		socket_connection_state_node->cb(
 			BT_SUCCESS, BT_SOCKET_CONNECTED, &connection,

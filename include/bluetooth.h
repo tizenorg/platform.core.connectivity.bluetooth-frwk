@@ -572,6 +572,7 @@ typedef struct
 typedef struct
 {
 	int socket_fd;	/**< The file descriptor of connected socket */
+	int server_fd;  /**< The file descriptor of the server socket or -1 for client connection */
 	bt_socket_role_e local_role;	/**< The local device role in this connection */
 	char *remote_address;	/**< The remote device address */
 	char *service_uuid;	/**< The service UUId */
