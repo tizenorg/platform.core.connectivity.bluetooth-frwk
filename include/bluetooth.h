@@ -109,6 +109,18 @@ typedef enum
 #define BT_SUCCESS BT_ERROR_NONE
 
 /**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE
+ * @brief Enumerations of connection link type.
+ * @since_tizen 2.3
+ */
+typedef enum
+{
+	BT_DEVICE_CONNECTION_LINK_BREDR, /**< BR/EDR link */
+	BT_DEVICE_CONNECTION_LINK_LE, /**< LE link */
+	BT_DEVICE_CONNECTION_LINK_DEFAULT = 0xFF, /**< The connection type defualt */
+} bt_device_connection_link_type_e;
+
+/**
  * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
  * @brief  Enumerations of the Bluetooth adapter state.
  */
@@ -472,7 +484,7 @@ typedef struct
 typedef enum {
 	BT_SC_NONE = 0, /**< No service class */
 	BT_SC_RES_SERVICE_MASK = 0x00000001, /**< RES service class */
-	BT_SC_SPP_SERVICE_MASK = 0x00000002, /**< SPP service class */
+	BT_SC_SPP_SERVICE_MASK = 0x00000002, /**< SPP nervice class */
 	BT_SC_DUN_SERVICE_MASK = 0x00000004, /**< DUN service class */
 	BT_SC_FAX_SERVICE_MASK = 0x00000008, /**< FAX service class */
 	BT_SC_LAP_SERVICE_MASK = 0x00000010, /**< LAP service class */
@@ -1533,6 +1545,47 @@ int bt_device_get_service_mask_from_uuid_list(char **uuids,
  *
  */
 int bt_adapter_recover(void);
+
+/**
+ * @internal
+ * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE
+ * @brief Creates a bond with a remote Bluetooth device, asynchronously.
+ * @since_tizen 2.3
+ * @privlevel platform
+ * @privilege %http://tizen.org/privilege/bluetooth.admin
+ *
+ * @remarks A bond can be destroyed by bt_device_destroy_bond().\n
+ * The bonding request can be cancelled by bt_device_cancel_bonding().
+ *
+ * @param[in] remote_address The address of the remote Bluetooth device
+ * with which the bond should be created
+ * @param[in] conn_type The connection type(LE or BREDR) to create
+ * bond with remote device
+ *
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_INVALID_PARAMETER Invalid parameter
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_RESOURCE_BUSY     Device or resource busy
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ * @retval #BT_ERROR_PERMISSION_DENIED  Permission denied
+ * @retval #BT_ERROR_NOT_SUPPORTED  Not supported
+ *
+ * @pre The state of local Bluetooth must be #BT_ADAPTER_ENABLED.
+ * @pre The remote device must be discoverable with bt_adapter_start_device_discovery().
+ * @post This function invokes bt_device_bond_created_cb().
+ *
+ * @see bt_adapter_start_device_discovery()
+ * @see bt_device_create_bond()
+ * @see bt_device_bond_created_cb()
+ * @see bt_device_cancel_bonding()
+ * @see bt_device_destroy_bond()
+ * @see bt_device_set_bond_created_cb()
+ * @see bt_device_unset_bond_created_cb()
+ */
+int bt_device_create_bond_by_type(const char *remote_address,
+				bt_device_connection_link_type_e conn_type);
 
 /**
  * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE
