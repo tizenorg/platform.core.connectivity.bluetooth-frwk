@@ -766,13 +766,17 @@ static void device_connected_changed(bluez_device_t *device,
 					int connected, void *user_data)
 {
 	struct device_connected_state_cb_node *node = user_data;
+	bt_device_connection_info_s conn_info;
 	char *device_address;
 
 	DBG("");
 
 	device_address = bluez_device_get_property_address(device);
+	conn_info.remote_address = device_address;
+	conn_info.link = BT_DEVICE_CONNECTION_LINK_DEFAULT;
+	conn_info.disconn_reason = BT_DEVICE_DISCONNECT_REASON_UNKNOWN;
 
-	node->cb(connected, device_address, node->user_data);
+	node->cb(connected, &conn_info, node->user_data);
 
 	g_free(device_address);
 }

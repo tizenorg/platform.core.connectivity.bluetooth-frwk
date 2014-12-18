@@ -110,6 +110,19 @@ typedef enum
 
 /**
  * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE
+ * @brief Enumerations of device disconnect reason.
+ * @since_tizen 2.3
+ */
+typedef enum
+{
+	BT_DEVICE_DISCONNECT_REASON_UNKNOWN, /**< Disconnected by unknown reason */
+	BT_DEVICE_DISCONNECT_REASON_TIMEOUT, /**< Disconnected by timeout */
+	BT_DEVICE_DISCONNECT_REASON_LOCAL_HOST, /**< Disconnected by local host */
+	BT_DEVICE_DISCONNECT_REASON_REMOTE, /**< Disconnected by remote */
+} bt_device_disconnect_reason_e;
+
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE
  * @brief Enumerations of connection link type.
  * @since_tizen 2.3
  */
@@ -119,6 +132,20 @@ typedef enum
 	BT_DEVICE_CONNECTION_LINK_LE, /**< LE link */
 	BT_DEVICE_CONNECTION_LINK_DEFAULT = 0xFF, /**< The connection type defualt */
 } bt_device_connection_link_type_e;
+
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE
+ * @brief Device connection information structure.
+ * @since_tizen 2.3
+ *
+ * @see bt_device_connection_state_changed_cb()
+ */
+typedef struct
+{
+	char *remote_address;   /**< The address of remote device */
+	bt_device_connection_link_type_e link;  /**< Link type */
+	bt_device_disconnect_reason_e disconn_reason;  /**< Disconnection reason */
+} bt_device_connection_info_s;
 
 /**
  * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
@@ -827,13 +854,15 @@ typedef void (*bt_device_service_searched_cb)(int result, bt_device_sdp_info_s *
 /**
  * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE
  * @brief  Called when the connection state is changed.
+ * @since_tizen 2.3
+ *
  * @param[in] connected The connection status: (@c true = connected, @c false = disconnected)
- * @param[in] remote_address The address of the remote Bluetooth device
+ * @param[in] conn_info The connection information
  * @param[in] user_data The user data passed from the callback registration function
  * @see bt_device_set_connection_state_changed_cb()
  * @see bt_device_unset_connection_state_changed_cb()
  */
-typedef void (*bt_device_connection_state_changed_cb)(bool connected, const char *remote_address, void *user_data);
+typedef void (*bt_device_connection_state_changed_cb)(bool connected, bt_device_connection_info_s *conn_info, void *user_data);
 
 /**
  * @ingroup CAPI_NETWORK_BLUETOOTH_SOCKET_MODULE

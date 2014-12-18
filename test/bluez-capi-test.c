@@ -480,9 +480,10 @@ static int set_discovery_callback(const char *p1, const char *p2)
 	return 0;
 }
 
-static void device_connected_changed(bool connected, const char *remote_address, void *user_data)
+static void device_connected_changed(bool connected,
+			bt_device_connection_info_s *conn_info, void *user_data)
 {
-	DBG("Device %s connected %d", remote_address, connected);
+	DBG("Device %s connected %d", conn_info->remote_address, connected);
 }
 
 static int set_device_connected_callback(const char *p1, const char *p2)
