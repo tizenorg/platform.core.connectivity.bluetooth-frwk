@@ -2060,6 +2060,27 @@ int bt_adapter_recover(void)
 	return BT_SUCCESS;
 }
 
+int bt_adapter_set_connectable_changed_cb(
+	bt_adapter_connectable_changed_cb callback, void *user_data)
+{
+	return BT_ERROR_NOT_SUPPORTED;
+}
+
+int bt_adapter_unset_connectable_changed_cb(void)
+{
+	return BT_ERROR_NOT_SUPPORTED;
+}
+
+int bt_adapter_get_connectable(bool *connectable)
+{
+	return BT_ERROR_NOT_SUPPORTED;
+}
+
+int bt_adapter_set_connectable(bool connectable)
+{
+	return BT_ERROR_NOT_SUPPORTED;
+}
+
 /* Device Function */
 
 int bt_device_create_bond_by_type(const char *remote_address,
@@ -6687,4 +6708,3 @@ int bt_gatt_read_characteristic_value(bt_gatt_attribute_h characteristic,
 
 	return BT_SUCCESS;
 }
-

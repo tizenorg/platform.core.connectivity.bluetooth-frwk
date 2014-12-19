@@ -4333,6 +4333,128 @@ int bt_device_connect_le(bt_device_gatt_state_changed_cb callback,
 int bt_device_disconnect_le(bt_device_gatt_state_changed_cb callback,
 			const char *address);
 
+/**
+ * @internal
+ * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
+ * @brief  Called when the connectable state changes.
+ * @since_tizen 2.3
+ *
+ * @param[in] result The result of the connectable state changing
+ * @param[in] connectable The connectable to be changed
+ * @param[in] user_data The user data passed from
+ * the callback registration function
+ *
+ * @pre This function will be invoked when the connectable state of local Bluetooth adapter changes
+ * if you register this callback using bt_adapter_set_connectable_changed_cb().
+ *
+ * @see bt_adapter_set_connectable()
+ * @see bt_adapter_set_connectable_changed_cb()
+ * @see bt_adapter_unset_connectable_changed_cb()
+ */
+typedef void (*bt_adapter_connectable_changed_cb)
+	(int result, bool connectable, void *user_data);
+
+/**
+ * @internal
+ * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
+ * @brief  Registers a callback function to be invoked when the connectable state changes.
+ * @since_tizen 2.3
+ *
+ * @param[in] callback The callback function to register
+ * @param[in] user_data The user data to be passed to the callback function
+ *
+ * @return   0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_NOT_SUPPORTED  Not supported
+ *
+ * @pre The Bluetooth service must be initialized with bt_initialize().
+ * @post bt_adapter_connectable_changed_cb() will be invoked.
+ *
+ * @see bt_initialize()
+ * @see bt_adapter_connectable_changed_cb()
+ * @see bt_adapter_unset_connectable_changed_cb()
+ */
+int bt_adapter_set_connectable_changed_cb(
+	bt_adapter_connectable_changed_cb callback, void *user_data);
+
+/**
+ * @internal
+ * @ingroup  CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
+ * @brief  Unregisters the callback function.
+ * @since_tizen 2.3
+ *
+ * @return  0 on success, otherwise a negative error value.
+ * @retval  #BT_ERROR_NONE  Successful
+ * @retval  #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval  #BT_ERROR_NOT_SUPPORTED  Not supported
+ *
+ * @pre  The Bluetooth service must be initialized with bt_initialize().
+ *
+ * @see  bt_initialize()
+ * @see  bt_adapter_set_connectable_changed_cb()
+ */
+int bt_adapter_unset_connectable_changed_cb(void);
+
+/**
+ * @internal
+ * @ingroup  CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
+ * @brief  Gets the connectable state of local Bluetooth adapter.
+ * @since_tizen 2.3
+ *
+ * @remarks When connectable state is false,
+ * no device can connect to this device
+ * and visibility mode cannot be changed.
+ *
+ * @param[out] connectable The connectable state of local Bluetooth adapter
+ *
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ * @retval #BT_ERROR_NOT_SUPPORTED  Not supported
+ *
+ * @pre The state of local Bluetooth must be #BT_ADAPTER_ENABLED.
+ *
+ * @see bt_adapter_set_connectable()
+ */
+int bt_adapter_get_connectable(bool *connectable);
+
+/**
+ * @internal
+ * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
+ * @brief  Sets the connectable state of local Bluetooth adapter.
+ * @since_tizen 2.3
+ * @privlevel platform
+ * @privilege %http://tizen.org/privilege/bluetooth.admin
+ *
+ * @remarks When connectable state is false,
+ * no device can connect to this device and visibility mode cannot be changed.
+ *
+ * @param[in] connectable The connectable state to set
+ *
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ * @retval #BT_ERROR_PERMISSION_DENIED  Permission denied
+ * @retval #BT_ERROR_NOT_SUPPORTED  Not supported
+ *
+ * @pre The state of local Bluetooth must be #BT_ADAPTER_ENABLED.
+ * @post bt_adapter_connectable_changed_cb() will
+ * be invoked if this function returns #BT_ERROR_NONE.
+ *
+ * @see bt_adapter_get_connectable()
+ * @see bt_adapter_connectable_changed_cb()
+ * @see bt_adapter_set_connectable_changed_cb()
+ * @see bt_adapter_unset_connectable_changed_cb()
+ */
+int bt_adapter_set_connectable(bool connectable);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
