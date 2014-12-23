@@ -186,6 +186,11 @@ struct adapter_visibility_mode_cb_node {
 	void *user_data;
 };
 
+struct bt_adapter_connectable_changed_cb_node {
+	bt_adapter_connectable_changed_cb cb;
+	void *user_data;
+};
+
 struct device_destroy_unpaired_cb_node {
 	bt_adapter_device_discovery_state_changed_cb cb;
 	void *user_data;
@@ -318,6 +323,8 @@ static struct adapter_state_cb_node *adapter_state_node;
 static struct adapter_discovering_cb_node *adapter_discovering_node;
 static struct adapter_visibility_duration_cb_node
 					*adapter_visibility_duration_node;
+static struct bt_adapter_connectable_changed_cb_node
+					*bt_adapter_connectable_changed_node;
 static struct adapter_visibility_mode_cb_node *adapter_visibility_mode_node;
 static struct device_destroy_unpaired_cb_node *unpaired_device_removed_node;
 static struct device_bond_cb_node *device_bond_node;
@@ -1524,6 +1531,8 @@ int bt_adapter_set_visibility(bt_adapter_visibility_mode_e discoverable_mode,
 				int duration)
 {
 	int discoverable;
+	bool connectable;
+	int ret;
 
 	DBG("");
 
@@ -1549,9 +1558,20 @@ int bt_adapter_set_visibility(bt_adapter_visibility_mode_e discoverable_mode,
 		return BT_ERROR_INVALID_PARAMETER;
 	}
 
-	bluez_adapter_set_discoverable_timeout(default_adapter, duration);
+	ret = bt_adapter_get_connectable(&connectable);
+	if (ret != 0)
+		return BT_ERROR_OPERATION_FAILED;
 
-	bluez_adapter_set_discoverable(default_adapter, discoverable);
+	if (connectable) {
+		bluez_adapter_set_discoverable_timeout(default_adapter,
+							duration);
+
+		bluez_adapter_set_discoverable(default_adapter,
+							discoverable);
+	} else {
+		DBG("connectable is set");
+		return BT_ERROR_OPERATION_FAILED;
+	}
 
 	return BT_SUCCESS;
 }
@@ -2060,25 +2080,113 @@ int bt_adapter_recover(void)
 	return BT_SUCCESS;
 }
 
+static void adapter_connectable_watch(int result,
+				gboolean connectable, void *user_data)
+{
+	DBG("result = %d, connectable = %d", result, connectable);
+	if (bt_adapter_connectable_changed_node &&
+				bt_adapter_connectable_changed_node->cb)
+		bt_adapter_connectable_changed_node->cb(
+				result, connectable,
+				bt_adapter_connectable_changed_node->user_data);
+}
+
 int bt_adapter_set_connectable_changed_cb(
 	bt_adapter_connectable_changed_cb callback, void *user_data)
 {
-	return BT_ERROR_NOT_SUPPORTED;
+	struct bt_adapter_connectable_changed_cb_node *node_data;
+
+	DBG("");
+
+	if (callback == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	if (bt_adapter_connectable_changed_node) {
+		DBG("visibility mode changed callback already set.");
+		return BT_ERROR_ALREADY_DONE;
+	}
+
+	node_data = g_new0(struct bt_adapter_connectable_changed_cb_node, 1);
+	if (node_data == NULL) {
+		ERROR("no memory");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	node_data->cb = callback;
+	node_data->user_data = user_data;
+
+	bt_adapter_connectable_changed_node = node_data;
+
+	adapter_connectable_set_service_watch(adapter_connectable_watch, NULL);
+
+	return BT_SUCCESS;
 }
 
 int bt_adapter_unset_connectable_changed_cb(void)
 {
-	return BT_ERROR_NOT_SUPPORTED;
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!bt_adapter_connectable_changed_node)
+		return BT_SUCCESS;
+
+	adapter_connectable_remove_service_watch();
+
+	g_free(bt_adapter_connectable_changed_node);
+	bt_adapter_connectable_changed_node = NULL;
+
+	return BT_SUCCESS;
 }
 
 int bt_adapter_get_connectable(bool *connectable)
 {
-	return BT_ERROR_NOT_SUPPORTED;
+	int ret;
+	gboolean conn;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (connectable == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	ret = comms_manager_get_connectable(&conn);
+
+	if (ret != 0)
+		return BT_ERROR_OPERATION_FAILED;
+
+	*connectable = (bool)conn;
+
+	return BT_SUCCESS;
 }
 
 int bt_adapter_set_connectable(bool connectable)
 {
-	return BT_ERROR_NOT_SUPPORTED;
+	int ret;
+
+	DBG("connectable = %d", connectable);
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	ret = comms_manager_set_connectable(connectable);
+
+	if (ret != 0)
+		return BT_ERROR_OPERATION_FAILED;
+
+	return BT_SUCCESS;
 }
 
 /* Device Function */

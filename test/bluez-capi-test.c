@@ -305,8 +305,83 @@ static int get_adapter_visibility(const char *p1, const char *p2)
 	return 0;
 }
 
-static void visibility_duration_changed_callback(int duration,
+static int get_adapter_connectable(const char *p1, const char *p2)
+{
+	int err;
+	bool connectable;
+
+	DBG("");
+
+	err = bt_adapter_get_connectable(&connectable);
+
+	if (err == BT_SUCCESS)
+		DBG("connectable = %d", connectable);
+	else {
+		DBG("bt_adapter_get_connectable err = %d", err);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int set_adapter_connectable(const char *p1, const char *p2)
+{
+	int err;
+	unsigned int connectable;
+
+	DBG("");
+
+	if (p1 == NULL) {
+		DBG("no connectable mode");
+		return 0;
+	}
+
+	connectable = atoi(p1);
+
+	err = bt_adapter_set_connectable((bool)connectable);
+
+	if (err != BT_SUCCESS) {
+		DBG("err = %d", err);
+		return -1;
+	} else
+		DBG("successfully");
+
+	return 0;
+}
+
+static void adapter_connectable_changed_callback(int result,
+						bool connectable,
 						void *user_data)
+{
+	DBG("adapter connectable changed result: %d", result);
+	DBG("adapter connectable changed to %d", connectable);
+}
+
+static int set_connectable_changed_callback(const char *p1, const char *p2)
+{
+	int ret = bt_adapter_set_connectable_changed_cb(
+				adapter_connectable_changed_callback, NULL);
+	if (ret != BT_SUCCESS) {
+		ERROR("bt_adapter_set_connectable_changed_cb failed %d", ret);
+		return 0;
+	}
+
+	return 0;
+}
+
+static int unset_connectable_changed_callback(const char *p1, const char *p2)
+{
+	int ret = bt_adapter_unset_connectable_changed_cb();
+	if (ret != BT_SUCCESS) {
+		ERROR("unset_connectable_changed_callback failed %d", ret);
+		return 0;
+	}
+
+	return 0;
+}
+
+static void visibility_duration_changed_callback(int duration,
+							void *user_data)
 {
 	DBG("adapter visibility changed to %d seconds", duration);
 }
@@ -2310,6 +2385,18 @@ struct {
 
 	{"get_adapter_visibility", get_adapter_visibility,
 		"Usage: get_adapter_visibility\n\tGet local adapter visibility"},
+
+	{"set_adapter_connectable", set_adapter_connectable,
+		"Usage: set_adapter_connectable 0/1, 0:Off, 1:On\n\tSet adapter connectable"},
+
+	{"get_adapter_connectable", get_adapter_connectable,
+		"Usage: get_adapter_connectable\n\tGet local adapter connectable"},
+
+	{"set_connectable_changed_callback", set_connectable_changed_callback,
+		"Usage: set_connectable_changed_callback\n\tset connectable callback"},
+
+	{"unset_connectable_changed_callback", unset_connectable_changed_callback,
+		"Usage: unset_connectable_changed_callback\n\tunset connectable callback"},
 
 	{"set_visibility_duration_callback", set_visibility_duration_callback,
 		"Usage: set_visibility_duration_callback\n\tSet duration callback"},

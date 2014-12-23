@@ -77,6 +77,9 @@ static GHashTable *comms_object_hash;
 comms_manager_bt_in_service_watch_t manager_bt_in_service_watch;
 void *manager_bt_in_service_watch_data;
 
+static adapter_connectable_watch_t adapter_connectable_changed_watch;
+static void *adapter_connectable_changed_watch_data;
+
 opp_manager_service_watch_t manager_opp_service_watch;
 void *manager_opp_service_watch_data;
 
@@ -153,6 +156,19 @@ static void handle_manager_bt_in_service_watch(GVariant *changed_properties,
 	manager_bt_in_service_watch(in_service, manager_bt_in_service_watch_data);
 }
 
+static void handle_manager_adapter_connectable_watch(GVariant *properties,
+							void *user_data)
+{
+	gboolean connectable;
+	gboolean variant_found = g_variant_lookup(properties,
+				"AdapterConnectable", "b", &connectable);
+	if (!variant_found)
+		return;
+
+	adapter_connectable_changed_watch(0, connectable,
+				adapter_connectable_changed_watch_data);
+}
+
 static void manager_properties_changed(GDBusProxy *proxy,
 					GVariant *changed_properties,
 					GStrv *invalidated_properties,
@@ -160,6 +176,10 @@ static void manager_properties_changed(GDBusProxy *proxy,
 {
 	if (manager_bt_in_service_watch)
 		handle_manager_bt_in_service_watch(
+					changed_properties, user_data);
+
+	if (adapter_connectable_changed_watch)
+		handle_manager_adapter_connectable_watch(
 					changed_properties, user_data);
 }
 
@@ -764,6 +784,61 @@ void comms_manager_disable_bluetooth(void)
 					bluetooth_simple_async_cb, NULL);
 }
 
+int comms_manager_set_connectable(gboolean connectable)
+{
+	GError *error = NULL;
+	GVariant *ret;
+
+	if (this_manager == NULL) {
+		ERROR("manager not reigster");
+		return -1;
+	}
+
+	ret = g_dbus_proxy_call_sync(this_manager->proxy,
+					"SetAdapterConnectable",
+					g_variant_new("(b)", connectable),
+					0, -1, NULL, &error);
+	if (ret == NULL) {
+		ERROR("%s", error->message);
+		g_error_free(error);
+		return -1;
+	}
+
+	g_variant_unref(ret);
+
+	return 0;
+}
+
+int comms_manager_get_connectable(gboolean *connectable)
+{
+	GError *error = NULL;
+	gboolean val;
+	GVariant *ret;
+
+	if (connectable == NULL)
+		return -1;
+
+	if (this_manager == NULL) {
+		ERROR("manager not reigster");
+		return -1;
+	}
+
+	ret = g_dbus_proxy_call_sync(this_manager->proxy,
+					"GetAdapterConnectable",
+					NULL, 0, -1, NULL, &error);
+	if (ret == NULL) {
+		ERROR("%s", error->message);
+		g_error_free(error);
+		return -1;
+	}
+
+	g_variant_get(ret, "(b)", &val);
+	g_variant_unref(ret);
+	*connectable = val;
+
+	return 0;
+}
+
 int comms_manager_get_bt_adapter_visibale_time(void)
 {
 	GError *error = NULL;
@@ -803,6 +878,20 @@ void opp_manager_remove_service_watch(void)
 {
 	manager_opp_service_watch = NULL;
 	manager_opp_service_watch_data = NULL;
+}
+
+void adapter_connectable_set_service_watch(
+				adapter_connectable_watch_t cb,
+				void *user_data)
+{
+	adapter_connectable_changed_watch = cb;
+	adapter_connectable_changed_watch_data = user_data;
+}
+
+void adapter_connectable_remove_service_watch(void)
+{
+	adapter_connectable_changed_watch = NULL;
+	adapter_connectable_changed_watch_data = NULL;
 }
 
 void comms_manager_set_bt_in_service_watch(

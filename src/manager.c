@@ -33,6 +33,8 @@
 
 #define BLUETOOTH_PATH "/org/tizen/comms/bluetooth"
 
+extern void opp_set_adapter_connectable(gboolean connectable);
+
 static GDBusObjectManagerServer *manager_server;
 GDBusObjectSkeleton *bt_object;
 
@@ -96,10 +98,11 @@ static void comms_manager_skeleton_init(CommsManagerSkeleton *skeleton)
 						COMMS_TYPE_MANAGER_SKELETON,
 						CommsManagerSkeletonPrivate);
 
-	skeleton->priv->properties = g_new0(GValue, 3);
+	skeleton->priv->properties = g_new0(GValue, 4);
 	g_value_init(&skeleton->priv->properties[0], G_TYPE_BOOLEAN);
 	g_value_init(&skeleton->priv->properties[1], G_TYPE_BOOLEAN);
 	g_value_init(&skeleton->priv->properties[2], G_TYPE_STRING);
+	g_value_init(&skeleton->priv->properties[3], G_TYPE_BOOLEAN);
 
 	bt_object = g_dbus_object_skeleton_new(BLUETOOTH_PATH);
 }
@@ -119,6 +122,10 @@ static const GDBusMethodInfo * const _method_info_pointers[] =
 			GDBUS_ARGS(_ARG("adapter", "s")), NULL),
 	GDBUS_METHOD("GetAdapterVisibleTime",
 			NULL, GDBUS_ARGS(_ARG("time", "u"))),
+	GDBUS_METHOD("SetAdapterConnectable",
+			GDBUS_ARGS(_ARG("connectable", "b")), NULL),
+	GDBUS_METHOD("GetAdapterConnectable",
+			NULL, GDBUS_ARGS(_ARG("connectable", "b"))),
 	NULL
 };
 
@@ -129,6 +136,8 @@ static const GDBusPropertyInfo * const _manager_property_info_pointers[] =
 	GDBUS_PROPERTY("BluetoothActivating", "b",
 			G_DBUS_PROPERTY_INFO_FLAGS_READABLE),
 	GDBUS_PROPERTY("DefaultAdapter", "s",
+			G_DBUS_PROPERTY_INFO_FLAGS_READABLE),
+	GDBUS_PROPERTY("AdapterConnectable", "b",
 			G_DBUS_PROPERTY_INFO_FLAGS_READABLE),
 	NULL
 };
@@ -230,9 +239,20 @@ static inline void set_default_adapter(CommsManagerSkeleton *skeleton,
 	set_string(skeleton, "DefaultAdapter", default_adapter);
 }
 
+static inline void set_adapter_connectable(CommsManagerSkeleton *skeleton,
+						const gboolean connectable)
+{
+	set_boolean(skeleton, "AdapterConnectable", connectable);
+}
+
 static inline gchar *get_default_adapter(CommsManagerSkeleton *skeleton)
 {
 	return get_string(skeleton, "DefaultAdapter");
+}
+
+static inline gboolean get_adapter_connectable(CommsManagerSkeleton *skeleton)
+{
+	return get_boolean(skeleton, "AdapterConnectable");
 }
 
 struct bt_activate_data {
@@ -323,6 +343,89 @@ static void adapter_powered_changed(bluez_adapter_t *adapter,
 		adapter_powered_on(adapter_activate_data->skeleton);
 }
 
+static void device_connected_changed(bluez_device_t *device,
+					int connected, void *user_data)
+{
+	CommsManagerSkeleton *skeleton = user_data;
+	gboolean connectable = TRUE;
+
+	DBG("");
+
+	if (skeleton)
+		connectable = get_adapter_connectable(skeleton);
+
+	if (connected && !connectable) {
+		DBG("disconnection all profile");
+		bluez_device_disconnect_all(device, NULL);
+	}
+}
+
+static void set_device_property_changed_callback(bluez_device_t *device,
+					CommsManagerSkeleton *skeleton)
+{
+	DBG("");
+
+	bluez_device_set_connected_changed_cb(device,
+					device_connected_changed,
+					skeleton);
+}
+
+static void unset_device_property_changed_callback(bluez_device_t *device)
+{
+	DBG("");
+
+	bluez_device_unset_connected_changed_cb(device);
+}
+
+static void foreach_device_property_callback(GList *list,
+					gboolean flag,
+					CommsManagerSkeleton *skeleton)
+{
+	bluez_device_t *device;
+	GList *iter, *next;
+
+	DBG("");
+
+	for (iter = g_list_first(list); iter; iter = next) {
+		next = g_list_next(iter);
+
+		device = iter->data;
+
+		if (flag)
+			set_device_property_changed_callback(device,
+							skeleton);
+		else
+			unset_device_property_changed_callback(device);
+	}
+}
+
+static void bt_device_set_connection_state_changed(
+					CommsManagerSkeleton *skeleton)
+{
+	GList *list;
+
+	DBG("");
+
+	if (default_adapter == NULL)
+		return;
+
+	list = bluez_adapter_get_devices(default_adapter);
+	foreach_device_property_callback(list, TRUE, skeleton);
+}
+
+static void bt_device_unset_connection_state_changed(void)
+{
+	GList *list;
+
+	DBG("");
+
+	if (default_adapter == NULL)
+		return;
+
+	list = bluez_adapter_get_devices(default_adapter);
+	foreach_device_property_callback(list, FALSE, NULL);
+}
+
 static void bt_adapter_set_enable(bluez_adapter_t *adapter, void *user_data)
 {
 	struct bt_activate_data *adapter_activate_data = user_data;
@@ -336,6 +439,8 @@ static void bt_adapter_set_enable(bluez_adapter_t *adapter, void *user_data)
 	bluez_adapter_get_property_powered(default_adapter, &powered);
 	if (powered == FALSE)
 		ret = bluez_adapter_set_powered(default_adapter, TRUE);
+
+	bt_device_set_connection_state_changed(adapter_activate_data->skeleton);
 
 	if (ret) {
 		bt_activate_timeout(adapter_activate_data);
@@ -558,6 +663,8 @@ static void handle_disable_bluetooth_service(GDBusConnection *connection,
 
 	ret = bluez_adapter_set_powered(default_adapter, FALSE);
 
+	bt_device_unset_connection_state_changed();
+
 	default_adapter = NULL;
 
 	if (ret)
@@ -637,6 +744,35 @@ done:
 					g_variant_new("(u)", remain_time));
 }
 
+static void handle_set_adapter_connectable(GDBusConnection *connection,
+					GVariant *parameters,
+					GDBusMethodInvocation *invocation,
+					gpointer user_data)
+{
+	CommsManagerSkeleton *skeleton = COMMS_MANAGER_SKELETON(user_data);
+	gboolean connectable;
+
+	g_variant_get(parameters, "(b)", &connectable);
+	set_adapter_connectable(skeleton, connectable);
+	opp_set_adapter_connectable(connectable);
+
+	g_dbus_method_invocation_return_value(invocation, NULL);
+}
+
+static void handle_get_adapter_connectable(GDBusConnection *connection,
+					GVariant *parameters,
+					GDBusMethodInvocation *invocation,
+					gpointer user_data)
+{
+	CommsManagerSkeleton *skeleton = COMMS_MANAGER_SKELETON(user_data);
+	gboolean connectable;
+
+	connectable = get_adapter_connectable(skeleton);
+
+	g_dbus_method_invocation_return_value(invocation,
+					g_variant_new("(b)", connectable));
+}
+
 static void _manager_skeleton_handle_method_call(
 				GDBusConnection *connection,
 				const gchar *sender,
@@ -659,6 +795,12 @@ static void _manager_skeleton_handle_method_call(
 						invocation, user_data);
 	else if (g_strcmp0(method_name, "GetAdapterVisibleTime") == 0)
 		handle_get_adapter_visible_time(connection, parameters,
+						invocation, user_data);
+	else if (g_strcmp0(method_name, "SetAdapterConnectable") == 0)
+		handle_set_adapter_connectable(connection, parameters,
+						invocation, user_data);
+	else if (g_strcmp0(method_name, "GetAdapterConnectable") == 0)
+		handle_get_adapter_connectable(connection, parameters,
 						invocation, user_data);
 	else
 		WARN("Unknown method");
@@ -818,7 +960,7 @@ static void manager_skeleton_set_property(GObject *object, guint prop_id,
 {
 	CommsManagerSkeleton *skeleton = COMMS_MANAGER_SKELETON(object);
 
-	g_assert(prop_id != 0 && prop_id - 1 < 3);
+	g_assert(prop_id != 0 && prop_id - 1 < 4);
 
 	DBG("prop_id %d", prop_id);
 
@@ -938,7 +1080,7 @@ static void manager_skeleton_get_property(GObject *object, guint prop_id,
 
 	DBG("prop_id %d", prop_id);
 
-	g_assert(prop_id != 0 && prop_id - 1 < 3);
+	g_assert(prop_id != 0 && prop_id - 1 < 4);
 
 	g_value_copy(&skeleton->priv->properties[prop_id - 1], value);
 }
@@ -1057,6 +1199,7 @@ static void manager_skeleton_finalize(GObject *object)
 	g_value_unset(&skeleton->priv->properties[0]);
 	g_value_unset(&skeleton->priv->properties[1]);
 	g_value_unset(&skeleton->priv->properties[2]);
+	g_value_unset(&skeleton->priv->properties[3]);
 
 	g_free(skeleton->priv->properties);
 
@@ -1110,6 +1253,12 @@ static void comms_manager_skeleton_class_init(CommsManagerSkeletonClass *klass)
 						"DefaultAdapter",
 						"DefaultAdapter",
 						"hci0", G_PARAM_READWRITE));
+
+	g_object_class_install_property(gobject_class, 4,
+			g_param_spec_boolean("AdapterConnectable",
+						"AdapterConnectable",
+						"AdapterConnectable",
+						TRUE, G_PARAM_READWRITE));
 }
 
 CommsManagerSkeleton *comms_service_manager_new(
@@ -1123,6 +1272,7 @@ CommsManagerSkeleton *comms_service_manager_new(
 				"BluetoothInService", FALSE,
 				"BluetoothActivating", FALSE,
 				"DefaultAdapter", DEFAULT_ADAPTER,
+				"AdapterConnectable", TRUE,
 				NULL);
 
 	vertical_notify_bt_set_flight_mode_cb(bluetooth_flight_mode_cb,

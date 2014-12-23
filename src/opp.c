@@ -40,6 +40,8 @@
 #define UID_LEN 8
 #define CONTEXT_LEN 28
 
+static gboolean g_connectable;
+
 struct user_privileges {
 	char address[ADDRESS_LEN];
 	char uid[UID_LEN];
@@ -683,6 +685,12 @@ static struct agent *find_server_agent(guint32 uid)
 	return NULL;
 }
 
+void opp_set_adapter_connectable(gboolean connectable)
+{
+	DBG("");
+	g_connectable = connectable;
+}
+
 static void handle_authorize_push(GDBusConnection *connection,
 				GVariant *parameters,
 				GDBusMethodInvocation *invocation,
@@ -698,7 +706,15 @@ static void handle_authorize_push(GDBusConnection *connection,
 	GVariant *param;
 	struct agent *agent = NULL;
 
-	DBG("");
+	DBG("g_connectable = %d", g_connectable);
+
+	if (!g_connectable) {
+		g_dbus_method_invocation_return_dbus_error(
+					invocation,
+					OBEX_ERROR_INTERFACE ".Rejected",
+					"RejectByUser");
+		return;
+	}
 
 	reply_data = g_new0(struct agent_reply_data, 1);
 
@@ -1799,6 +1815,8 @@ void bt_service_opp_init(GDBusObjectSkeleton *gdbus_object_skeleton,
 		return;
 
 	bt_object_skeleton = gdbus_object_skeleton;
+
+	g_connectable = TRUE;
 
 	session_connection = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &error);
 	if (session_connection == NULL) {

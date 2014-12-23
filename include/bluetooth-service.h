@@ -46,6 +46,17 @@ void opp_manager_set_service_watch(
 
 void opp_manager_remove_service_watch(void);
 
+typedef void (*adapter_connectable_watch_t)(
+			int result,
+			gboolean connectable,
+			void *user_data);
+
+void adapter_connectable_set_service_watch(
+			adapter_connectable_watch_t cb,
+			void *user_data);
+
+void adapter_connectable_remove_service_watch(void);
+
 typedef void (*comms_manager_bt_in_service_watch_t)(
 			uint in_service,
 			void *user_data);
@@ -157,5 +168,9 @@ int comms_bluetooth_get_user_privileges_sync(
 
 int comms_bluetooth_remove_user_privileges_sync(
 			const char *address);
+
+int comms_manager_set_connectable(gboolean connectable);
+
+int comms_manager_get_connectable(gboolean *connectable);
 
 #endif
