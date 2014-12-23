@@ -131,4 +131,6 @@ void device_path_to_address(const char *device_path,
 
 GDBusConnection *get_system_lib_dbus_connect(void);
 
+unsigned char *convert_address_to_baddr(const char *address);
+
 #endif

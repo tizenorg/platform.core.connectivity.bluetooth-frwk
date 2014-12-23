@@ -23,6 +23,11 @@
 #include <gio/gunixfdlist.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdio.h>
+#include <errno.h>
+#include <ctype.h>
+#include <stdarg.h>
+#include <stdlib.h>
 #include "common.h"
 
 struct error_map_t {
@@ -376,6 +381,53 @@ void device_path_to_address(const char *device_path, char *device_address)
 
 		g_strlcpy(device_address, address, BT_ADDRESS_STRING_SIZE);
 	}
+}
+
+static int check_address(const char *device_address)
+{
+	DBG("");
+
+	if (strlen(device_address) != 17)
+		return -1;
+
+	while (*device_address) {
+		device_address += 2;
+
+		if (*device_address == 0)
+			break;
+
+		if (*device_address++ != ':')
+			return -1;
+	}
+
+	return 0;
+}
+
+unsigned char *convert_address_to_baddr(const char *address)
+{
+	int i, num;
+	unsigned char *baddr = g_malloc0(6);
+
+	DBG("address = %s, len = %d", address, strlen(address));
+
+	if (baddr == NULL)
+		return NULL;
+
+	if (check_address(address) != 0) {
+		DBG("check_address != 0");
+		return NULL;
+	}
+
+	num = 0;
+
+	DBG("address = %s", address);
+
+	for (i = 5; i >= 0; i--, address += 3) {
+		baddr[num++] = strtol(address, NULL, 16);
+		DBG("0x%2x", baddr[num-1]);
+	}
+
+	return baddr;
 }
 
 GDBusConnection *get_system_lib_dbus_connect(void)

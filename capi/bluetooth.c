@@ -51,6 +51,14 @@
 #define WRITE_REQUEST "write"
 #define WRITE_COMMAND "write-without-response"
 
+#define NEARD_AGENT_INTERFACE "org.neard.HandoverAgent"
+#define NEARD_AGENT_PATH "/org/bluez/neard_handover_agent"
+
+#define NEARD_SIZE 100
+#define NEARD_CLASS 0x0D
+#define NEARD_HASH 0x0E
+#define NEARD_RANDOMIZER 0x0F
+
 #define ADDRESS_LEN 20
 static char pairing_address[ADDRESS_LEN];
 
@@ -76,6 +84,8 @@ static void profile_connect_callback(bluez_device_t *device,
 
 static void profile_disconnect_callback(bluez_device_t *device,
 					enum device_profile_state state);
+
+static GDBusConnection *get_system_dbus_connect(void);
 
 static int request_name_on_dbus(const char *name);
 static void release_name_on_dbus(const char *name);
@@ -2048,11 +2058,153 @@ int bt_adapter_get_local_info(char **chipset, char **firmware,
 	return BT_ERROR_NOT_SUPPORTED;
 }
 
+gboolean get_neard_data(unsigned char *peir, unsigned char **hash,
+		unsigned char **randomizer, int *hash_len, int *randomizer_len)
+{
+	int head_len = sizeof(uint16_t) + 6;
+
+	DBG("");
+
+	peir += head_len;
+
+	while (*peir != 0) {
+		peir++;
+		if (*peir == NEARD_CLASS) {
+			peir += 4;
+		} else if (*peir == NEARD_HASH) {
+			memcpy(*hash, peir, 16);
+			*hash_len = 16;
+			peir += 17;
+		} else if (*peir == NEARD_RANDOMIZER) {
+			memcpy(*randomizer, peir, 16);
+			*randomizer_len = 16;
+			peir += 17;
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
 int bt_adapter_get_local_oob_data(unsigned char **hash,
 				unsigned char **randomizer,
 				int *hash_len, int *randomizer_len)
 {
-	return BT_ERROR_NOT_SUPPORTED;
+	GVariant *val, *result;
+	GDBusConnection *connection;
+	GVariantBuilder *builder;
+	GError *error = NULL;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (hash == NULL || randomizer == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	connection = get_system_dbus_connect();
+	if (connection == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	val = g_variant_new("s", "active");
+	builder = g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
+	g_variant_builder_add(builder, "{sv}", "State", val);
+
+	result = g_dbus_connection_call_sync(connection, BLUEZ_NAME,
+				NEARD_AGENT_PATH,
+				NEARD_AGENT_INTERFACE,
+				"RequestOOB",
+				g_variant_new("(a{sv})", builder),
+				NULL, 0, -1, NULL, &error);
+
+	if (error) {
+		DBG("error %s", error->message);
+		g_error_free(error);
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	if (result != NULL) {
+		if (g_variant_is_of_type(val, G_VARIANT_TYPE("(a{sv})"))) {
+			GVariantIter *iter;
+			GVariant *item;
+
+			g_variant_get(result, "(a{sv})", &iter);
+			while ((item = g_variant_iter_next_value(iter))) {
+				unsigned char *peir;
+				gboolean is_fin;
+				gchar *key;
+				GVariant *value;
+
+				g_variant_get(item, "{sv}", &key, &value);
+				if (g_strcmp0("EIR", key) == 0) {
+					g_variant_get(value, "(ay)", &peir);
+					if (peir == NULL) {
+						DBG("Err");
+						goto done;
+					}
+					is_fin = get_neard_data(peir,
+							hash, randomizer,
+							hash_len,
+							randomizer_len);
+					if (!is_fin) {
+						DBG("is_fin failed");
+						goto done;
+					}
+				}
+			}
+		}
+	}
+
+	return BT_SUCCESS;
+done:
+	return BT_ERROR_OPERATION_FAILED;
+}
+
+unsigned char *set_neard_data(const char *remote_address,
+			unsigned char *hash, unsigned char *randomizer,
+			int hash_len, int randomizer_len)
+{
+	unsigned char *peir = g_malloc0(NEARD_SIZE);
+	unsigned char *data = peir;
+	unsigned char *baddr;
+
+	DBG("");
+
+	if (data == NULL) {
+		DBG("failed");
+		return NULL;
+	}
+
+	data += sizeof(uint16_t);
+
+	baddr = convert_address_to_baddr(remote_address);
+	if (baddr == NULL) {
+		DBG("baddr failed");
+		g_free(peir);
+		return NULL;
+	}
+
+	memcpy(data, baddr, 6);
+	data += 6;
+	g_free(baddr);
+
+	*data++ = 17;
+	*data++ = NEARD_HASH;
+
+	memcpy(data, hash, hash_len);
+	data += 16;
+
+	*data++ = 17;
+	*data++ = NEARD_RANDOMIZER;
+
+	memcpy(data, randomizer, randomizer_len);
+	data += 16;
+
+	return peir;
 }
 
 int bt_adapter_set_remote_oob_data(const char *remote_address,
@@ -2060,18 +2212,91 @@ int bt_adapter_set_remote_oob_data(const char *remote_address,
 				unsigned char *randomizer,
 				int hash_len, int randomizer_len)
 {
-	return BT_ERROR_NOT_SUPPORTED;
+	GVariant *val;
+	GDBusConnection *connection;
+	GVariantBuilder *builder;
+	unsigned char *peir;
+	GError *error = NULL;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (remote_address == NULL ||
+			hash == NULL || randomizer == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	connection = get_system_dbus_connect();
+	if (connection == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	peir = set_neard_data(remote_address, hash, randomizer,
+					hash_len, randomizer_len);
+
+	if (peir == NULL) {
+		DBG("peir failed");
+		return BT_ERROR_OUT_OF_MEMORY;
+	}
+
+	builder = g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
+	val = g_variant_new("ay", peir);
+	g_variant_builder_add(builder, "{sv}", "EIR", val);
+
+	val = g_variant_new("s", "active");
+	g_variant_builder_add(builder, "{sv}", "State", val);
+
+	g_dbus_connection_call_sync(connection, BLUEZ_NAME,
+				NEARD_AGENT_PATH,
+				NEARD_AGENT_INTERFACE,
+				"PushOOB",
+				g_variant_new("(a{sv})", builder),
+				NULL, 0, -1, NULL, &error);
+
+	if (error) {
+		DBG("error %s", error->message);
+		g_error_free(error);
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	g_free(peir);
+	return BT_SUCCESS;
 }
 
 int bt_adapter_remove_remote_oob_data(const char *remote_address)
 {
-	/*bluez5.X does not provide the interface.
-	* At the same time, it is not necessary to be used by app.
-	* neard(NFC daemon) has controlled it after bluez5.X
-	* Therefore, the CAPI won't be implemented.
-	* NTB will match the design of upstream.
-	*/
-	return BT_ERROR_NOT_SUPPORTED;
+	GDBusConnection *connection;
+	GError *error = NULL;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	connection = get_system_dbus_connect();
+	if (connection == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	g_dbus_connection_call_sync(connection, BLUEZ_NAME,
+				NEARD_AGENT_PATH,
+				NEARD_AGENT_INTERFACE,
+				"Release",
+				NULL,
+				NULL, 0, -1, NULL, &error);
+
+	if (error) {
+		DBG("error %s", error->message);
+		g_error_free(error);
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	return BT_SUCCESS;
 }
 
 int bt_device_get_service_mask_from_uuid_list(char **uuids,
