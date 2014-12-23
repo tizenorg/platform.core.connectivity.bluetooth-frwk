@@ -26,6 +26,7 @@
 #include "common.h"
 #include "bluez.h"
 #include "bluetooth-service.h"
+#include "uuid.h"
 
 #include "bluetooth.h"
 
@@ -2051,7 +2052,121 @@ int bt_device_get_service_mask_from_uuid_list(char **uuids,
 					int no_of_service,
 					bt_service_class_t *service_mask_list)
 {
-	return BT_ERROR_NOT_SUPPORTED;
+	int i = 0;
+	char **parts = NULL;
+	bt_service_class_t service_mask = 0;
+
+	DBG("");
+
+	if (*uuids == NULL || service_mask_list == NULL)
+		return BT_ERROR_INVALID_PARAMETER;
+
+	DBG("no_of_service = %d", no_of_service);
+
+	for (i = 0; i < no_of_service; i++) {
+		parts = g_strsplit(uuids[i], "-", -1);
+		if (parts == NULL || parts[0] == NULL) {
+			g_strfreev(parts);
+			continue;
+		}
+
+		if (!g_strcmp0(SPP_PROFILE_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_SPP_SERVICE_MASK;
+		else if (!g_strcmp0(LAP_PROFILE_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_LAP_SERVICE_MASK;
+		else if (!g_strcmp0(DUN_PROFILE_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_DUN_SERVICE_MASK;
+		else if (!g_strcmp0(OBEX_SYNC_SERVICE_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_SYNC_SERVICE_MASK;
+		else if (!g_strcmp0(OBEX_PUSH_SERVICE_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_OPP_SERVICE_MASK;
+		else if (!g_strcmp0(OBEX_FILE_TRANSFER_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_FTP_SERVICE_MASK;
+		else if (!g_strcmp0(HS_PROFILE_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_HSP_SERVICE_MASK;
+		else if (!g_strcmp0(CTP_PROFILE_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_CTP_SERVICE_MASK;
+		else if (!g_strcmp0(AUDIO_SOURCE_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_NONE;
+		else if (!g_strcmp0(AUDIO_SINK_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_A2DP_SERVICE_MASK;
+		else if (!g_strcmp0(VIDEO_SOURCE_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_NONE;
+		else if (!g_strcmp0(VIDEO_SINK_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_NONE;
+		else if (!g_strcmp0(AV_REMOTE_CONTROL_TARGET_UUID_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_NONE;
+		else if (!g_strcmp0(ADVANCED_AUDIO_PROFILE_UUID_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_A2DP_SERVICE_MASK;
+		else if (!g_strcmp0(AV_REMOTE_CONTROL_UUID_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_AVRCP_SERVICE_MASK;
+		else if (!g_strcmp0(ICP_PROFILE_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_ICP_SERVICE_MASK;
+		else if (!g_strcmp0(FAX_PROFILE_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_FAX_SERVICE_MASK;
+		else if (!g_strcmp0(HEADSET_AG_SERVICE_UUID_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_NONE;
+		else if (!g_strcmp0(PAN_PANU_PROFILE_UUID_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_PANU_SERVICE_MASK;
+		else if (!g_strcmp0(PAN_NAP_PROFILE_UUID_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_NAP_SERVICE_MASK;
+		else if (!g_strcmp0(PAN_GN_PROFILE_UUID_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_GN_SERVICE_MASK;
+		else if (!g_strcmp0(REFERENCE_PRINTING_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_NONE;
+		else if (!g_strcmp0(OBEX_IMAGING_UUID_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_NONE;
+		else if (!g_strcmp0(OBEX_IMAGING_RESPONDER_UUID_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_BIP_SERVICE_MASK;
+		else if (!g_strcmp0(HF_PROFILE_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_HFP_SERVICE_MASK;
+		else if (!g_strcmp0(HFG_PROFILE_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_NONE;
+		else if (!g_strcmp0(
+				DIRECT_PRINTING_REFERENCE_OBJ_UUID_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_NONE;
+		else if (!g_strcmp0(BASIC_PRINTING_HEAD, parts[0]))
+			service_mask |= BT_SC_NONE;
+		else if (!g_strcmp0(HID_PROFILE_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_HID_SERVICE_MASK;
+		else if (!g_strcmp0(SIM_ACCESS_PROFILE_UUID_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_SAP_SERVICE_MASK;
+		else if (!g_strcmp0(OBEX_PBAP_PROFILE_UUID_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_PBAP_SERVICE_MASK;
+		else if (!g_strcmp0(OBEX_BPPS_PROFILE_UUID_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_BPP_SERVICE_MASK;
+		else if (!g_strcmp0(PNP_INFORMATION_UUID_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_NONE;
+		else if (!g_strcmp0(OBEX_PRINTING_STATUS_UUID_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_BPP_SERVICE_MASK;
+		else if (!g_strcmp0(HCR_PROFILE_UUID_HEAD, parts[0]))
+			service_mask |= BT_SC_NONE;
+		else if (!g_strcmp0(OBEX_SYNCML_TRANSFER_UUID_HEAD,
+							parts[0]))
+			service_mask |= BT_SC_NONE;
+
+		g_strfreev(parts);
+	}
+
+	*service_mask_list = service_mask;
+
+	return BT_ERROR_NONE;
 }
 
 static gboolean adapter_recover_timeout_cb(gpointer user_data)
