@@ -4455,6 +4455,84 @@ int bt_adapter_get_connectable(bool *connectable);
  */
 int bt_adapter_set_connectable(bool connectable);
 
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
+ * @brief Get the Hash and Randmoizer value, synchronously.
+ * @since_tizen 2.3
+ *
+ * @param[out] hash The hash value recieved from the controller
+ * @param[out] randomizer The hash value recieved from the controller
+ * @param[out] hash_len The length of the hash value
+ * @param[out] randomizer_len The length of the randomizer value
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ * @retval #BT_ERROR_NOT_SUPPORTED  Not supported
+ *
+ * @pre The state of local Bluetooth must be #BT_ADAPTER_ENABLED.
+ * @pre The Bluetooth service must be initialized with bt_initialize().
+ * @see bt_initialize()
+ */
+int bt_adapter_get_local_oob_data(unsigned char **hash,
+					unsigned char **randomizer,
+					int *hash_len, int *randomizer_len);
+
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
+ * @brief Sets the Hash and Randmoizer value, synchronously.
+ * @since_tizen 2.3
+ * @privlevel public
+ * @privilege %http://tizen.org/privilege/bluetooth
+ *
+ * @param[in] remote_address Remote device address
+ * @param[in] hash The hash value recieved from the controller
+ * @param[in] randomizer The hash value recieved from the controller
+ * @param[in] hash_len The length of the hash value. Allowed value is 16
+ * @param[in] randomizer_len The length of the randomizer value. Allowed value is 16
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ * @retval #BT_ERROR_PERMISSION_DENIED  Permission denied
+ * @retval #BT_ERROR_NOT_SUPPORTED  Not supported
+ *
+ * @pre The state of local Bluetooth must be #BT_ADAPTER_ENABLED.
+ * @pre The Bluetooth service must be initialized with bt_initialize().
+ * @see bt_initialize()
+ */
+int bt_adapter_set_remote_oob_data(const char *remote_address,
+				unsigned char *hash,
+				unsigned char *randomizer,
+				int hash_len, int randomizer_len);
+
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
+ * @brief Deletes the Hash and Randomizer value, synchronously.
+ * @since_tizen 2.3
+ * @privlevel public
+ * @privilege %http://tizen.org/privilege/bluetooth
+ *
+ * @param[in] remote_address Remote device address
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ * @retval #BT_ERROR_PERMISSION_DENIED  Permission denied
+ * @retval #BT_ERROR_NOT_SUPPORTED  Not supported
+ *
+ * @pre The state of local Bluetooth must be #BT_ADAPTER_ENABLED.
+ * @pre The Bluetooth service must be initialized with bt_initialize().
+ * @see bt_initialize()
+ */
+int bt_adapter_remove_remote_oob_data(const char *remote_address);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

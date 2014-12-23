@@ -2048,6 +2048,32 @@ int bt_adapter_get_local_info(char **chipset, char **firmware,
 	return BT_ERROR_NOT_SUPPORTED;
 }
 
+int bt_adapter_get_local_oob_data(unsigned char **hash,
+				unsigned char **randomizer,
+				int *hash_len, int *randomizer_len)
+{
+	return BT_ERROR_NOT_SUPPORTED;
+}
+
+int bt_adapter_set_remote_oob_data(const char *remote_address,
+				unsigned char *hash,
+				unsigned char *randomizer,
+				int hash_len, int randomizer_len)
+{
+	return BT_ERROR_NOT_SUPPORTED;
+}
+
+int bt_adapter_remove_remote_oob_data(const char *remote_address)
+{
+	/*bluez5.X does not provide the interface.
+	* At the same time, it is not necessary to be used by app.
+	* neard(NFC daemon) has controlled it after bluez5.X
+	* Therefore, the CAPI won't be implemented.
+	* NTB will match the design of upstream.
+	*/
+	return BT_ERROR_NOT_SUPPORTED;
+}
+
 int bt_device_get_service_mask_from_uuid_list(char **uuids,
 					int no_of_service,
 					bt_service_class_t *service_mask_list)
