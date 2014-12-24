@@ -2058,7 +2058,7 @@ int bt_adapter_get_local_info(char **chipset, char **firmware,
 	return BT_ERROR_NOT_SUPPORTED;
 }
 
-gboolean get_neard_data(unsigned char *peir, unsigned char **hash,
+gboolean get_neard_data(const unsigned char *peir, unsigned char **hash,
 		unsigned char **randomizer, int *hash_len, int *randomizer_len)
 {
 	int head_len = sizeof(uint16_t) + 6;
@@ -2134,15 +2134,18 @@ int bt_adapter_get_local_oob_data(unsigned char **hash,
 
 			g_variant_get(result, "(a{sv})", &iter);
 			while ((item = g_variant_iter_next_value(iter))) {
-				unsigned char *peir;
+				const unsigned char *peir;
 				gboolean is_fin;
 				gchar *key;
 				GVariant *value;
+				gsize n_elts;
 
 				g_variant_get(item, "{sv}", &key, &value);
 				if (g_strcmp0("EIR", key) == 0) {
 					g_variant_get(value, "(ay)", &peir);
-					if (peir == NULL) {
+					peir = g_variant_get_fixed_array(value,
+						&n_elts, sizeof(unsigned char));
+					if (peir == NULL || n_elts < 0) {
 						DBG("Err");
 						goto done;
 					}
@@ -2243,7 +2246,8 @@ int bt_adapter_set_remote_oob_data(const char *remote_address,
 	}
 
 	builder = g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
-	val = g_variant_new("ay", peir);
+	val = g_variant_new_fixed_array(G_VARIANT_TYPE_BYTE, peir,
+				G_N_ELEMENTS(peir), sizeof(peir[0]));
 	g_variant_builder_add(builder, "{sv}", "EIR", val);
 
 	val = g_variant_new("s", "active");

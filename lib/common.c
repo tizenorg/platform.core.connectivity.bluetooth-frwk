@@ -408,7 +408,8 @@ unsigned char *convert_address_to_baddr(const char *address)
 	int i, num;
 	unsigned char *baddr = g_malloc0(6);
 
-	DBG("address = %s, len = %d", address, strlen(address));
+	DBG("address = %s, len = %d", address,
+					(int)strlen(address));
 
 	if (baddr == NULL)
 		return NULL;
