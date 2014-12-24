@@ -3711,6 +3711,32 @@ void bluez_device_set_trusted(struct _bluez_device *device,
 					simple_reply_callback, NULL);
 }
 
+int bluez_device_set_blocked(struct _bluez_device *device,
+					gboolean blocked)
+{
+	GError *error = NULL;
+	GVariant *ret;
+	GVariant *val = g_variant_new("b", blocked);
+	GVariant *parameter = g_variant_new("(ssv)",
+				DEVICE_INTERFACE, "Blocked", val);
+
+	DBG("");
+
+	ret = g_dbus_proxy_call_sync(device->parent->properties_proxy,
+					"Set", parameter, 0,
+					-1, NULL, &error);
+
+	if (ret == NULL) {
+		ERROR("%s", error->message);
+		g_error_free(error);
+		return -1;
+	}
+
+	g_variant_unref(ret);
+
+	return 0;
+}
+
 void bluez_device_set_alias(struct _bluez_device *device,
 					const gchar *alias)
 {

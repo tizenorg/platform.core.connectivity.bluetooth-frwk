@@ -431,6 +431,10 @@ void bluez_device_unset_trusted_changed_cb(
 void bluez_device_set_trusted(
 				struct _bluez_device *device,
 				gboolean trusted);
+
+int bluez_device_set_blocked(struct _bluez_device *device,
+				gboolean blocked);
+
 void bluez_device_set_alias(
 				struct _bluez_device *device,
 				const gchar *alias);

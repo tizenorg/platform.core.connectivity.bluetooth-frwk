@@ -1049,7 +1049,6 @@ static void device_pair_cb(enum bluez_error_type type, void *user_data)
 
 static void pair_cb(gchar *address, gboolean paired, gpointer user_data)
 {
-
 	DBG("address=%s", address);
 	DBG("pairing_device_address=%s", pairing_device_address);
 	DBG("paired = %d", paired);

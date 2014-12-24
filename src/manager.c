@@ -357,6 +357,7 @@ static void device_connected_changed(bluez_device_t *device,
 	if (connected && !connectable) {
 		DBG("disconnection all profile");
 		bluez_device_disconnect_all(device, NULL);
+		bluez_device_set_blocked(device, TRUE);
 	}
 }
 
@@ -426,6 +427,26 @@ static void bt_device_unset_connection_state_changed(void)
 	foreach_device_property_callback(list, FALSE, NULL);
 }
 
+static void bt_adapter_device_callback(struct _bluez_device *device,
+						gpointer user_data)
+{
+	gboolean connectable;
+	CommsManagerSkeleton *skeleton = user_data;
+
+	DBG("");
+
+	if (!skeleton)
+		return;
+
+	set_device_property_changed_callback(device, skeleton);
+
+	connectable = get_adapter_connectable(skeleton);
+	DBG("connectable = %d", connectable);
+
+	if (!connectable)
+		bluez_device_set_blocked(device, TRUE);
+}
+
 static void bt_adapter_set_enable(bluez_adapter_t *adapter, void *user_data)
 {
 	struct bt_activate_data *adapter_activate_data = user_data;
@@ -441,6 +462,9 @@ static void bt_adapter_set_enable(bluez_adapter_t *adapter, void *user_data)
 		ret = bluez_adapter_set_powered(default_adapter, TRUE);
 
 	bt_device_set_connection_state_changed(adapter_activate_data->skeleton);
+	bluez_adapter_set_device_created_cb(default_adapter,
+					bt_adapter_device_callback,
+					adapter_activate_data->skeleton);
 
 	if (ret) {
 		bt_activate_timeout(adapter_activate_data);
@@ -744,6 +768,21 @@ done:
 					g_variant_new("(u)", remain_time));
 }
 
+static void foreach_device_set_blocked(GList *list,
+				gboolean connectable)
+{
+	bluez_device_t *device;
+	GList *iter, *next;
+
+	DBG("");
+
+	for (iter = g_list_first(list); iter; iter = next) {
+		next = g_list_next(iter);
+		device = iter->data;
+		bluez_device_set_blocked(device, connectable);
+	}
+}
+
 static void handle_set_adapter_connectable(GDBusConnection *connection,
 					GVariant *parameters,
 					GDBusMethodInvocation *invocation,
@@ -751,9 +790,31 @@ static void handle_set_adapter_connectable(GDBusConnection *connection,
 {
 	CommsManagerSkeleton *skeleton = COMMS_MANAGER_SKELETON(user_data);
 	gboolean connectable;
+	gchar *default_adapter_name;
+	GList *list;
+
+	DBG("");
+
+	if (!skeleton) {
+		comms_error_failed(invocation, "Failed");
+		return;
+	}
+
+	if (default_adapter == NULL) {
+		default_adapter_name = get_default_adapter(skeleton);
+		DBG("adapter: %s", default_adapter_name);
+
+		default_adapter = bluez_adapter_get_adapter(
+						default_adapter_name);
+	}
 
 	g_variant_get(parameters, "(b)", &connectable);
 	set_adapter_connectable(skeleton, connectable);
+	if (default_adapter) {
+		list = bluez_adapter_get_devices(default_adapter);
+		foreach_device_set_blocked(list, !connectable);
+	}
+
 	opp_set_adapter_connectable(connectable);
 
 	g_dbus_method_invocation_return_value(invocation, NULL);
