@@ -305,6 +305,94 @@ static int get_adapter_visibility(const char *p1, const char *p2)
 	return 0;
 }
 
+static int get_local_oob_data(const char *p1, const char *p2)
+{
+	int err;
+	unsigned char hash[20], randomizer[20];
+	int hash_len, randomizer_len;
+
+	DBG("");
+
+	memset(hash, 0, 20);
+	memset(randomizer, 0, 20);
+
+	err = bt_adapter_get_local_oob_data((unsigned char **)&hash,
+				(unsigned char **)&randomizer,
+				&hash_len, &randomizer_len);
+
+	if (err == BT_SUCCESS) {
+		DBG("hash = %s, randomizer = %s", hash, randomizer);
+		DBG("hash_len = %d, randomizer_len = %d",
+					hash_len, randomizer_len);
+	} else {
+		DBG("bt_adapter_get_local_oob_data err = %d", err);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int set_remote_oob_data(const char *p1, const char *p2)
+{
+	int err;
+	unsigned char hash[20], randomizer[20];
+	int hash_len, randomizer_len;
+
+	DBG("");
+
+	if (p1 == NULL) {
+		DBG("no remote address");
+		return 0;
+	}
+
+	DBG("remote address = %s", p1);
+
+	memset(hash, 0, 20);
+	memset(randomizer, 0, 20);
+	memcpy((unsigned char *)hash, "hash", 4);
+	memcpy((unsigned char *)randomizer, "randomizer", 10);
+	hash_len = 4;
+	randomizer_len = 10;
+
+	err = bt_adapter_set_remote_oob_data(p1, (unsigned char *)hash,
+					(unsigned char *)randomizer,
+					hash_len, randomizer_len);
+
+	if (err == BT_SUCCESS)
+		DBG("Successful");
+	else {
+		DBG("bt_adapter_set_remote_oob_data err = %d", err);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int remove_remote_oob_data(const char *p1, const char *p2)
+{
+	int err;
+
+	DBG("");
+
+	if (p1 == NULL) {
+		DBG("no remote address");
+		return 0;
+	}
+
+	DBG("remote address = %s", p1);
+
+	err = bt_adapter_remove_remote_oob_data(p1);
+
+	if (err == BT_SUCCESS)
+		DBG("Successful");
+	else {
+		DBG("dapter_remove_remote_oob_data err = %d", err);
+		return -1;
+	}
+
+	return 0;
+}
+
 static int get_adapter_connectable(const char *p1, const char *p2)
 {
 	int err;
@@ -2665,6 +2753,15 @@ struct {
 
 	{"gatt_read_characteristic_value", gatt_read_characteristic_value,
 		"Usage: gatt_read_characteristic_value\n\tgatt read characteristic value"},
+
+	{"get_local_oob_data", get_local_oob_data,
+		"Usage: get_local_oob_data\n\tget local oob data value"},
+
+	{"set_remote_oob_data", set_remote_oob_data,
+		"Usage: set_remote_oob_data\n\tset remote oob data value"},
+
+	{"remove_remote_oob_data", remove_remote_oob_data,
+		"Usage: remove_remote_oob_data\n\tremove remote oob data"},
 
 	{"q", quit,
 		"Usage: q\n\tQuit"},
