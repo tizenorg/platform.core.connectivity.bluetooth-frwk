@@ -386,7 +386,59 @@ static int remove_remote_oob_data(const char *p1, const char *p2)
 	if (err == BT_SUCCESS)
 		DBG("Successful");
 	else {
-		DBG("dapter_remove_remote_oob_data err = %d", err);
+		DBG("bt_adapter_remove_remote_oob_data err = %d", err);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int get_version(const char *p1, const char *p2)
+{
+	int err;
+	char version[100];
+
+	DBG("");
+
+	memset(version, 0, 100);
+
+	err = bt_adapter_get_version((char **)&version);
+
+	if (err == BT_SUCCESS)
+		DBG("version = %s", version);
+	else {
+		DBG("bt_adapter_get_version err = %d", err);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int get_local_info(const char *p1, const char *p2)
+{
+	int err;
+	char chipset[100];
+	char firmware[100];
+	char stack_version[100];
+	char profiles[100];
+
+	DBG("");
+
+	memset(chipset, 0, 100);
+	memset(firmware, 0, 100);
+	memset(stack_version, 0, 100);
+	memset(profiles, 0, 100);
+
+	err = bt_adapter_get_local_info((char **)&chipset, (char **)&firmware,
+				(char **)&stack_version, (char **)&profiles);
+
+	if (err == BT_SUCCESS) {
+		DBG("chipset = %s", chipset);
+		DBG("firmware = %s", firmware);
+		DBG("stack_version = %s", stack_version);
+		DBG("profiles = %s", profiles);
+	} else {
+		DBG("bt_adapter_get_local_info err = %d", err);
 		return -1;
 	}
 
@@ -2758,10 +2810,16 @@ struct {
 		"Usage: get_local_oob_data\n\tget local oob data value"},
 
 	{"set_remote_oob_data", set_remote_oob_data,
-		"Usage: set_remote_oob_data\n\tset remote oob data value"},
+		"Usage: set_remote_oob_data address\n\tset remote oob data value"},
 
 	{"remove_remote_oob_data", remove_remote_oob_data,
-		"Usage: remove_remote_oob_data\n\tremove remote oob data"},
+		"Usage: remove_remote_oob_data address\n\tremove remote oob data"},
+
+	{"get_version", get_version,
+		"Usage: get_version\n\tget adapter version value"},
+
+	{"get_local_info", get_local_info,
+		"Usage: get_local_info\n\tget local adapter info"},
 
 	{"q", quit,
 		"Usage: q\n\tQuit"},

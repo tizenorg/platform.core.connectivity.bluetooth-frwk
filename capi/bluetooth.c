@@ -2049,12 +2049,28 @@ int bt_adapter_free_device_info(bt_device_info_s *device_info)
 
 int bt_adapter_get_version(char **version)
 {
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
 	return BT_ERROR_NOT_SUPPORTED;
 }
 
 int bt_adapter_get_local_info(char **chipset, char **firmware,
 				char **stack_version, char **profiles)
 {
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
 	return BT_ERROR_NOT_SUPPORTED;
 }
 
