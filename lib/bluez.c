@@ -361,7 +361,10 @@ static adapter_device_discovery_info_t *get_discovery_device_info(
 	char *alias, *address;
 	char **uuids;
 	unsigned int class;
+	guint16 appearance = 0x00;
 	adapter_device_discovery_info_t *device_info;
+
+	DBG("");
 
 	if (device == NULL)
 		return NULL;
@@ -378,6 +381,7 @@ static adapter_device_discovery_info_t *get_discovery_device_info(
 	bluez_device_get_property_class(device, &class);
 	bluez_device_get_property_rssi(device, &rssi);
 	bluez_device_get_property_paired(device, &paired);
+	bluez_device_get_property_appearance(device, &appearance);
 
 	len = g_strv_length(uuids);
 
@@ -387,6 +391,7 @@ static adapter_device_discovery_info_t *get_discovery_device_info(
 	device_info->rssi = rssi;
 	device_info->is_bonded = paired;
 	device_info->service_uuid = uuids;
+	device_info->appearance = convert_appearance_to_type(appearance);
 
 	device_info->bt_class = class;
 
@@ -3773,6 +3778,14 @@ int bluez_device_get_property_class(struct _bluez_device *device,
 {
 	return property_get_uint32(device->property_proxy,
 				DEVICE_INTERFACE, "Class", class);
+}
+
+int bluez_device_get_property_appearance(struct _bluez_device *device,
+					guint16 *appearance)
+{
+	return property_get_uint16(device->property_proxy,
+				DEVICE_INTERFACE,
+				"Appearance", appearance);
 }
 
 int bluez_device_get_property_paired(struct _bluez_device *device,

@@ -419,6 +419,7 @@ static bt_adapter_device_discovery_info_s *get_discovery_device_info(
 	device_info->rssi = device_discovery_info->rssi;
 	device_info->is_bonded = device_discovery_info->is_bonded;
 	device_info->service_uuid = device_discovery_info->service_uuid;
+	device_info->appearance = device_discovery_info->appearance;
 
 	divide_device_class(&device_info->bt_class,
 					device_discovery_info->bt_class);

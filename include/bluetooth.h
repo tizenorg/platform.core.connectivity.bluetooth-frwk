@@ -537,21 +537,37 @@ typedef enum {
 } bt_service_class_t;
 
 /**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE
+ * @brief  Enumerations of gap appearance type.
+ * @since_tizen 2.3
+ */
+typedef enum {
+	BT_APPEARANCE_TYPE_UNKNOWN = 0x00, /**< Unknown appearance type */
+	BT_APPEARANCE_TYPE_GENERIC_PHONE = 0x40, /**< Generic Phone type - Generic category */
+	BT_APPEARANCE_TYPE_GENERIC_COMPUTER = 0x80, /**< Generic Computer type - Generic category */
+	BT_APPEARANCE_TYPE_GENERIC_WATCH = 0xC0, /**< Generic Watch type - Generic category */
+} bt_appearance_type_e;
+
+/**
  * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
  * @brief Structure of device discovery information.
+ * @since_tizen 2.3
  *
  * @see #bt_class_s
  * @see bt_adapter_device_discovery_state_changed_cb()
  */
 typedef struct
 {
-	char *remote_address;	/**< The address of remote device */
-	char *remote_name;	/**< The name of remote device */
+	char *remote_address;   /**< The address of remote device */
+	char *remote_name;      /**< The name of remote device */
 	bt_class_s bt_class;    /**< The Bluetooth classes */
-	int rssi;	/**< The strength indicator of received signal  */
-	bool is_bonded;	/**< The bonding state */
+	int rssi;       /**< The strength indicator of received signal  */
+	bool is_bonded; /**< The bonding state */
 	char **service_uuid;  /**< The UUID list of service */
-	int service_count;	/**< The number of services */
+	int service_count;      /**< The number of services */
+	bt_appearance_type_e appearance;        /**< The Bluetooth appearance */
+	int manufacturer_data_len;      /**< manufacturer specific data length */
+	char *manufacturer_data;                /**< manufacturer specific data */
 } bt_adapter_device_discovery_info_s;
 
 /**

@@ -144,6 +144,33 @@ int property_get_int16(GDBusProxy *proxy,
 	return 0;
 }
 
+int property_get_uint16(GDBusProxy *proxy,
+				const char *interface_name,
+				const char *property,
+				guint16 *value)
+{
+	GVariant *uint16_v, *uint16_vv;
+	GError *error = NULL;
+
+	uint16_vv = g_dbus_proxy_call_sync(
+			proxy, "Get",
+			g_variant_new("(ss)", interface_name, property),
+			0, -1, NULL, &error);
+
+	if (uint16_vv == NULL) {
+		WARN("no cached property %s", property);
+		return -1;
+	}
+
+	g_variant_get(uint16_vv, "(v)", &uint16_v);
+
+	*value = g_variant_get_uint16(uint16_v);
+
+	g_variant_unref(uint16_v);
+
+	return 0;
+}
+
 int property_get_uint32(GDBusProxy *proxy,
 				const char *interface_name,
 				const char *property,
@@ -446,4 +473,10 @@ GDBusConnection *get_system_lib_dbus_connect(void)
 	}
 
 	return conn;
+}
+
+unsigned int convert_appearance_to_type(unsigned int appearance)
+{
+	/*todo support it later*/
+	return 0x00;
 }

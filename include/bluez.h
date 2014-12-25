@@ -138,6 +138,7 @@ typedef struct {
 	gboolean is_bonded;
 	char **service_uuid;
 	int service_count;
+	unsigned int appearance;
 } adapter_device_discovery_info_t;
 
 adapter_device_discovery_info_t *bluez_get_discovery_device_info(
@@ -619,6 +620,10 @@ char *bluez_device_get_property_alias(
 int bluez_device_get_property_class(
 				struct _bluez_device *device,
 				guint32 *class);
+
+int bluez_device_get_property_appearance(
+				struct _bluez_device *device,
+				guint16 *appearance);
 
 int bluez_device_get_property_paired(
 				struct _bluez_device *device,

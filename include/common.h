@@ -85,6 +85,10 @@ int property_get_int16(GDBusProxy *proxy,
 				const char *interface_name,
 				const char *property,
 				gint16 *value);
+int property_get_uint16(GDBusProxy *proxy,
+				const char *interface_name,
+				const char *property,
+				guint16 *value);
 int property_get_uint32(GDBusProxy *proxy,
 				const char *interface_name,
 				const char *property,
@@ -132,5 +136,7 @@ void device_path_to_address(const char *device_path,
 GDBusConnection *get_system_lib_dbus_connect(void);
 
 unsigned char *convert_address_to_baddr(const char *address);
+
+unsigned int convert_appearance_to_type(unsigned int appearance);
 
 #endif
