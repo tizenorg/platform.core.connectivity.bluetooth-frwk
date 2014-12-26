@@ -29,6 +29,7 @@
 #include "uuid.h"
 
 #include "bluetooth.h"
+#include "ntb-bluetooth.h"
 
 #define ERROR_INTERFACE "org.tizen.comms.Error"
 #define SPP_PROFILE_PATH "/bluetooth/profile/spp"
@@ -1286,7 +1287,7 @@ void _bt_service_bt_in_service_watch(uint in_service, void *user_data)
 	DBG("%d", in_service);
 }
 
-int bt_initialize(void)
+int ntb_bt_initialize(void)
 {
 	if (bt_service_init)
 		return BT_SUCCESS;
@@ -1305,7 +1306,7 @@ int bt_initialize(void)
 	return BT_SUCCESS;
 }
 
-int bt_deinitialize(void)
+int ntb_bt_deinitialize(void)
 {
 	if (bt_service_init == false)
 		return BT_SUCCESS;
@@ -1319,7 +1320,7 @@ int bt_deinitialize(void)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_enable(void)
+int ntb_bt_adapter_enable(void)
 {
 	DBG("");
 
@@ -1334,7 +1335,7 @@ int bt_adapter_enable(void)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_disable(void)
+int ntb_bt_adapter_disable(void)
 {
 	DBG("");
 
@@ -1351,7 +1352,7 @@ int bt_adapter_disable(void)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_get_state(bt_adapter_state_e *adapter_state)
+int ntb_bt_adapter_get_state(bt_adapter_state_e *adapter_state)
 {
 	int powered;
 
@@ -1375,7 +1376,7 @@ int bt_adapter_get_state(bt_adapter_state_e *adapter_state)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_get_address(char **local_address)
+int ntb_bt_adapter_get_address(char **local_address)
 {
 	char *address;
 
@@ -1399,7 +1400,7 @@ int bt_adapter_get_address(char **local_address)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_get_name(char **local_name)
+int ntb_bt_adapter_get_name(char **local_name)
 {
 	char *name;
 
@@ -1423,7 +1424,7 @@ int bt_adapter_get_name(char **local_name)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_set_name(const char *local_name)
+int ntb_bt_adapter_set_name(const char *local_name)
 {
 	DBG("");
 
@@ -1441,7 +1442,7 @@ int bt_adapter_set_name(const char *local_name)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_set_name_changed_cb(bt_adapter_name_changed_cb callback,
+int ntb_bt_adapter_set_name_changed_cb(bt_adapter_name_changed_cb callback,
 					void *user_data)
 {
 	struct adapter_name_cb_node *node_data;
@@ -1472,7 +1473,7 @@ int bt_adapter_set_name_changed_cb(bt_adapter_name_changed_cb callback,
 	return BT_SUCCESS;
 }
 
-int bt_adapter_unset_name_changed_cb(void)
+int ntb_bt_adapter_unset_name_changed_cb(void)
 {
 	DBG("");
 
@@ -1493,7 +1494,7 @@ int bt_adapter_unset_name_changed_cb(void)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_get_visibility(bt_adapter_visibility_mode_e *mode,
+int ntb_bt_adapter_get_visibility(bt_adapter_visibility_mode_e *mode,
 				int *duration)
 {
 	int discoverable;
@@ -1539,7 +1540,7 @@ int bt_adapter_get_visibility(bt_adapter_visibility_mode_e *mode,
 	return BT_SUCCESS;
 }
 
-int bt_adapter_set_visibility(bt_adapter_visibility_mode_e discoverable_mode,
+int ntb_bt_adapter_set_visibility(bt_adapter_visibility_mode_e discoverable_mode,
 				int duration)
 {
 	int discoverable;
@@ -1570,7 +1571,7 @@ int bt_adapter_set_visibility(bt_adapter_visibility_mode_e discoverable_mode,
 		return BT_ERROR_INVALID_PARAMETER;
 	}
 
-	ret = bt_adapter_get_connectable(&connectable);
+	ret = ntb_bt_adapter_get_connectable(&connectable);
 	if (ret != 0)
 		return BT_ERROR_OPERATION_FAILED;
 
@@ -1592,7 +1593,7 @@ static gboolean bt_stop_discovery_timeout_cb(gpointer user_data)
 {
 	event_id = 0;
 
-	bt_adapter_stop_device_discovery();
+	ntb_bt_adapter_stop_device_discovery();
 
 	return FALSE;
 }
@@ -1606,7 +1607,7 @@ static void bt_stop_discovery_timeout(void)
 		(GSourceFunc)bt_stop_discovery_timeout_cb, NULL);
 }
 
-int bt_adapter_start_device_discovery(void)
+int ntb_bt_adapter_start_device_discovery(void)
 {
 	DBG("");
 
@@ -1623,7 +1624,7 @@ int bt_adapter_start_device_discovery(void)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_stop_device_discovery(void)
+int ntb_bt_adapter_stop_device_discovery(void)
 {
 	DBG("");
 
@@ -1638,7 +1639,7 @@ int bt_adapter_stop_device_discovery(void)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_is_discovering(bool *is_discovering)
+int ntb_bt_adapter_is_discovering(bool *is_discovering)
 {
 	int discovering;
 
@@ -1660,7 +1661,7 @@ int bt_adapter_is_discovering(bool *is_discovering)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_is_service_used(const char *service_uuid, bool *used)
+int ntb_bt_adapter_is_service_used(const char *service_uuid, bool *used)
 {
 	guint length, index;
 	char **uuids;
@@ -1692,7 +1693,7 @@ int bt_adapter_is_service_used(const char *service_uuid, bool *used)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_set_device_discovery_state_changed_cb(
+int ntb_bt_adapter_set_device_discovery_state_changed_cb(
 			bt_adapter_device_discovery_state_changed_cb callback,
 			void *user_data)
 {
@@ -1758,7 +1759,7 @@ int bt_adapter_set_device_discovery_state_changed_cb(
 	return BT_SUCCESS;
 }
 
-int bt_adapter_set_state_changed_cb(bt_adapter_state_changed_cb callback,
+int ntb_bt_adapter_set_state_changed_cb(bt_adapter_state_changed_cb callback,
 					void *user_data)
 {
 	struct adapter_state_cb_node *node_data;
@@ -1789,7 +1790,7 @@ int bt_adapter_set_state_changed_cb(bt_adapter_state_changed_cb callback,
 	return BT_SUCCESS;
 }
 
-int bt_adapter_set_visibility_duration_changed_cb(
+int ntb_bt_adapter_set_visibility_duration_changed_cb(
 			bt_adapter_visibility_duration_changed_cb callback,
 			void *user_data)
 {
@@ -1820,7 +1821,7 @@ int bt_adapter_set_visibility_duration_changed_cb(
 	return BT_SUCCESS;
 }
 
-int bt_adapter_set_visibility_mode_changed_cb(
+int ntb_bt_adapter_set_visibility_mode_changed_cb(
 			bt_adapter_visibility_mode_changed_cb callback,
 			void *user_data)
 {
@@ -1852,7 +1853,7 @@ int bt_adapter_set_visibility_mode_changed_cb(
 	return BT_SUCCESS;
 }
 
-int bt_adapter_unset_state_changed_cb(void)
+int ntb_bt_adapter_unset_state_changed_cb(void)
 {
 	DBG("");
 
@@ -1873,7 +1874,7 @@ int bt_adapter_unset_state_changed_cb(void)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_unset_device_discovery_state_changed_cb(void)
+int ntb_bt_adapter_unset_device_discovery_state_changed_cb(void)
 {
 	DBG("");
 
@@ -1912,7 +1913,7 @@ int bt_adapter_unset_device_discovery_state_changed_cb(void)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_unset_visibility_duration_changed_cb(void)
+int ntb_bt_adapter_unset_visibility_duration_changed_cb(void)
 {
 	DBG("");
 
@@ -1933,7 +1934,7 @@ int bt_adapter_unset_visibility_duration_changed_cb(void)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_unset_visibility_mode_changed_cb(void)
+int ntb_bt_adapter_unset_visibility_mode_changed_cb(void)
 {
 	DBG("");
 
@@ -1954,14 +1955,14 @@ int bt_adapter_unset_visibility_mode_changed_cb(void)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_reset(void)
+int ntb_bt_adapter_reset(void)
 {
 	DBG("Not implement");
 
 	return BT_SUCCESS;
 }
 
-int bt_adapter_foreach_bonded_device(bt_adapter_bonded_device_cb callback,
+int ntb_bt_adapter_foreach_bonded_device(bt_adapter_bonded_device_cb callback,
 					void *user_data)
 {
 	int paired;
@@ -2007,7 +2008,7 @@ int bt_adapter_foreach_bonded_device(bt_adapter_bonded_device_cb callback,
 	return BT_SUCCESS;
 }
 
-int bt_adapter_get_bonded_device_info(const char *remote_address,
+int ntb_bt_adapter_get_bonded_device_info(const char *remote_address,
 					bt_device_info_s **device_info)
 {
 	bluez_device_t *device;
@@ -2038,7 +2039,7 @@ int bt_adapter_get_bonded_device_info(const char *remote_address,
 	return BT_SUCCESS;
 }
 
-int bt_adapter_free_device_info(bt_device_info_s *device_info)
+int ntb_bt_adapter_free_device_info(bt_device_info_s *device_info)
 {
 	if (!device_info)
 		return BT_ERROR_INVALID_PARAMETER;
@@ -2048,7 +2049,7 @@ int bt_adapter_free_device_info(bt_device_info_s *device_info)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_get_version(char **version)
+int ntb_bt_adapter_get_version(char **version)
 {
 	DBG("");
 
@@ -2061,7 +2062,7 @@ int bt_adapter_get_version(char **version)
 	return BT_ERROR_NOT_SUPPORTED;
 }
 
-int bt_adapter_get_local_info(char **chipset, char **firmware,
+int ntb_bt_adapter_get_local_info(char **chipset, char **firmware,
 				char **stack_version, char **profiles)
 {
 	DBG("");
@@ -2320,7 +2321,7 @@ int bt_adapter_remove_remote_oob_data(const char *remote_address)
 	return BT_SUCCESS;
 }
 
-int bt_device_get_service_mask_from_uuid_list(char **uuids,
+int ntb_bt_device_get_service_mask_from_uuid_list(char **uuids,
 					int no_of_service,
 					bt_service_class_t *service_mask_list)
 {
@@ -2446,19 +2447,19 @@ static gboolean adapter_recover_timeout_cb(gpointer user_data)
 	DBG("");
 
 	adapter_recover_timeout_id = 0;
-	bt_adapter_enable();
+	ntb_bt_adapter_enable();
 
 	return FALSE;
 }
 
-int bt_adapter_recover(void)
+int ntb_bt_adapter_recover(void)
 {
 	DBG("");
 
 	if (adapter_recover_timeout_id != 0)
 		return BT_ERROR_NOW_IN_PROGRESS;
 
-	if (bt_adapter_disable() == BT_SUCCESS) {
+	if (ntb_bt_adapter_disable() == BT_SUCCESS) {
 		adapter_recover_timeout_id = g_timeout_add(2000,
 					adapter_recover_timeout_cb, NULL);
 	} else
@@ -2478,7 +2479,7 @@ static void adapter_connectable_watch(int result,
 				bt_adapter_connectable_changed_node->user_data);
 }
 
-int bt_adapter_set_connectable_changed_cb(
+int ntb_bt_adapter_set_connectable_changed_cb(
 	bt_adapter_connectable_changed_cb callback, void *user_data)
 {
 	struct bt_adapter_connectable_changed_cb_node *node_data;
@@ -2509,7 +2510,7 @@ int bt_adapter_set_connectable_changed_cb(
 	return BT_SUCCESS;
 }
 
-int bt_adapter_unset_connectable_changed_cb(void)
+int ntb_bt_adapter_unset_connectable_changed_cb(void)
 {
 	DBG("");
 
@@ -2530,7 +2531,7 @@ int bt_adapter_unset_connectable_changed_cb(void)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_get_connectable(bool *connectable)
+int ntb_bt_adapter_get_connectable(bool *connectable)
 {
 	int ret;
 	gboolean conn;
@@ -2556,7 +2557,7 @@ int bt_adapter_get_connectable(bool *connectable)
 	return BT_SUCCESS;
 }
 
-int bt_adapter_set_connectable(bool connectable)
+int ntb_bt_adapter_set_connectable(bool connectable)
 {
 	int ret;
 
@@ -2578,7 +2579,7 @@ int bt_adapter_set_connectable(bool connectable)
 
 /* Device Function */
 
-int bt_device_create_bond_by_type(const char *remote_address,
+int ntb_bt_device_create_bond_by_type(const char *remote_address,
 				bt_device_connection_link_type_e conn_type)
 {
 	/*at current, bluez doesn't support the feature*/
@@ -2639,7 +2640,7 @@ static void bt_device_paired_cb(enum bluez_error_type error,
 	free_device_info(device_info);
 }
 
-int bt_device_create_bond(const char *remote_address)
+int ntb_bt_device_create_bond(const char *remote_address)
 {
 	int user_privilieges;
 
@@ -2675,7 +2676,7 @@ int bt_device_create_bond(const char *remote_address)
 	return BT_ERROR_NOT_ENABLED;
 }
 
-int bt_device_cancel_bonding(void)
+int ntb_bt_device_cancel_bonding(void)
 {
 	enum bluez_error_type error_type;
 	int powered;
@@ -2720,7 +2721,7 @@ int bt_device_cancel_bonding(void)
 		return BT_ERROR_OPERATION_FAILED;
 }
 
-int bt_device_destroy_bond(const char *remote_address)
+int ntb_bt_device_destroy_bond(const char *remote_address)
 {
 	bluez_device_t *device;
 	int user_privilieges;
@@ -2763,7 +2764,7 @@ int bt_device_destroy_bond(const char *remote_address)
 	return BT_SUCCESS;
 }
 
-int bt_device_set_alias(const char *remote_address, const char *alias)
+int ntb_bt_device_set_alias(const char *remote_address, const char *alias)
 {
 	bluez_device_t *device;
 	int user_privilieges;
@@ -2802,7 +2803,7 @@ int bt_device_set_alias(const char *remote_address, const char *alias)
 	return BT_SUCCESS;
 }
 
-int bt_device_set_authorization(const char *remote_address,
+int ntb_bt_device_set_authorization(const char *remote_address,
 				bt_device_authorization_e authorization_state)
 {
 	int trusted;
@@ -2886,7 +2887,7 @@ static void free_device_sdp_info(bt_device_sdp_info_s *sdp_info)
 	g_free(sdp_info);
 }
 
-int bt_device_start_service_search(const char *remote_address)
+int ntb_bt_device_start_service_search(const char *remote_address)
 {
 	bluez_device_t *device = NULL;
 	bt_device_sdp_info_s *sdp_info;
@@ -2965,7 +2966,7 @@ int bt_device_start_service_search(const char *remote_address)
 	return BT_SUCCESS;
 }
 
-int bt_device_cancel_service_search(void)
+int ntb_bt_device_cancel_service_search(void)
 {
 	/*
 	 * BlueZ 5.x don't support cancel device service search
@@ -2975,7 +2976,7 @@ int bt_device_cancel_service_search(void)
 	return BT_SUCCESS;
 }
 
-int bt_device_set_bond_created_cb(bt_device_bond_created_cb callback,
+int ntb_bt_device_set_bond_created_cb(bt_device_bond_created_cb callback,
 							void *user_data)
 {
 	struct device_bond_cb_node *node;
@@ -3013,7 +3014,7 @@ int bt_device_set_bond_created_cb(bt_device_bond_created_cb callback,
 	return BT_SUCCESS;
 }
 
-int bt_device_unset_bond_created_cb(void)
+int ntb_bt_device_unset_bond_created_cb(void)
 {
 	GList *list;
 	DBG("");
@@ -3038,7 +3039,7 @@ int bt_device_unset_bond_created_cb(void)
 	return BT_SUCCESS;
 }
 
-int bt_device_set_bond_destroyed_cb(bt_device_bond_destroyed_cb callback,
+int ntb_bt_device_set_bond_destroyed_cb(bt_device_bond_destroyed_cb callback,
 							void *user_data)
 {
 	struct device_destroy_paired_cb_node *node;
@@ -3069,7 +3070,7 @@ int bt_device_set_bond_destroyed_cb(bt_device_bond_destroyed_cb callback,
 	return BT_SUCCESS;
 }
 
-int bt_device_unset_bond_destroyed_cb(void)
+int ntb_bt_device_unset_bond_destroyed_cb(void)
 {
 	DBG("");
 
@@ -3094,7 +3095,7 @@ int bt_device_unset_bond_destroyed_cb(void)
 	return BT_SUCCESS;
 }
 
-int bt_device_set_authorization_changed_cb(
+int ntb_bt_device_set_authorization_changed_cb(
 			bt_device_authorization_changed_cb callback,
 						void *user_data)
 {
@@ -3133,7 +3134,7 @@ int bt_device_set_authorization_changed_cb(
 	return BT_SUCCESS;
 }
 
-int bt_device_unset_authorization_changed_cb(void)
+int ntb_bt_device_unset_authorization_changed_cb(void)
 {
 	GList *list;
 	DBG("");
@@ -3158,7 +3159,7 @@ int bt_device_unset_authorization_changed_cb(void)
 	return BT_SUCCESS;
 }
 
-int bt_device_set_service_searched_cb(bt_device_service_searched_cb callback,
+int ntb_bt_device_set_service_searched_cb(bt_device_service_searched_cb callback,
 							void *user_data)
 {
 	struct device_service_search_cb_node *node;
@@ -3187,7 +3188,7 @@ int bt_device_set_service_searched_cb(bt_device_service_searched_cb callback,
 	return BT_SUCCESS;
 }
 
-int bt_device_unset_service_searched_cb(void)
+int ntb_bt_device_unset_service_searched_cb(void)
 {
 	DBG("");
 
@@ -3203,7 +3204,7 @@ int bt_device_unset_service_searched_cb(void)
 	return BT_SUCCESS;
 }
 
-int bt_device_set_connection_state_changed_cb(
+int ntb_bt_device_set_connection_state_changed_cb(
 				bt_device_connection_state_changed_cb callback,
 				void *user_data)
 {
@@ -3242,7 +3243,7 @@ int bt_device_set_connection_state_changed_cb(
 	return BT_SUCCESS;
 }
 
-int bt_device_unset_connection_state_changed_cb(void)
+int ntb_bt_device_unset_connection_state_changed_cb(void)
 {
 	GList *list;
 	DBG("");
@@ -3269,21 +3270,21 @@ int bt_device_unset_connection_state_changed_cb(void)
 
 /* Audio Function */
 
-int bt_audio_initialize(void)
+int ntb_bt_audio_initialize(void)
 {
 	DBG("Not implement");
 
 	return BT_SUCCESS;
 }
 
-int bt_audio_deinitialize(void)
+int ntb_bt_audio_deinitialize(void)
 {
 	DBG("Not implement");
 
 	return BT_SUCCESS;
 }
 
-int bt_audio_connect(const char *remote_address,
+int ntb_bt_audio_connect(const char *remote_address,
 				bt_audio_profile_type_e type)
 {
 	bluez_device_t *device;
@@ -3372,7 +3373,7 @@ done:
 	return BT_SUCCESS;
 }
 
-int bt_audio_disconnect(const char *remote_address,
+int ntb_bt_audio_disconnect(const char *remote_address,
 				bt_audio_profile_type_e type)
 {
 	bluez_device_t *device;
@@ -3461,7 +3462,7 @@ done:
 	return BT_SUCCESS;
 }
 
-int bt_audio_set_connection_state_changed_cb(
+int ntb_bt_audio_set_connection_state_changed_cb(
 			bt_audio_connection_state_changed_cb callback,
 			void *user_data)
 {
@@ -3491,7 +3492,7 @@ int bt_audio_set_connection_state_changed_cb(
 	return BT_SUCCESS;
 }
 
-int bt_audio_unset_connection_state_changed_cb(void)
+int ntb_bt_audio_unset_connection_state_changed_cb(void)
 {
 	DBG("");
 
@@ -3509,7 +3510,7 @@ int bt_audio_unset_connection_state_changed_cb(void)
 	return BT_SUCCESS;
 }
 
-int bt_avrcp_target_initialize(
+int ntb_bt_avrcp_target_initialize(
 			bt_avrcp_target_connection_state_changed_cb callback,
 			void *user_data)
 {
@@ -3551,7 +3552,7 @@ int bt_avrcp_target_initialize(
 	return BT_SUCCESS;
 }
 
-int bt_avrcp_target_deinitialize(void)
+int ntb_bt_avrcp_target_deinitialize(void)
 {
 	DBG("");
 
@@ -3571,7 +3572,7 @@ int bt_avrcp_target_deinitialize(void)
 	return BT_SUCCESS;
 }
 
-int bt_avrcp_set_repeat_mode_changed_cb(
+int ntb_bt_avrcp_set_repeat_mode_changed_cb(
 		bt_avrcp_repeat_mode_changed_cb callback,
 		void *user_data)
 {
@@ -3606,7 +3607,7 @@ int bt_avrcp_set_repeat_mode_changed_cb(
 	return BT_SUCCESS;
 }
 
-int bt_avrcp_unset_repeat_mode_changed_cb(void)
+int ntb_bt_avrcp_unset_repeat_mode_changed_cb(void)
 {
 	DBG("");
 
@@ -3624,7 +3625,7 @@ int bt_avrcp_unset_repeat_mode_changed_cb(void)
 	return BT_SUCCESS;
 }
 
-int bt_avrcp_set_shuffle_mode_changed_cb(
+int ntb_bt_avrcp_set_shuffle_mode_changed_cb(
 		bt_avrcp_shuffle_mode_changed_cb callback,
 		void *user_data)
 {
@@ -3659,7 +3660,7 @@ int bt_avrcp_set_shuffle_mode_changed_cb(
 	return BT_SUCCESS;
 }
 
-int bt_avrcp_unset_shuffle_mode_changed_cb(void)
+int ntb_bt_avrcp_unset_shuffle_mode_changed_cb(void)
 {
 	DBG("");
 
@@ -3677,7 +3678,7 @@ int bt_avrcp_unset_shuffle_mode_changed_cb(void)
 	return BT_SUCCESS;
 }
 
-int bt_avrcp_target_notify_repeat_mode(bt_avrcp_repeat_mode_e mode)
+int ntb_bt_avrcp_target_notify_repeat_mode(bt_avrcp_repeat_mode_e mode)
 {
 	int ret;
 
@@ -3697,7 +3698,7 @@ int bt_avrcp_target_notify_repeat_mode(bt_avrcp_repeat_mode_e mode)
 		return BT_ERROR_OPERATION_FAILED;
 }
 
-int bt_avrcp_target_notify_shuffle_mode(bt_avrcp_shuffle_mode_e mode)
+int ntb_bt_avrcp_target_notify_shuffle_mode(bt_avrcp_shuffle_mode_e mode)
 {
 	int ret;
 
@@ -3717,7 +3718,7 @@ int bt_avrcp_target_notify_shuffle_mode(bt_avrcp_shuffle_mode_e mode)
 		return BT_ERROR_OPERATION_FAILED;
 }
 
-int bt_avrcp_target_notify_player_state(bt_avrcp_player_state_e state)
+int ntb_bt_avrcp_target_notify_player_state(bt_avrcp_player_state_e state)
 {
 	int ret;
 
@@ -3737,7 +3738,7 @@ int bt_avrcp_target_notify_player_state(bt_avrcp_player_state_e state)
 		return BT_ERROR_OPERATION_FAILED;
 }
 
-int bt_avrcp_target_notify_position(unsigned int position)
+int ntb_bt_avrcp_target_notify_position(unsigned int position)
 {
 	int ret;
 
@@ -3779,7 +3780,7 @@ static void _bt_avrcp_metadata_free(media_metadata_attributes_t *metadata)
 		g_free(metadata->album);
 }
 
-int bt_avrcp_target_notify_track(const char *title, const char *artist,
+int ntb_bt_avrcp_target_notify_track(const char *title, const char *artist,
 		const char *album, const char *genre, unsigned int track_num,
 		unsigned int total_tracks, unsigned int duration)
 {
@@ -3815,19 +3816,19 @@ int bt_avrcp_target_notify_track(const char *title, const char *artist,
 	return BT_ERROR_OPERATION_FAILED;
 }
 
-int bt_avrcp_target_notify_equalizer_state(bt_avrcp_equalizer_state_e state)
+int ntb_bt_avrcp_target_notify_equalizer_state(bt_avrcp_equalizer_state_e state)
 {
 	/*bluez-5.X doesn't provide the property*/
 	return BT_SUCCESS;
 }
 
-int bt_avrcp_target_notify_scan_mode(bt_avrcp_scan_mode_e mode)
+int ntb_bt_avrcp_target_notify_scan_mode(bt_avrcp_scan_mode_e mode)
 {
 	/*bluez-5.X doesn't provide the property*/
 	return BT_SUCCESS;
 }
 
-int bt_avrcp_set_equalizer_state_changed_cb(
+int ntb_bt_avrcp_set_equalizer_state_changed_cb(
 				bt_avrcp_equalizer_state_changed_cb callback,
 				void *user_data)
 {
@@ -3835,27 +3836,27 @@ int bt_avrcp_set_equalizer_state_changed_cb(
 	return BT_SUCCESS;
 }
 
-int bt_avrcp_unset_equalizer_state_changed_cb(void)
+int ntb_bt_avrcp_unset_equalizer_state_changed_cb(void)
 {
 	/*bluez-5.X doesn't provide the property*/
 	return BT_SUCCESS;
 }
 
-int bt_avrcp_set_scan_mode_changed_cb(bt_avrcp_scan_mode_changed_cb callback,
+int ntb_bt_avrcp_set_scan_mode_changed_cb(bt_avrcp_scan_mode_changed_cb callback,
 				void *user_data)
 {
 	/*bluez-5.X doesn't provide the property*/
 	return BT_SUCCESS;
 }
 
-int bt_avrcp_unset_scan_mode_changed_cb(void)
+int ntb_bt_avrcp_unset_scan_mode_changed_cb(void)
 {
 	 /*bluez-5.X doesn't provide the property*/
 	return BT_SUCCESS;
 }
 
 /* Hid function */
-int bt_hid_host_initialize(
+int ntb_bt_hid_host_initialize(
 		bt_hid_host_connection_state_changed_cb connection_cb,
 		void *user_data)
 {
@@ -3896,7 +3897,7 @@ int bt_hid_host_initialize(
 	return BT_SUCCESS;
 }
 
-int bt_hid_host_deinitialize(void)
+int ntb_bt_hid_host_deinitialize(void)
 {
 	GList *list;
 	DBG("");
@@ -3943,7 +3944,7 @@ static void profile_connect_callback(bluez_device_t *device,
 	}
 }
 
-int bt_hid_host_connect(const char *remote_address)
+int ntb_bt_hid_host_connect(const char *remote_address)
 {
 	bluez_device_t *device;
 	int user_privilieges;
@@ -4008,7 +4009,7 @@ static void profile_disconnect_callback(bluez_device_t *device,
 	}
 }
 
-int bt_hid_host_disconnect(const char *remote_address)
+int ntb_bt_hid_host_disconnect(const char *remote_address)
 {
 	bluez_device_t *device;
 	int user_privilieges;
@@ -4918,7 +4919,7 @@ done:
 	return -1;
 }
 
-int bt_agent_register(bt_agent *agent)
+int ntb_bt_agent_register(bt_agent *agent)
 {
 	int ret;
 
@@ -4944,7 +4945,7 @@ int bt_agent_register(bt_agent *agent)
 }
 
 #ifdef TIZEN_3
-int bt_agent_register_sync(void)
+int ntb_bt_agent_register_sync(void)
 {
 	int ret;
 
@@ -4965,7 +4966,7 @@ int bt_agent_register_sync(void)
 }
 #endif
 
-int bt_agent_unregister(void)
+int ntb_bt_agent_unregister(void)
 {
 	if (initialized == false)
 		return BT_ERROR_NOT_INITIALIZED;
@@ -4990,7 +4991,7 @@ static void bt_agent_simple_reject(GDBusMethodInvocation *invocation)
 			"RejectedByUser");
 }
 
-void bt_agent_confirm_accept(bt_req_t *requestion)
+void ntb_bt_agent_confirm_accept(bt_req_t *requestion)
 {
 	GDBusMethodInvocation *invocation = requestion;
 
@@ -4998,7 +4999,7 @@ void bt_agent_confirm_accept(bt_req_t *requestion)
 }
 
 #ifdef TIZEN_3
-void bt_agent_reply_sync(bt_agent_accept_type_t reply)
+void ntb_bt_agent_reply_sync(bt_agent_accept_type_t reply)
 {
   DBG("reply [%d]", reply);
 
@@ -5017,14 +5018,14 @@ void bt_agent_reply_sync(bt_agent_accept_type_t reply)
 }
 #endif
 
-void bt_agent_confirm_reject(bt_req_t *requestion)
+void ntb_bt_agent_confirm_reject(bt_req_t *requestion)
 {
 	GDBusMethodInvocation *invocation = requestion;
 
 	bt_agent_simple_reject(invocation);
 }
 
-void bt_agent_pincode_reply(const char *pin_code, bt_req_t *requestion)
+void ntb_bt_agent_pincode_reply(const char *pin_code, bt_req_t *requestion)
 {
 	GDBusMethodInvocation *invocation = requestion;
 
@@ -5032,7 +5033,7 @@ void bt_agent_pincode_reply(const char *pin_code, bt_req_t *requestion)
 					g_variant_new("(s)", pin_code));
 }
 
-void bt_agent_pincode_cancel(bt_req_t *requestion)
+void ntb_bt_agent_pincode_cancel(bt_req_t *requestion)
 {
 	GDBusMethodInvocation *invocation = requestion;
 
@@ -5629,7 +5630,7 @@ static int bt_spp_unset_data_received_cb(void)
 	return BT_SUCCESS;
 }
 
-int bt_socket_create_rfcomm(const char *service_uuid, int *socket_fd)
+int ntb_bt_socket_create_rfcomm(const char *service_uuid, int *socket_fd)
 {
 	struct spp_context *spp_ctx;
 	int ret;
@@ -5651,7 +5652,7 @@ int bt_socket_create_rfcomm(const char *service_uuid, int *socket_fd)
 	return BT_SUCCESS;
 }
 
-int bt_socket_destroy_rfcomm(int socket_fd)
+int ntb_bt_socket_destroy_rfcomm(int socket_fd)
 {
 	struct spp_context *spp_ctx;
 
@@ -5662,7 +5663,7 @@ int bt_socket_destroy_rfcomm(int socket_fd)
 	return bt_spp_destroy_rfcomm(spp_ctx->uuid);
 }
 
-int bt_socket_connect_rfcomm(const char *remote_address,
+int ntb_bt_socket_connect_rfcomm(const char *remote_address,
 				const char *service_uuid)
 {
 	struct spp_context *spp_ctx;
@@ -5714,7 +5715,7 @@ done:
 	return bt_spp_connect_rfcomm(remote_address, service_uuid);
 }
 
-int bt_socket_disconnect_rfcomm(int socket_fd)
+int ntb_bt_socket_disconnect_rfcomm(int socket_fd)
 {
 	struct spp_context *spp_ctx;
 	struct spp_channel *spp_chan;
@@ -5729,7 +5730,7 @@ int bt_socket_disconnect_rfcomm(int socket_fd)
 						spp_ctx->uuid);
 }
 
-int bt_socket_listen(int socket_fd, int max_pending_connections)
+int ntb_bt_socket_listen(int socket_fd, int max_pending_connections)
 {
 	struct spp_context *spp_ctx;
 
@@ -5745,7 +5746,7 @@ int bt_socket_listen(int socket_fd, int max_pending_connections)
 	return BT_SUCCESS;
 }
 
-int bt_socket_listen_and_accept_rfcomm(int socket_fd,
+int ntb_bt_socket_listen_and_accept_rfcomm(int socket_fd,
 				int max_pending_connections)
 {
 	struct spp_context *spp_ctx;
@@ -5764,7 +5765,7 @@ int bt_socket_listen_and_accept_rfcomm(int socket_fd,
 	return BT_SUCCESS;
 }
 
-int bt_socket_accept(int requested_socket_fd)
+int ntb_bt_socket_accept(int requested_socket_fd)
 {
 	struct spp_context *spp_ctx;
 
@@ -5777,7 +5778,7 @@ int bt_socket_accept(int requested_socket_fd)
 	return BT_SUCCESS;
 }
 
-int bt_socket_reject(int socket_fd)
+int ntb_bt_socket_reject(int socket_fd)
 {
 	struct spp_context *spp_ctx;
 
@@ -5790,19 +5791,19 @@ int bt_socket_reject(int socket_fd)
 	return BT_SUCCESS;
 }
 
-int bt_socket_send_data(int socket_fd, const char *data, int length)
+int ntb_bt_socket_send_data(int socket_fd, const char *data, int length)
 {
 	return bt_spp_send_data(socket_fd, data, length);
 }
 
-int bt_socket_set_data_received_cb(bt_socket_data_received_cb callback,
+int ntb_bt_socket_set_data_received_cb(bt_socket_data_received_cb callback,
 							void *user_data)
 {
 	return bt_spp_set_data_received_cb(
 				(bt_spp_data_received_cb)callback, user_data);
 }
 
-int bt_socket_set_connection_requested_cb(
+int ntb_bt_socket_set_connection_requested_cb(
 				bt_socket_connection_requested_cb callback,
 				void *user_data)
 {
@@ -5833,7 +5834,7 @@ int bt_socket_set_connection_requested_cb(
 	return BT_SUCCESS;
 }
 
-int bt_socket_set_connection_state_changed_cb(
+int ntb_bt_socket_set_connection_state_changed_cb(
 			bt_socket_connection_state_changed_cb callback,
 			void *user_data)
 {
@@ -5864,7 +5865,7 @@ int bt_socket_set_connection_state_changed_cb(
 	return BT_SUCCESS;
 }
 
-int bt_socket_unset_connection_requested_cb(void)
+int ntb_bt_socket_unset_connection_requested_cb(void)
 {
 	if (initialized == false)
 		return BT_ERROR_NOT_INITIALIZED;
@@ -5878,12 +5879,12 @@ int bt_socket_unset_connection_requested_cb(void)
 	return BT_SUCCESS;
 }
 
-int bt_socket_unset_data_received_cb(void)
+int ntb_bt_socket_unset_data_received_cb(void)
 {
 	return bt_spp_unset_data_received_cb();
 }
 
-int bt_socket_unset_connection_state_changed_cb(void)
+int ntb_bt_socket_unset_connection_state_changed_cb(void)
 {
 	if (initialized == false)
 		return BT_ERROR_NOT_INITIALIZED;
@@ -5933,7 +5934,7 @@ char *get_connman_service_path(const char *adapter_name,
 	return path;
 }
 
-int bt_panu_connect(const char *remote_address, bt_panu_service_type_e type)
+int ntb_bt_panu_connect(const char *remote_address, bt_panu_service_type_e type)
 {
 	GDBusConnection *connection;
 	bt_device_info_s *device_bond_info;
@@ -6020,7 +6021,7 @@ done:
 	return ret;
 }
 
-int bt_panu_disconnect(const char *remote_address)
+int ntb_bt_panu_disconnect(const char *remote_address)
 {
 	GDBusConnection *connection;
 	char *path, *adapter_address;
@@ -6102,7 +6103,7 @@ done:
 	return ret;
 }
 
-int bt_panu_set_connection_state_changed_cb(
+int ntb_bt_panu_set_connection_state_changed_cb(
 				bt_panu_connection_state_changed_cb callback,
 				void *user_data)
 {
@@ -6143,7 +6144,7 @@ int bt_panu_set_connection_state_changed_cb(
 	return BT_SUCCESS;
 }
 
-int bt_panu_unset_connection_state_changed_cb(void)
+int ntb_bt_panu_unset_connection_state_changed_cb(void)
 {
 	GList *list;
 	DBG("");
@@ -6203,17 +6204,17 @@ static int connman_set_tethering(bool tethering)
 	return BT_SUCCESS;
 }
 
-int bt_nap_activate(void)
+int ntb_bt_nap_activate(void)
 {
 	return connman_set_tethering(true);
 }
 
-int bt_nap_deactivate(void)
+int ntb_bt_nap_deactivate(void)
 {
 	return connman_set_tethering(false);
 }
 
-int bt_hdp_register_sink_app(unsigned short data_type, char **app_id)
+int ntb_bt_hdp_register_sink_app(unsigned short data_type, char **app_id)
 {
 	int result = BT_ERROR_NONE;
 
@@ -6230,7 +6231,7 @@ int bt_hdp_register_sink_app(unsigned short data_type, char **app_id)
 	return result;
 }
 
-int bt_hdp_unregister_sink_app(const char *app_id)
+int ntb_bt_hdp_unregister_sink_app(const char *app_id)
 {
 	int result = BT_ERROR_NONE;
 
@@ -6247,7 +6248,7 @@ int bt_hdp_unregister_sink_app(const char *app_id)
 	return result;
 }
 
-int bt_hdp_send_data(unsigned int channel, const char *data,
+int ntb_bt_hdp_send_data(unsigned int channel, const char *data,
 						unsigned int size)
 {
 	int result = BT_ERROR_NONE;
@@ -6265,7 +6266,7 @@ int bt_hdp_send_data(unsigned int channel, const char *data,
 	return result;
 }
 
-int bt_hdp_connect_to_source(const char *remote_address, const char *app_id)
+int ntb_bt_hdp_connect_to_source(const char *remote_address, const char *app_id)
 {
 	int result = BT_ERROR_NONE;
 	int user_privilieges;
@@ -6299,7 +6300,7 @@ int bt_hdp_connect_to_source(const char *remote_address, const char *app_id)
 	return result;
 }
 
-int bt_hdp_disconnect(const char *remote_address, unsigned int channel)
+int ntb_bt_hdp_disconnect(const char *remote_address, unsigned int channel)
 {
 	int result = BT_ERROR_NONE;
 	int user_privilieges;
@@ -6333,7 +6334,7 @@ int bt_hdp_disconnect(const char *remote_address, unsigned int channel)
 	return result;
 }
 
-int bt_hdp_set_connection_state_changed_cb(bt_hdp_connected_cb connected_cb,
+int ntb_bt_hdp_set_connection_state_changed_cb(bt_hdp_connected_cb connected_cb,
 		bt_hdp_disconnected_cb disconnected_cb, void *user_data)
 {
 	struct hdp_connection_changed_cb_node *node_data = NULL;
@@ -6372,7 +6373,7 @@ int bt_hdp_set_connection_state_changed_cb(bt_hdp_connected_cb connected_cb,
 	return BT_SUCCESS;
 }
 
-int bt_hdp_unset_connection_state_changed_cb(void)
+int ntb_bt_hdp_unset_connection_state_changed_cb(void)
 {
 	GList *list;
 
@@ -6395,7 +6396,7 @@ int bt_hdp_unset_connection_state_changed_cb(void)
 	return BT_SUCCESS;
 }
 
-int bt_hdp_set_data_received_cb(bt_hdp_data_received_cb callback,
+int ntb_bt_hdp_set_data_received_cb(bt_hdp_data_received_cb callback,
 							void *user_data)
 {
 	struct hdp_set_data_received_cb_node *node_data = NULL;
@@ -6435,7 +6436,7 @@ int bt_hdp_set_data_received_cb(bt_hdp_data_received_cb callback,
 	return BT_SUCCESS;
 }
 
-int bt_hdp_unset_data_received_cb(void)
+int ntb_bt_hdp_unset_data_received_cb(void)
 {
 	GList *list;
 
@@ -6584,7 +6585,7 @@ int bt_device_disconnect_le(bt_device_gatt_state_changed_cb callback,
 	return BT_SUCCESS;
 }
 
-int bt_nap_set_connection_state_changed_cb(
+int ntb_bt_nap_set_connection_state_changed_cb(
 				bt_nap_connection_state_changed_cb callback,
 				void *user_data)
 {
@@ -6616,7 +6617,7 @@ int bt_nap_set_connection_state_changed_cb(
 	return BT_SUCCESS;
 }
 
-int bt_nap_unset_connection_state_changed_cb(void)
+int ntb_bt_nap_unset_connection_state_changed_cb(void)
 {
 	DBG("");
 
@@ -6657,7 +6658,7 @@ static gboolean spp_is_device_connected(const char *address)
 	return false;
 }
 
-int bt_device_foreach_connected_profiles(
+int ntb_bt_device_foreach_connected_profiles(
 			const char *remote_address,
 			bt_device_connected_profile callback,
 			void *user_data)
@@ -6726,7 +6727,7 @@ int bt_device_foreach_connected_profiles(
 	return BT_SUCCESS;
 }
 
-int bt_gatt_foreach_primary_services(const char *remote_address,
+int ntb_bt_gatt_foreach_primary_services(const char *remote_address,
 				bt_gatt_primary_service_cb callback,
 				void *user_data)
 {
@@ -6782,7 +6783,7 @@ int bt_gatt_foreach_primary_services(const char *remote_address,
 	return BT_SUCCESS;
 }
 
-int bt_gatt_discover_characteristics(bt_gatt_attribute_h service,
+int ntb_bt_gatt_discover_characteristics(bt_gatt_attribute_h service,
 				bt_gatt_characteristics_discovered_cb callback,
 				void *user_data)
 {
@@ -6832,7 +6833,7 @@ int bt_gatt_discover_characteristics(bt_gatt_attribute_h service,
 
 }
 
-int bt_gatt_get_service_uuid(bt_gatt_attribute_h service, char **uuid)
+int ntb_bt_gatt_get_service_uuid(bt_gatt_attribute_h service, char **uuid)
 {
 	bluez_gatt_service_t *gatt_service;
 	const char *service_path = service;
@@ -6857,7 +6858,7 @@ int bt_gatt_get_service_uuid(bt_gatt_attribute_h service, char **uuid)
 	return BT_SUCCESS;
 }
 
-int bt_gatt_foreach_included_services(bt_gatt_attribute_h service,
+int ntb_bt_gatt_foreach_included_services(bt_gatt_attribute_h service,
 				bt_gatt_included_service_cb callback,
 				void *user_data)
 {
@@ -6902,7 +6903,7 @@ int bt_gatt_foreach_included_services(bt_gatt_attribute_h service,
 	return BT_SUCCESS;
 }
 
-int bt_gatt_set_characteristic_changed_cb(bt_gatt_attribute_h service,
+int ntb_bt_gatt_set_characteristic_changed_cb(bt_gatt_attribute_h service,
 				bt_gatt_characteristic_changed_cb callback,
 				void *user_data)
 {
@@ -6958,7 +6959,7 @@ int bt_gatt_set_characteristic_changed_cb(bt_gatt_attribute_h service,
 	return BT_SUCCESS;
 }
 
-int bt_gatt_unset_characteristic_changed_cb(bt_gatt_attribute_h service)
+int ntb_bt_gatt_unset_characteristic_changed_cb(bt_gatt_attribute_h service)
 {
 	bluez_gatt_service_t *gatt_service;
 	const char *service_path = service;
@@ -7008,7 +7009,7 @@ int bt_gatt_unset_characteristic_changed_cb(bt_gatt_attribute_h service)
 	return BT_SUCCESS;
 }
 
-int bt_gatt_get_characteristic_declaration(bt_gatt_attribute_h characteristic,
+int ntb_bt_gatt_get_characteristic_declaration(bt_gatt_attribute_h characteristic,
 				char **uuid, unsigned char **value,
 				int *value_length)
 {
@@ -7053,7 +7054,7 @@ int bt_gatt_get_characteristic_declaration(bt_gatt_attribute_h characteristic,
 	return BT_SUCCESS;
 }
 
-int bt_gatt_set_characteristic_value_request(bt_gatt_attribute_h characteristic,
+int ntb_bt_gatt_set_characteristic_value_request(bt_gatt_attribute_h characteristic,
 				const unsigned char *value,
 				int value_length,
 				unsigned char request,
@@ -7122,7 +7123,7 @@ int bt_gatt_set_characteristic_value_request(bt_gatt_attribute_h characteristic,
 
 }
 
-int bt_gatt_clone_attribute_handle(bt_gatt_attribute_h *clone,
+int ntb_bt_gatt_clone_attribute_handle(bt_gatt_attribute_h *clone,
 				bt_gatt_attribute_h origin)
 {
 	DBG("");
@@ -7141,7 +7142,7 @@ int bt_gatt_clone_attribute_handle(bt_gatt_attribute_h *clone,
 	return BT_SUCCESS;
 }
 
-int bt_gatt_destroy_attribute_handle(bt_gatt_attribute_h handle)
+int ntb_bt_gatt_destroy_attribute_handle(bt_gatt_attribute_h handle)
 {
 	DBG("");
 
@@ -7159,7 +7160,7 @@ int bt_gatt_destroy_attribute_handle(bt_gatt_attribute_h handle)
 	return BT_SUCCESS;
 }
 
-int bt_gatt_read_characteristic_value(bt_gatt_attribute_h characteristic,
+int ntb_bt_gatt_read_characteristic_value(bt_gatt_attribute_h characteristic,
 		bt_gatt_characteristic_read_cb callback)
 {
 	bluez_gatt_char_t *gatt_char;

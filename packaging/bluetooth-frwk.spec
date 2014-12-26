@@ -33,13 +33,13 @@ Requires:   %{name} = %{version}
 Test case for Bluetooth Framework (DEV). Some test programs to test the APIs
 and interfaces about Bluetooth Framework or other inner code.
 
-%package devel
-Summary:    Network Bluetooth Framework (DEV)
-Requires:   %{name} = %{version}-%{release}
+#%package devel
+#Summary:    Network Bluetooth Framework (DEV)
+#Requires:   %{name} = %{version}-%{release}
 
-%description devel
-Development files for Bleutooth Framework based on BlueZ an Obexd stack, with
-API descriptions files and config file.
+#%description devel
+#Development files for Bleutooth Framework based on BlueZ an Obexd stack, with
+#API descriptions files and config file.
 
 %prep
 %setup -q
@@ -66,7 +66,7 @@ make %{?jobs:-j%jobs}
 install -D -m 0644 %{SOURCE1} %{buildroot}%{_datadir}/icons/default/bt-icon.png
 
 # also install bluetooth-api.pc file for compatibility with other components
-ln -sf %{_libdir}/pkgconfig/capi-network-bluetooth.pc %{buildroot}%{_libdir}/pkgconfig/bluetooth-api.pc
+#ln -sf %{_libdir}/pkgconfig/capi-network-bluetooth.pc %{buildroot}%{_libdir}/pkgconfig/bluetooth-api.pc
 
 %post -p /sbin/ldconfig
 
@@ -76,7 +76,7 @@ ln -sf %{_libdir}/pkgconfig/capi-network-bluetooth.pc %{buildroot}%{_libdir}/pkg
 %manifest %{name}.manifest
 %defattr(-, root, root)
 %{_bindir}/bluetooth-service
-%{_libdir}/libcapi-network-bluetooth.so.*
+#%{_libdir}/libcapi-network-bluetooth.so.*
 %config %{_sysconfdir}/dbus-1/system.d/bluezlib.conf
 %config %{_sysconfdir}/dbus-1/system.d/bluezobex.conf
 %config %{_sysconfdir}/dbus-1/system.d/bluetooth-service.conf
@@ -88,14 +88,14 @@ ln -sf %{_libdir}/pkgconfig/capi-network-bluetooth.pc %{buildroot}%{_libdir}/pkg
 
 %files test
 %manifest %{name}.manifest
-%{_libdir}/%{name}-test/bluez-capi-test
+#%{_libdir}/%{name}-test/bluez-capi-test
 %{_libdir}/%{name}-test/bt-serivce-lib-test
 %{_libdir}/%{name}-test/bluez-lib-test
 %{_libdir}/%{name}-test/obex-lib-test
 %config %{_sysconfdir}/dbus-1/system.d/bluez-lib-test.conf
 
-%files devel
-%{_includedir}/network/bluetooth.h
-%{_libdir}/pkgconfig/capi-network-bluetooth.pc
-%{_libdir}/pkgconfig/bluetooth-api.pc
-%{_libdir}/libcapi-network-bluetooth.so
+#%files devel
+#%{_includedir}/network/bluetooth.h
+#%{_libdir}/pkgconfig/capi-network-bluetooth.pc
+#%{_libdir}/pkgconfig/bluetooth-api.pc
+#%{_libdir}/libcapi-network-bluetooth.so

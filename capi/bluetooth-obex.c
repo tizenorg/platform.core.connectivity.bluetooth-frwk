@@ -28,6 +28,7 @@
 #include <string.h>
 
 #include "bluetooth.h"
+#include "ntb-bluetooth.h"
 #include "obex.h"
 #include "common.h"
 #include "bluetooth-service.h"
@@ -617,7 +618,7 @@ int bt_opp_transfer_cancel(int transfer_id)
 	return BT_SUCCESS;
 }
 
-int bt_opp_server_set_destination(const char *dir)
+int ntb_bt_opp_server_set_destination(const char *dir)
 {
 	if (dir == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
@@ -683,7 +684,7 @@ void server_connect_requested_cb(const char *remote_address, const char *name,
 				opp_server_conn_req_node->user_data);
 }
 
-int bt_opp_server_initialize(const char *destination,
+int ntb_bt_opp_server_initialize(const char *destination,
 			bt_opp_server_push_requested_cb push_requested_cb,
 			void *user_data)
 {
@@ -722,7 +723,7 @@ int bt_opp_server_initialize(const char *destination,
 	return ret;
 }
 
-int bt_opp_server_initialize_by_connection_request(const char *destination,
+int ntb_bt_opp_server_initialize_by_connection_request(const char *destination,
 		bt_opp_server_connection_requested_cb connection_requested_cb,
 		void *user_data)
 {
@@ -762,7 +763,7 @@ int bt_opp_server_initialize_by_connection_request(const char *destination,
 	return ret;
 }
 
-int bt_opp_server_deinitialize(void)
+int ntb_bt_opp_server_deinitialize(void)
 {
 	DBG("");
 
@@ -835,7 +836,7 @@ static void bt_opp_client_transfer_state_cb(unsigned int id,
 	DBG("-");
 }
 
-int bt_opp_server_accept(bt_opp_server_transfer_progress_cb progress_cb,
+int ntb_bt_opp_server_accept(bt_opp_server_transfer_progress_cb progress_cb,
 			bt_opp_server_transfer_finished_cb finished_cb,
 			const char *name, void *user_data, int *transfer_id)
 {
@@ -852,7 +853,7 @@ int bt_opp_server_accept(bt_opp_server_transfer_progress_cb progress_cb,
 	return bt_opp_server_accept_request(name, user_data, transfer_id);
 }
 
-int bt_opp_server_reject(void)
+int ntb_bt_opp_server_reject(void)
 {
 	DBG("");
 
@@ -864,7 +865,7 @@ int bt_opp_server_reject(void)
 	return bt_opp_server_reject_request();
 }
 
-int bt_opp_server_cancel_transfer(int transfer_id)
+int ntb_bt_opp_server_cancel_transfer(int transfer_id)
 {
 	DBG("");
 
@@ -876,7 +877,7 @@ int bt_opp_server_cancel_transfer(int transfer_id)
 	return bt_opp_transfer_cancel(transfer_id);
 }
 
-int bt_opp_client_initialize(void)
+int ntb_bt_opp_client_initialize(void)
 {
 	int ret;
 
@@ -898,7 +899,7 @@ int bt_opp_client_initialize(void)
 	return BT_SUCCESS;
 }
 
-int bt_opp_client_deinitialize(void)
+int ntb_bt_opp_client_deinitialize(void)
 {
 	DBG("");
 
@@ -919,7 +920,7 @@ int bt_opp_client_deinitialize(void)
 	return BT_SUCCESS;
 }
 
-int bt_opp_client_add_file(const char *file)
+int ntb_bt_opp_client_add_file(const char *file)
 {
 	int ret = BT_ERROR_NONE;
 
@@ -950,7 +951,7 @@ int bt_opp_client_add_file(const char *file)
 	return BT_ERROR_NONE;
 }
 
-int bt_opp_client_clear_files(void)
+int ntb_bt_opp_client_clear_files(void)
 {
 	DBG("");
 
@@ -964,7 +965,7 @@ int bt_opp_client_clear_files(void)
 	return BT_ERROR_NONE;
 }
 
-int bt_opp_client_push_files(const char *remote_address,
+int ntb_bt_opp_client_push_files(const char *remote_address,
 				bt_opp_client_push_responded_cb responded_cb,
 				bt_opp_client_push_progress_cb progress_cb,
 				bt_opp_client_push_finished_cb finished_cb,
@@ -1014,7 +1015,7 @@ int bt_opp_client_push_files(const char *remote_address,
 	return ret;
 }
 
-int bt_opp_client_cancel_push(void)
+int ntb_bt_opp_client_cancel_push(void)
 {
 	int user_privilieges;
 
