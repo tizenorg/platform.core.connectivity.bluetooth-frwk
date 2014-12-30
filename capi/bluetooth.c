@@ -548,9 +548,11 @@ static void bluez_unpaired_device_removed(bluez_device_t *device,
 
 	discovery_device_info = get_discovery_device_info(device_info);
 
+	/*
 	if (node->cb)
 		node->cb(BT_SUCCESS, BT_ADAPTER_DEVICE_DISCOVERY_REMOVED,
 				discovery_device_info, node->user_data);
+	*/
 
 	free_discovery_device_info(discovery_device_info);
 }

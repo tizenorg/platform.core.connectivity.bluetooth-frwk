@@ -172,14 +172,13 @@ typedef enum
 /**
  * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
  * @brief Enumerations of the discovery state of Bluetooth device.
- *
+ * @since_tizen 2.3
  */
 typedef enum
 {
 	BT_ADAPTER_DEVICE_DISCOVERY_STARTED, /**< Device discovery is started */
 	BT_ADAPTER_DEVICE_DISCOVERY_FINISHED, /**< Device discovery is finished */
 	BT_ADAPTER_DEVICE_DISCOVERY_FOUND, /**< The remote Bluetooth device is found */
-	BT_ADAPTER_DEVICE_DISCOVERY_REMOVED, /**< The remote Bluetooth device is removed */
 } bt_adapter_device_discovery_state_e;
 
 /**

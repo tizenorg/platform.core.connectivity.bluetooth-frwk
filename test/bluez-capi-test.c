@@ -659,7 +659,7 @@ static void device_discovery_cb(int result,
 				g_strdupv(discovery_info->service_uuid);
 
 		device_list = g_list_append(device_list, device_info);
-	} else if (state == BT_ADAPTER_DEVICE_DISCOVERY_REMOVED) {
+/*	} else if (state == BT_ADAPTER_DEVICE_DISCOVERY_REMOVED) {
 		GList *iter, *next;
 
 		for (iter = g_list_first(device_list); iter; iter = next) {
@@ -678,6 +678,7 @@ static void device_discovery_cb(int result,
 				g_free(info);
 			}
 		}
+*/
 	} else if (state == BT_ADAPTER_DEVICE_DISCOVERY_FINISHED)
 		DBG("BT_ADAPTER_DEVICE_DISCOVERY_FINISHED");
 	else
