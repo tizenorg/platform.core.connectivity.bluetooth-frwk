@@ -2050,6 +2050,10 @@ int bt_adapter_free_device_info(bt_device_info_s *device_info)
 
 int bt_adapter_get_version(char **version)
 {
+	char *chipset, *firmware;
+	char *stack_version;
+	int ret;
+
 	DBG("");
 
 	if (initialized == false)
@@ -2058,12 +2062,30 @@ int bt_adapter_get_version(char **version)
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
-	return BT_ERROR_NOT_SUPPORTED;
+	ret = bluez_get_local_info(version, &chipset,
+				&firmware, &stack_version);
+
+	if (chipset)
+		g_free(chipset);
+	if (firmware)
+		g_free(firmware);
+	if (stack_version)
+		g_free(stack_version);
+
+	if (ret == 0)
+		return BT_SUCCESS;
+
+	return BT_ERROR_OPERATION_FAILED;
 }
 
 int bt_adapter_get_local_info(char **chipset, char **firmware,
 				char **stack_version, char **profiles)
 {
+	int ret;
+	char **p, **uuids;
+	char *profile, *version = NULL;
+	guint length, index;
+
 	DBG("");
 
 	if (initialized == false)
@@ -2072,7 +2094,47 @@ int bt_adapter_get_local_info(char **chipset, char **firmware,
 	if (default_adapter == NULL)
 		return BT_ERROR_ADAPTER_NOT_FOUND;
 
-	return BT_ERROR_NOT_SUPPORTED;
+	ret = bluez_get_local_info(&version, chipset, firmware, stack_version);
+
+	if (ret != 0) {
+		*chipset = NULL;
+		*firmware = NULL;
+		*stack_version = NULL;
+	} else if (version)
+		g_free(version);
+
+	uuids = bluez_adapter_get_property_uuids(default_adapter);
+	length = g_strv_length(uuids);
+
+	DBG("length = %d", length);
+
+	if (length) {
+		p = convert_uuid_to_profiles(uuids);
+		length = g_strv_length(p);
+		if (length > 0) {
+			profile = g_malloc0(length*70);
+			if (!profile) {
+				profiles = NULL;
+				goto done;
+			}
+			for (index = 0; index < length; ++index) {
+				strcat(profile, p[index]);
+				strcat(profile, ";");
+			}
+			ret = 0;
+			*profiles = profile;
+			g_strfreev(p);
+		}
+	} else
+		profiles = NULL;
+
+done:
+	g_strfreev(uuids);
+
+	if (ret == 0)
+		return BT_SUCCESS;
+
+	return BT_ERROR_OPERATION_FAILED;
 }
 
 gboolean get_neard_data(const unsigned char *peir, unsigned char **hash,

@@ -1,6 +1,6 @@
 Name:       bluetooth-frwk
 Summary:    Network Bluetooth Framework
-Version:    0.2
+Version:    0.3
 Release:    1
 Group:      Network & Connectivity/Bluetooth
 License:    Apache-2.0

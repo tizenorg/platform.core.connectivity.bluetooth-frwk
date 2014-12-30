@@ -139,4 +139,6 @@ unsigned char *convert_address_to_baddr(const char *address);
 
 unsigned int convert_appearance_to_type(unsigned int appearance);
 
+char **convert_uuid_to_profiles(char **uuids);
+
 #endif

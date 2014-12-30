@@ -20,9 +20,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <gio/gio.h>
+#include <stdio.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <sys/param.h>
+#include <sys/uio.h>
+#include <sys/poll.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
 #include "common.h"
 #include "bluez.h"
+#include "uuid.h"
 
+#define BLUEZ_VERSION "bluez5.19"
 #define BLUEZ_NAME "org.bluez"
 #define OBJECT_MANAGE_PATH "/"
 #define ADAPTER_INTERFACE "org.bluez.Adapter1"
@@ -48,6 +61,22 @@
 #define MEDIA_PLAYER_INTERFACE  "org.mpris.MediaPlayer2.Player"
 
 GDBusObjectManager *object_manager = NULL;
+
+struct sockaddr_h {
+	sa_family_t	family;
+	guint16	dev;
+};
+
+struct cmd_filter {
+	guint32	t_mask;
+	guint32	e_mask[2];
+	guint16	code;
+};
+
+struct cmd_hdr {
+	guint16	code;
+	guint8	len;
+} __attribute__ ((packed));
 
 struct player_settinngs_t {
 	int key;
@@ -4867,4 +4896,1225 @@ gboolean bluez_get_media_type(const char *remote_address)
 	}
 
 	return is_type;
+}
+
+static int bluez_read_local_info(int handle, guint8 *version,
+			guint16 *reversion, guint16 *manufacturer)
+{
+	guint8 buf[260], *ptr;
+	struct cmd_filter set_filter, cur_filter;
+	guint8 type = 0x01;
+	struct cmd_hdr cmd;
+	struct iovec cmd_data[2];
+	int i, len;
+	socklen_t cur_filter_len;
+
+	DBG("");
+
+	cur_filter_len = sizeof(cur_filter);
+
+	if (getsockopt(handle, 0, 2, &cur_filter,
+					&cur_filter_len) < 0) {
+		DBG("getsockopt failure");
+		return -1;
+	}
+
+	set_filter.t_mask = 0x0010;
+	set_filter.e_mask[0] = 0x4000;
+	set_filter.e_mask[1] = 0x0000;
+	set_filter.code = 0x00;
+
+	if (setsockopt(handle, 0, 2, &set_filter, sizeof(set_filter)) < 0) {
+		DBG("setsockopt failed");
+		goto failed;
+	}
+
+	cmd.code = 0x1001;
+	cmd.len = 0;
+
+	cmd_data[0].iov_base = &type;
+	cmd_data[0].iov_len  = 1;
+	cmd_data[1].iov_base = &cmd;
+	cmd_data[1].iov_len  = 3;
+
+	while (writev(handle, cmd_data, 2) < 0) {
+		if (errno == EAGAIN || errno == EINTR)
+			continue;
+		DBG("write error");
+		goto failed;
+	}
+
+	for (i = 0; i < 5; i++) {
+		while ((len = read(handle, buf, sizeof(buf))) < 0) {
+			if (errno == EAGAIN || errno == EINTR)
+				continue;
+			DBG("read error");
+			goto failed;
+		}
+
+		ptr = buf + 3;
+		len -= 3;
+
+		if ((*(buf + 1)) == 0X0E) {
+			guint16 *p16;
+			guint8 *p8;
+
+			p8 = ptr + 1;
+			p16 = (guint16 *)p8;
+			if (p16[0] != 0x1001)
+				continue;
+			ptr += 3;
+			len -= 3;
+
+			p8 = ptr + 1;
+			*version = *p8;
+			p8++;
+			p16 = (guint16 *)p8;
+			*reversion = *p16;
+			p16++;
+			p8 = (guint8 *)p16;
+			p8++;
+			p16 = (guint16 *)p8;
+			*manufacturer = *p16;
+			goto done;
+		}
+	}
+
+failed:
+	setsockopt(handle, 0, 2, &cur_filter, sizeof(cur_filter));
+	return -1;
+done:
+	setsockopt(handle, 0, 2, &cur_filter, sizeof(cur_filter));
+	return 0;
+}
+
+static char *get_local_manufacturer(guint manufacturer)
+{
+	char *manu = g_malloc0(sizeof(char)*260);
+
+	DBG("+");
+
+	if (!manu)
+		return NULL;
+
+	switch (manufacturer) {
+	case 0:
+		strcpy(manu, BLUETOOTH_COMPANY_0);
+		break;
+	case 1:
+		strcpy(manu, BLUETOOTH_COMPANY_1);
+		break;
+	case 2:
+		strcpy(manu, BLUETOOTH_COMPANY_2);
+		break;
+	case 3:
+		strcpy(manu, BLUETOOTH_COMPANY_3);
+		break;
+	case 4:
+		strcpy(manu, BLUETOOTH_COMPANY_4);
+		break;
+	case 5:
+		strcpy(manu, BLUETOOTH_COMPANY_5);
+		break;
+	case 6:
+		strcpy(manu, BLUETOOTH_COMPANY_6);
+		break;
+	case 7:
+		strcpy(manu, BLUETOOTH_COMPANY_7);
+		break;
+	case 8:
+		strcpy(manu, BLUETOOTH_COMPANY_8);
+		break;
+	case 9:
+		strcpy(manu, BLUETOOTH_COMPANY_9);
+		break;
+	case 10:
+		strcpy(manu, BLUETOOTH_COMPANY_10);
+		break;
+	case 11:
+		strcpy(manu, BLUETOOTH_COMPANY_11);
+		break;
+	case 12:
+		strcpy(manu, BLUETOOTH_COMPANY_12);
+		break;
+	case 13:
+		strcpy(manu, BLUETOOTH_COMPANY_13);
+		break;
+	case 14:
+		strcpy(manu, BLUETOOTH_COMPANY_14);
+		break;
+	case 15:
+		strcpy(manu, BLUETOOTH_COMPANY_15);
+		break;
+	case 16:
+		strcpy(manu, BLUETOOTH_COMPANY_16);
+		break;
+	case 17:
+		strcpy(manu, BLUETOOTH_COMPANY_17);
+		break;
+	case 18:
+		strcpy(manu, BLUETOOTH_COMPANY_18);
+		break;
+	case 19:
+		strcpy(manu, BLUETOOTH_COMPANY_19);
+		break;
+	case 20:
+		strcpy(manu, BLUETOOTH_COMPANY_20);
+		break;
+	case 21:
+		strcpy(manu, BLUETOOTH_COMPANY_21);
+		break;
+	case 22:
+		strcpy(manu, BLUETOOTH_COMPANY_22);
+		break;
+	case 23:
+		strcpy(manu, BLUETOOTH_COMPANY_23);
+		break;
+	case 24:
+		strcpy(manu, BLUETOOTH_COMPANY_24);
+		break;
+	case 25:
+		strcpy(manu, BLUETOOTH_COMPANY_25);
+		break;
+	case 26:
+		strcpy(manu, BLUETOOTH_COMPANY_26);
+		break;
+	case 27:
+		strcpy(manu, BLUETOOTH_COMPANY_27);
+		break;
+	case 28:
+		strcpy(manu, BLUETOOTH_COMPANY_28);
+		break;
+	case 29:
+		strcpy(manu, BLUETOOTH_COMPANY_29);
+		break;
+	case 30:
+		strcpy(manu, BLUETOOTH_COMPANY_30);
+		break;
+	case 31:
+		strcpy(manu, BLUETOOTH_COMPANY_31);
+		break;
+	case 32:
+		strcpy(manu, BLUETOOTH_COMPANY_32);
+		break;
+	case 33:
+		strcpy(manu, BLUETOOTH_COMPANY_33);
+		break;
+	case 34:
+		strcpy(manu, BLUETOOTH_COMPANY_34);
+		break;
+	case 35:
+		strcpy(manu, BLUETOOTH_COMPANY_35);
+		break;
+	case 36:
+		strcpy(manu, BLUETOOTH_COMPANY_36);
+		break;
+	case 37:
+		strcpy(manu, BLUETOOTH_COMPANY_37);
+		break;
+	case 38:
+		strcpy(manu, BLUETOOTH_COMPANY_38);
+		break;
+	case 39:
+		strcpy(manu, BLUETOOTH_COMPANY_39);
+		break;
+	case 40:
+		strcpy(manu, BLUETOOTH_COMPANY_40);
+		break;
+	case 41:
+		strcpy(manu, BLUETOOTH_COMPANY_41);
+		break;
+	case 42:
+		strcpy(manu, BLUETOOTH_COMPANY_42);
+		break;
+	case 43:
+		strcpy(manu, BLUETOOTH_COMPANY_43);
+		break;
+	case 44:
+		strcpy(manu, BLUETOOTH_COMPANY_44);
+		break;
+	case 45:
+		strcpy(manu, BLUETOOTH_COMPANY_45);
+		break;
+	case 46:
+		strcpy(manu, BLUETOOTH_COMPANY_46);
+		break;
+	case 47:
+		strcpy(manu, BLUETOOTH_COMPANY_47);
+		break;
+	case 48:
+		strcpy(manu, BLUETOOTH_COMPANY_48);
+		break;
+	case 49:
+		strcpy(manu, BLUETOOTH_COMPANY_49);
+		break;
+	case 50:
+		strcpy(manu, BLUETOOTH_COMPANY_50);
+		break;
+	case 51:
+		strcpy(manu, BLUETOOTH_COMPANY_51);
+		break;
+	case 52:
+		strcpy(manu, BLUETOOTH_COMPANY_52);
+		break;
+	case 53:
+		strcpy(manu, BLUETOOTH_COMPANY_53);
+		break;
+	case 54:
+		strcpy(manu, BLUETOOTH_COMPANY_54);
+		break;
+	case 55:
+		strcpy(manu, BLUETOOTH_COMPANY_55);
+		break;
+	case 56:
+		strcpy(manu, BLUETOOTH_COMPANY_56);
+		break;
+	case 57:
+		strcpy(manu, BLUETOOTH_COMPANY_57);
+		break;
+	case 58:
+		strcpy(manu, BLUETOOTH_COMPANY_58);
+		break;
+	case 59:
+		strcpy(manu, BLUETOOTH_COMPANY_59);
+		break;
+	case 60:
+		strcpy(manu, BLUETOOTH_COMPANY_60);
+		break;
+	case 61:
+		strcpy(manu, BLUETOOTH_COMPANY_61);
+		break;
+	case 62:
+		strcpy(manu, BLUETOOTH_COMPANY_62);
+		break;
+	case 63:
+		strcpy(manu, BLUETOOTH_COMPANY_63);
+		break;
+	case 64:
+		strcpy(manu, BLUETOOTH_COMPANY_64);
+		break;
+	case 65:
+		strcpy(manu, BLUETOOTH_COMPANY_65);
+		break;
+	case 66:
+		strcpy(manu, BLUETOOTH_COMPANY_66);
+		break;
+	case 67:
+		strcpy(manu, BLUETOOTH_COMPANY_67);
+		break;
+	case 68:
+		strcpy(manu, BLUETOOTH_COMPANY_68);
+		break;
+	case 69:
+		strcpy(manu, BLUETOOTH_COMPANY_69);
+		break;
+	case 70:
+		strcpy(manu, BLUETOOTH_COMPANY_70);
+		break;
+	case 71:
+		strcpy(manu, BLUETOOTH_COMPANY_71);
+		break;
+	case 72:
+		strcpy(manu, BLUETOOTH_COMPANY_72);
+		break;
+	case 73:
+		strcpy(manu, BLUETOOTH_COMPANY_73);
+		break;
+	case 74:
+		strcpy(manu, BLUETOOTH_COMPANY_74);
+		break;
+	case 75:
+		strcpy(manu, BLUETOOTH_COMPANY_75);
+		break;
+	case 76:
+		strcpy(manu, BLUETOOTH_COMPANY_76);
+		break;
+	case 77:
+		strcpy(manu, BLUETOOTH_COMPANY_77);
+		break;
+	case 78:
+		strcpy(manu, BLUETOOTH_COMPANY_78);
+		break;
+	case 79:
+		strcpy(manu, BLUETOOTH_COMPANY_79);
+		break;
+	case 80:
+		strcpy(manu, BLUETOOTH_COMPANY_80);
+		break;
+	case 81:
+		strcpy(manu, BLUETOOTH_COMPANY_81);
+		break;
+	case 82:
+		strcpy(manu, BLUETOOTH_COMPANY_82);
+		break;
+	case 83:
+		strcpy(manu, BLUETOOTH_COMPANY_83);
+		break;
+	case 84:
+		strcpy(manu, BLUETOOTH_COMPANY_84);
+		break;
+	case 85:
+		strcpy(manu, BLUETOOTH_COMPANY_85);
+		break;
+	case 86:
+		strcpy(manu, BLUETOOTH_COMPANY_86);
+		break;
+	case 87:
+		strcpy(manu, BLUETOOTH_COMPANY_87);
+		break;
+	case 88:
+		strcpy(manu, BLUETOOTH_COMPANY_88);
+		break;
+	case 89:
+		strcpy(manu, BLUETOOTH_COMPANY_89);
+		break;
+	case 90:
+		strcpy(manu, BLUETOOTH_COMPANY_90);
+		break;
+	case 91:
+		strcpy(manu, BLUETOOTH_COMPANY_91);
+		break;
+	case 92:
+		strcpy(manu, BLUETOOTH_COMPANY_92);
+		break;
+	case 93:
+		strcpy(manu, BLUETOOTH_COMPANY_93);
+		break;
+	case 94:
+		strcpy(manu, BLUETOOTH_COMPANY_94);
+		break;
+	case 95:
+		strcpy(manu, BLUETOOTH_COMPANY_95);
+		break;
+	case 96:
+		strcpy(manu, BLUETOOTH_COMPANY_96);
+		break;
+	case 97:
+		strcpy(manu, BLUETOOTH_COMPANY_97);
+		break;
+	case 98:
+		strcpy(manu, BLUETOOTH_COMPANY_98);
+		break;
+	case 99:
+		strcpy(manu, BLUETOOTH_COMPANY_99);
+		break;
+	case 100:
+		strcpy(manu, BLUETOOTH_COMPANY_100);
+		break;
+	case 101:
+		strcpy(manu, BLUETOOTH_COMPANY_101);
+		break;
+	case 102:
+		strcpy(manu, BLUETOOTH_COMPANY_102);
+		break;
+	case 103:
+		strcpy(manu, BLUETOOTH_COMPANY_103);
+		break;
+	case 104:
+		strcpy(manu, BLUETOOTH_COMPANY_104);
+		break;
+	case 105:
+		strcpy(manu, BLUETOOTH_COMPANY_105);
+		break;
+	case 106:
+		strcpy(manu, BLUETOOTH_COMPANY_106);
+		break;
+	case 107:
+		strcpy(manu, BLUETOOTH_COMPANY_107);
+		break;
+	case 108:
+		strcpy(manu, BLUETOOTH_COMPANY_108);
+		break;
+	case 109:
+		strcpy(manu, BLUETOOTH_COMPANY_109);
+		break;
+	case 110:
+		strcpy(manu, BLUETOOTH_COMPANY_110);
+		break;
+	case 111:
+		strcpy(manu, BLUETOOTH_COMPANY_111);
+		break;
+	case 112:
+		strcpy(manu, BLUETOOTH_COMPANY_112);
+		break;
+	case 113:
+		strcpy(manu, BLUETOOTH_COMPANY_113);
+		break;
+	case 114:
+		strcpy(manu, BLUETOOTH_COMPANY_114);
+		break;
+	case 115:
+		strcpy(manu, BLUETOOTH_COMPANY_115);
+		break;
+	case 116:
+		strcpy(manu, BLUETOOTH_COMPANY_116);
+		break;
+	case 117:
+		strcpy(manu, BLUETOOTH_COMPANY_117);
+		break;
+	case 118:
+		strcpy(manu, BLUETOOTH_COMPANY_118);
+		break;
+	case 119:
+		strcpy(manu, BLUETOOTH_COMPANY_119);
+		break;
+	case 120:
+		strcpy(manu, BLUETOOTH_COMPANY_120);
+		break;
+	case 121:
+		strcpy(manu, BLUETOOTH_COMPANY_121);
+		break;
+	case 122:
+		strcpy(manu, BLUETOOTH_COMPANY_122);
+		break;
+	case 123:
+		strcpy(manu, BLUETOOTH_COMPANY_123);
+		break;
+	case 124:
+		strcpy(manu, BLUETOOTH_COMPANY_124);
+		break;
+	case 125:
+		strcpy(manu, BLUETOOTH_COMPANY_125);
+		break;
+	case 126:
+		strcpy(manu, BLUETOOTH_COMPANY_126);
+		break;
+	case 127:
+		strcpy(manu, BLUETOOTH_COMPANY_127);
+		break;
+	case 128:
+		strcpy(manu, BLUETOOTH_COMPANY_128);
+		break;
+	case 129:
+		strcpy(manu, BLUETOOTH_COMPANY_129);
+		break;
+	case 130:
+		strcpy(manu, BLUETOOTH_COMPANY_130);
+		break;
+	case 131:
+		strcpy(manu, BLUETOOTH_COMPANY_131);
+		break;
+	case 132:
+		strcpy(manu, BLUETOOTH_COMPANY_132);
+		break;
+	case 133:
+		strcpy(manu, BLUETOOTH_COMPANY_133);
+		break;
+	case 134:
+		strcpy(manu, BLUETOOTH_COMPANY_134);
+		break;
+	case 135:
+		strcpy(manu, BLUETOOTH_COMPANY_135);
+		break;
+	case 136:
+		strcpy(manu, BLUETOOTH_COMPANY_136);
+		break;
+	case 137:
+		strcpy(manu, BLUETOOTH_COMPANY_137);
+		break;
+	case 138:
+		strcpy(manu, BLUETOOTH_COMPANY_138);
+		break;
+	case 139:
+		strcpy(manu, BLUETOOTH_COMPANY_139);
+		break;
+	case 140:
+		strcpy(manu, BLUETOOTH_COMPANY_140);
+		break;
+	case 141:
+		strcpy(manu, BLUETOOTH_COMPANY_141);
+		break;
+	case 142:
+		strcpy(manu, BLUETOOTH_COMPANY_142);
+		break;
+	case 143:
+		strcpy(manu, BLUETOOTH_COMPANY_143);
+		break;
+	case 144:
+		strcpy(manu, BLUETOOTH_COMPANY_144);
+		break;
+	case 145:
+		strcpy(manu, BLUETOOTH_COMPANY_145);
+		break;
+	case 146:
+		strcpy(manu, BLUETOOTH_COMPANY_146);
+		break;
+	case 147:
+		strcpy(manu, BLUETOOTH_COMPANY_147);
+		break;
+	case 148:
+		strcpy(manu, BLUETOOTH_COMPANY_148);
+		break;
+	case 149:
+		strcpy(manu, BLUETOOTH_COMPANY_149);
+		break;
+	case 150:
+		strcpy(manu, BLUETOOTH_COMPANY_150);
+		break;
+	case 151:
+		strcpy(manu, BLUETOOTH_COMPANY_151);
+		break;
+	case 152:
+		strcpy(manu, BLUETOOTH_COMPANY_152);
+		break;
+	case 153:
+		strcpy(manu, BLUETOOTH_COMPANY_153);
+		break;
+	case 154:
+		strcpy(manu, BLUETOOTH_COMPANY_154);
+		break;
+	case 155:
+		strcpy(manu, BLUETOOTH_COMPANY_155);
+		break;
+	case 156:
+		strcpy(manu, BLUETOOTH_COMPANY_156);
+		break;
+	case 157:
+		strcpy(manu, BLUETOOTH_COMPANY_157);
+		break;
+	case 158:
+		strcpy(manu, BLUETOOTH_COMPANY_158);
+		break;
+	case 159:
+		strcpy(manu, BLUETOOTH_COMPANY_159);
+		break;
+	case 160:
+		strcpy(manu, BLUETOOTH_COMPANY_160);
+		break;
+	case 161:
+		strcpy(manu, BLUETOOTH_COMPANY_161);
+		break;
+	case 162:
+		strcpy(manu, BLUETOOTH_COMPANY_162);
+		break;
+	case 163:
+		strcpy(manu, BLUETOOTH_COMPANY_163);
+		break;
+	case 164:
+		strcpy(manu, BLUETOOTH_COMPANY_164);
+		break;
+	case 165:
+		strcpy(manu, BLUETOOTH_COMPANY_165);
+		break;
+	case 166:
+		strcpy(manu, BLUETOOTH_COMPANY_166);
+		break;
+	case 167:
+		strcpy(manu, BLUETOOTH_COMPANY_167);
+		break;
+	case 168:
+		strcpy(manu, BLUETOOTH_COMPANY_168);
+		break;
+	case 169:
+		strcpy(manu, BLUETOOTH_COMPANY_169);
+		break;
+	case 170:
+		strcpy(manu, BLUETOOTH_COMPANY_170);
+		break;
+	case 171:
+		strcpy(manu, BLUETOOTH_COMPANY_171);
+		break;
+	case 172:
+		strcpy(manu, BLUETOOTH_COMPANY_172);
+		break;
+	case 173:
+		strcpy(manu, BLUETOOTH_COMPANY_173);
+		break;
+	case 174:
+		strcpy(manu, BLUETOOTH_COMPANY_174);
+		break;
+	case 175:
+		strcpy(manu, BLUETOOTH_COMPANY_175);
+		break;
+	case 176:
+		strcpy(manu, BLUETOOTH_COMPANY_176);
+		break;
+	case 177:
+		strcpy(manu, BLUETOOTH_COMPANY_177);
+		break;
+	case 178:
+		strcpy(manu, BLUETOOTH_COMPANY_178);
+		break;
+	case 179:
+		strcpy(manu, BLUETOOTH_COMPANY_179);
+		break;
+	case 180:
+		strcpy(manu, BLUETOOTH_COMPANY_180);
+		break;
+	case 181:
+		strcpy(manu, BLUETOOTH_COMPANY_181);
+		break;
+	case 182:
+		strcpy(manu, BLUETOOTH_COMPANY_182);
+		break;
+	case 183:
+		strcpy(manu, BLUETOOTH_COMPANY_183);
+		break;
+	case 184:
+		strcpy(manu, BLUETOOTH_COMPANY_184);
+		break;
+	case 185:
+		strcpy(manu, BLUETOOTH_COMPANY_185);
+		break;
+	case 186:
+		strcpy(manu, BLUETOOTH_COMPANY_186);
+		break;
+	case 187:
+		strcpy(manu, BLUETOOTH_COMPANY_187);
+		break;
+	case 188:
+		strcpy(manu, BLUETOOTH_COMPANY_188);
+		break;
+	case 189:
+		strcpy(manu, BLUETOOTH_COMPANY_189);
+		break;
+	case 190:
+		strcpy(manu, BLUETOOTH_COMPANY_190);
+		break;
+	case 191:
+		strcpy(manu, BLUETOOTH_COMPANY_191);
+		break;
+	case 192:
+		strcpy(manu, BLUETOOTH_COMPANY_192);
+		break;
+	case 193:
+		strcpy(manu, BLUETOOTH_COMPANY_193);
+		break;
+	case 194:
+		strcpy(manu, BLUETOOTH_COMPANY_194);
+		break;
+	case 195:
+		strcpy(manu, BLUETOOTH_COMPANY_195);
+		break;
+	case 196:
+		strcpy(manu, BLUETOOTH_COMPANY_196);
+		break;
+	case 197:
+		strcpy(manu, BLUETOOTH_COMPANY_197);
+		break;
+	case 198:
+		strcpy(manu, BLUETOOTH_COMPANY_198);
+		break;
+	case 199:
+		strcpy(manu, BLUETOOTH_COMPANY_199);
+		break;
+	case 200:
+		strcpy(manu, BLUETOOTH_COMPANY_200);
+		break;
+	case 201:
+		strcpy(manu, BLUETOOTH_COMPANY_201);
+		break;
+	case 202:
+		strcpy(manu, BLUETOOTH_COMPANY_202);
+		break;
+	case 203:
+		strcpy(manu, BLUETOOTH_COMPANY_203);
+		break;
+	case 204:
+		strcpy(manu, BLUETOOTH_COMPANY_204);
+		break;
+	case 205:
+		strcpy(manu, BLUETOOTH_COMPANY_205);
+		break;
+	case 206:
+		strcpy(manu, BLUETOOTH_COMPANY_206);
+		break;
+	case 207:
+		strcpy(manu, BLUETOOTH_COMPANY_207);
+		break;
+	case 208:
+		strcpy(manu, BLUETOOTH_COMPANY_208);
+		break;
+	case 209:
+		strcpy(manu, BLUETOOTH_COMPANY_209);
+		break;
+	case 210:
+		strcpy(manu, BLUETOOTH_COMPANY_210);
+		break;
+	case 211:
+		strcpy(manu, BLUETOOTH_COMPANY_211);
+		break;
+	case 212:
+		strcpy(manu, BLUETOOTH_COMPANY_212);
+		break;
+	case 213:
+		strcpy(manu, BLUETOOTH_COMPANY_213);
+		break;
+	case 214:
+		strcpy(manu, BLUETOOTH_COMPANY_214);
+		break;
+	case 215:
+		strcpy(manu, BLUETOOTH_COMPANY_215);
+		break;
+	case 216:
+		strcpy(manu, BLUETOOTH_COMPANY_216);
+		break;
+	case 217:
+		strcpy(manu, BLUETOOTH_COMPANY_217);
+		break;
+	case 218:
+		strcpy(manu, BLUETOOTH_COMPANY_218);
+		break;
+	case 219:
+		strcpy(manu, BLUETOOTH_COMPANY_219);
+		break;
+	case 220:
+		strcpy(manu, BLUETOOTH_COMPANY_220);
+		break;
+	case 221:
+		strcpy(manu, BLUETOOTH_COMPANY_221);
+		break;
+	case 222:
+		strcpy(manu, BLUETOOTH_COMPANY_222);
+		break;
+	case 223:
+		strcpy(manu, BLUETOOTH_COMPANY_223);
+		break;
+	case 224:
+		strcpy(manu, BLUETOOTH_COMPANY_224);
+		break;
+	case 225:
+		strcpy(manu, BLUETOOTH_COMPANY_225);
+		break;
+	case 226:
+		strcpy(manu, BLUETOOTH_COMPANY_226);
+		break;
+	case 227:
+		strcpy(manu, BLUETOOTH_COMPANY_227);
+		break;
+	case 228:
+		strcpy(manu, BLUETOOTH_COMPANY_228);
+		break;
+	case 229:
+		strcpy(manu, BLUETOOTH_COMPANY_229);
+		break;
+	case 230:
+		strcpy(manu, BLUETOOTH_COMPANY_230);
+		break;
+	case 231:
+		strcpy(manu, BLUETOOTH_COMPANY_231);
+		break;
+	case 232:
+		strcpy(manu, BLUETOOTH_COMPANY_232);
+		break;
+	case 233:
+		strcpy(manu, BLUETOOTH_COMPANY_233);
+		break;
+	case 234:
+		strcpy(manu, BLUETOOTH_COMPANY_234);
+		break;
+	case 235:
+		strcpy(manu, BLUETOOTH_COMPANY_235);
+		break;
+	case 236:
+		strcpy(manu, BLUETOOTH_COMPANY_236);
+		break;
+	case 237:
+		strcpy(manu, BLUETOOTH_COMPANY_237);
+		break;
+	case 238:
+		strcpy(manu, BLUETOOTH_COMPANY_238);
+		break;
+	case 239:
+		strcpy(manu, BLUETOOTH_COMPANY_239);
+		break;
+	case 240:
+		strcpy(manu, BLUETOOTH_COMPANY_240);
+		break;
+	case 241:
+		strcpy(manu, BLUETOOTH_COMPANY_241);
+		break;
+	case 242:
+		strcpy(manu, BLUETOOTH_COMPANY_242);
+		break;
+	case 243:
+		strcpy(manu, BLUETOOTH_COMPANY_243);
+		break;
+	case 244:
+		strcpy(manu, BLUETOOTH_COMPANY_244);
+		break;
+	case 245:
+		strcpy(manu, BLUETOOTH_COMPANY_245);
+		break;
+	case 246:
+		strcpy(manu, BLUETOOTH_COMPANY_246);
+		break;
+	case 247:
+		strcpy(manu, BLUETOOTH_COMPANY_247);
+		break;
+	case 248:
+		strcpy(manu, BLUETOOTH_COMPANY_248);
+		break;
+	case 249:
+		strcpy(manu, BLUETOOTH_COMPANY_249);
+		break;
+	case 250:
+		strcpy(manu, BLUETOOTH_COMPANY_250);
+		break;
+	case 251:
+		strcpy(manu, BLUETOOTH_COMPANY_251);
+		break;
+	case 252:
+		strcpy(manu, BLUETOOTH_COMPANY_252);
+		break;
+	case 253:
+		strcpy(manu, BLUETOOTH_COMPANY_253);
+		break;
+	case 254:
+		strcpy(manu, BLUETOOTH_COMPANY_254);
+		break;
+	case 255:
+		strcpy(manu, BLUETOOTH_COMPANY_255);
+		break;
+	case 256:
+		strcpy(manu, BLUETOOTH_COMPANY_256);
+		break;
+	case 257:
+		strcpy(manu, BLUETOOTH_COMPANY_257);
+		break;
+	case 258:
+		strcpy(manu, BLUETOOTH_COMPANY_258);
+		break;
+	case 259:
+		strcpy(manu, BLUETOOTH_COMPANY_259);
+		break;
+	case 260:
+		strcpy(manu, BLUETOOTH_COMPANY_260);
+		break;
+	case 261:
+		strcpy(manu, BLUETOOTH_COMPANY_261);
+		break;
+	case 262:
+		strcpy(manu, BLUETOOTH_COMPANY_262);
+		break;
+	case 263:
+		strcpy(manu, BLUETOOTH_COMPANY_263);
+		break;
+	case 264:
+		strcpy(manu, BLUETOOTH_COMPANY_264);
+		break;
+	case 265:
+		strcpy(manu, BLUETOOTH_COMPANY_265);
+		break;
+	case 266:
+		strcpy(manu, BLUETOOTH_COMPANY_266);
+		break;
+	case 267:
+		strcpy(manu, BLUETOOTH_COMPANY_267);
+		break;
+	case 268:
+		strcpy(manu, BLUETOOTH_COMPANY_268);
+		break;
+	case 269:
+		strcpy(manu, BLUETOOTH_COMPANY_269);
+		break;
+	case 270:
+		strcpy(manu, BLUETOOTH_COMPANY_270);
+		break;
+	case 271:
+		strcpy(manu, BLUETOOTH_COMPANY_271);
+		break;
+	case 272:
+		strcpy(manu, BLUETOOTH_COMPANY_272);
+		break;
+	case 273:
+		strcpy(manu, BLUETOOTH_COMPANY_273);
+		break;
+	case 274:
+		strcpy(manu, BLUETOOTH_COMPANY_274);
+		break;
+	case 275:
+		strcpy(manu, BLUETOOTH_COMPANY_275);
+		break;
+	case 276:
+		strcpy(manu, BLUETOOTH_COMPANY_276);
+		break;
+	case 277:
+		strcpy(manu, BLUETOOTH_COMPANY_277);
+		break;
+	case 278:
+		strcpy(manu, BLUETOOTH_COMPANY_278);
+		break;
+	case 279:
+		strcpy(manu, BLUETOOTH_COMPANY_279);
+		break;
+	case 280:
+		strcpy(manu, BLUETOOTH_COMPANY_280);
+		break;
+	case 281:
+		strcpy(manu, BLUETOOTH_COMPANY_281);
+		break;
+	case 282:
+		strcpy(manu, BLUETOOTH_COMPANY_282);
+		break;
+	case 283:
+		strcpy(manu, BLUETOOTH_COMPANY_283);
+		break;
+	case 284:
+		strcpy(manu, BLUETOOTH_COMPANY_284);
+		break;
+	case 285:
+		strcpy(manu, BLUETOOTH_COMPANY_285);
+		break;
+	case 286:
+		strcpy(manu, BLUETOOTH_COMPANY_286);
+		break;
+	case 287:
+		strcpy(manu, BLUETOOTH_COMPANY_287);
+		break;
+	case 288:
+		strcpy(manu, BLUETOOTH_COMPANY_288);
+		break;
+	case 289:
+		strcpy(manu, BLUETOOTH_COMPANY_289);
+		break;
+	case 290:
+		strcpy(manu, BLUETOOTH_COMPANY_290);
+		break;
+	case 291:
+		strcpy(manu, BLUETOOTH_COMPANY_291);
+		break;
+	case 292:
+		strcpy(manu, BLUETOOTH_COMPANY_292);
+		break;
+	case 293:
+		strcpy(manu, BLUETOOTH_COMPANY_293);
+		break;
+	case 294:
+		strcpy(manu, BLUETOOTH_COMPANY_294);
+		break;
+	case 295:
+		strcpy(manu, BLUETOOTH_COMPANY_295);
+		break;
+	case 296:
+		strcpy(manu, BLUETOOTH_COMPANY_296);
+		break;
+	case 297:
+		strcpy(manu, BLUETOOTH_COMPANY_297);
+		break;
+	case 298:
+		strcpy(manu, BLUETOOTH_COMPANY_298);
+		break;
+	case 299:
+		strcpy(manu, BLUETOOTH_COMPANY_299);
+		break;
+	case 300:
+		strcpy(manu, BLUETOOTH_COMPANY_300);
+		break;
+	case 301:
+		strcpy(manu, BLUETOOTH_COMPANY_301);
+		break;
+	case 302:
+		strcpy(manu, BLUETOOTH_COMPANY_302);
+		break;
+	case 303:
+		strcpy(manu, BLUETOOTH_COMPANY_303);
+		break;
+	case 304:
+		strcpy(manu, BLUETOOTH_COMPANY_304);
+		break;
+	case 305:
+		strcpy(manu, BLUETOOTH_COMPANY_305);
+		break;
+	case 306:
+		strcpy(manu, BLUETOOTH_COMPANY_306);
+		break;
+	case 307:
+		strcpy(manu, BLUETOOTH_COMPANY_307);
+		break;
+	case 308:
+		strcpy(manu, BLUETOOTH_COMPANY_308);
+		break;
+	case 309:
+		strcpy(manu, BLUETOOTH_COMPANY_309);
+		break;
+	case 310:
+		strcpy(manu, BLUETOOTH_COMPANY_310);
+		break;
+	case 311:
+		strcpy(manu, BLUETOOTH_COMPANY_311);
+		break;
+	case 312:
+		strcpy(manu, BLUETOOTH_COMPANY_312);
+		break;
+	case 313:
+		strcpy(manu, BLUETOOTH_COMPANY_313);
+		break;
+	case 314:
+		strcpy(manu, BLUETOOTH_COMPANY_314);
+		break;
+	case 315:
+		strcpy(manu, BLUETOOTH_COMPANY_315);
+		break;
+	case 316:
+		strcpy(manu, BLUETOOTH_COMPANY_316);
+		break;
+	case 317:
+		strcpy(manu, BLUETOOTH_COMPANY_317);
+		break;
+	case 318:
+		strcpy(manu, BLUETOOTH_COMPANY_318);
+		break;
+	case 319:
+		strcpy(manu, BLUETOOTH_COMPANY_319);
+		break;
+	case 320:
+		strcpy(manu, BLUETOOTH_COMPANY_320);
+		break;
+	case 321:
+		strcpy(manu, BLUETOOTH_COMPANY_321);
+		break;
+	case 322:
+		strcpy(manu, BLUETOOTH_COMPANY_322);
+		break;
+	case 323:
+		strcpy(manu, BLUETOOTH_COMPANY_323);
+		break;
+	case 324:
+		strcpy(manu, BLUETOOTH_COMPANY_324);
+		break;
+	case 325:
+		strcpy(manu, BLUETOOTH_COMPANY_325);
+		break;
+	case 326:
+		strcpy(manu, BLUETOOTH_COMPANY_326);
+		break;
+	case 327:
+		strcpy(manu, BLUETOOTH_COMPANY_327);
+		break;
+	case 328:
+		strcpy(manu, BLUETOOTH_COMPANY_328);
+		break;
+	case 329:
+		strcpy(manu, BLUETOOTH_COMPANY_329);
+		break;
+	case 330:
+		strcpy(manu, BLUETOOTH_COMPANY_330);
+		break;
+	case 331:
+		strcpy(manu, BLUETOOTH_COMPANY_331);
+		break;
+	case 332:
+		strcpy(manu, BLUETOOTH_COMPANY_332);
+		break;
+	case 333:
+		strcpy(manu, BLUETOOTH_COMPANY_333);
+		break;
+	case 334:
+		strcpy(manu, BLUETOOTH_COMPANY_334);
+		break;
+	case 335:
+		strcpy(manu, BLUETOOTH_COMPANY_335);
+		break;
+	case 65535:
+		strcpy(manu, BLUETOOTH_COMPANY_MAX);
+		break;
+	default:
+		g_free(manu);
+		manu = NULL;
+		break;
+	}
+
+	DBG("-");
+
+	return manu;
+}
+
+static char *get_local_version(guint16 version)
+{
+	char *ver = g_malloc0(sizeof(char)*10);
+
+	DBG("+");
+
+	if (!ver)
+		return NULL;
+
+	if (version == 0x00)
+		strcpy(ver, "1.0b");
+	else if (version == 0x01)
+		strcpy(ver, "1.1");
+	else if (version == 0x02)
+		strcpy(ver, "1.2");
+	else if (version == 0x03)
+		strcpy(ver, "2.0");
+	else if (version == 0x04)
+		strcpy(ver, "2.1");
+	else if (version == 0x05)
+		strcpy(ver, "3.0");
+	else if (version == 0x06)
+		strcpy(ver, "4.0");
+	else if (version == 0x07)
+		strcpy(ver, "4.1");
+	else {
+		g_free(ver);
+		ver = NULL;
+	}
+
+	DBG("-");
+
+	return ver;
+}
+
+static char *get_local_stack_version(void)
+{
+	char *ver = g_malloc0(sizeof(char)*10);
+
+	DBG("+");
+
+	if (!ver)
+		return NULL;
+
+	strcpy(ver, BLUEZ_VERSION);
+
+	DBG("-");
+
+	return ver;
+}
+
+int bluez_get_local_info(char **local_version, char **chipset,
+				char **firmware, char **stack_version)
+{
+	struct sockaddr_h addr;
+	int handle;
+	guint8 version;
+	guint16 reversion, manufacturer;
+	int ret;
+
+	if (!local_version || !chipset || !firmware || !stack_version)
+		return -1;
+
+	DBG("");
+
+	handle = socket(AF_BLUETOOTH, SOCK_RAW | SOCK_CLOEXEC, 1);
+	if (handle < 0) {
+		DBG("create socket error");
+		return -1;
+	}
+
+	memset(&addr, 0, sizeof(addr));
+	addr.family = 31;
+	addr.dev = 0;
+	if (bind(handle, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+		DBG("socket bind error");
+		goto failed;
+	}
+
+	ret = bluez_read_local_info(handle, &version,
+					&reversion, &manufacturer);
+	if (ret != 0) {
+		DBG("get local version error");
+		goto failed;
+	}
+
+	*local_version = get_local_version(version);
+	*stack_version = get_local_stack_version();
+	/*Todo: at current, not support it*/
+	*firmware = NULL;
+	*chipset = get_local_manufacturer(manufacturer);
+
+	close(handle);
+	return 0;
+failed:
+	close(handle);
+	return -1;
 }

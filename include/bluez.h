@@ -763,4 +763,7 @@ void bluez_set_paired_changed_cb(bluez_paired_cb_t cb,
 
 void bluez_unset_paired_changed_cb(void);
 
+int bluez_get_local_info(char **local_version, char **chipset,
+				char **firmware, char **stack_version);
+
 #endif

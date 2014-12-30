@@ -29,6 +29,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include "common.h"
+#include "uuid.h"
 
 struct error_map_t {
 	const gchar *error_key_str;
@@ -479,4 +480,635 @@ unsigned int convert_appearance_to_type(unsigned int appearance)
 {
 	/*todo support it later*/
 	return 0x00;
+}
+
+char **convert_uuid_to_profiles(char **uuids)
+{
+	guint length, index;
+	gint num = 0;
+	char **parts = NULL;
+	unsigned int service;
+	char **profiles;
+
+	DBG("");
+
+	length = g_strv_length(uuids);
+
+	profiles = g_malloc0(sizeof(char *)*length + 1);
+
+	if (!profiles)
+		return NULL;
+
+	for (index = 0; index < length; ++index) {
+		parts = g_strsplit(uuids[index], "-", -1);
+		if (parts == NULL || parts[0] == NULL) {
+			g_strfreev(parts);
+			continue;
+		}
+
+		service = g_ascii_strtoull(parts[0], NULL, 16);
+
+		switch (service) {
+		case  BLUETOOTH_SDP_UUID:
+			profiles[num] = g_strdup("SDP");
+			break;
+		case  BLUETOOTH_RFCOMM_UUID:
+			profiles[num] = g_strdup("RFCOMM");
+			break;
+		case  BLUETOOTH_TCS_UUID:
+			profiles[num] = g_strdup("TCS-BIN");
+			break;
+		case  BLUETOOTH_ATT_UUID:
+			profiles[num] = g_strdup("ATT");
+			break;
+		case  BLUETOOTH_OBEX_UUID:
+			profiles[num] = g_strdup("OBEX");
+			break;
+		case  BLUETOOTH_BNEP_UUID:
+			profiles[num] = g_strdup("BNEP");
+			break;
+		case  BLUETOOTH_UPNP_UUID:
+			profiles[num] = g_strdup("UPNP");
+			break;
+		case  BLUETOOTH_HIDP_UUID:
+			profiles[num] = g_strdup("HIDP");
+			break;
+		case  BLUETOOTH_HCCC_UUID:
+			profiles[num] = g_strdup("Hardcopy Control Channel");
+			break;
+		case  BLUETOOTH_HCDC_UUID:
+			profiles[num] = g_strdup("Hardcopy Data Channel");
+			break;
+		case  BLUETOOTH_HCN_UUID:
+			profiles[num] = g_strdup("Hardcopy Notification");
+			break;
+		case  BLUETOOTH_AVCTP_UUID:
+			profiles[num] = g_strdup("AVCTP");
+			break;
+		case  BLUETOOTH_AVDTP_UUID:
+			profiles[num] = g_strdup("AVDTP");
+			break;
+		case  BLUETOOTH_CMTP_UUID:
+			profiles[num] = g_strdup("CMTP");
+			break;
+		case  BLUETOOTH_MCAPC_UUID:
+			profiles[num] = g_strdup("MCAP Control Channel");
+			break;
+		case  BLUETOOTH_MCAPD_UUID:
+			profiles[num] = g_strdup("MCAP Data Channel");
+			break;
+		case  BLUETOOTH_L2CAP_UUID:
+			profiles[num] = g_strdup("L2CAP");
+			break;
+		case  BLUETOOTH_SDSSC_UUID:
+			profiles[num] =
+				g_strdup(
+				"Service Discovery Server Service Class");
+			break;
+		case  BLUETOOTH_BGDSC_UUID:
+			profiles[num] =
+				g_strdup(
+				"Browse Group Descriptor Service Class");
+			break;
+		case  BLUETOOTH_PBR_UUID:
+			profiles[num] = g_strdup("Public Browse Root");
+			break;
+		case  BLUETOOTH_SP_UUID:
+			profiles[num] = g_strdup("Serial Port");
+			break;
+		case  BLUETOOTH_LAUP_UUID:
+			profiles[num] = g_strdup("LAN Access Using PPP");
+			break;
+		case  BLUETOOTH_DN_UUID:
+			profiles[num] = g_strdup("Dialup Networking");
+			break;
+		case  BLUETOOTH_IrMCS_UUID:
+			profiles[num] = g_strdup("IrMC Sync");
+			break;
+		case  BLUETOOTH_OPP_UUID:
+			profiles[num] = g_strdup("OBEX Object Push");
+			break;
+		case  BLUETOOTH_FTP_UUID:
+			profiles[num] = g_strdup("OBEX File Transfer");
+			break;
+		case  BLUETOOTH_IRMCSC_UUID:
+			profiles[num] = g_strdup("IrMC Sync Command");
+			break;
+		case  BLUETOOTH_HSP_UUID:
+			profiles[num] = g_strdup("Headset");
+			break;
+		case  BLUETOOTH_CT_UUID:
+			profiles[num] = g_strdup("Cordless Telephony");
+			break;
+		case  BLUETOOTH_ASOURCE_UUID:
+			profiles[num] = g_strdup("Audio Source");
+			break;
+		case  BLUETOOTH_ASINK_UUID:
+			profiles[num] = g_strdup("Audio Sink");
+			break;
+		case  BLUETOOTH_AVRCT_UUID:
+			profiles[num] = g_strdup("A/V Remote Control Target");
+			break;
+		case  BLUETOOTH_AAD_UUID:
+			profiles[num] = g_strdup("Advanced Audio Distribution");
+			break;
+		case  BLUETOOTH_AVRC_UUID:
+			profiles[num] = g_strdup("A/V Remote Control");
+			break;
+		case  BLUETOOTH_AVRCC_UUID:
+			profiles[num] =
+				g_strdup("A/V Remote Control Controller");
+			break;
+		case  BLUETOOTH_INTERCOM_UUID:
+			profiles[num] = g_strdup("Intercom");
+			break;
+		case  BLUETOOTH_FAX_UUID:
+			profiles[num] = g_strdup("Fax");
+			break;
+		case  BLUETOOTH_HSPG_UUID:
+			profiles[num] = g_strdup("Headset AG");
+			break;
+		case  BLUETOOTH_WAP_UUID:
+			profiles[num] = g_strdup("WAP");
+			break;
+		case  BLUETOOTH_WAPC_UUID:
+			profiles[num] = g_strdup("WAP Client");
+			break;
+		case  BLUETOOTH_PANU_UUID:
+			profiles[num] = g_strdup("PANU");
+			break;
+		case  BLUETOOTH_NAP_UUID:
+			profiles[num] = g_strdup("NAP");
+			break;
+		case  BLUETOOTH_GN_UUID:
+			profiles[num] = g_strdup("GN");
+			break;
+		case  BLUETOOTH_DP_UUID:
+			profiles[num] = g_strdup("Direct Printing");
+			break;
+		case  BLUETOOTH_RP_UUID:
+			profiles[num] = g_strdup("Reference Printing");
+			break;
+		case  BLUETOOTH_BIP_UUID:
+			profiles[num] = g_strdup("Basic Imaging Profile");
+			break;
+		case  BLUETOOTH_IR_UUID:
+			profiles[num] = g_strdup("Imaging Responder");
+			break;
+		case  BLUETOOTH_IAA_UUID:
+			profiles[num] = g_strdup("Imaging Automatic Archive");
+			break;
+		case  BLUETOOTH_IRO_UUID:
+			profiles[num] = g_strdup("Imaging Referenced Objects");
+			break;
+		case  BLUETOOTH_HFP_UUID:
+			profiles[num] = g_strdup("Handsfree");
+			break;
+		case  BLUETOOTH_HFPG_UUID:
+			profiles[num] = g_strdup("Handsfree Audio Gateway");
+			break;
+		case  BLUETOOTH_DPROS_UUID:
+			profiles[num] =
+				g_strdup(
+				"Direct Printing Refrence Objects Service");
+			break;
+		case  BLUETOOTH_RU_UUID:
+			profiles[num] = g_strdup("Reflected UI");
+			break;
+		case  BLUETOOTH_BP_UUID:
+			profiles[num] = g_strdup("Basic Printing");
+			break;
+		case  BLUETOOTH_PS_UUID:
+			profiles[num] = g_strdup("Printing Status");
+			break;
+		case  BLUETOOTH_HIDS_UUID:
+			profiles[num] =
+				g_strdup("Human Interface Device Service");
+			break;
+		case  BLUETOOTH_HCR_UUID:
+			profiles[num] = g_strdup("Hardcopy Cable Replacement");
+			break;
+		case  BLUETOOTH_HCRP_UUID:
+			profiles[num] = g_strdup("HCR Print");
+			break;
+		case  BLUETOOTH_HCRS_UUID:
+			profiles[num] = g_strdup("HCR Scan");
+			break;
+		case  BLUETOOTH_CIA_UUID:
+			profiles[num] = g_strdup("Common ISDN Access");
+			break;
+		case  BLUETOOTH_SAP_UUID:
+			profiles[num] = g_strdup("SIM Access");
+			break;
+		case  BLUETOOTH_PBAPC_UUID:
+			profiles[num] = g_strdup("Phonebook Access Client");
+			break;
+		case  BLUETOOTH_PBAPS_UUID:
+			profiles[num] = g_strdup("Phonebook Access Server");
+			break;
+		case  BLUETOOTH_PBAP_UUID:
+			profiles[num] = g_strdup("Phonebook Access");
+			break;
+		case  BLUETOOTH_HSPHS_UUID:
+			profiles[num] = g_strdup("Headset HS");
+			break;
+		case  BLUETOOTH_MAPS_UUID:
+			profiles[num] = g_strdup("Message Access Server");
+			break;
+		case  BLUETOOTH_MNS_UUID:
+			profiles[num] = g_strdup("Message Notification Server");
+			break;
+		case  BLUETOOTH_MAP_UUID:
+			profiles[num] = g_strdup("Message Access Profile");
+			break;
+		case  BLUETOOTH_GNSS_UUID:
+			profiles[num] = g_strdup("GNSS");
+			break;
+		case  BLUETOOTH_GNSSS_UUID:
+			profiles[num] = g_strdup("GNSS Server");
+			break;
+		case  BLUETOOTH_PNPI_UUID:
+			profiles[num] = g_strdup("PnP Information");
+			break;
+		case  BLUETOOTH_GENERICN_UUID:
+			profiles[num] = g_strdup("Generic Networking");
+			break;
+		case  BLUETOOTH_GENERIFT_UUID:
+			profiles[num] = g_strdup("Generic File Transfer");
+			break;
+		case  BLUETOOTH_GENERIAD_UUID:
+			profiles[num] = g_strdup("Generic Audio");
+			break;
+		case  BLUETOOTH_GENERITP_UUID:
+			profiles[num] = g_strdup("Generic Telephony");
+			break;
+		case  BLUETOOTH_UPNPS_UUID:
+			profiles[num] = g_strdup("UPNP Service");
+			break;
+		case  BLUETOOTH_UPNPIPS_UUID:
+			profiles[num] = g_strdup("UPNP IP Service");
+			break;
+		case  BLUETOOTH_UPNPIPPAN_UUID:
+			profiles[num] = g_strdup("UPNP IP PAN");
+			break;
+		case  BLUETOOTH_UPNPIPLAP_UUID:
+			profiles[num] = g_strdup("UPNP IP LAP");
+			break;
+		case  BLUETOOTH_UPNPIPL2CAP_UUID:
+			profiles[num] = g_strdup("UPNP IP L2CAP");
+			break;
+		case  BLUETOOTH_VSOURCE_UUID:
+			profiles[num] = g_strdup("Video Source");
+			break;
+		case  BLUETOOTH_VSINK_UUID:
+			profiles[num] = g_strdup("Video Sink");
+			break;
+		case  BLUETOOTH_VDIST_UUID:
+			profiles[num] = g_strdup("Video Distribution");
+			break;
+		case  BLUETOOTH_HDP_UUID:
+			profiles[num] = g_strdup("HDP");
+			break;
+		case  BLUETOOTH_HDPSOURCE_UUID:
+			profiles[num] = g_strdup("HDP Source");
+			break;
+		case  BLUETOOTH_HDPSINK_UUID:
+			profiles[num] = g_strdup("HDP Sink");
+			break;
+		case  BLUETOOTH_GAP_UUID:
+			profiles[num] = g_strdup("Generic Access Profile");
+			break;
+		case  BLUETOOTH_GATTP_UUID:
+			profiles[num] = g_strdup("Generic Attribute Profile");
+			break;
+		case  BLUETOOTH_IAP_UUID:
+			profiles[num] = g_strdup("Immediate Alert");
+			break;
+		case  BLUETOOTH_LLOSTP_UUID:
+			profiles[num] = g_strdup("Link Loss");
+			break;
+		case  BLUETOOTH_TXP_UUID:
+			profiles[num] = g_strdup("Tx Power");
+			break;
+		case  BLUETOOTH_CTSP_UUID:
+			profiles[num] = g_strdup("Current Time Service");
+			break;
+		case  BLUETOOTH_RTUS_UUID:
+			profiles[num] =
+				g_strdup("Reference Time Update Service");
+			break;
+		case  BLUETOOTH_NDCS_UUID:
+			profiles[num] = g_strdup("Next DST Change Service");
+			break;
+		case  BLUETOOTH_GLUCOSE_UUID:
+			profiles[num] = g_strdup("Glucose");
+			break;
+		case  BLUETOOTH_HEALTHT_UUID:
+			profiles[num] = g_strdup("Health Thermometer");
+			break;
+		case  BLUETOOTH_DEVICEI_UUID:
+			profiles[num] = g_strdup("Device Information");
+			break;
+		case  BLUETOOTH_HEARTR_UUID:
+			profiles[num] = g_strdup("Heart Rate");
+			break;
+		case  BLUETOOTH_PASS_UUID:
+			profiles[num] = g_strdup("Phone Alert Status Service");
+			break;
+		case  BLUETOOTH_BSP_UUID:
+			profiles[num] = g_strdup("Battery Service");
+			break;
+		case  BLUETOOTH_BLOODPP_UUID:
+			profiles[num] = g_strdup("Blood Pressure");
+			break;
+		case  BLUETOOTH_ANS_UUID:
+			profiles[num] = g_strdup("Alert Notification Service");
+			break;
+		case  BLUETOOTH_HID_UUID:
+			profiles[num] = g_strdup("Human Interface Device");
+			break;
+		case  BLUETOOTH_SCANP_UUID:
+			profiles[num] = g_strdup("Scan Parameters");
+			break;
+		case  BLUETOOTH_RSAC_UUID:
+			profiles[num] = g_strdup("Running Speed and Cadence");
+			break;
+		case  BLUETOOTH_CSAC_UUID:
+			profiles[num] = g_strdup("Cycling Speed and Cadence");
+			break;
+		case  BLUETOOTH_PRIMARYS_UUID:
+			profiles[num] = g_strdup("Primary Service");
+			break;
+		case  BLUETOOTH_SECONDS_UUID:
+			profiles[num] = g_strdup("Secondary Service");
+			break;
+		case  BLUETOOTH_INCLUDE_UUID:
+			profiles[num] = g_strdup("Include");
+			break;
+		case  BLUETOOTH_CHARACTER_UUID:
+			profiles[num] = g_strdup("Characteristic");
+			break;
+		case  BLUETOOTH_CHARACTEREP_UUID:
+			profiles[num] =
+				g_strdup("Characteristic Extended Properties");
+			break;
+		case  BLUETOOTH_CHARACTEREPUD_UUID:
+			profiles[num] =
+				g_strdup("Characteristic User Description");
+			break;
+		case  BLUETOOTH_CCHARACTEREPC_UUID:
+			profiles[num] =
+				g_strdup("Client Characteristic Configuration");
+			break;
+		case  BLUETOOTH_SCHARACTEREPC_UUID:
+			profiles[num] =
+				g_strdup("Server Characteristic Configuration");
+			break;
+		case  BLUETOOTH_CHARACTEREPF_UUID:
+			profiles[num] = g_strdup("Characteristic Format");
+			break;
+		case  BLUETOOTH_CHARACTEREPAF_UUID:
+			profiles[num] =
+				g_strdup("Characteristic Aggregate Formate");
+			break;
+		case  BLUETOOTH_VALIDRANGE_UUID:
+			profiles[num] = g_strdup("Valid Range");
+			break;
+		case  BLUETOOTH_EXTERNALRR_UUID:
+			profiles[num] = g_strdup("External Report Reference");
+			break;
+		case  BLUETOOTH_REPORTR_UUID:
+			profiles[num] = g_strdup("Report Reference");
+			break;
+		case  BLUETOOTH_DEVICENAME_UUID:
+			profiles[num] = g_strdup("Device Name");
+			break;
+		case  BLUETOOTH_APPEARANCE_UUID:
+			profiles[num] = g_strdup("Appearance");
+			break;
+		case  BLUETOOTH_PPF_UUID:
+			profiles[num] = g_strdup("Peripheral Privacy Flag");
+			break;
+		case  BLUETOOTH_RECONNADDR_UUID:
+			profiles[num] = g_strdup("Reconnection Address");
+			break;
+		case  BLUETOOTH_PPCP_UUID:
+			profiles[num] =
+				g_strdup(
+				"Peripheral Preferred Connection Parameters");
+			break;
+		case  BLUETOOTH_SERVICEC_UUID:
+			profiles[num] = g_strdup("Service Changed");
+			break;
+		case  BLUETOOTH_ALEVEL_UUID:
+			profiles[num] = g_strdup("Alert Level");
+			break;
+		case  BLUETOOTH_TXPLEVEL_UUID:
+			profiles[num] = g_strdup("Tx Power Level");
+			break;
+		case  BLUETOOTH_DATATIME_UUID:
+			profiles[num] = g_strdup("Date Time");
+			break;
+		case  BLUETOOTH_DOW_UUID:
+			profiles[num] = g_strdup("Day of Week");
+			break;
+		case  BLUETOOTH_DDT_UUID:
+			profiles[num] = g_strdup("Day Date Time");
+			break;
+		case  BLUETOOTH_EXACTT256_UUID:
+			profiles[num] = g_strdup("Exact Time 256");
+			break;
+		case  BLUETOOTH_DSTOFF_UUID:
+			profiles[num] = g_strdup("DST Offset");
+			break;
+		case  BLUETOOTH_TIMEZ_UUID:
+			profiles[num] = g_strdup("Time Zone");
+			break;
+		case  BLUETOOTH_LOCALTI_UUID:
+			profiles[num] = g_strdup("Local Time Information");
+			break;
+		case  BLUETOOTH_TIMEWDST_UUID:
+			profiles[num] = g_strdup("Time with DST");
+			break;
+		case  BLUETOOTH_TIMEACCURACY_UUID:
+			profiles[num] = g_strdup("Time Accuracy");
+			break;
+		case  BLUETOOTH_TIMESOURCE_UUID:
+			profiles[num] = g_strdup("Time Source");
+			break;
+		case  BLUETOOTH_REFERENCETI_UUID:
+			profiles[num] = g_strdup("Reference Time Information");
+			break;
+		case  BLUETOOTH_TIMEUCP_UUID:
+			profiles[num] = g_strdup("Time Update Control Point");
+			break;
+		case  BLUETOOTH_TIMEUS_UUID:
+			profiles[num] = g_strdup("Time Update State");
+			break;
+		case  BLUETOOTH_GLUCOSEM_UUID:
+			profiles[num] = g_strdup("Glucose Measurement");
+			break;
+		case  BLUETOOTH_BATTERYL_UUID:
+			profiles[num] = g_strdup("Battery Level");
+			break;
+		case  BLUETOOTH_TEMPERATUREM_UUID:
+			profiles[num] = g_strdup("Temperature Measurement");
+			break;
+		case  BLUETOOTH_TEMPERATURET_UUID:
+			profiles[num] = g_strdup("Temperature Type");
+			break;
+		case  BLUETOOTH_INTERMEDIATET_UUID:
+			profiles[num] = g_strdup("Intermediate Temperature");
+			break;
+		case  BLUETOOTH_MEASUREMENTI_UUID:
+			profiles[num] = g_strdup("Measurement Interval");
+			break;
+		case  BLUETOOTH_BKIR_UUID:
+			profiles[num] = g_strdup("Boot Keyboard Input Report");
+			break;
+		case  BLUETOOTH_SYSTEMID_UUID:
+			profiles[num] = g_strdup("System ID");
+			break;
+		case  BLUETOOTH_MODELNS_UUID:
+			profiles[num] = g_strdup("Model Number String");
+			break;
+		case  BLUETOOTH_SNS_UUID:
+			profiles[num] = g_strdup("Serial Number String");
+			break;
+		case  BLUETOOTH_FIRMRS_UUID:
+			profiles[num] = g_strdup("Firmware Revision String");
+			break;
+		case  BLUETOOTH_HARDRS_UUID:
+			profiles[num] = g_strdup("Hardware Revision String");
+			break;
+		case  BLUETOOTH_SOFTRS_UUID:
+			profiles[num] = g_strdup("Software Revision String");
+			break;
+		case  BLUETOOTH_MANUNS_UUID:
+			profiles[num] = g_strdup("Manufacturer Name String");
+			break;
+		case  BLUETOOTH_IEEE11073_UUID:
+			profiles[num] =
+				g_strdup(
+				"IEEE 11073-20601 Regulatory Cert. Data List");
+			break;
+		case  BLUETOOTH_CURRENTT_UUID:
+			profiles[num] = g_strdup("Current Time");
+			break;
+		case  BLUETOOTH_SCANR_UUID:
+			profiles[num] = g_strdup("Scan Refresh");
+			break;
+		case  BLUETOOTH_BKOR_UUID:
+			profiles[num] = g_strdup("Boot Keyboard Output Report");
+			break;
+		case  BLUETOOTH_BMIR_UUID:
+			profiles[num] = g_strdup("Boot Mouse Input Report");
+			break;
+		case  BLUETOOTH_GMC_UUID:
+			profiles[num] = g_strdup("Glucose Measurement Context");
+			break;
+		case  BLUETOOTH_BLOODPM_UUID:
+			profiles[num] = g_strdup("Blood Pressure Measurement");
+			break;
+		case  BLUETOOTH_INTERMEDIATECP_UUID:
+			profiles[num] = g_strdup("Intermediate Cuff Pressure");
+			break;
+		case  BLUETOOTH_HEARTRM_UUID:
+			profiles[num] = g_strdup("Heart Rate Measurement");
+			break;
+		case  BLUETOOTH_BODYSL_UUID:
+			profiles[num] = g_strdup("Body Sensor Location");
+			break;
+		case  BLUETOOTH_HEARTRCP_UUID:
+			profiles[num] = g_strdup("Heart Rate Control Point");
+			break;
+		case  BLUETOOTH_ALERTS_UUID:
+			profiles[num] = g_strdup("Alert Status");
+			break;
+		case  BLUETOOTH_RINGERCP_UUID:
+			profiles[num] = g_strdup("Ringer Control Point");
+			break;
+		case  BLUETOOTH_RINGERS_UUID:
+			profiles[num] = g_strdup("Ringer Setting");
+			break;
+		case  BLUETOOTH_ALERTCIBM_UUID:
+			profiles[num] = g_strdup("Alert Category ID Bit Mask");
+			break;
+		case  BLUETOOTH_ALERTCI_UUID:
+			profiles[num] = g_strdup("Alert Category ID");
+			break;
+		case  BLUETOOTH_ALERTNCP_UUID:
+			profiles[num] =
+				g_strdup("Alert Notification Control Point");
+			break;
+		case  BLUETOOTH_UNREADAS_UUID:
+			profiles[num] = g_strdup("Unread Alert Status");
+			break;
+		case  BLUETOOTH_NEWALERT_UUID:
+			profiles[num] = g_strdup("New Alert");
+			break;
+		case  BLUETOOTH_SNAC_UUID:
+			profiles[num] =
+				g_strdup("Supported New Alert Category");
+			break;
+		case  BLUETOOTH_SUAC_UUID:
+			profiles[num] =
+				g_strdup("Supported Unread Alert Category");
+			break;
+		case  BLUETOOTH_BLOODPF_UUID:
+			profiles[num] = g_strdup("Blood Pressure Feature");
+			break;
+		case  BLUETOOTH_HIDINFO_UUID:
+			profiles[num] = g_strdup("HID Information");
+			break;
+		case  BLUETOOTH_REPORTMAP_UUID:
+			profiles[num] = g_strdup("Report Map");
+			break;
+		case  BLUETOOTH_HIDCP_UUID:
+			profiles[num] = g_strdup("HID Control Point");
+			break;
+		case  BLUETOOTH_REPORT_UUID:
+			profiles[num] = g_strdup("Report");
+			break;
+		case  BLUETOOTH_PROTOCALM_UUID:
+			profiles[num] = g_strdup("Protocol Mode");
+			break;
+		case  BLUETOOTH_SCANIW_UUID:
+			profiles[num] = g_strdup("Scan Interval Window");
+			break;
+		case  BLUETOOTH_PNPID_UUID:
+			profiles[num] = g_strdup("PnP ID");
+			break;
+		case  BLUETOOTH_GLUCOSEF_UUID:
+			profiles[num] = g_strdup("Glucose Feature");
+			break;
+		case  BLUETOOTH_RECORDACP_UUID:
+			profiles[num] = g_strdup("Record Access Control Point");
+			break;
+		case  BLUETOOTH_RSCM_UUID:
+			profiles[num] = g_strdup("RSC Measurement");
+			break;
+		case  BLUETOOTH_RSMF_UUID:
+			profiles[num] = g_strdup("RSC Feature");
+			break;
+		case  BLUETOOTH_SCCP_UUID:
+			profiles[num] = g_strdup("SC Control Point");
+			break;
+		case  BLUETOOTH_CSCM_UUID:
+			profiles[num] = g_strdup("CSC Measurement");
+			break;
+		case  BLUETOOTH_CSCF_UUID:
+			profiles[num] = g_strdup("CSC Feature");
+			break;
+		case  BLUETOOTH_SENSORL_UUID:
+			profiles[num] = g_strdup("Sensor Location");
+			break;
+		default:
+			num--;
+			break;
+		}
+		num++;
+	}
+
+	return profiles;
 }

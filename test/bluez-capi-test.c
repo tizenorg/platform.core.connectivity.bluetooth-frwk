@@ -396,17 +396,17 @@ static int remove_remote_oob_data(const char *p1, const char *p2)
 static int get_version(const char *p1, const char *p2)
 {
 	int err;
-	char version[100];
+	char *version;
 
 	DBG("");
 
-	memset(version, 0, 100);
+	err = bt_adapter_get_version(&version);
 
-	err = bt_adapter_get_version((char **)&version);
-
-	if (err == BT_SUCCESS)
+	if (err == BT_SUCCESS) {
 		DBG("version = %s", version);
-	else {
+		if (version)
+			g_free(version);
+	} else {
 		DBG("bt_adapter_get_version err = %d", err);
 		return -1;
 	}
@@ -417,26 +417,29 @@ static int get_version(const char *p1, const char *p2)
 static int get_local_info(const char *p1, const char *p2)
 {
 	int err;
-	char chipset[100];
-	char firmware[100];
-	char stack_version[100];
-	char profiles[100];
+	char *chipset;
+	char *firmware;
+	char *stack_version;
+	char *profiles;
 
 	DBG("");
 
-	memset(chipset, 0, 100);
-	memset(firmware, 0, 100);
-	memset(stack_version, 0, 100);
-	memset(profiles, 0, 100);
-
-	err = bt_adapter_get_local_info((char **)&chipset, (char **)&firmware,
-				(char **)&stack_version, (char **)&profiles);
+	err = bt_adapter_get_local_info(&chipset, &firmware,
+				&stack_version, &profiles);
 
 	if (err == BT_SUCCESS) {
 		DBG("chipset = %s", chipset);
 		DBG("firmware = %s", firmware);
 		DBG("stack_version = %s", stack_version);
 		DBG("profiles = %s", profiles);
+		if (chipset)
+			g_free(chipset);
+		if (firmware)
+			g_free(firmware);
+		if (stack_version)
+			g_free(stack_version);
+		if (profiles)
+			g_free(profiles);
 	} else {
 		DBG("bt_adapter_get_local_info err = %d", err);
 		return -1;
