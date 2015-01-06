@@ -6277,6 +6277,17 @@ int bt_nap_deactivate(void)
 	return connman_set_tethering(false);
 }
 
+int bt_nap_disconnect_all(void)
+{
+	DBG("");
+
+	if (bt_nap_deactivate() == BT_SUCCESS) {
+		DBG("nap deactivate done");
+		return bt_nap_activate();
+	} else
+		return BT_ERROR_OPERATION_FAILED;
+}
+
 int bt_hdp_register_sink_app(unsigned short data_type, char **app_id)
 {
 	int result = BT_ERROR_NONE;
