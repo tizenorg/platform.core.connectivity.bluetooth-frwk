@@ -1694,6 +1694,11 @@ int bt_adapter_is_service_used(const char *service_uuid, bool *used)
 	return BT_SUCCESS;
 }
 
+int bt_socket_is_service_used(const char *service_uuid, bool *used)
+{
+	return bt_adapter_is_service_used(service_uuid, used);
+}
+
 int bt_adapter_set_device_discovery_state_changed_cb(
 			bt_adapter_device_discovery_state_changed_cb callback,
 			void *user_data)
