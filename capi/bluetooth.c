@@ -6732,6 +6732,76 @@ static gboolean spp_is_device_connected(const char *address)
 	return false;
 }
 
+int bt_device_is_profile_connected(const char *remote_address,
+					bt_profile_e bt_profile,
+					bool *connected_status)
+{
+	bluez_device_t *device;
+	bt_device_info_s *device_info;
+	gboolean rfcomm_connected;
+	gboolean is_type;
+	gboolean hid_connected = false;
+	int user_privilieges;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (!remote_address) {
+		DBG("address = NULL");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
+
+	device = bluez_adapter_get_device_by_address(default_adapter,
+							remote_address);
+	if (device == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	device_info = get_device_info(device);
+
+	if (device_info->is_connected == false)
+		return  BT_ERROR_REMOTE_DEVICE_NOT_CONNECTED;
+
+	if (bt_profile == BT_PROFILE_RFCOMM) {
+		rfcomm_connected = spp_is_device_connected(remote_address);
+		*connected_status = rfcomm_connected;
+		goto done;
+	} else if (bt_profile == BT_PROFILE_A2DP) {
+		is_type = bluez_get_media_type(remote_address);
+
+		/*not check hfp and hsp connected, hfp is not ready*/
+		/*todo hfp and hsp checking*/
+		*connected_status = is_type;
+		goto done;
+	} else if (bt_profile == BT_PROFILE_HID) {
+		bluez_device_input_get_property_connected(device,
+							&hid_connected);
+		*connected_status = hid_connected;
+		goto done;
+	}
+
+	free_device_info(device_info);
+	return BT_ERROR_NOT_SUPPORTED;
+done:
+	free_device_info(device_info);
+	return BT_SUCCESS;
+}
+
 int bt_device_foreach_connected_profiles(
 			const char *remote_address,
 			bt_device_connected_profile callback,

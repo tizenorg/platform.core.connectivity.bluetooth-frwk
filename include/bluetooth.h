@@ -1839,6 +1839,27 @@ int bt_device_foreach_connected_profiles(const char *remote_address, bt_device_c
 
 /**
  * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE
+ * @brief Gets the profile connected status.
+ * @since_tizen 2.3
+ * @param[in] remote_address The address of the remote device
+ * @param[in] bt_profile wish to know bt_profile
+ * @param[out] connected_status the connected status
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_INVALID_PARAMETER  Invalid parameter
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_REMOTE_DEVICE_NOT_BONDED   Remote device not bonded
+ * @retval #BT_ERROR_OPERATION_FAILED   Operation failed
+ * @retval #BT_ERROR_NOT_SUPPORTED  Not supported
+ *
+ * @pre The state of local Bluetooth must be #BT_ADAPTER_ENABLED.
+ */
+int bt_device_is_profile_connected(const char *remote_address, bt_profile_e bt_profile,
+					bool *connected_status);
+
+/**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_DEVICE_MODULE
  * @brief  Registers a callback function to be invoked when the bond creates.
  * @param[in] callback The callback function to register
  * @param[in] user_data The user data to be passed to the callback function
