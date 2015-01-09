@@ -1479,6 +1479,35 @@ static int device_disconnect_le(const char *p1, const char *p2)
 	return 0;
 }
 
+static bool device_foreach_connected_profiles_callback(bt_profile_e profile,
+						void *user_data)
+{
+	DBG("device profile connected profile = %x", profile);
+	return TRUE;
+}
+
+static int device_foreach_connected_profiles(const char *p1, const char *p2)
+{
+	int err;
+
+	DBG("");
+
+	if (p1 == NULL) {
+		ERROR("must give the device address");
+		return 0;
+	}
+
+	err = bt_device_foreach_connected_profiles(p1,
+			device_foreach_connected_profiles_callback, NULL);
+	if (err != BT_SUCCESS) {
+		ERROR("bt_device_foreach_connected_profiles error: %d",
+								err);
+		return 0;
+	}
+
+	return 0;
+}
+
 static int hid_disconnect(const char *p1, const char *p2)
 {
 	int err;
@@ -2647,6 +2676,9 @@ struct {
 
 	{"device_disconnect_le", device_disconnect_le,
 		"Usage: device_disconnect_le 70:F9:27:64:DF:65\n\tDisconnect LE device"},
+
+	{"device_foreach_connected_profiles", device_foreach_connected_profiles,
+		"Usage: device_foreach_connected_profiles address\n\tdevice connected profiles"},
 
 	{"hid_host_initialize", hid_host_initialize,
 		"Usage: hid_host_initialize\n\tInitialize hid host"},
