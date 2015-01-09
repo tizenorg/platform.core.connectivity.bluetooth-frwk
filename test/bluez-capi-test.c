@@ -1341,7 +1341,10 @@ static int audio_connect(const char *p1, const char *p2)
 	int err;
 
 	DBG("+");
-	if (g_strcmp0(p2, "a2dp") == 0) {
+	if (g_strcmp0(p2, "ag") == 0) {
+		DBG("ag");
+		err = bt_audio_connect(p1, BT_AUDIO_PROFILE_TYPE_AG);
+	} else if (g_strcmp0(p2, "a2dp") == 0) {
 		DBG("a2dp");
 		err = bt_audio_connect(p1, BT_AUDIO_PROFILE_TYPE_A2DP);
 	} else if (g_strcmp0(p2, "all") == 0) {
@@ -2101,6 +2104,33 @@ static int nap_activate(const char *p1, const char *p2)
 	return 0;
 }
 
+static int nap_disconnect_all(const char *p1, const char *p2)
+{
+	int ret;
+
+	ret = bt_nap_disconnect_all();
+	if (ret != BT_SUCCESS)
+		DBG("bt_nap_disconnect_all failed %d", ret);
+
+	return 0;
+}
+
+static int nap_disconnect(const char *p1, const char *p2)
+{
+	int ret;
+
+	if (p1 == NULL) {
+		ERROR("nap_disconnect need remote address");
+		return 0;
+	}
+
+	ret = bt_nap_disconnect(p1);
+	if (ret != BT_SUCCESS)
+		DBG("bt_nap_disconnect failed %d", ret);
+
+	return 0;
+}
+
 static int nap_deactivate(const char *p1, const char *p2)
 {
 	int ret;
@@ -2630,10 +2660,10 @@ struct {
 		"Usage: hid_disconnect 70:F9:27:64:DF:65\n\tDisconnect HID profile"},
 
 	{"audio_connect", audio_connect,
-		"Usage: audio_connect address type(a2dp/all)\n\tConnect audio profile"},
+		"Usage: audio_connect address type(ag/a2dp/all)\n\tConnect audio profile"},
 
 	{"audio_disconnect", audio_disconnect,
-		"Usage: audio_disconnect address type(a2dp/all)\n\tDisconnect audio profile"},
+		"Usage: audio_disconnect address type(ag/a2dp/all)\n\tDisconnect audio profile"},
 
 	{"audio_set_connection_state_changed", audio_set_connection_state_changed,
 		"Usage: audio_set_connection_state_changed\n\tset connection state callback"},
@@ -2761,6 +2791,12 @@ struct {
 
 	{"nap_deactivate", nap_deactivate,
 		"Usage: nap_deactivate\n\tdeactivate NAP"},
+
+	{"nap_disconnect_all", nap_disconnect_all,
+		"Usage: nap_disconnect_all\n\tdisconnect all nap connection"},
+
+	{"nap_disconnect", nap_disconnect,
+		"Usage: nap_disconnect remote_addr\n\tdisconnect nap connection"},
 
 	{"nap_set_connection_state_changed_cb", nap_set_connection_state_changed_cb,
 		"Usage: nap_set_connection_state_changed_cb\n\tset nap conn cb"},

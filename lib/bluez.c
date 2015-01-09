@@ -257,6 +257,7 @@ struct _bluez_gatt_desc {
 static GHashTable *bluez_object_hash;
 
 static GList *bluez_adapter_list;
+static GList *bluez_network_list;
 
 static GHashTable *bluez_adapter_hash;
 
@@ -553,6 +554,79 @@ static void handle_adapter_discoverable_timeout_changed(
 				adapter->discoverable_timeout_cb_data);
 }
 
+static void _bluez_remove_all_net_address(void)
+{
+	char *network_address;
+	GList *list, *next;
+
+	DBG("+");
+
+	if (bluez_network_list == NULL)
+		return;
+
+	for (list = g_list_first(bluez_network_list); list; list = next) {
+		next = g_list_next(list);
+		network_address = list->data;
+
+		bluez_network_list =
+			g_list_remove(bluez_network_list, network_address);
+		g_free(network_address);
+	}
+
+	bluez_network_list = NULL;
+
+	DBG("-");
+
+	return;
+}
+
+static void _bluez_remove_network_address(const char *address)
+{
+	char *network_address;
+	GList *list, *next;
+
+	DBG("address = %s", address);
+
+	if (bluez_network_list == NULL)
+		return;
+
+	for (list = g_list_first(bluez_network_list); list; list = next) {
+		next = g_list_next(list);
+		network_address = list->data;
+
+		if (!g_strcmp0(network_address, address)) {
+			bluez_network_list =
+				g_list_remove(bluez_network_list,
+							network_address);
+			g_free(network_address);
+			return;
+		}
+	}
+
+	return;
+}
+
+gboolean bluez_find_network_address(const char *address)
+{
+	char *network_address;
+	GList *list, *next;
+
+	DBG("address = %s", address);
+
+	if (bluez_network_list == NULL)
+		return FALSE;
+
+	for (list = g_list_first(bluez_network_list); list; list = next) {
+		next = g_list_next(list);
+		network_address = list->data;
+
+		if (!g_strcmp0(network_address, address))
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
 static void networkserver_on_signal(GDBusProxy *proxy,
 					gchar *sender_name,
 					gchar *signal_name,
@@ -578,8 +652,15 @@ static void networkserver_on_signal(GDBusProxy *proxy,
 			address, device,
 			nap_connnection_state_cb_data);
 
+	if (connected)
+		bluez_network_list =
+			g_list_append(bluez_network_list, address);
+	else {
+		_bluez_remove_network_address(address);
+		g_free(address);
+	}
+
 	g_free(device);
-	g_free(address);
 }
 
 static void adapter_properties_changed(GDBusProxy *proxy,
@@ -1241,7 +1322,7 @@ static void parse_bluez_control_interfaces(gpointer data, gpointer user_data)
 	if (g_strcmp0(iface_name, MEDIATRANSPORT_INTERFACE) == 0) {
 		gchar *uuid, *device_address;
 		gchar *device_path;
-		enum audio_profile_type type;
+		enum audio_profile_type type = AUDIO_TYPE_ALL;
 
 		path = g_dbus_proxy_get_object_path(proxy);
 
@@ -1280,10 +1361,13 @@ static void parse_bluez_control_interfaces(gpointer data, gpointer user_data)
 		if (g_strcmp0(uuid, BT_A2DP_SINK_UUID) == 0) {
 			type = AUDIO_TYPE_A2DP;
 			object->media_type = type;
+		} else if (g_strcmp0(uuid, BT_A2DP_SOURCE_UUID) == 0) {
+			type = AUDIO_TYPE_AG;
+			object->media_type = type;
 		}
 
 		if (audio_state_cb) {
-				audio_state_cb(0, TRUE, device_address,
+			audio_state_cb(0, TRUE, device_address,
 					type, audio_state_cb_data);
 		}
 
@@ -2774,7 +2858,13 @@ static void detach_gatt_service_head(struct _bluez_device *device)
 
 static void unregister_bluez_device(struct _bluez_device *device)
 {
+	char address[BT_ADDRESS_STRING_SIZE];
+
 	DBG("device path %s", device->object_path);
+
+	convert_device_path_to_address(device->object_path, address);
+
+	_bluez_remove_network_address((char *)address);
 
 	g_hash_table_steal(bluez_device_hash, device->object_path);
 
@@ -3201,6 +3291,7 @@ static void destruct_bluez_object_manager(void)
 
 void bluez_lib_deinit(void)
 {
+	_bluez_remove_all_net_address();
 	destruct_bluez_objects();
 	destruct_bluez_object_manager();
 }
@@ -4866,12 +4957,12 @@ void bluez_device_disconnect_le(struct _bluez_device *device)
 			bluez_device_disconnect_cb, notify);
 }
 
-gboolean bluez_get_media_type(const char *remote_address)
+enum audio_profile_type bluez_get_media_type(const char *remote_address)
 {
 	struct _bluez_object *object;
 	GList *list, *next;
 	int length;
-	gboolean is_type = FALSE;
+	enum audio_profile_type type = AUDIO_TYPE_UNKNOWN;
 	gchar device_address[BT_ADDRESS_STRING_SIZE];
 
 	DBG("");
@@ -4888,14 +4979,18 @@ gboolean bluez_get_media_type(const char *remote_address)
 		convert_device_path_to_address(object->path_name,
 						(gchar *)device_address);
 
-		if (!g_strcmp0(remote_address, device_address) &&
-			object->media_type == AUDIO_TYPE_A2DP) {
-			is_type = TRUE;
-			break;
+		if (!g_strcmp0(remote_address, device_address)) {
+			if (object->media_type == AUDIO_TYPE_A2DP) {
+				type = AUDIO_TYPE_A2DP;
+				break;
+			} else if (object->media_type == AUDIO_TYPE_AG) {
+				type = AUDIO_TYPE_AG;
+				break;
+			}
 		}
 	}
 
-	return is_type;
+	return type;
 }
 
 static int bluez_read_local_info(int handle, guint8 *version,

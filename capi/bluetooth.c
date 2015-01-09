@@ -3360,7 +3360,7 @@ int bt_audio_connect(const char *remote_address,
 	int user_privilieges, len;
 	adapter_device_discovery_info_t *device_info;
 
-	DBG("");
+	DBG("type = %x", type);
 
 	if (initialized == false)
 		return BT_ERROR_NOT_INITIALIZED;
@@ -3394,6 +3394,9 @@ int bt_audio_connect(const char *remote_address,
 	case BT_AUDIO_PROFILE_TYPE_ALL:
 		uuid = BT_GENERIC_AUDIO_UUID;
 		break;
+	case BT_AUDIO_PROFILE_TYPE_AG:
+		uuid = BT_A2DP_SOURCE_UUID;
+		break;
 	default:
 		DBG("Unknown role");
 		return BT_ERROR_INVALID_PARAMETER;
@@ -3403,6 +3406,8 @@ int bt_audio_connect(const char *remote_address,
 							remote_address);
 	if (device == NULL)
 		return BT_ERROR_OPERATION_FAILED;
+
+	DBG("uuid = %s", uuid);
 
 	if (type != BT_AUDIO_PROFILE_TYPE_ALL)
 		bluez_device_connect_profile(device, uuid,
@@ -3482,6 +3487,9 @@ int bt_audio_disconnect(const char *remote_address,
 		break;
 	case BT_AUDIO_PROFILE_TYPE_ALL:
 		uuid = BT_GENERIC_AUDIO_UUID;
+		break;
+	case BT_AUDIO_PROFILE_TYPE_AG:
+		uuid = BT_A2DP_SOURCE_UUID;
 		break;
 	default:
 		DBG("Unknown role");
@@ -6293,6 +6301,51 @@ int bt_nap_disconnect_all(void)
 		return BT_ERROR_OPERATION_FAILED;
 }
 
+int bt_nap_disconnect(const char *remote_address)
+{
+	bluez_device_t *device;
+	gboolean nap_server_connected;
+	int user_privilieges;
+
+	DBG("");
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	if (remote_address == NULL) {
+		DBG("address = NULL");
+		return BT_ERROR_INVALID_PARAMETER;
+	}
+
+	user_privilieges = bt_device_get_privileges(remote_address);
+
+	if (user_privilieges == 0) {
+		DBG("user not privilieges to pair and use");
+		/*todo: This point will check if Cynara allow user
+			use the remote device
+			if ok, return BT_SUCCESS.
+		*/
+		return BT_ERROR_NOT_ENABLED;
+	}
+
+	nap_server_connected = bluez_find_network_address(remote_address);
+
+	if (!nap_server_connected)
+		return BT_ERROR_NOT_ENABLED;
+
+	device = bluez_adapter_get_device_by_address(default_adapter,
+							remote_address);
+	if (device == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	bluez_device_disconnect_all(device, NULL);
+
+	return BT_SUCCESS;
+}
+
 int bt_hdp_register_sink_app(unsigned short data_type, char **app_id)
 {
 	int result = BT_ERROR_NONE;
@@ -6744,8 +6797,9 @@ int bt_device_is_profile_connected(const char *remote_address,
 	bluez_device_t *device;
 	bt_device_info_s *device_info;
 	gboolean rfcomm_connected;
-	gboolean is_type;
+	enum audio_profile_type audio_type;
 	gboolean hid_connected = false;
+	gboolean nap_server_connected, nap_connected;
 	int user_privilieges;
 
 	DBG("");
@@ -6787,17 +6841,31 @@ int bt_device_is_profile_connected(const char *remote_address,
 		*connected_status = rfcomm_connected;
 		goto done;
 	} else if (bt_profile == BT_PROFILE_A2DP) {
-		is_type = bluez_get_media_type(remote_address);
-
-		/*not check hfp and hsp connected, hfp is not ready*/
-		/*todo hfp and hsp checking*/
-		*connected_status = is_type;
+		audio_type = bluez_get_media_type(remote_address);
+		if (audio_type == AUDIO_TYPE_A2DP)
+			*connected_status = TRUE;
+		else
+			*connected_status = FALSE;
 		goto done;
 	} else if (bt_profile == BT_PROFILE_HID) {
 		bluez_device_input_get_property_connected(device,
 							&hid_connected);
 		*connected_status = hid_connected;
 		goto done;
+	} else if (bt_profile == BT_PROFILE_AG) {
+		audio_type = bluez_get_media_type(remote_address);
+		if (audio_type == AUDIO_TYPE_AG)
+			*connected_status = TRUE;
+		else
+			*connected_status = FALSE;
+	}  else if (bt_profile == BT_PROFILE_NAP) {
+		bluez_device_network_get_property_connected(device,
+							&nap_connected);
+		*connected_status = nap_connected;
+	}  else if (bt_profile == BT_PROFILE_NAP_SERVER) {
+		nap_server_connected =
+				bluez_find_network_address(remote_address);
+		*connected_status = nap_server_connected;
 	}
 
 	free_device_info(device_info);
@@ -6815,9 +6883,10 @@ int bt_device_foreach_connected_profiles(
 	bluez_device_t *device;
 	bt_device_info_s *device_info;
 	gboolean rfcomm_connected;
-	gboolean is_type;
-	gboolean hid_connected = false;
+	gboolean hid_connected = false, nap_connected;
+	gboolean nap_server_connected;
 	int user_privilieges;
+	enum audio_profile_type audio_type;
 
 	DBG("");
 
@@ -6857,19 +6926,29 @@ int bt_device_foreach_connected_profiles(
 	if (rfcomm_connected)
 		callback(BT_PROFILE_RFCOMM, user_data);
 
-	is_type = bluez_get_media_type(remote_address);
+	audio_type = bluez_get_media_type(remote_address);
 
 	/*not check hfp and hsp connected, hfp is not ready*/
 	/*todo hfp and hsp checking*/
 
-	if (is_type)
+	if (audio_type == AUDIO_TYPE_A2DP)
 		callback(BT_PROFILE_A2DP, user_data);
+	else if (audio_type == AUDIO_TYPE_AG)
+		callback(BT_PROFILE_AG, user_data);
 
 	if (!(bluez_device_input_get_property_connected(device,
 					&hid_connected))) {
 		if (hid_connected)
 			callback(BT_PROFILE_HID, user_data);
 	}
+
+	bluez_device_network_get_property_connected(device, &nap_connected);
+	if (nap_connected)
+		callback(BT_PROFILE_NAP, user_data);
+
+	nap_server_connected = bluez_find_network_address(remote_address);
+	if (nap_server_connected)
+		callback(BT_PROFILE_NAP_SERVER, user_data);
 
 	free_device_info(device_info);
 

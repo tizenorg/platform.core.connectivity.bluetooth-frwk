@@ -197,10 +197,14 @@ typedef enum
  */
 typedef enum
 {
-    BT_PROFILE_RFCOMM = 0x01, /**< RFCOMM Profile */
-    BT_PROFILE_A2DP = 0x02, /**< Advanced Audio Distribution Profile */
-    BT_PROFILE_HSP = 0x04, /**< Headset Profile */
-    BT_PROFILE_HID = 0x08, /**< Human Interface Device Profile */
+	BT_PROFILE_RFCOMM = 0x01, /**< RFCOMM Profile */
+	BT_PROFILE_A2DP = 0x02, /**< Advanced Audio Distribution Profile */
+	BT_PROFILE_HSP = 0x04, /**< Headset Profile */
+	BT_PROFILE_HID = 0x08, /**< Human Interface Device Profile */
+	BT_PROFILE_NAP = 0x10, /**< Network Access Point Profile */
+	BT_PROFILE_AG = 0x20, /**< Audio Gateway Profile */
+	BT_PROFILE_GATT = 0x40, /**< Generic Attribute Profile */
+	BT_PROFILE_NAP_SERVER = 0x80, /**< NAP server Profile */
 } bt_profile_e;
 
 /**
@@ -357,9 +361,10 @@ typedef enum {
  * @brief  Enumerations for the types of profiles related with audio
  */
 typedef enum {
-    BT_AUDIO_PROFILE_TYPE_ALL = 0,  /**< All supported profiles related with audio */
-    BT_AUDIO_PROFILE_TYPE_HSP_HFP,  /**< HSP(Headset Profile) and HFP(Hands-Free Profile) */
-    BT_AUDIO_PROFILE_TYPE_A2DP,  /**< A2DP(Advanced Audio Distribution Profile) */
+	BT_AUDIO_PROFILE_TYPE_ALL = 0,  /**< All supported profiles related with audio */
+	BT_AUDIO_PROFILE_TYPE_HSP_HFP,  /**< HSP(Headset Profile) and HFP(Hands-Free Profile) */
+	BT_AUDIO_PROFILE_TYPE_A2DP,  /**< A2DP(Advanced Audio Distribution Profile) */
+	BT_AUDIO_PROFILE_TYPE_AG,  /**< AG(Audio Gateway) */
 } bt_audio_profile_type_e;
 
 /**
@@ -2667,6 +2672,27 @@ int bt_nap_deactivate(void);
  * @see bt_nap_activate()
  */
 int bt_nap_disconnect_all(void);
+
+/**
+ * @internal
+ * @ingroup CAPI_NETWORK_BLUETOOTH_PAN_NAP_MODULE
+ * @brief Disconnects the specified PANU(Personal Area Networking User) which is connected to you.
+ * @since_tizen 2.3
+ * @privlevel public
+ * @privilege %http://tizen.org/privilege/bluetooth
+ * @param[in] remote_address  The remote address
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ * @retval #BT_ERROR_PERMISSION_DENIED  Permission denied
+ * @retval #BT_ERROR_NOT_SUPPORTED  Not supported
+ *
+ * @pre The Bluetooth NAP service must be activated with bt_nap_activate().
+ * @see bt_nap_activate()
+ */
+int bt_nap_disconnect(const char *remote_address);
 
 /**
  * @ingroup CAPI_NETWORK_BLUETOOTH_PAN_NAP_MODULE

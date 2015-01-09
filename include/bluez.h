@@ -511,7 +511,11 @@ void bluez_set_nap_connection_state_cb(
 void bluez_unset_nap_connection_state_cb(void);
 
 enum audio_profile_type {
+	AUDIO_TYPE_ALL,
+	AUDIO_TYPE_HSP_HFP,
 	AUDIO_TYPE_A2DP,
+	AUDIO_TYPE_AG,
+	AUDIO_TYPE_UNKNOWN,
 };
 
 typedef void (*bluez_audio_state_cb_t)(int result,
@@ -749,7 +753,7 @@ void hdp_internal_handle_disconnect(gpointer user_data,
 void hdp_internal_handle_connect(gpointer user_data,
 						GVariant *param);
 
-gboolean bluez_get_media_type(const char *remote_address);
+enum audio_profile_type bluez_get_media_type(const char *remote_address);
 
 int bluez_media_register_player(struct _bluez_adapter *adapter);
 
@@ -765,5 +769,7 @@ void bluez_unset_paired_changed_cb(void);
 
 int bluez_get_local_info(char **local_version, char **chipset,
 				char **firmware, char **stack_version);
+
+gboolean bluez_find_network_address(const char *address);
 
 #endif
