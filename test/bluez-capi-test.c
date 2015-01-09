@@ -629,6 +629,7 @@ static void device_discovery_cb(int result,
 		DBG("\tRSSI: %d", discovery_info->rssi);
 		DBG("\tIs bonded: %d", discovery_info->is_bonded);
 		DBG("\tservice_count: %d", discovery_info->service_count);
+		DBG("\tappearance: %x", discovery_info->appearance);
 
 		for (len = 0; len < discovery_info->service_count; len++)
 			DBG("\t service %d: %s", len,

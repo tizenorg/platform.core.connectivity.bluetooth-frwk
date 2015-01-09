@@ -479,7 +479,7 @@ GDBusConnection *get_system_lib_dbus_connect(void)
 unsigned int convert_appearance_to_type(unsigned int appearance)
 {
 	/*todo support it later*/
-	return 0x00;
+	return appearance;
 }
 
 char **convert_uuid_to_profiles(char **uuids)
