@@ -6879,14 +6879,17 @@ int bt_device_is_profile_connected(const char *remote_address,
 			*connected_status = TRUE;
 		else
 			*connected_status = FALSE;
+		goto done;
 	}  else if (bt_profile == BT_PROFILE_NAP) {
 		bluez_device_network_get_property_connected(device,
 							&nap_connected);
 		*connected_status = nap_connected;
+		goto done;
 	}  else if (bt_profile == BT_PROFILE_NAP_SERVER) {
 		nap_server_connected =
 				bluez_find_network_address(remote_address);
 		*connected_status = nap_server_connected;
+		goto done;
 	}
 
 	free_device_info(device_info);
