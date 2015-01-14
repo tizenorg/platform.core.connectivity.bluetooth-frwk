@@ -6266,6 +6266,54 @@ int bt_panu_unset_connection_state_changed_cb(void)
 	return BT_SUCCESS;
 }
 
+static int connman_get_tethering(bool *tethering)
+{
+	GVariant *result;
+	GDBusConnection *connection;
+	GError *error = NULL;
+
+	if (initialized == false)
+		return BT_ERROR_NOT_INITIALIZED;
+
+	if (default_adapter == NULL)
+		return BT_ERROR_ADAPTER_NOT_FOUND;
+
+	connection = get_system_dbus_connect();
+	if (connection == NULL)
+		return BT_ERROR_OPERATION_FAILED;
+
+	result = g_dbus_connection_call_sync(connection, CONNMAN_DBUS_NAME,
+				CONNMAN_BLUETOOTH_TECHNOLOGY_PATH,
+				CONNMAN_BLUETOTOH_TECHNOLOGY_INTERFACE,
+				"GetProperties", NULL, NULL,
+					0, -1, NULL, &error);
+
+	if (error) {
+		DBG("error %s", error->message);
+		g_error_free(error);
+		return BT_ERROR_OPERATION_FAILED;
+	}
+
+	if (result != NULL) {
+		GVariantIter *iter;
+		GVariant *item;
+
+		g_variant_get(result, "(a{sv})", &iter);
+		while ((item = g_variant_iter_next_value(iter))) {
+			gchar *key;
+			GVariant *value;
+
+			g_variant_get(item, "{sv}", &key, &value);
+			if (g_strcmp0("Tethering", key) == 0) {
+				*tethering = g_variant_get_boolean(value);
+				return BT_SUCCESS;
+			}
+		}
+	}
+
+	return BT_ERROR_OPERATION_FAILED;
+}
+
 static int connman_set_tethering(bool tethering)
 {
 	GDBusConnection *connection;
@@ -6316,6 +6364,11 @@ int bt_nap_disconnect_all(void)
 	DBG("");
 
 	if (bt_nap_deactivate() == BT_SUCCESS) {
+		bool tethering = true;
+
+		while (true == tethering) {
+			connman_get_tethering(&tethering);
+		}
 		DBG("nap deactivate done");
 		return bt_nap_activate();
 	} else

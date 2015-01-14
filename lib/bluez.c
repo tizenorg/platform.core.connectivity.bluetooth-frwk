@@ -638,9 +638,9 @@ static void networkserver_on_signal(GDBusProxy *proxy,
 
 	DBG("sender_name = %s, signal_name = %s",
 				sender_name, signal_name);
-	if (strcasecmp(signal_name, "PeerConnected"))
+	if (!strcasecmp(signal_name, "PeerConnected"))
 		connected = TRUE;
-	else if (strcasecmp(signal_name, "PeerDisconnected"))
+	else if (!strcasecmp(signal_name, "PeerDisconnected"))
 		connected = FALSE;
 	else
 		return;
