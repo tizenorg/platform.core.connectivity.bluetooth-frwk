@@ -74,6 +74,7 @@ static guint profile_id;
 static GDBusConnection *conn;
 static guint bluetooth_ext_agent_id;
 static guint adapter_recover_timeout_id;
+static guint nap_deactivate_timeout_id;
 
 static bluez_adapter_t *default_adapter;
 
@@ -6359,20 +6360,38 @@ int bt_nap_deactivate(void)
 	return connman_set_tethering(false);
 }
 
+static gboolean bt_nap_deactive_timeout_cb(gpointer user_data)
+{
+	DBG("");
+
+	bool tethering = true;
+
+	nap_deactivate_timeout_id = 0;
+
+	connman_get_tethering(&tethering);
+	if ( tethering == false ) {
+		DBG("nap deactivate done");
+		bt_nap_activate();
+	} else
+		DBG("nap deactivate failed");
+
+	return FALSE;
+}
+
 int bt_nap_disconnect_all(void)
 {
 	DBG("");
 
-	if (bt_nap_deactivate() == BT_SUCCESS) {
-		bool tethering = true;
+	if (nap_deactivate_timeout_id != 0)
+		return BT_ERROR_NOW_IN_PROGRESS;
 
-		while (true == tethering) {
-			connman_get_tethering(&tethering);
-		}
-		DBG("nap deactivate done");
-		return bt_nap_activate();
+	if (bt_nap_deactivate() == BT_SUCCESS) {
+		nap_deactivate_timeout_id = g_timeout_add(2000,
+						bt_nap_deactive_timeout_cb, NULL);
 	} else
 		return BT_ERROR_OPERATION_FAILED;
+
+	return BT_SUCCESS;
 }
 
 int bt_nap_disconnect(const char *remote_address)
