@@ -50,6 +50,7 @@
 
 #define WRITE_REQUEST "write"
 #define WRITE_COMMAND "write-without-response"
+#define NOTIFYING "notify"
 
 #define NEARD_AGENT_INTERFACE "org.neard.HandoverAgent"
 #define NEARD_AGENT_PATH "/org/bluez/neard_handover_agent"
@@ -384,7 +385,11 @@ static int service_by_path_cmp(gconstpointer a, gconstpointer b)
 	const struct char_changed_cb_node *node_data = a;
 	const char *service_path = b;
 	const char *object_path = node_data->object_path;
-
+	DBG("%p", node_data);
+	if (object_path == NULL)
+		return -1;
+	DBG("service path %s", service_path);
+	DBG("object path %s", object_path);
 	return strcmp(service_path, object_path);
 }
 
@@ -972,6 +977,22 @@ static void foreach_device_property_callback(GList *list, unsigned int flag)
 	}
 }
 
+static bool gatt_char_is_notifying_capable(bluez_gatt_char_t *characteristic)
+{
+	guint length, index;
+	char **flags;
+
+	flags = bluez_gatt_char_property_get_flags(characteristic);
+	length = g_strv_length(flags);
+
+	for (index = 0; index < length; ++index) {
+		if (strcmp(flags[index], NOTIFYING) == 0) 
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
 static void foreach_characteristic_property_callback(GList *list,
 						void *user_data)
 {
@@ -986,14 +1007,20 @@ static void foreach_characteristic_property_callback(GList *list,
 
 		characteristic = iter->data;
 
-		if (node_data)
+		if (node_data) {
+			if (gatt_char_is_notifying_capable(characteristic))
+				bluez_gatt_char_start_notify(characteristic);
+		
 			bluez_set_char_value_changed_cb(characteristic,
 						bluez_char_value_changed,
 						node_data);
-		else
+		} else {
+			if (gatt_char_is_notifying_capable(characteristic))
+				bluez_gatt_char_stop_notify(characteristic);
+		
 			bluez_unset_char_value_changed_cb(characteristic);
+		}
 	}
-
 }
 
 static void bluez_device_created(bluez_device_t *device, void *user_data)
@@ -6689,7 +6716,7 @@ int bt_device_connect_le(bt_device_gatt_state_changed_cb callback,
 {
 	bluez_device_t *device;
 	struct device_connect_cb_node *node_data = NULL;
-	int user_privilieges;
+//	int user_privilieges;
 
 	DBG("");
 
@@ -6703,18 +6730,18 @@ int bt_device_connect_le(bt_device_gatt_state_changed_cb callback,
 		DBG("address = NULL");
 		return BT_ERROR_INVALID_PARAMETER;
 	}
-
+/*
 	user_privilieges = bt_device_get_privileges(remote_address);
 
 	if (user_privilieges == 0) {
 		DBG("user not privilieges to pair and use");
-		/*todo: This point will check if Cynara allow user
+		todo: This point will check if Cynara allow user
 			use the remote device
 			if ok, return BT_SUCCESS.
-		*/
+		
 		return BT_ERROR_NOT_ENABLED;
 	}
-
+*/
 	if (callback == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
 
@@ -6752,7 +6779,7 @@ int bt_device_disconnect_le(bt_device_gatt_state_changed_cb callback,
 {
 	bluez_device_t *device;
 	struct device_disconnect_cb_node *node_data = NULL;
-	int user_privilieges;
+//	int user_privilieges;
 
 	DBG("");
 
@@ -6766,18 +6793,18 @@ int bt_device_disconnect_le(bt_device_gatt_state_changed_cb callback,
 		DBG("address = NULL");
 		return BT_ERROR_INVALID_PARAMETER;
 	}
-
+/*
 	user_privilieges = bt_device_get_privileges(remote_address);
 
 	if (user_privilieges == 0) {
 		DBG("user not privilieges to pair and use");
-		/*todo: This point will check if Cynara allow user
+		todo: This point will check if Cynara allow user
 			use the remote device
 			if ok, return BT_SUCCESS.
-		*/
+		
 		return BT_ERROR_NOT_ENABLED;
 	}
-
+*/
 	if (callback == NULL)
 		return BT_ERROR_INVALID_PARAMETER;
 
@@ -7058,7 +7085,7 @@ int bt_gatt_foreach_primary_services(const char *remote_address,
 	bluez_device_t *device;
 	GList *primary_services, *list, *next;
 	char *service_path;
-	int user_privilieges;
+//	int user_privilieges;
 
 	DBG("");
 
@@ -7072,18 +7099,18 @@ int bt_gatt_foreach_primary_services(const char *remote_address,
 		DBG("address = NULL");
 		return BT_ERROR_INVALID_PARAMETER;
 	}
-
+/*
 	user_privilieges = bt_device_get_privileges(remote_address);
 
 	if (user_privilieges == 0) {
 		DBG("user not privilieges to pair and use");
-		/*todo: This point will check if Cynara allow user
+		todo: This point will check if Cynara allow user
 			use the remote device
 			if ok, return BT_SUCCESS.
-		*/
+		
 		return BT_ERROR_NOT_ENABLED;
 	}
-
+*/
 	device = bluez_adapter_get_device_by_address(default_adapter,
 							remote_address);
 	if (device == NULL)
@@ -7256,14 +7283,16 @@ int bt_gatt_set_characteristic_changed_cb(bt_gatt_attribute_h service,
 		}
 	}
 
+	DBG("AAAA");
 	gatt_service = bluez_gatt_get_service_by_path(service_path);
 	if (gatt_service == NULL)
 		return BT_ERROR_OPERATION_FAILED;
-
+	DBG("cccc");
 	characteristics = bluez_gatt_service_get_chars(gatt_service);
 	if (characteristics == NULL)
 		return BT_ERROR_OPERATION_FAILED;
 
+	DBG("BBBB");
 	node_data = g_new0(struct char_changed_cb_node, 1);
 	if (node_data == NULL) {
 		ERROR("no memory");
@@ -7275,6 +7304,7 @@ int bt_gatt_set_characteristic_changed_cb(bt_gatt_attribute_h service,
 	node_data->object_path =
 		bluez_gatt_service_get_object_path(gatt_service);
 
+	DBG("%p", node_data);
 	char_changed_node_list =
 		g_list_append(char_changed_node_list, node_data);
 
@@ -7322,9 +7352,9 @@ int bt_gatt_unset_characteristic_changed_cb(bt_gatt_attribute_h service)
 	characteristics = bluez_gatt_service_get_chars(gatt_service);
 	if (characteristics == NULL)
 		return BT_ERROR_OPERATION_FAILED;
-
+	DBG("%p", node_data);
 	char_changed_node_list =
-			g_list_remove(char_changed_node_list, found);
+			g_list_remove(char_changed_node_list, node_data);
 
 	g_free(node_data);
 

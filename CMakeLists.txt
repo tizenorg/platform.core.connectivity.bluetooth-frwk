@@ -1,6 +1,7 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 PROJECT("Tizen Bluetooth Framework" C)
 
+SET(LIB_INSTALL_DIR "/usr/lib")
 SET(TEST_INSTALL_DIR "${LIB_INSTALL_DIR}/bluetooth-frwk-test/")
 SET(PLUGIN_INSTALL_DIR "${LIB_INSTALL_DIR}/bluetooth-service/plugins/")
 SET(CMAKE_C_FLAGS "-O3 -Wall -Werror -DPLUGINDIR=\\\"${PLUGIN_INSTALL_DIR}\\\"")

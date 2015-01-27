@@ -1787,6 +1787,22 @@ void bluez_gatt_write_char_value(struct _bluez_gatt_char *characteristic,
 	g_variant_builder_unref(builder);
 }
 
+void bluez_gatt_char_start_notify(struct _bluez_gatt_char *characteristic)
+{
+	g_dbus_proxy_call(characteristic->proxy,
+			"StartNotify", NULL,
+			0, -1, NULL,
+			NULL, NULL);
+}
+
+void bluez_gatt_char_stop_notify(struct _bluez_gatt_char *characteristic)
+{
+	g_dbus_proxy_call(characteristic->proxy,
+			"StopNotify", NULL,
+			0, -1, NULL,
+			NULL, NULL);
+}
+
 static void destruct_bluez_device(gpointer data)
 {
 	struct _bluez_device *device = data;

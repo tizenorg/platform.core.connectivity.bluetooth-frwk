@@ -351,6 +351,10 @@ void bluez_gatt_write_char_value(struct _bluez_gatt_char *characteristic,
 				int value_length,
 				unsigned char request);
 
+void bluez_gatt_char_start_notify(struct _bluez_gatt_char *characteristic);
+
+void bluez_gatt_char_stop_notify(struct _bluez_gatt_char *characteristic);
+
 typedef void (*char_write_value_cb_t)(
 				struct _bluez_gatt_char *characteristic,
 				gpointer user_data);
