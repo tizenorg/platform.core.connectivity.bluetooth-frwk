@@ -1966,11 +1966,13 @@ static void attach_device(struct _gatt_service_head *new_head)
 {
 	struct _bluez_device *device;
 
+	DBG("%s", new_head->device_path);
 	device = g_hash_table_lookup(bluez_device_hash,
 			(gconstpointer) new_head->device_path);
 	if (device == NULL)
 		return;
 
+	DBG("device->service_head %p", new_head);
 	device->service_head = new_head;
 	new_head->device = device;
 }
@@ -2064,6 +2066,8 @@ static void add_to_gatt_service_head_list(struct _bluez_gatt_service *service,
 		next = g_list_next(list);
 
 		if (!g_strcmp0(head->device_path, device_path)) {
+			if (!head->device)
+				attach_device(head);
 
 			DBG("insert %s into %s", service->object_path,
 							device_path);
@@ -2115,6 +2119,8 @@ static void add_to_gatt_char_head_list(struct _bluez_gatt_char *characteristic,
 		next = g_list_next(list);
 
 		if (!g_strcmp0(head->gatt_service_path, gatt_service_path)) {
+			if (!head->service)
+				attach_gatt_service(head);
 
 			DBG("insert %s into %s", characteristic->object_path,
 							gatt_service_path);
@@ -2168,7 +2174,9 @@ static void add_to_gatt_desc_head_list(struct _bluez_gatt_desc *descriptor,
 		next = g_list_next(list);
 
 		if (!g_strcmp0(head->gatt_char_path, gatt_char_path)) {
-
+			if (!head->characteristic)
+				attach_gatt_char(head);
+				
 			DBG("insert %s into %s", descriptor->object_path,
 							gatt_char_path);
 
@@ -2223,6 +2231,7 @@ static void register_bluez_device(struct _bluez_device *device)
 
 	g_free(adapter_path);
 
+	DBG("%s", device->object_path);
 	g_hash_table_insert(bluez_device_hash,
 				(gpointer) device->object_path,
 				(gpointer) device);
@@ -2854,6 +2863,7 @@ static void detach_gatt_service_head(struct _bluez_device *device)
 			continue;
 
 		if (!g_strcmp0(head->device_path, device->object_path)) {
+			DBG("DFADFADFAFAFASFAFDAF");
 			device->service_head = NULL;
 			head->device = NULL;
 			break;
@@ -3719,7 +3729,10 @@ GList *bluez_device_get_primary_services(struct _bluez_device *device)
 	GList *primary_services = NULL;
 	GList *services, *list, *next;
 	int primary;
-
+	DBG("DDD");
+	DBG("%p", device);
+	DBG("%p", service_head);
+	DBG("%p",service_head->gatt_service_hash);
 	services = g_hash_table_get_values(service_head->gatt_service_hash);
 
 	for (list = g_list_first(services); list; list = next) {
