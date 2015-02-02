@@ -61,6 +61,7 @@
 #define MEDIA_PLAYER_INTERFACE  "org.mpris.MediaPlayer2.Player"
 
 GDBusObjectManager *object_manager = NULL;
+gboolean first_time = FALSE;
 
 struct sockaddr_h {
 	sa_family_t	family;
@@ -3729,10 +3730,19 @@ GList *bluez_device_get_primary_services(struct _bluez_device *device)
 	GList *primary_services = NULL;
 	GList *services, *list, *next;
 	int primary;
+	int num = 1000;
 	DBG("DDD");
 	DBG("%p", device);
+	if (!first_time) {
+		while (num)
+			num--;
+		first_time = TRUE;
+	
+	}
+	if (!service_head)
+		return primary_services;
+
 	DBG("%p", service_head);
-	DBG("%p",service_head->gatt_service_hash);
 	services = g_hash_table_get_values(service_head->gatt_service_hash);
 
 	for (list = g_list_first(services); list; list = next) {
