@@ -752,7 +752,7 @@ int test_input_callback(void *data)
 			if (ret < 0)
 				TC_PRT("failed with [0x%04x]", ret);
 
-			TC_PRT("volume: %d", volume);
+			TC_PRT("volume: %u", volume);
 			break;
 		}
 		case 38:
