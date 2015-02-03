@@ -157,15 +157,10 @@ static gboolean bt_media_agent_set_property(BtMediaAgent *agent,
 						const char *property, GValue *val,
 						DBusGMethodInvocation *context)
 {
-	GError *error;
-	const gchar *value;
-	unsigned int status;
-
 	BT_DBG("property %s\n", property);
 
 	dbus_g_method_return(context);
 	return TRUE;
-
 }
 
 static const char *loopstatus_to_repeat(const char *value)
