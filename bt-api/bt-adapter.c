@@ -225,7 +225,6 @@ BT_EXPORT_API int bluetooth_get_discoverable_mode(bluetooth_discoverable_mode_t 
 						  discoverable_mode_ptr)
 {
 	int result;
-	int timeout = 0;
 
 	BT_CHECK_PARAMETER(discoverable_mode_ptr, return);
 
