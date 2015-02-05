@@ -1606,10 +1606,7 @@ static DBusHandlerResult __bt_manager_event_filter(DBusConnection *conn,
 				DBUS_TYPE_ARRAY, DBUS_TYPE_STRING,
 				&dev_info->uuids, dev_info->uuid_count,
 				DBUS_TYPE_INVALID);
-			if (!dev_info->paired)
-				g_list = g_list_append(g_list, dev_info);
-			else
-				_bt_free_device_info(dev_info);
+			g_list = g_list_append(g_list, dev_info);
 		} else if (bt_event == BT_MEDIA_TRANSFER_EVENT) {
 			__bt_parse_audio_properties(msg);
 		}
