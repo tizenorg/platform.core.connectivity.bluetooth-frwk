@@ -77,6 +77,8 @@ static guint bluetooth_ext_agent_id;
 static guint adapter_recover_timeout_id;
 static guint nap_deactivate_timeout_id;
 
+static gboolean le_scan_flag;
+
 static bluez_adapter_t *default_adapter;
 
 static guint event_id;
@@ -1079,6 +1081,8 @@ static void bluez_adapter_discovering_changed(bluez_adapter_t *adapter,
 	device_list = bluez_adapter_get_devices(default_adapter);
 	for (list = g_list_first(device_list); list; list = next) {
 		adapter_device_discovery_info_t *device_info;
+		int len = 0;
+		gboolean is_le = FALSE;
 
 		DBG("device discoverying changed");
 
@@ -1090,8 +1094,23 @@ static void bluez_adapter_discovering_changed(bluez_adapter_t *adapter,
 
 		discovery_device_info = get_discovery_device_info(device_info);
 
-		node->cb(BT_SUCCESS, BT_ADAPTER_DEVICE_DISCOVERY_FOUND,
+		for (len = 0; len < discovery_device_info->service_count; len++) {
+			DBG("service_uuid = %s",
+					discovery_device_info->service_uuid[len]);
+			if (!g_strcmp0(discovery_device_info->service_uuid[len],
+				"0000180d-0000-1000-8000-00805f9b34fb")) {
+				DBG("the device is le");
+				is_le = TRUE;
+			}
+		}
+
+		DBG("le_scan_flag = %d, is_le = %d", le_scan_flag, is_le);
+
+		if (le_scan_flag == FALSE || is_le == TRUE)
+			node->cb(BT_SUCCESS, BT_ADAPTER_DEVICE_DISCOVERY_FOUND,
 				discovery_device_info, node->user_data);
+
+		is_le = FALSE;
 
 		set_device_property_changed_callback(device);
 
@@ -1657,9 +1676,23 @@ static void bt_stop_discovery_timeout(void)
 		(GSourceFunc)bt_stop_discovery_timeout_cb, NULL);
 }
 
+int bt_adapter_le_start_device_discovery(void)
+{
+	int err;
+	DBG("");
+
+	err = bt_adapter_start_device_discovery();
+
+	le_scan_flag = TRUE;
+
+	return err;
+}
+
 int bt_adapter_start_device_discovery(void)
 {
 	DBG("");
+
+	le_scan_flag = FALSE;
 
 	if (initialized == false)
 		return BT_ERROR_NOT_INITIALIZED;

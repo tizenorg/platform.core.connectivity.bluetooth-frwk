@@ -1165,6 +1165,40 @@ int bt_adapter_get_visibility(bt_adapter_visibility_mode_e *mode, int *duration)
 int bt_adapter_set_visibility(bt_adapter_visibility_mode_e discoverable_mode, int duration);
 
 /**
+ * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_LE_MODULE
+ * @brief Starts the LE device discovery for a BT_ADAPTER_DEVICE_DISCOVERY_LE type.
+ * @since_tizen 2.3
+ * @privlevel public
+ * @privilege %http://tizen.org/privilege/bluetooth
+ *
+ * @details If a LE device is discovered, bt_adapter_le_device_discovery_state_changed_cb()
+*  will be invoked with #BT_ADAPTER_LE_DEVICE_DISCOVERY_FOUND, and then bt_adapter_le_device_discovery_state_changed_cb()
+ * will be called with #BT_ADAPTER_LE_DEVICE_DISCOVERY_FINISHED in case of the completion or cancellation of the discovery.
+ *
+ * @remarks To connect to peer Bluetooth device, you need to know its Bluetooth address. \n
+ * The device discovery can be stopped by bt_adapter_le_stop_device_discovery().
+ *
+ * @return 0 on success, otherwise a negative error value.
+ * @retval #BT_ERROR_NONE  Successful
+ * @retval #BT_ERROR_NOT_INITIALIZED  Not initialized
+ * @retval #BT_ERROR_NOT_ENABLED  Not enabled
+ * @retval #BT_ERROR_NOW_IN_PROGRESS  Operation is now in progress
+ * @retval #BT_ERROR_OPERATION_FAILED  Operation failed
+ * @retval #BT_ERROR_PERMISSION_DENIED  Permission denied
+ * @retval #BT_ERROR_NOT_SUPPORTED  Not supported
+ *
+ * @pre The state of local Bluetooth must be #BT_ADAPTER_ENABLED.
+ * or must be #BT_ADAPTER_LE_ENABLED.
+ * @post This function invokes bt_adapter_le_device_discovery_state_changed_cb().
+ *
+ * @see bt_adapter_le_is_discovering()
+ * @see bt_adapter_le_device_discovery_state_changed_cb()
+ * @see bt_adapter_le_set_device_discovery_state_changed_cb()
+ * @see bt_adapter_le_unset_device_discovery_state_changed_cb()
+ */
+int bt_adapter_le_start_device_discovery(void);
+
+/**
  * @ingroup CAPI_NETWORK_BLUETOOTH_ADAPTER_MODULE
  * @brief Starts the device discovery, asynchronously.
  *
