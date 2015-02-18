@@ -1,13 +1,17 @@
 /*
- * bluetooth-frwk
+ * Bluetooth-frwk
  *
- * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
+ *
+ * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
+ *		 Girishashok Joshi <girish.joshi@samsung.com>
+ *		 Chanyeol Park <chanyeol.park@samsung.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *              http://www.apache.org/licenses/LICENSE-2.0
+ *		http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -75,6 +79,7 @@ typedef enum {
 	GAP_AGENT_REJECT,
 	GAP_AGENT_CANCEL,
 	GAP_AGENT_TIMEOUT,
+	GAP_AGENT_ACCEPT_ALWAYS,
 } GAP_AGENT_ACCEPT_TYPE_T;
 
 struct _GapAgent {
@@ -87,7 +92,7 @@ struct _GapAgentClass {
 
 GapAgent *_gap_agent_new(void);
 void _gap_agent_setup_dbus(GapAgent *agent, GAP_AGENT_FUNC_CB *func_cb,
-					const char *path);
+					const char *path, DBusGProxy *adapter);
 gboolean _gap_agent_register(GapAgent *agent);
 void _gap_agent_reset_dbus(GapAgent *agent);
 
@@ -104,13 +109,20 @@ gboolean gap_agent_reply_authorize(GapAgent *agent, const guint accept,
 
 gboolean _gap_agent_exist_osp_server(GapAgent *agent, int type, char *uuid);
 
+bt_agent_osp_server_t *_gap_agent_get_osp_server(GapAgent *agent, int type,
+					char *uuid);
+
 gchar* _gap_agent_get_path(GapAgent *agent);
 
 gboolean _gap_agent_is_canceled(GapAgent *agent);
 
+void _gap_agent_set_canceled(GapAgent *agent, gboolean value);
+
 gboolean _gap_agent_register_osp_server(GapAgent *agent,
 						const gint type,
-						const char *uuid);
+						const char *uuid,
+						const char *path,
+						int fd);
 
 gboolean _gap_agent_unregister_osp_server(GapAgent *agent,
 						const gint type,

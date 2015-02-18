@@ -1,13 +1,17 @@
 /*
- * bluetooth-frwk
+ * Bluetooth-frwk
  *
- * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
+ *
+ * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
+ *		 Girishashok Joshi <girish.joshi@samsung.com>
+ *		 Chanyeol Park <chanyeol.park@samsung.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *              http://www.apache.org/licenses/LICENSE-2.0
+ *		http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -202,7 +206,7 @@ int _bt_oob_remove_remote_data(
 	if (!reply) {
 		BT_ERR("Error in RemoveRemoteData \n");
 		if (dbus_error_is_set(&err)) {
-			BT_DBG("%s", err.message);
+			BT_ERR("%s", err.message);
 			dbus_error_free(&err);
 			g_free(dev_addr);
 			return BLUETOOTH_ERROR_INTERNAL;
