@@ -1,13 +1,17 @@
 /*
- * bluetooth-frwk
+ * Bluetooth-frwk
  *
- * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
+ *
+ * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
+ *		 Girishashok Joshi <girish.joshi@samsung.com>
+ *		 Chanyeol Park <chanyeol.park@samsung.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *              http://www.apache.org/licenses/LICENSE-2.0
+ *		http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -46,7 +50,9 @@
 #define BT_AGENT_FAIL -1
 #define BT_AGENT_ERROR_NONE 0
 
+#ifndef TIZEN_WEARABLE
 #define BT_FILE_VISIBLE_TIME "file/private/libug-setting-bluetooth-efl/visibility_time"
+#endif
 
 typedef enum {
 	HS_PROFILE_UUID = ((unsigned short)0x1108),		/**<HS*/
@@ -73,6 +79,8 @@ typedef enum {
 	BT_AGENT_EVENT_EXCHANGE_REQUEST = 0x0800,
 	BT_AGENT_EVENT_PBAP_REQUEST = 0x1000,
 	BT_AGENT_EVENT_MAP_REQUEST = 0x2000,
+	BT_AGENT_EVENT_SYSTEM_RESET_REQUEST = 0x4000,
+	BT_AGENT_EVENT_LEGACY_PAIR_FAILED_FROM_REMOTE = 0x8000,
 } bt_agent_event_type_t;
 
 typedef enum {
@@ -103,6 +111,8 @@ typedef enum {
 typedef struct {
 	int type;
 	char *uuid;
+	char *path;
+	int fd;
 } bt_agent_osp_server_t;
 
 typedef struct {
@@ -114,12 +124,21 @@ void* _bt_create_agent(const char *path, gboolean adapter);
 
 void _bt_destroy_agent(void *agent);
 
-gboolean _bt_agent_is_canceled(void *agent);
+gboolean _bt_agent_is_canceled(void);
+void _bt_agent_set_canceled(gboolean value);
 
-gboolean _bt_agent_register_osp_server(const gint type, const char *uuid);
+gboolean _bt_agent_register_osp_server(const gint type,
+		const char *uuid, char *path, int fd);
 
 gboolean _bt_agent_unregister_osp_server(const gint type, const char *uuid);
 
 gboolean _bt_agent_reply_authorize(gboolean accept);
 
+int _bt_agent_reply_cancellation(void);
+
+int _bt_launch_system_popup(bt_agent_event_type_t event_type,
+							const char *device_name,
+							char *passkey,
+							const char *filename,
+							const char *agent_path);
 #endif

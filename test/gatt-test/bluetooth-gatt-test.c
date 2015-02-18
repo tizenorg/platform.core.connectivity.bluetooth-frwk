@@ -154,8 +154,8 @@ static void __accept_bdaddress(bluetooth_device_address_t *device_address)
 static void __accept_alert_level()
 {
 	TC_PRT("Enter alert level \n 0 - no alert 1 - mild alert 2 - High alert : ");
-	scanf("%d", &g_alert_level);
-	TC_PRT("You have selected alert level %d ", g_alert_level);
+	scanf("%u", &g_alert_level);
+	TC_PRT("You have selected alert level %u ", g_alert_level);
 }
 
 int test_input_callback(void *data)
