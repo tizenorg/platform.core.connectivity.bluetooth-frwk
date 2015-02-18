@@ -4,6 +4,7 @@ PROJECT(bt-service-api C)
 SET(SRCS
 bt-common.c
 bt-adapter.c
+bt-adapter-le.c
 bt-device.c
 bt-hid.c
 bt-network.c
@@ -11,7 +12,6 @@ bt-audio.c
 bt-oob.c
 bt-hdp.c
 bt-avrcp.c
-bt-gatt.c
 bt-telephony.c
 bt-opp-client.c
 bt-obex-server.c
@@ -19,14 +19,18 @@ bt-rfcomm-client.c
 bt-rfcomm-server.c
 bt-request-sender.c
 bt-event-handler.c
-)
+bt-scmst.c
+bt-gatt-service.c
+bt-pbap.c
+bt-gatt-client.c)
 
 SET(HEADERS
 bluetooth-api.h
 bluetooth-hid-api.h
 bluetooth-audio-api.h
 bluetooth-telephony-api.h
-bluetooth-media-control.h)
+bluetooth-media-control.h
+bluetooth-scmst-api.h)
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 SET(EXEC_PREFIX "\${prefix}")
@@ -41,13 +45,21 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 INCLUDE(FindPkgConfig)
 
-IF(LIBNOTIFY_SUPPORT OR LIBNOTIFICATION_SUPPORT)
-pkg_check_modules(packages REQUIRED dlog dbus-glib-1 gobject-2.0 gmodule-2.0 vconf
-libxml-2.0)
-ELSE(LIBNOTIFY_SUPPORT OR LIBNOTIFICATION_SUPPORT)
-pkg_check_modules(packages REQUIRED dlog dbus-glib-1 gobject-2.0 gmodule-2.0 vconf
- libxml-2.0 syspopup-caller)
-ENDIF(LIBNOTIFY_SUPPORT OR LIBNOTIFICATION_SUPPORT)
+SET(PKG_MODULES
+	dlog
+	dbus-glib-1
+	gobject-2.0
+	gmodule-2.0
+	vconf
+	libxml-2.0
+	security-server
+	glib-2.0
+	gio-2.0
+	gio-unix-2.0
+)
+
+INCLUDE(FindPkgConfig)
+pkg_check_modules(packages REQUIRED ${PKG_MODULES})
 
 FOREACH(flag ${packages_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")
@@ -79,8 +91,8 @@ SET_TARGET_PROPERTIES(bluetooth-api PROPERTIES SOVERSION ${VERSION_MAJOR})
 SET_TARGET_PROPERTIES(bluetooth-api PROPERTIES VERSION ${VERSION})
 TARGET_LINK_LIBRARIES(bluetooth-api ${packages_LDFLAGS})
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-api.pc.in ${CMAKE_CURRENT_BINARY_DIR}/bluetooth-api.pc @ONLY)
-INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/bluetooth-api.pc DESTINATION ${LIB_INSTALL_DIR}/pkgconfig)
-INSTALL(TARGETS bluetooth-api DESTINATION ${LIB_INSTALL_DIR} COMPONENT RuntimeLibraries)
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/bluetooth-api.pc DESTINATION lib/pkgconfig)
+INSTALL(TARGETS bluetooth-api DESTINATION lib COMPONENT RuntimeLibraries)
 
 FOREACH(hfile ${HEADERS})
 	INSTALL(FILES ${CMAKE_SOURCE_DIR}/include/${hfile} DESTINATION include/bt-service)

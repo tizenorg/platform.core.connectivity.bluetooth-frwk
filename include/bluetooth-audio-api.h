@@ -1,13 +1,16 @@
 /*
- * bluetooth-frwk
+ * bluetooth-audio-api
  *
- * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
+ *
+ * Contact:	Hocheol Seo <hocheol.seo@samsung.com>
+ * 		GirishAshok Joshi <girish.joshi@samsung.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *              http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -183,6 +186,60 @@ int bluetooth_ag_get_headset_volume(unsigned int *speaker_gain);
  *
  */
 int bluetooth_ag_set_speaker_gain(unsigned int speaker_gain);
+
+typedef struct {
+	int event;
+	int result;
+	void *param_data;
+	void *user_data;
+} bt_hf_event_param_t;
+
+typedef void (*bt_hf_func_ptr) (int, bt_hf_event_param_t *, void *);
+
+
+int bluetooth_hf_init(bt_hf_func_ptr cb, void *user_data);
+
+int bluetooth_hf_deinit(void);
+
+int bluetooth_hf_connect(bluetooth_device_address_t *remote_address);
+
+int bluetooth_hf_disconnect(bluetooth_device_address_t *remote_address);
+
+int bluetooth_hf_answer_call();
+
+int bluetooth_hf_terminate_call();
+
+int bluetooth_hf_initiate_call(char *number);
+
+int bluetooth_hf_voice_recognition(unsigned int status);
+
+int bluetooth_hf_audio_disconnect(void);
+
+int bluetooth_hf_set_speaker_gain(unsigned int speaker_gain);
+
+int bluetooth_hf_send_dtmf(char *dtmf);
+
+int bluetooth_hf_send_xsat_cmd(int app_id, char *xsat_cmd);
+
+int bluetooth_hf_swap_call(void);
+
+int bluetooth_hf_release_all_call(void);
+
+int bluetooth_hf_release_and_accept(void);
+
+int bluetooth_hf_join_call(void);
+
+int bluetooth_hf_get_call_list(void *call_list, bt_hf_call_status_info_t **call_status);
+
+int bluetooth_hf_free_call_list(bt_hf_call_list_s *call_list);
+
+int bluetooth_hf_request_call_list(bt_hf_call_list_s **call_list);
+
+int bluetooth_hf_get_codec(unsigned int *codec_id);
+
+int bluetooth_hf_get_audio_connected(unsigned int *audio_connected);
+
+int bluetooth_hf_is_hf_connected(gboolean *hf_connected);
 
 #ifdef __cplusplus
 }
