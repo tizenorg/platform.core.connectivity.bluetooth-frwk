@@ -22,6 +22,9 @@
  */
 
 #include <vconf.h>
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
+#include <syspopup_caller.h>
+#endif
 
 #include "bluetooth-api.h"
 #include "bt-internal-types.h"
@@ -66,23 +69,22 @@ static int __bt_fill_device_list(GArray *out_param2, GPtrArray **dev_list)
 
 BT_EXPORT_API int bluetooth_check_adapter(void)
 {
-	int ret;
-	int value;
+	int result;
+	bluetooth_adapter_state_t state;
 
-	ret = _bt_get_adapter_path(_bt_gdbus_get_system_gconn(), NULL);
+	BT_INIT_PARAMS();
+	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
-	if (ret != BLUETOOTH_ERROR_NONE) {
-		return BLUETOOTH_ADAPTER_DISABLED;
+	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_CHECK_ADAPTER,
+		in_param1, in_param2, in_param3, in_param4, &out_param);
+
+	if (result == BLUETOOTH_ERROR_NONE) {
+		state = g_array_index(out_param, bluetooth_adapter_state_t, 0);
 	}
 
-	/* check VCONFKEY_BT_STATUS */
-	if (vconf_get_int(VCONFKEY_BT_STATUS, &value) != 0) {
-		BT_ERR("fail to get vconf key!");
-		return BLUETOOTH_ADAPTER_DISABLED;
-	}
+	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
-	return value == VCONFKEY_BT_STATUS_OFF ? BLUETOOTH_ADAPTER_DISABLED :
-						BLUETOOTH_ADAPTER_ENABLED;
+	return state ? BLUETOOTH_ADAPTER_ENABLED : BLUETOOTH_ADAPTER_DISABLED;
 }
 
 BT_EXPORT_API int bluetooth_enable_adapter(void)
@@ -161,7 +163,6 @@ BT_EXPORT_API int bluetooth_get_local_address(bluetooth_device_address_t *local_
 	int result;
 
 	BT_CHECK_PARAMETER(local_address, return);
-	BT_CHECK_ENABLED_ANY(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -206,7 +207,6 @@ BT_EXPORT_API int bluetooth_get_local_name(bluetooth_device_name_t *local_name)
 	int result;
 
 	BT_CHECK_PARAMETER(local_name, return);
-	BT_CHECK_ENABLED_ANY(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -279,25 +279,6 @@ BT_EXPORT_API int bluetooth_get_discoverable_mode(bluetooth_discoverable_mode_t 
 
 	BT_CHECK_PARAMETER(discoverable_mode_ptr, return);
 
-#ifndef TIZEN_WEARABLE
-	int timeout = 0;
-	/* Requirement in OSP */
-	if (bluetooth_check_adapter() == BLUETOOTH_ADAPTER_DISABLED) {
-		if (vconf_get_int(BT_FILE_VISIBLE_TIME, &timeout) != 0) {
-			BT_ERR("Fail to get the timeout value");
-			return BLUETOOTH_ERROR_INTERNAL;
-		}
-
-		if (timeout == -1) {
-			*discoverable_mode_ptr = BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE;
-		} else {
-			*discoverable_mode_ptr = BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE;
-		}
-
-		return BLUETOOTH_ERROR_NONE;
-	}
-#endif
-
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
@@ -305,7 +286,8 @@ BT_EXPORT_API int bluetooth_get_discoverable_mode(bluetooth_discoverable_mode_t 
 		in_param1, in_param2, in_param3, in_param4, &out_param);
 
 	if (result == BLUETOOTH_ERROR_NONE) {
-		*discoverable_mode_ptr = g_array_index(out_param, int, 0);
+		*discoverable_mode_ptr = g_array_index(out_param,
+					int, 0);
 	}
 
 	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);

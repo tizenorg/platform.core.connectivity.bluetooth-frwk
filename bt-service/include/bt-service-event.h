@@ -42,6 +42,10 @@ void _bt_deinit_service_event_receiver(void);
 int _bt_opp_client_event_init(void);
 void _bt_opp_client_event_deinit(void);
 
+void _bt_get_temp_remote_devinfo(void);
+
+void _bt_stop_discovery_timeout(void);
+
 int _bt_send_hf_local_term_event(char *address);
 int _bt_init_hf_local_term_event_sender(void);
 void _bt_deinit_hf_local_term_event_sender(void);

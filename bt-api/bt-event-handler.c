@@ -561,6 +561,16 @@ void __bt_adapter_event_filter(GDBusConnection *connection,
 				event_info->cb, event_info->user_data);
 
 		g_free(device_info);
+	} else if (strcasecmp(signal_name, BT_DEVICE_DISAPPEARED) == 0) {
+		bluetooth_device_info_t *device_info;
+
+		device_info = __bt_get_device_info_in_message(parameters, &result);
+		ret_if(device_info == NULL);
+
+		_bt_common_event_cb(BLUETOOTH_EVENT_REMOTE_DEVICE_DISAPPEARED,
+				result, device_info,
+				event_info->cb, event_info->user_data);
+		g_free(device_info);
 	} else if (strcasecmp(signal_name, BT_BOND_CREATED) == 0) {
 		bluetooth_device_info_t *device_info;
 

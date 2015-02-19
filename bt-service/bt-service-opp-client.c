@@ -196,7 +196,8 @@ gboolean _bt_obex_client_completed(const char *transfer_path, gboolean success)
 		return FALSE;
 	}
 
-	result = (success == TRUE) ? BLUETOOTH_ERROR_NONE : BLUETOOTH_ERROR_CANCEL;
+	result = (success == TRUE) ? BLUETOOTH_ERROR_NONE
+				: BLUETOOTH_ERROR_CANCEL;
 
 	sending_info->transfer_info->transfer_status = BT_TRANSFER_STATUS_COMPLETED;
 	sending_info->result = result;
@@ -254,12 +255,14 @@ gboolean _bt_obex_client_completed(const char *transfer_path, gboolean success)
 
 gboolean _bt_obex_client_started(const char *transfer_path)
 {
-	BT_DBG("+");
-
+	GValue *value;
+	const char *transfer_name;
+	const char *file_name;
+	int size;
 	int result = BLUETOOTH_ERROR_NONE;
+	GHashTable *hash = NULL;
 	GError *error;
 	DBusGConnection *g_conn;
-	DBusGProxy *properties_proxy;
 	DBusGProxy *transfer_proxy;
 
 	if (sending_info == NULL || sending_info->is_canceled == TRUE) {
@@ -269,24 +272,44 @@ gboolean _bt_obex_client_started(const char *transfer_path)
 
 	/* Get the session bus. */
 	g_conn = _bt_get_session_gconn();
-	retv_if(g_conn == NULL, FALSE);
+	retv_if(g_conn == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	properties_proxy = dbus_g_proxy_new_for_name(g_conn, BT_OBEXD_DBUS_NAME,
-			transfer_path, BT_PROPERTIES_INTERFACE);
+	__bt_free_transfer_info(sending_info->transfer_info);
 
-	retv_if(properties_proxy == NULL, FALSE);
-
-	sending_info->transfer_info->properties_proxy = properties_proxy;
+	sending_info->transfer_info = g_malloc0(sizeof(bt_transfer_info_t));
 
 	transfer_proxy = dbus_g_proxy_new_for_name(g_conn, BT_OBEXD_DBUS_NAME,
-			transfer_path, BT_OBEX_TRANSFER_INTERFACE);
+				transfer_path, BT_PROPERTIES_INTERFACE);
 
 	retv_if(transfer_proxy == NULL, FALSE);
 
 	sending_info->transfer_info->proxy = transfer_proxy;
 
-	sending_info->transfer_info->transfer_status = BT_TRANSFER_STATUS_STARTED;
-	sending_info->result = result;
+	if (!dbus_g_proxy_call(transfer_proxy, "GetAll", NULL,
+				G_TYPE_STRING, BT_OBEX_TRANSFER_INTERFACE,
+				G_TYPE_INVALID,
+				dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
+				G_TYPE_VALUE), &hash, G_TYPE_INVALID))
+		goto fail;
+
+	if (hash == NULL)
+		goto fail;
+
+	value = g_hash_table_lookup(hash, "Name");
+	transfer_name = value ? g_value_get_string(value) : NULL;
+
+	value = g_hash_table_lookup(hash, "Filename");
+	file_name = value ? g_value_get_string(value) : NULL;
+
+	value = g_hash_table_lookup(hash, "Size");
+	size = value ? g_value_get_uint64(value) : 0;
+
+	sending_info->transfer_info->transfer_name = g_strdup(transfer_name);
+	sending_info->transfer_info->file_name = g_strdup(file_name);
+	sending_info->transfer_info->size = size;
+	sending_info->result = BLUETOOTH_ERROR_NONE;
+
+	g_hash_table_destroy(hash);
 
 	_bt_send_event(BT_OPP_CLIENT_EVENT,
 			BLUETOOTH_EVENT_OPC_TRANSFER_STARTED,
@@ -296,7 +319,6 @@ gboolean _bt_obex_client_started(const char *transfer_path)
 			DBUS_TYPE_INT32, &sending_info->request_id,
 			DBUS_TYPE_INVALID);
 
-	BT_DBG("-");
 	return TRUE;
 canceled:
 	error = g_error_new(__bt_opc_error_quark(), BT_OBEX_AGENT_ERROR_CANCEL,
@@ -304,8 +326,24 @@ canceled:
 
 	g_error_free(error);
 
-	BT_DBG("-");
 	return FALSE;
+fail:
+	result = BLUETOOTH_ERROR_INTERNAL;
+
+	/* Send the event in only error none case */
+	_bt_send_event(BT_OPP_CLIENT_EVENT,
+			BLUETOOTH_EVENT_OPC_DISCONNECTED,
+			DBUS_TYPE_INT32, &result,
+			DBUS_TYPE_STRING, &sending_info->address,
+			DBUS_TYPE_INT32, &sending_info->request_id,
+			DBUS_TYPE_INVALID);
+
+	__bt_free_sending_info(sending_info);
+	sending_info = NULL;
+
+	_bt_opp_client_event_deinit();
+
+	return TRUE;
 }
 
 static void __bt_free_sending_data(gpointer data)
@@ -325,6 +363,8 @@ static void __bt_free_sending_data(gpointer data)
 	g_free(info->address);
 	g_free(info);
 }
+
+
 
 static void __bt_sending_release_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 					void *user_data)

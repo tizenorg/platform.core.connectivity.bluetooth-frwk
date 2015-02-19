@@ -27,7 +27,9 @@
 #include <glib.h>
 #include <dlog.h>
 #include <string.h>
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
+#endif
 
 #include "bluetooth-api.h"
 #include "bt-internal-types.h"
@@ -93,6 +95,7 @@ static struct player_settinngs_t scan_status[] = {
 	{ SCAN_GROUP, "group" },
 	{ SCAN_INVALID, "" },
 };
+
 DBusConnection *g_bt_dbus_conn = NULL;
 static char *avrcp_control_path = NULL;
 

@@ -29,7 +29,9 @@
 #include <dlog.h>
 #include <vconf.h>
 #include <vconf-internal-bt-keys.h>
-//#include <journal/device.h>
+#ifdef ENABLE_TIZEN_2_4
+#include <journal/device.h>
+#endif
 
 #include "bluetooth-api.h"
 #include "bt-internal-types.h"
@@ -49,8 +51,8 @@
 #include "bt-service-headset-connection.h"
 #include "bt-service-opp-client.h"
 
-static DBusGConnection *manager_conn;
-static DBusGConnection *obexd_conn;
+static DBusGConnection *manager_conn = NULL;
+static DBusGConnection *obexd_conn = NULL;
 static GList *p_cache_list = NULL;
 static DBusGConnection *opc_obexd_conn = NULL;
 
@@ -188,14 +190,14 @@ static gboolean __bt_parse_device_properties(DBusMessageIter *item_iter,
 				dev_info->address = g_strdup(address);
 			} else if (strcasecmp(key, "Class") == 0) {
 				dbus_message_iter_get_basic(&iter_dict_val, &dev_info->class);
-			} else if (strcasecmp(key, "name") == 0) {
+			} else if (strcasecmp(key, "Name") == 0) {
 				dbus_message_iter_get_basic(&iter_dict_val, &value);
 				if (dev_info->name == NULL)
 					dev_info->name = g_strdup(value);
 			} else if (strcasecmp(key, "Connected") == 0) {
 				dbus_message_iter_get_basic(&iter_dict_val,
 						&dev_info->connected);
-			} else if (strcasecmp(key, "paired") == 0) {
+			} else if (strcasecmp(key, "Paired") == 0) {
 				dbus_message_iter_get_basic(&iter_dict_val,
 						&dev_info->paired);
 			} else if (strcasecmp(key, "Trusted") == 0) {
@@ -484,6 +486,34 @@ gboolean _bt_discovery_finished_cb(gpointer user_data)
 	}
 
 	return FALSE;
+}
+
+gboolean _bt_stop_discovery_timeout_cb(gpointer user_data)
+{
+	DBusGProxy *adapter_proxy;
+
+	event_id = 0;
+
+	adapter_proxy = _bt_get_adapter_proxy();
+	retv_if(adapter_proxy == NULL, FALSE);
+
+	/* Need to stop searching */
+	dbus_g_proxy_call(adapter_proxy,
+				"StopDiscovery",
+				NULL,
+				G_TYPE_INVALID,
+				G_TYPE_INVALID);
+
+	return FALSE;
+}
+
+void _bt_stop_discovery_timeout(void)
+{
+	if (event_id > 0)
+		return;
+
+	event_id = g_timeout_add(BT_STOP_DISCOVERY_TIMEOUT,
+		(GSourceFunc)_bt_stop_discovery_timeout_cb, NULL);
 }
 
 static gboolean __bt_le_discovery_finished_cb(gpointer user_data)
@@ -1003,62 +1033,6 @@ static void __bt_adapter_property_changed_event(DBusMessageIter *msg_iter, const
 	} while(dbus_message_iter_next(&item_iter));
 }
 
-static void __bt_obex_property_changed_event(DBusMessageIter *msg_iter, const char *path)
-{
-	BT_DBG("+");
-
-	DBusMessageIter value_iter;
-	DBusMessageIter dict_iter;
-	DBusMessageIter item_iter;
-	const char *property = NULL;
-
-	dbus_message_iter_recurse(msg_iter, &item_iter);
-
-	if (dbus_message_iter_get_arg_type(&item_iter)
-					!= DBUS_TYPE_DICT_ENTRY) {
-		BT_ERR("This is bad format dbus");
-		return;
-	}
-
-	do {
-		dbus_message_iter_recurse(&item_iter, &dict_iter);
-
-		dbus_message_iter_get_basic(&dict_iter, &property);
-		ret_if(property == NULL);
-
-		ret_if(!dbus_message_iter_next(&dict_iter));
-
-		BT_DBG("property :%s", property);
-
-		if (strcasecmp(property, "Status") == 0) {
-			const char  *status;
-			dbus_message_iter_recurse(&dict_iter, &value_iter);
-			dbus_message_iter_get_basic(&value_iter, &status);
-
-			if (strcasecmp(status, "active") == 0){
-				_bt_obex_transfer_started(path);
-			} else if (strcasecmp(status, "complete") == 0) {
-				_bt_obex_transfer_completed(path, TRUE);
-				_bt_pbap_obex_transfer_completed(path, TRUE);
-			} else if (strcasecmp(status, "error") == 0){
-				_bt_obex_transfer_completed(path, FALSE);
-				_bt_pbap_obex_transfer_completed(path, FALSE);
-			}
-		} else if (strcasecmp(property, "Transferred") == 0) {
-			static int transferred  = 0;
-			dbus_message_iter_recurse(&dict_iter, &value_iter);
-			dbus_message_iter_get_basic(&value_iter, &transferred);
-
-			_bt_obex_transfer_progress(path,transferred);
-		}
-
-		dbus_message_iter_next(&item_iter);
-	} while (dbus_message_iter_get_arg_type(&item_iter) ==
-			DBUS_TYPE_DICT_ENTRY);
-
-	BT_DBG("-");
-}
-
 static void __bt_device_property_changed_event(DBusMessageIter *msg_iter, const char *path)
 {
 	BT_DBG("+");
@@ -1366,6 +1340,63 @@ static void __bt_media_control_changed_event(DBusMessageIter *msg_iter, const ch
 	BT_DBG("-");
 }
 
+static void __bt_obex_property_changed_event(DBusMessageIter *msg_iter, const char *path)
+{
+	BT_DBG("+");
+
+	DBusMessageIter value_iter;
+	DBusMessageIter dict_iter;
+	DBusMessageIter item_iter;
+	const char *property = NULL;
+
+	dbus_message_iter_recurse(msg_iter, &item_iter);
+
+	if (dbus_message_iter_get_arg_type(&item_iter)
+					!= DBUS_TYPE_DICT_ENTRY) {
+		BT_ERR("This is bad format dbus");
+		return;
+	}
+
+	do {
+		dbus_message_iter_recurse(&item_iter, &dict_iter);
+
+		dbus_message_iter_get_basic(&dict_iter, &property);
+		ret_if(property == NULL);
+
+		ret_if(!dbus_message_iter_next(&dict_iter));
+
+		BT_DBG("property :%s", property);
+
+		if (strcasecmp(property, "Status") == 0) {
+			const char	*status;
+			dbus_message_iter_recurse(&dict_iter, &value_iter);
+			dbus_message_iter_get_basic(&value_iter, &status);
+
+			if (strcasecmp(status, "active") == 0){
+				_bt_obex_transfer_started(path);
+			} else if (strcasecmp(status, "complete") == 0) {
+				_bt_obex_transfer_completed(path, TRUE);
+				_bt_pbap_obex_transfer_completed(path, TRUE);
+			} else if (strcasecmp(status, "error") == 0){
+				_bt_obex_transfer_completed(path, FALSE);
+				_bt_pbap_obex_transfer_completed(path, FALSE);
+			}
+		} else if (strcasecmp(property, "Transferred") == 0) {
+			static int transferred	= 0;
+			dbus_message_iter_recurse(&dict_iter, &value_iter);
+			dbus_message_iter_get_basic(&value_iter, &transferred);
+
+			_bt_obex_transfer_progress(path,transferred);
+		}
+
+		dbus_message_iter_next(&item_iter);
+	} while (dbus_message_iter_get_arg_type(&item_iter) ==
+			DBUS_TYPE_DICT_ENTRY);
+
+	BT_DBG("-");
+}
+
+
 void _bt_handle_property_changed_event(DBusMessage *msg)
 {
 	DBusMessageIter item_iter;
@@ -1412,89 +1443,6 @@ void _bt_handle_property_changed_event(DBusMessage *msg)
 					dbus_message_get_path(msg));
 	}
 }
-
-void __bt_opc_property_changed_event(DBusMessageIter *msg_iter,
-						const char *path)
-{
-	DBusMessageIter value_iter;
-	DBusMessageIter dict_iter;
-	DBusMessageIter item_iter;
-	const char *property = NULL;
-
-	dbus_message_iter_recurse(msg_iter, &item_iter);
-
-	if (dbus_message_iter_get_arg_type(&item_iter)
-				!= DBUS_TYPE_DICT_ENTRY) {
-		BT_ERR("This is bad format dbus");
-		return;
-	}
-
-	dbus_message_iter_recurse(&item_iter, &dict_iter);
-
-	dbus_message_iter_get_basic(&dict_iter, &property);
-	ret_if(property == NULL);
-
-	ret_if(!dbus_message_iter_next(&dict_iter));
-
-	if (strcasecmp(property, "Status") == 0) {
-		const char *status = NULL;
-		dbus_message_iter_recurse(&dict_iter, &value_iter);
-		dbus_message_iter_get_basic(&value_iter, &status);
-
-		BT_INFO("Status is %s", status);
-
-		if(strcasecmp(status, "active") == 0){
-			_bt_obex_client_started(path);
-		}else if (strcasecmp(status, "complete") == 0) {
-			_bt_obex_client_completed(path, TRUE);
-		}else if (strcasecmp(status, "error") == 0){
-			_bt_obex_client_completed(path, FALSE);
-		}
-	} else if (strcasecmp(property, "Transferred") == 0) {
-		static int transferred  = 0;
-		dbus_message_iter_recurse(&dict_iter, &value_iter);
-		dbus_message_iter_get_basic(&value_iter, &transferred);
-
-		_bt_obex_client_progress(path, transferred);
-	} else {
-		BT_DBG("property : [%s]", property);
-	}
-}
-
-void _bt_opc_property_changed_event(DBusMessage *msg)
-{
-	DBusMessageIter item_iter;
-	const char *member = dbus_message_get_member(msg);
-	const char *interface_name = NULL;
-
-	ret_if(member == NULL);
-
-	dbus_message_iter_init(msg, &item_iter);
-
-	if (dbus_message_iter_get_arg_type(&item_iter)
-				!= DBUS_TYPE_STRING) {
-		BT_ERR("This is bad format dbus");
-		return;
-	}
-
-	dbus_message_iter_get_basic(&item_iter, &interface_name);
-
-	ret_if(interface_name == NULL);
-
-	BT_DBG("interface: %s", interface_name);
-
-	ret_if(dbus_message_iter_next(&item_iter) == FALSE);
-
-	ret_if(dbus_message_iter_get_arg_type(&item_iter) != DBUS_TYPE_ARRAY);
-
-	if (strcasecmp(interface_name, BT_OBEX_TRANSFER_INTERFACE) == 0) {
-		__bt_opc_property_changed_event(&item_iter,
-					dbus_message_get_path(msg));
-	} else {
-		BT_DBG("interface_name : [%s]", interface_name);
-	}
-}
-
 
 void _bt_handle_input_event(DBusMessage *msg)
 {
@@ -1842,7 +1790,9 @@ void _bt_handle_device_event(DBusMessage *msg)
 		BT_ERR_C("Connected [%s]", !addr_type ? "BREDR" : "LE");
 
 		_bt_logging_connection(TRUE, addr_type);
-//		journal_bt_connected();
+#ifdef ENABLE_TIZEN_2_4
+		journal_bt_connected();
+#endif
 
 		/*Send event to application*/
 		_bt_send_event(BT_DEVICE_EVENT,
@@ -1869,7 +1819,9 @@ void _bt_handle_device_event(DBusMessage *msg)
 		address = g_malloc0(BT_ADDRESS_STRING_SIZE);
 
 		_bt_convert_device_path_to_address(path, address);
-//		journal_bt_disconnected();
+#ifdef ENABLE_TIZEN_2_4
+		journal_bt_disconnected();
+#endif
 
 		/* 0x00 BDADDR_BRDER
 		      0x01 BDADDR_LE_PUBLIC
@@ -2831,67 +2783,86 @@ static gboolean __bt_is_obexd_event(DBusMessage *msg)
 	return FALSE;
 }
 
-static DBusHandlerResult __bt_obexd_event_filter(DBusConnection *conn,
-						DBusMessage *msg, void *data)
+void __bt_opc_property_changed_event(DBusMessageIter *msg_iter,
+						const char *path)
 {
-	const char *member = dbus_message_get_member(msg);
-	char *object_path = NULL;
+	DBusMessageIter value_iter;
+	DBusMessageIter dict_iter;
+	DBusMessageIter item_iter;
+	const char *property = NULL;
 
-	if (dbus_message_get_type(msg) != DBUS_MESSAGE_TYPE_SIGNAL)
-		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+	dbus_message_iter_recurse(msg_iter, &item_iter);
 
-	retv_if(member == NULL, DBUS_HANDLER_RESULT_NOT_YET_HANDLED);
-
-	if (strcasecmp(member, "InterfacesAdded") == 0) {
-		BT_DBG("InterfacesAdded");
-		if (__bt_get_object_path(msg, &object_path)) {
-			BT_ERR("Fail to get the path");
-			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
-		}
-
-		BT_INFO("object_path = [%s]", object_path);
-
-		/*Handle OPP_SERVER_CONNECTED_EVENT here */
-		if (strncmp(object_path, BT_SESSION_BASEPATH_SERVER,
-				strlen(BT_SESSION_BASEPATH_SERVER)) != 0)
-			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
-
-		if (g_strrstr(object_path, "session") && g_strrstr(object_path, "transfer")) {
-			BT_DBG("Obex_Server_Session_Transfer connected");
-			_bt_obex_transfer_connected();
-		}
-	} else if (strcasecmp(member, "InterfacesRemoved") == 0) {
-		/*Handle OPP_SERVER_DISCONNECTED_EVENT here */
-		BT_DBG("InterfacesRemoved");
-		if (__bt_get_object_path(msg, &object_path)) {
-			BT_ERR("Fail to get the path");
-			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
-		}
-
-		BT_INFO("object_path = [%s]", object_path);
-
-		if (strncmp(object_path, BT_SESSION_BASEPATH_SERVER,
-				strlen(BT_SESSION_BASEPATH_SERVER)) != 0)
-			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
-
-		if (g_strrstr(object_path, "session") && g_strrstr(object_path, "transfer")) {
-			BT_DBG("Obex_Server_Session_Transfer disconnected");
-			_bt_obex_transfer_disconnected();
-		}
-	} else if (__bt_is_obexd_event(msg) == TRUE) {
-		const char *path = dbus_message_get_path(msg);
-
-		if (strncmp(path, BT_SESSION_BASEPATH_SERVER,
-				strlen(BT_SESSION_BASEPATH_SERVER)) != 0 &&
-			strncmp(path, BT_SESSION_BASEPATH_CLIENT,
-				strlen(BT_SESSION_BASEPATH_CLIENT)) != 0) {
-			BT_DBG("DBUS_HANDLER_RESULT_NOT_YET_HANDLED");
-			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
-		}
-
-		_bt_handle_property_changed_event(msg);
+	if (dbus_message_iter_get_arg_type(&item_iter)
+				!= DBUS_TYPE_DICT_ENTRY) {
+		BT_ERR("This is bad format dbus");
+		return;
 	}
-	return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+	dbus_message_iter_recurse(&item_iter, &dict_iter);
+
+	dbus_message_iter_get_basic(&dict_iter, &property);
+	ret_if(property == NULL);
+
+	ret_if(!dbus_message_iter_next(&dict_iter));
+
+	if (strcasecmp(property, "Status") == 0) {
+		const char *status = NULL;
+		dbus_message_iter_recurse(&dict_iter, &value_iter);
+		dbus_message_iter_get_basic(&value_iter, &status);
+
+		BT_INFO("Status is %s", status);
+
+		if(strcasecmp(status, "active") == 0){
+			_bt_obex_client_started(path);
+		}else if (strcasecmp(status, "complete") == 0) {
+			_bt_obex_client_completed(path, TRUE);
+		}else if (strcasecmp(status, "error") == 0){
+			_bt_obex_client_completed(path, FALSE);
+		}
+	} else if (strcasecmp(property, "Transferred") == 0) {
+		static int transferred  = 0;
+		dbus_message_iter_recurse(&dict_iter, &value_iter);
+		dbus_message_iter_get_basic(&value_iter, &transferred);
+
+		_bt_obex_client_progress(path, transferred);
+	} else {
+		BT_DBG("property : [%s]", property);
+	}
+}
+
+void _bt_opc_property_changed_event(DBusMessage *msg)
+{
+	DBusMessageIter item_iter;
+	const char *member = dbus_message_get_member(msg);
+	const char *interface_name = NULL;
+
+	ret_if(member == NULL);
+
+	dbus_message_iter_init(msg, &item_iter);
+
+	if (dbus_message_iter_get_arg_type(&item_iter)
+				!= DBUS_TYPE_STRING) {
+		BT_ERR("This is bad format dbus");
+		return;
+	}
+
+	dbus_message_iter_get_basic(&item_iter, &interface_name);
+
+	ret_if(interface_name == NULL);
+
+	BT_DBG("interface: %s", interface_name);
+
+	ret_if(dbus_message_iter_next(&item_iter) == FALSE);
+
+	ret_if(dbus_message_iter_get_arg_type(&item_iter) != DBUS_TYPE_ARRAY);
+
+	if (strcasecmp(interface_name, BT_OBEX_TRANSFER_INTERFACE) == 0) {
+		__bt_opc_property_changed_event(&item_iter,
+					dbus_message_get_path(msg));
+	} else {
+		BT_DBG("interface_name : [%s]", interface_name);
+	}
 }
 
 static gboolean __bt_is_obexd_client_event(DBusMessage *msg)
@@ -2992,40 +2963,67 @@ static DBusHandlerResult __bt_opc_event_filter(DBusConnection *conn,
 	return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
 
-int _bt_opp_client_event_init(void)
+static DBusHandlerResult __bt_obexd_event_filter(DBusConnection *conn,
+						DBusMessage *msg, void *data)
 {
-	GError *error = NULL;
+	const char *member = dbus_message_get_member(msg);
+	char *object_path = NULL;
 
-	if (opc_obexd_conn == NULL) {
-		opc_obexd_conn = dbus_g_bus_get(DBUS_BUS_SESSION, &error);
-		if (error != NULL) {
-			BT_ERR("ERROR: Can't get on session bus [%s]",
-							 error->message);
-			g_error_free(error);
-			return BLUETOOTH_ERROR_INTERNAL;
+	if (dbus_message_get_type(msg) != DBUS_MESSAGE_TYPE_SIGNAL)
+		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+	retv_if(member == NULL, DBUS_HANDLER_RESULT_NOT_YET_HANDLED);
+
+	if (strcasecmp(member, "InterfacesAdded") == 0) {
+		BT_DBG("InterfacesAdded");
+		if (__bt_get_object_path(msg, &object_path)) {
+			BT_ERR("Fail to get the path");
+			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 		}
 
-		retv_if(opc_obexd_conn == NULL, BLUETOOTH_ERROR_INTERNAL);
-	}
+		BT_INFO("object_path = [%s]", object_path);
 
-	if (_bt_register_service_event(opc_obexd_conn,
-			BT_OPP_CLIENT_EVENT) != BLUETOOTH_ERROR_NONE) {
-		dbus_g_connection_unref(opc_obexd_conn);
-		opc_obexd_conn = NULL;
-		return BLUETOOTH_ERROR_INTERNAL;
-	}
+		/*Handle OPP_SERVER_CONNECTED_EVENT here */
+		if (strncmp(object_path, BT_SESSION_BASEPATH_SERVER,
+				strlen(BT_SESSION_BASEPATH_SERVER)) != 0)
+			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 
-	return BLUETOOTH_ERROR_NONE;
-}
+		if (g_strrstr(object_path, "session") && g_strrstr(object_path, "transfer")) {
+			BT_DBG("Obex_Server_Session_Transfer connected");
+			_bt_obex_transfer_connected();
+		}
+	} else if (strcasecmp(member, "InterfacesRemoved") == 0) {
+		/*Handle OPP_SERVER_DISCONNECTED_EVENT here */
+		BT_DBG("InterfacesRemoved");
+		if (__bt_get_object_path(msg, &object_path)) {
+			BT_ERR("Fail to get the path");
+			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+		}
 
-void _bt_opp_client_event_deinit(void)
-{
-	if (opc_obexd_conn) {
-		_bt_unregister_service_event(opc_obexd_conn,
-						BT_OPP_CLIENT_EVENT);
-		dbus_g_connection_unref(opc_obexd_conn);
-		opc_obexd_conn = NULL;
+		BT_INFO("object_path = [%s]", object_path);
+
+		if (strncmp(object_path, BT_SESSION_BASEPATH_SERVER,
+				strlen(BT_SESSION_BASEPATH_SERVER)) != 0)
+			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+		if (g_strrstr(object_path, "session") && g_strrstr(object_path, "transfer")) {
+			BT_DBG("Obex_Server_Session_Transfer disconnected");
+			_bt_obex_transfer_disconnected();
+		}
+	} else if (__bt_is_obexd_event(msg) == TRUE) {
+		const char *path = dbus_message_get_path(msg);
+
+		if (strncmp(path, BT_SESSION_BASEPATH_SERVER,
+				strlen(BT_SESSION_BASEPATH_SERVER)) != 0 &&
+			strncmp(path, BT_SESSION_BASEPATH_CLIENT,
+				strlen(BT_SESSION_BASEPATH_CLIENT)) != 0) {
+			BT_DBG("DBUS_HANDLER_RESULT_NOT_YET_HANDLED");
+			return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+		}
+
+		_bt_handle_property_changed_event(msg);
 	}
+	return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
 
 int _bt_register_service_event(DBusGConnection *g_conn, int event_type)
@@ -3081,7 +3079,7 @@ int _bt_register_service_event(DBusGConnection *g_conn, int event_type)
 		break;
 	case BT_HEADSET_EVENT:
 		match1 = g_strdup_printf(EVENT_MATCH_RULE,
-					BT_HEADSET_INTERFACE);
+					BT_HFP_AGENT_INTERFACE);
 
 		match2 = g_strdup_printf(EVENT_MATCH_RULE,
 					BT_SINK_INTERFACE);
@@ -3331,4 +3329,40 @@ void _bt_deinit_service_event_receiver(void)
 		g_source_remove(event_id);
 
 	BT_DBG("-");
+}
+
+int _bt_opp_client_event_init(void)
+{
+	GError *error = NULL;
+
+	if (opc_obexd_conn == NULL) {
+		opc_obexd_conn = dbus_g_bus_get(DBUS_BUS_SESSION, &error);
+		if (error != NULL) {
+			BT_ERR("ERROR: Can't get on session bus [%s]",
+							 error->message);
+			g_error_free(error);
+			return BLUETOOTH_ERROR_INTERNAL;
+		}
+
+		retv_if(opc_obexd_conn == NULL, BLUETOOTH_ERROR_INTERNAL);
+	}
+
+	if (_bt_register_service_event(opc_obexd_conn,
+			BT_OPP_CLIENT_EVENT) != BLUETOOTH_ERROR_NONE) {
+		dbus_g_connection_unref(opc_obexd_conn);
+		opc_obexd_conn = NULL;
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	return BLUETOOTH_ERROR_NONE;
+}
+
+void _bt_opp_client_event_deinit(void)
+{
+	if (opc_obexd_conn) {
+		_bt_unregister_service_event(opc_obexd_conn,
+						BT_OPP_CLIENT_EVENT);
+		dbus_g_connection_unref(opc_obexd_conn);
+		opc_obexd_conn = NULL;
+	}
 }

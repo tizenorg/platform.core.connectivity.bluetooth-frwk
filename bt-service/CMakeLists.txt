@@ -28,6 +28,18 @@ bt-service-gap-agent.c
 bt-service-pbap.c
 )
 
+IF(LIBNOTIFY_SUPPORT)
+LIST(APPEND SRCS
+bt-popup.c
+)
+ENDIF(LIBNOTIFY_SUPPORT)
+
+IF(LIBNOTIFICATION_SUPPORT)
+LIST(APPEND SRCS
+bt-service-agent-notification.c
+)
+ENDIF(LIBNOTIFICATION_SUPPORT)
+
 IF("${CMAKE_BUILD_TYPE}" STREQUAL "")
 	SET(CMAKE_BUILD_TYPE "Release")
 ENDIF("${CMAKE_BUILD_TYPE}" STREQUAL "")
@@ -42,13 +54,18 @@ SET(PKG_MODULES
 	vconf
 	syspopup-caller
 	dbus-glib-1
+	status
 	alarm-service
 	notification
+#	libnotify
+#	gdk-pixbuf-2.0
+#	gtk+-3.0
 	security-server
 	capi-content-mime-type
 	capi-network-connection
 	pkgmgr
 #	journal
+	libprivilege-control
 )
 
 IF("$ENV{CFLAGS}" MATCHES "-DTIZEN_NETWORK_TETHERING_ENABLE")
@@ -95,16 +112,32 @@ ADD_DEFINITIONS("-DAPP_DIR=\"${APP_DIR}\"")
 ADD_DEFINITIONS("-DAPP_LOCALEDIR=\"${APP_LOCALEDIR}\"")
 ADD_DEFINITIONS("-DAPP_SYSCONFDIR=\"${APP_SYSCONFDIR}\"")
 
+IF(LIBNOTIFY_SUPPORT OR LIBNOTIFICATION_SUPPORT)
+	ADD_DEFINITIONS("-DDATA_DIR_ICON=\"${SHARE_INSTALL_PREFIX}\"")
+	MESSAGE("Icon used for notification is : ${SHARE_INSTALL_PREFIX}/icons/default/bt-icon.png")
+ENDIF(LIBNOTIFY_SUPPORT OR LIBNOTIFICATION_SUPPORT)
+
 SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed -pie")
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SRCS})
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS})
 
-INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service DESTINATION /etc/rc.d/init.d)
+# to permit usage of bluetooth_cancel_bonding in bt-popup.c. This build bluetooth-api first.
+IF(LIBNOTIFY_SUPPORT)
+	ADD_DEPENDENCIES(${PROJECT_NAME} bluetooth-api)
+	TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS} bluetooth-api)
+ELSE(LIBNOTIFY_SUPPORT)
+	TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS})
+ENDIF(LIBNOTIFY_SUPPORT)
+
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service.in ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service DESTINATION share/dbus-1/system-services)
 INSTALL(TARGETS ${PROJECT_NAME} DESTINATION bin)
 
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/auto-pair-blacklist DESTINATION /opt/var/lib/bluetooth/)
+
+# install booting script
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service.conf.in ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service.conf)
+
 IF (TIZEN_WEARABLE)
 	INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/wearable/stack_info DESTINATION /usr/etc/bluetooth/)
 ELSE ()

@@ -128,6 +128,7 @@ extern "C" {
 
 #define BT_BLUEZ_PATH "/org/bluez"
 #define BT_BLUEZ_HCI_PATH "/org/bluez/hci0"
+#define BT_BLUEZ_HCI_DEV_PATH "/org/bluez/hci0/dev"
 #define BT_AGENT_NAME "org.bluez.frwk_agent"
 #define BT_AGENT_PATH "/org/bluez/agent/frwk_agent"
 #define BT_DEVICE_AGENT_PATH "/org/tizen/device_agent"
@@ -153,17 +154,19 @@ extern "C" {
 #define BT_SERIAL_INTERFACE "org.bluez.Serial"
 #define BT_SERIAL_MANAGER_INTERFACE "org.bluez.SerialProxyManager"
 #define BT_SERIAL_PROXY_INTERFACE "org.bluez.SerialProxy"
+#define BT_HFP_AGENT_INTERFACE "Org.Hfp.App.Interface"
 #define BT_SINK_INTERFACE "org.bluez.AudioSink"
 #define BT_AUDIO_INTERFACE "org.bluez.Audio"
 #define BT_HEADSET_INTERFACE "org.bluez.Headset"
 #define BT_OOB_INTERFACE "org.bluez.OutOfBand"
 #define BT_HANDSFREE_GATEWAY_INTERFACE "org.bluez.HandsfreeGateway"
-#define BT_OBEXD_INTERFACE "org.openobex"
-#define BT_OBEXD_MANAGER_INTERFACE "org.openobex.Manager"
-#define BT_OBEXD_TRANSFER_INTERFACE "org.openobex.Transfer"
+#define BT_OBEXD_DBUS_NAME "org.bluez.obex"
+#define BT_OBEXD_MANAGER_INTERFACE "org.bluez.obex.AgentManager1"
+#define BT_OBEXD_TRANSFER_INTERFACE "org.bluez.obex.Transfer1"
 
 #define BT_PROPERTIES_INTERFACE "org.freedesktop.DBus.Properties"
 
+#define MPRIS_PLAYER_INTERFACE "org.mpris.MediaPlayer2.Player"
 
 #define BT_OBEX_SERVICE_NAME "org.bluez.obex"
 #define BT_OBEX_CLIENT_PATH "/org/bluez/obex"
@@ -188,6 +191,7 @@ extern "C" {
 #define BT_INTERFACES_REMOVED "InterfacesRemoved"
 #define BT_NAME_OWNER_CHANGED "NameOwnerChanged"
 #define BT_PROPERTIES_CHANGED "PropertiesChanged"
+#define DBUS_INTERFACE_OBJECT_MANAGER "/"
 
 
 
@@ -236,6 +240,8 @@ extern "C" {
 #define BT_LE_ADV_SCAN_IND		0x02
 #define BT_LE_ADV_NONCONN_IND	0x03
 #define BT_LE_ADV_SCAN_RSP		0x04
+
+#define BT_STOP_DISCOVERY_TIMEOUT 1000*15
 
 /* Profile states matched to btd_service_state_t of bluez service.h */
 typedef enum {
@@ -331,6 +337,8 @@ void _bt_logging_connection(gboolean connect, int addr_type);
 
 char *_bt_get_adapter_path(void);
 
+gboolean _bt_get_adapter_power(void);
+
 void _bt_deinit_proxys(void);
 
 void _bt_convert_device_path_to_address(const char *device_path,
@@ -362,6 +370,10 @@ int _bt_unregister_osp_server_in_agent(int type, char *uuid);
 int _bt_set_socket_non_blocking(int socket_fd);
 
 int _bt_set_non_blocking_tty(int sk);
+
+gboolean _bt_is_headset_class(int dev_class);
+
+char *_bt_get_device_object_path(char *address);
 
 void _bt_deinit_bluez_proxy(void);
 

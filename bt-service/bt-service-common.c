@@ -70,9 +70,6 @@ static DBusGProxy *__bt_init_adapter_proxy(void)
 {
 	DBusGProxy *manager_proxy;
 	DBusGProxy *proxy;
-	char *adapter_path = NULL;
-
-	g_type_init();
 
 	if (system_conn == NULL) {
 		system_conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
@@ -82,13 +79,8 @@ static DBusGProxy *__bt_init_adapter_proxy(void)
 	manager_proxy = _bt_get_manager_proxy();
 	retv_if(manager_proxy == NULL, NULL);
 
-	adapter_path = _bt_get_adapter_path();
-	retv_if(adapter_path == NULL, NULL);
-
 	proxy = dbus_g_proxy_new_for_name(system_conn, BT_BLUEZ_NAME,
-				adapter_path, BT_ADAPTER_INTERFACE);
-
-	g_free(adapter_path);
+				BT_BLUEZ_HCI_PATH, BT_ADAPTER_INTERFACE);
 
 	retv_if(proxy == NULL, NULL);
 
@@ -101,7 +93,6 @@ static DBusGProxy *__bt_init_adapter_properties_proxy(void)
 {
 	DBusGProxy *manager_proxy;
 	DBusGProxy *proxy;
-	char *adapter_path = NULL;
 
 	g_type_init();
 
@@ -113,13 +104,8 @@ static DBusGProxy *__bt_init_adapter_properties_proxy(void)
 	manager_proxy = _bt_get_manager_proxy();
 	retv_if(manager_proxy == NULL, NULL);
 
-	adapter_path = _bt_get_adapter_path();
-	retv_if(adapter_path == NULL, NULL);
-
 	proxy = dbus_g_proxy_new_for_name(system_conn, BT_BLUEZ_NAME,
-				adapter_path, BT_PROPERTIES_INTERFACE);
-
-	g_free(adapter_path);
+			BT_BLUEZ_HCI_PATH, BT_PROPERTIES_INTERFACE);
 
 	retv_if(proxy == NULL, NULL);
 
@@ -206,6 +192,36 @@ static void *__bt_init_net_conn(void)
 void *_bt_get_net_conn(void)
 {
 	return (net_conn) ? net_conn : __bt_init_net_conn();
+}
+
+gboolean _bt_get_adapter_power(void)
+{
+	DBusGProxy *proxy = NULL;
+	gboolean powered;
+	GValue powered_v = { 0 };
+	GError *err = NULL;
+
+	proxy = _bt_get_adapter_properties_proxy();
+	retv_if(proxy == NULL, FALSE);
+
+	if (!dbus_g_proxy_call(proxy, "Get", &err,
+			G_TYPE_STRING, BT_ADAPTER_INTERFACE,
+			G_TYPE_STRING, "Powered",
+			G_TYPE_INVALID,
+			G_TYPE_VALUE, &powered_v,
+			G_TYPE_INVALID)) {
+		if (err != NULL) {
+			BT_ERR("Getting property failed: [%s]\n", err->message);
+			g_error_free(err);
+		}
+		return FALSE;
+	}
+
+	powered = (gboolean)g_value_get_boolean(&powered_v);
+
+	BT_DBG("powered = %d", powered);
+
+	return powered;
 }
 
 DBusGProxy *_bt_get_adapter_proxy(void)
