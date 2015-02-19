@@ -186,7 +186,6 @@ extern "C" {
 #define BT_EVENT_FREEDESKTOP "org.freedesktop.DBus"
 #define BT_FREEDESKTOP_PATH "/org/freedesktop/DBus"
 
-#define BT_EVENT_MANAGER "org.bluez.Manager"
 #define BT_MANAGER_PATH "/"
 
 
@@ -194,6 +193,7 @@ extern "C" {
 #define BT_ADAPTER_INTERFACE "org.bluez.Adapter1"
 #define BT_DEVICE_INTERFACE "org.bluez.Device1"
 #define BT_PROPERTIES_INTERFACE "org.freedesktop.DBus.Properties"
+#define BT_BLUEZ_HCI_PATH "/org/bluez/hci0"
 
 
 #define BT_SERIAL_INTERFACE "org.bluez.Serial"
@@ -330,16 +330,8 @@ DBusConnection *_bt_get_system_conn(void);
 
 GDBusConnection *_bt_init_system_gdbus_conn(void);
 
-char *_bt_get_cookie(void);
-
-int _bt_get_cookie_size(void);
-
 int _bt_register_osp_server_in_agent(int type, char *uuid, char *path, int fd);
 int _bt_unregister_osp_server_in_agent(int type, char *uuid);
-
-void _bt_generate_cookie(void);
-
-void _bt_destroy_cookie(void);
 
 int _bt_check_privilege(int service_type, int service_function);
 

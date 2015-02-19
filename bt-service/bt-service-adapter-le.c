@@ -28,10 +28,14 @@
 #include <dlog.h>
 #include <string.h>
 #include <vconf.h>
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
+#endif
 #include <aul.h>
 #include <notification.h>
-//#include <journal/device.h>
+#ifdef ENABLE_TIZEN_2_4
+#include <journal/device.h>
+#endif
 
 #include "bt-internal-types.h"
 #include "bt-service-common.h"

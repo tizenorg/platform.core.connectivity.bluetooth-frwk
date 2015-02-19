@@ -54,7 +54,7 @@ BT_EXPORT_API int bluetooth_gatt_free_service_property(bt_gatt_service_property_
 
 	g_free(svc_pty->uuid);
 	g_free(svc_pty->handle);
-	g_strfreev(svc_pty->include_handles.handle);
+	g_strfreev(svc_pty->handle_info.handle);
 	g_strfreev(svc_pty->char_handle.handle);
 
 	memset(svc_pty, 0, sizeof(bt_gatt_service_property_t));
@@ -184,8 +184,8 @@ BT_EXPORT_API int bluetooth_gatt_get_service_property(const char *service_handle
 				g_ptr_array_add(gp_array, (gpointer)char_handle);
 			}
 			if (gp_array->len != 0) {
-				service->include_handles.count = gp_array->len;
-				service->include_handles.handle =
+				service->handle_info.count = gp_array->len;
+				service->handle_info.handle =
 						__get_string_array_from_gptr_array(gp_array);
 			}
 			g_ptr_array_free(gp_array, TRUE);

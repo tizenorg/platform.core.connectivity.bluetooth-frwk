@@ -26,7 +26,9 @@
 #include <glib.h>
 #include <dlog.h>
 #include <string.h>
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
+#endif
 
 #include "bluetooth-api.h"
 #include "bt-internal-types.h"
@@ -279,7 +281,6 @@ static char *__bt_get_audio_path(bluetooth_device_address_t *address)
 	DBusGProxy *audio_proxy;
 	DBusGProxy *adapter_proxy;
 	DBusGConnection *g_conn;
-	GError *error = NULL;
 
 	retv_if(address == NULL, NULL);
 
@@ -291,23 +292,14 @@ static char *__bt_get_audio_path(bluetooth_device_address_t *address)
 
 	_bt_convert_addr_type_to_string(addr_str, address->addr);
 
-	dbus_g_proxy_call(adapter_proxy, "FindDevice",
-			&error, G_TYPE_STRING, addr_str,
-			G_TYPE_INVALID, DBUS_TYPE_G_OBJECT_PATH,
-			&object_path, G_TYPE_INVALID);
+	object_path = _bt_get_device_object_path(addr_str);
 
-	if (error != NULL) {
-		BT_ERR("Failed to Find device: %s\n", error->message);
-		g_error_free(error);
-		return NULL;
-	}
-
-	retv_if(object_path == NULL, NULL);
+	retv_if(object_path == NULL, BLUETOOTH_ERROR_NOT_FOUND);
 
 	audio_proxy = dbus_g_proxy_new_for_name(g_conn,
-			BT_BLUEZ_NAME,
-			object_path,
-			BT_HEADSET_INTERFACE);
+					BT_BLUEZ_NAME,
+					object_path,
+					BT_HFP_AGENT_INTERFACE);
 
 	retv_if(audio_proxy == NULL, NULL);
 

@@ -439,6 +439,7 @@ typedef enum {
 	BLUETOOTH_EVENT_DEVICE_AUTHORIZED,	    /**< Bluetooth event authorize device */
 	BLUETOOTH_EVENT_DEVICE_UNAUTHORIZED,	    /**< Bluetooth event unauthorize device */
 	BLUETOOTH_EVENT_DISCOVERABLE_TIMEOUT_CHANGED,  /**< Bluetooth event mode changed */
+		BLUETOOTH_EVENT_REMOTE_DEVICE_DISAPPEARED, /**< Bluetooth event remote device disappeared*/
 	BLUETOOTH_EVENT_CONNECTABLE_CHANGED,	    /**< Bluetooth event connectable changed */
 
 	BLUETOOTH_EVENT_RSSI_ENABLED,		/**< Bluetooth event RSSI monitoring enabled */
@@ -918,9 +919,9 @@ typedef struct {
 */
 
 typedef struct {
-	int socket_fd; /**< the socket fd */
-	int server_id; /* Server id */
-	int device_role; /** < Device role - RFCOMM_ROLE_SERVER or RFCOMM_ROLE_CLIENT */
+	int socket_fd;
+		/**< the socket fd */
+	int device_role;/** < Device role - RFCOMM_ROLE_SERVER or RFCOMM_ROLE_CLIENT */
 	bluetooth_device_address_t device_addr;
 					      /**< device address */
 	char uuid[BLUETOOTH_UUID_STRING_MAX];
@@ -1060,7 +1061,7 @@ typedef struct {
 	char *uuid;
 	char *handle;
 	gboolean primary;
-	bt_gatt_handle_info_t include_handles;
+	bt_gatt_handle_info_t handle_info;
 	bt_gatt_handle_info_t char_handle;
 } bt_gatt_service_property_t;
 
@@ -1464,6 +1465,7 @@ int bluetooth_unregister_callback(void);
  *
  * @return      BLUETOOTH_ERROR_NONE - Success\n
  *		BLUETOOTH_ERROR_DEVICE_ALREADY_ENABLED - Adapter already enabled\n
+ *		BLUETOOTH_ERROR_ACCESS_DENIED - Enabling adapter is not allowed by MDM policy\n
  *		BLUETOOTH_ERROR_IN_PROGRESS - Adapter is activating or deactivating\n
  * @exception   BLUETOOTH_ERROR_INTERNAL - Dbus proxy call is fail
  * @remark      None
@@ -3059,7 +3061,7 @@ int bluetooth_rfcomm_listen(int socket_fd, int max_pending_connection);
  * @remark       None
  * @see    	  bluetooth_rfcomm_reject_connection
  */
-int bluetooth_rfcomm_accept_connection(int server_fd);
+int bluetooth_rfcomm_accept_connection(int server_fd, int *client_fd);
 
 /**
  * @fn int bluetooth_rfcomm_reject_connection()
@@ -3538,6 +3540,7 @@ int bluetooth_opc_init(void);
  *              BLUETOOTH_ERROR_INTERNAL - Internal Error \n
  *              BLUETOOTH_ERROR_NO_RESOURCES - Not resource available \n
  *              BLUETOOTH_ERROR_IN_PROGRESS -Already one push in progress \n
+ *              BLUETOOTH_ERROR_ACCESS_DENIED - Not allowed by MDM policy \n
  *
  * @exception   None
  * @param[in]  device_address   The remote device Bd address.

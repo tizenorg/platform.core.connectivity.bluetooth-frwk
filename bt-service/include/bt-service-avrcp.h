@@ -37,6 +37,7 @@
 extern "C" {
 #endif
 
+#define BLUEZ_MEDIA_PLAYER_INTERFACE	"org.bluez.MediaPlayer"
 #define BT_MEDIA_OBJECT_PATH "/Musicplayer"
 
 #define BT_MEDIA_CONTROL_PATH "%s/player0"

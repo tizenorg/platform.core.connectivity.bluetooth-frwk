@@ -27,7 +27,9 @@
 #include <string.h>
 #include <malloc.h>
 #include <stacktrim.h>
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
+#endif
 #include <vconf.h>
 
 #include "bt-internal-types.h"

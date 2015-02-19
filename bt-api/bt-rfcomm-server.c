@@ -115,7 +115,7 @@ static void __connected_cb(rfcomm_info_t *info, bt_event_info_t *event_info)
 	g_strlcpy(conn_info.uuid, info->uuid, BLUETOOTH_UUID_STRING_MAX);
 	conn_info.socket_fd = info->fd;
 	conn_info.device_addr = info->addr;
-	conn_info.server_id = info->id;
+//	conn_info.server_id = info->id;
 
 	BT_INFO_C("Connected [RFCOMM Server]");
 	_bt_common_event_cb(BLUETOOTH_EVENT_RFCOMM_CONNECTED,
@@ -662,7 +662,7 @@ BT_EXPORT_API int bluetooth_rfcomm_listen(int socket_fd, int max_pending_connect
 #endif
 }
 
-BT_EXPORT_API int bluetooth_rfcomm_accept_connection(int server_fd)
+BT_EXPORT_API int bluetooth_rfcomm_accept_connection(int server_fd, int *client_fd)
 {
 	int result;
 
@@ -678,7 +678,13 @@ BT_EXPORT_API int bluetooth_rfcomm_accept_connection(int server_fd)
 
 	BT_DBG("result: %x", result);
 
+	if (result == BLUETOOTH_ERROR_NONE) {
+		*client_fd = g_array_index(out_param, int, 0);
+	}
+
 	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	BT_DBG("client_fd: %d", *client_fd);
 
 	return result;
 }

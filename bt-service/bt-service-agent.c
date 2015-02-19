@@ -26,7 +26,6 @@
 #include <string.h>
 #include <malloc.h>
 #include <stacktrim.h>
-#include <syspopup_caller.h>
 #include <vconf.h>
 #include <package-manager.h>
 
@@ -43,6 +42,14 @@
 #include "bt-service-rfcomm-server.h"
 #include "bt-service-device.h"
 #include "bt-service-audio.h"
+
+#if defined(LIBNOTIFY_SUPPORT)
+#include "bt-popup.h"
+#elif defined(LIBNOTIFICATION_SUPPORT)
+#include "bt-service-agent-notification.h"
+#else
+#include <syspopup_caller.h>
+#endif
 
 #define BT_APP_AUTHENTICATION_TIMEOUT		35
 #define BT_APP_AUTHORIZATION_TIMEOUT		15
@@ -101,7 +108,13 @@ static gboolean __bt_agent_system_popup_timer_cb(gpointer user_data)
 
 	++retry_count;
 
+#if defined(LIBNOTIFY_SUPPORT)
+	ret = notify_launch(b);
+#elif defined(LIBNOTIFICATION_SUPPORT)
+	ret = notification_launch(b);
+#else
 	ret = syspopup_launch("bt-syspopup", b);
+#endif
 	if (ret < 0) {
 		BT_ERR("Sorry! Can't launch popup, ret=%d, Re-try[%d] time..",
 							ret, retry_count);
@@ -397,7 +410,9 @@ int _bt_launch_system_popup(bt_agent_event_type_t event_type,
 
 	bundle_add(b, "event-type", event_str);
 
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	ret = syspopup_launch("bt-syspopup", b);
+#endif
 	if (0 > ret) {
 		BT_ERR("Popup launch failed...retry %d", ret);
 
@@ -551,7 +566,7 @@ static gboolean __display_request(GapAgent *agent, DBusGProxy *device,
 				dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
 				G_TYPE_VALUE), &hash, G_TYPE_INVALID);
 	if (error) {
-		BT_ERR("error in GetBasicProperties [%s]\n", error->message);
+		BT_ERR("error in GetAll [%s]\n", error->message);
 		g_error_free(error);
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "",
 					     NULL);
@@ -607,7 +622,7 @@ static gboolean __confirm_request(GapAgent *agent, DBusGProxy *device,
 				G_TYPE_VALUE), &hash, G_TYPE_INVALID);
 
 	if (error) {
-		BT_ERR("error in GetBasicProperties [%s]", error->message);
+		BT_ERR("error in GetAll [%s]", error->message);
 		g_error_free(error);
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "",
 					     NULL);
@@ -672,7 +687,9 @@ static gboolean __pairing_cancel_request(GapAgent *agent, const char *address)
 {
 	BT_DBG("On Going Pairing is cancelled by remote\n");
 
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	syspopup_destroy_all();
+#endif
 
 	__bt_agent_release_memory();
 
@@ -787,7 +804,7 @@ fail:
 				dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
 				G_TYPE_VALUE), &hash, G_TYPE_INVALID);
 	if (error) {
-		BT_ERR("error in GetBasicProperties [%s]\n", error->message);
+		BT_ERR("error in GetAll [%s]\n", error->message);
 		g_error_free(error);
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "",
 					     NULL);
@@ -885,7 +902,9 @@ static gboolean __authorization_cancel_request(GapAgent *agent,
 
 	gap_agent_reply_authorize(agent, GAP_AGENT_CANCEL, NULL);
 
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	syspopup_destroy_all();
+#endif
 
 	__bt_agent_release_memory();
 
@@ -922,7 +941,7 @@ void* _bt_create_agent(const char *path, gboolean adapter)
 
 	agent = _gap_agent_new();
 
-	_gap_agent_setup_dbus(agent, &func_cb, path, adapter_proxy);
+	_gap_agent_setup_dbus(agent, &func_cb, path);
 
 	if (adapter) {
 		if (!_gap_agent_register(agent)) {

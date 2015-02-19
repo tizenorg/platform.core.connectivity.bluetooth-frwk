@@ -466,7 +466,9 @@ int _bt_launch_mdm_popup(char *mode)
 
 	bundle_add(b, "mode", mode);
 
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	ret = syspopup_launch(BT_MDM_SYSPOPUP, b);
+#endif
 
 	if (ret < 0)
 		BT_DBG("Popup launch failed: %d\n", ret);

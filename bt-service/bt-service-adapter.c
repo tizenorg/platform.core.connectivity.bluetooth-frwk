@@ -28,10 +28,17 @@
 #include <dlog.h>
 #include <string.h>
 #include <vconf.h>
+#include <status.h>
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
+#endif
+#ifdef __TIZEN_MOBILE__
 #include <aul.h>
+#endif
 #include <notification.h>
-//#include <journal/device.h>
+#ifdef ENABLE_TIZEN_2_4
+#include <journal/device.h>
+#endif
 
 #include "alarm.h"
 
@@ -276,6 +283,227 @@ static void __bt_get_service_list(GValue *value, bluetooth_device_info_t *dev)
 	}
 }
 
+static bt_remote_dev_info_t *__bt_parse_remote_device_info(
+					DBusMessageIter *item_iter)
+{
+	DBusMessageIter value_iter;
+	bt_remote_dev_info_t *dev_info;
+
+	dbus_message_iter_recurse(item_iter, &value_iter);
+
+	if (dbus_message_iter_get_arg_type(&value_iter) !=
+					DBUS_TYPE_DICT_ENTRY) {
+		BT_DBG("No entry");
+		return NULL;
+	}
+
+	dev_info = g_malloc0(sizeof(bt_remote_dev_info_t));
+
+	while (dbus_message_iter_get_arg_type(&value_iter) ==
+						DBUS_TYPE_DICT_ENTRY) {
+		char *value = NULL;
+		char *key;
+		DBusMessageIter dict_entry;
+		DBusMessageIter iter_dict_val;
+
+		dbus_message_iter_recurse(&value_iter, &dict_entry);
+
+		dbus_message_iter_get_basic(&dict_entry, &key);
+
+		if (key == NULL) {
+			dbus_message_iter_next(&value_iter);
+			continue;
+		}
+
+		if (!dbus_message_iter_next(&dict_entry)) {
+			dbus_message_iter_next(&value_iter);
+			continue;
+		}
+		dbus_message_iter_recurse(&dict_entry, &iter_dict_val);
+
+		if (strcasecmp(key, "Address") == 0) {
+			const char *address = NULL;
+			dbus_message_iter_get_basic(&iter_dict_val,
+							&address);
+			dev_info->address = g_strdup(address);
+		} else if (strcasecmp(key, "Class") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val,
+						&dev_info->class);
+		} else if (strcasecmp(key, "Name") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val,
+							&value);
+			if (dev_info->name == NULL)
+				dev_info->name = g_strdup(value);
+		} else if (strcasecmp(key, "Connected") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val,
+						&dev_info->connected);
+		} else if (strcasecmp(key, "Paired") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val,
+						&dev_info->paired);
+		} else if (strcasecmp(key, "Trusted") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val,
+						&dev_info->trust);
+		} else if (strcasecmp(key, "RSSI") == 0) {
+			dbus_message_iter_get_basic(&iter_dict_val,
+						&dev_info->rssi);
+		} else if (strcasecmp(key, "UUIDs") == 0) {
+			DBusMessageIter uuid_iter;
+			DBusMessageIter tmp_iter;
+			int i = 0;
+
+			dbus_message_iter_recurse(&iter_dict_val,
+							&uuid_iter);
+			tmp_iter = uuid_iter;
+
+			/* Store the uuid count */
+			while (dbus_message_iter_get_arg_type(&tmp_iter) !=
+							DBUS_TYPE_INVALID) {
+
+				dbus_message_iter_get_basic(&tmp_iter,
+								&value);
+
+				dev_info->uuid_count++;
+				if (!dbus_message_iter_next(&tmp_iter))
+					break;
+			}
+
+			/* Store the uuids */
+			if (dev_info->uuid_count > 0) {
+				dev_info->uuids = g_new0(char *,
+						dev_info->uuid_count + 1);
+			} else {
+				dbus_message_iter_next(&value_iter);
+				continue;
+			}
+
+			while (dbus_message_iter_get_arg_type(&uuid_iter) !=
+							DBUS_TYPE_INVALID) {
+				dbus_message_iter_get_basic(&uuid_iter,
+								&value);
+				dev_info->uuids[i] = g_strdup(value);
+				i++;
+				if (!dbus_message_iter_next(&uuid_iter)) {
+					break;
+				}
+			}
+		}
+
+		dbus_message_iter_next(&value_iter);
+	}
+
+	return dev_info;
+}
+
+static void __bt_extract_remote_devinfo(DBusMessageIter *msg_iter,
+						GArray **dev_list)
+{
+	bt_remote_dev_info_t *dev_info = NULL;
+	char *object_path = NULL;
+	DBusMessageIter value_iter;
+
+	/* Parse the signature:  oa{sa{sv}}} */
+	ret_if(dbus_message_iter_get_arg_type(msg_iter) !=
+					DBUS_TYPE_OBJECT_PATH);
+
+	dbus_message_iter_get_basic(msg_iter, &object_path);
+	ret_if(object_path == NULL);
+
+	/* object array (oa) */
+	ret_if(dbus_message_iter_next(msg_iter) == FALSE);
+	ret_if(dbus_message_iter_get_arg_type(msg_iter) != DBUS_TYPE_ARRAY);
+
+	dbus_message_iter_recurse(msg_iter, &value_iter);
+
+	/* string array (sa) */
+	while (dbus_message_iter_get_arg_type(&value_iter) ==
+					DBUS_TYPE_DICT_ENTRY) {
+		char *interface_name = NULL;
+		DBusMessageIter interface_iter;
+
+		dbus_message_iter_recurse(&value_iter, &interface_iter);
+
+		ret_if(dbus_message_iter_get_arg_type(&interface_iter) !=
+							DBUS_TYPE_STRING);
+
+		dbus_message_iter_get_basic(&interface_iter, &interface_name);
+
+		ret_if(dbus_message_iter_next(&interface_iter) == FALSE);
+
+		ret_if(dbus_message_iter_get_arg_type(&interface_iter) !=
+							DBUS_TYPE_ARRAY);
+
+		if (g_strcmp0(interface_name, "org.bluez.Device1") == 0) {
+			BT_DBG("Found a device: %s", object_path);
+			dev_info = __bt_parse_remote_device_info(
+							&interface_iter);
+
+			if (dev_info) {
+				g_array_append_vals(*dev_list, dev_info,
+					sizeof(bt_remote_dev_info_t));
+			}
+		}
+
+		dbus_message_iter_next(&value_iter);
+	}
+}
+
+int _bt_get_remote_found_devices(GArray **dev_list)
+{
+	DBusMessage *msg;
+	DBusMessage *reply;
+	DBusMessageIter reply_iter;
+	DBusMessageIter value_iter;
+	DBusError err;
+	DBusConnection *conn;
+
+	conn = _bt_get_system_conn();
+	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	msg = dbus_message_new_method_call(BT_BLUEZ_NAME, BT_MANAGER_PATH,
+						BT_MANAGER_INTERFACE,
+						"GetManagedObjects");
+
+	retv_if(msg == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	/* Synchronous call */
+	dbus_error_init(&err);
+	reply = dbus_connection_send_with_reply_and_block(
+					conn, msg,
+					-1, &err);
+	dbus_message_unref(msg);
+
+	if (!reply) {
+		BT_ERR("Can't get managed objects");
+
+		if (dbus_error_is_set(&err)) {
+			BT_ERR("%s", err.message);
+			dbus_error_free(&err);
+		}
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	if (dbus_message_iter_init(reply, &reply_iter) == FALSE) {
+		BT_ERR("Fail to iterate the reply");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	dbus_message_iter_recurse(&reply_iter, &value_iter);
+
+	/* signature of GetManagedObjects:  a{oa{sa{sv}}} */
+	while (dbus_message_iter_get_arg_type(&value_iter) ==
+						DBUS_TYPE_DICT_ENTRY) {
+		DBusMessageIter msg_iter;
+
+		dbus_message_iter_recurse(&value_iter, &msg_iter);
+
+		__bt_extract_remote_devinfo(&msg_iter, dev_list);
+
+		dbus_message_iter_next(&value_iter);
+	}
+
+	return BLUETOOTH_ERROR_NONE;
+}
+
 static int __bt_get_bonded_device_info(gchar *device_path,
 		bluetooth_device_info_t *dev_info)
 {
@@ -427,6 +655,30 @@ void _bt_adapter_set_status(bt_status_t status)
 	BT_INFO("adapter_status changed [%d] -> [%d]", adapter_status, status);
 	adapter_status = status;
 }
+
+#ifdef __TIZEN_MOBILE__
+static void __launch_bt_service(int status, int run_type)
+{
+	bundle *kb;
+	char status_val[5] = { 0, };
+	char run_type_val[5] = { 0, };
+
+	snprintf(status_val, sizeof(status_val), "%d", status);
+	snprintf(run_type_val, sizeof(run_type_val), "%d", run_type);
+
+	BT_DBG("status: %s, run_type: %s", status_val, run_type_val);
+
+	kb = bundle_create();
+
+	bundle_add(kb, "launch-type", "setstate");
+	bundle_add(kb, "status", status_val);
+	bundle_add(kb, "run-type", run_type_val);
+
+	aul_launch_app("com.samsung.bluetooth", kb);
+
+	bundle_free(kb);
+}
+#endif
 
 bt_status_t _bt_adapter_get_status(void)
 {
@@ -794,15 +1046,22 @@ void _bt_handle_adapter_added(void)
 		return;
 	}
 
+#ifdef __TIZEN_MOBILE__
+	if (!aul_app_is_running("com.samsung.bluetooth"))
+			__launch_bt_service(0, 0);
+
 	if (_bt_register_media_player() != BLUETOOTH_ERROR_NONE)
 		BT_ERR("Fail to register media player");
+#endif
 
 	if (_bt_register_obex_server() != BLUETOOTH_ERROR_NONE)
 		BT_ERR("Fail to init obex server");
 
 #ifndef TIZEN_WEARABLE
+/*
 	if (_bt_network_activate() != BLUETOOTH_ERROR_NONE)
 		BT_ERR("Fail to activate network");
+*/
 #endif
 
 	/* add the vconf noti handler */
@@ -819,7 +1078,9 @@ void _bt_handle_adapter_added(void)
 		__bt_set_enabled();
 		_bt_adapter_set_status(BT_ACTIVATED);
 	}
-//	journal_bt_on();
+#ifdef ENABLE_TIZEN_2_4
+	journal_bt_on();
+#endif
 
 	_bt_service_register_vconf_handler();
 }
@@ -829,7 +1090,9 @@ void _bt_handle_adapter_removed(void)
 	int ret;
 
 	_bt_adapter_set_status(BT_DEACTIVATED);
-//	journal_bt_off();
+#ifdef ENABLE_TIZEN_2_4
+	journal_bt_off();
+#endif
 
 	__bt_visibility_alarm_remove();
 
@@ -1209,20 +1472,13 @@ int _bt_reset_adapter(void)
 
 int _bt_check_adapter(int *status)
 {
-
-	char *adapter_path = NULL;
-
 	BT_CHECK_PARAMETER(status, return);
 
-	*status = BT_ADAPTER_DISABLED;
+	*status = 0; /* 0: disabled */
 
-	adapter_path = _bt_get_adapter_path();
+	if (_bt_get_adapter_power())
+		*status = 1; /* 1: enabled */
 
-
-	if (adapter_path != NULL)
-		*status = BT_ADAPTER_ENABLED;
-
-	g_free(adapter_path);
 	return BLUETOOTH_ERROR_NONE;
 }
 
@@ -1909,7 +2165,6 @@ int _bt_set_connectable(gboolean is_connectable)
 
 gboolean _bt_get_discovering_property(bt_discovery_role_type_t discovery_type)
 {
-
 	DBusGProxy *proxy;
 	GValue discovering_v = { 0 };
 	GError *err = NULL;
@@ -1937,7 +2192,6 @@ gboolean _bt_get_discovering_property(bt_discovery_role_type_t discovery_type)
 	}
 
 	return g_value_get_boolean(&discovering_v);
-
 }
 
 unsigned int _bt_get_discoverable_timeout_property(void)

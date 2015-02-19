@@ -26,7 +26,9 @@
 #include <glib.h>
 #include <dlog.h>
 #include <string.h>
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
+#endif
 
 #include "bluetooth-api.h"
 #include "bt-internal-types.h"
@@ -159,7 +161,9 @@ static gboolean __bt_syspopup_timer_cb(gpointer user_data)
 
 	b = (bundle *)user_data;
 
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	ret = syspopup_launch("bt-syspopup", b);
+#endif
 	if (ret < 0) {
 		BT_ERR("Sorry!! Cannot launch popup return = %d, Retrying...", ret);
 	} else {
@@ -193,7 +197,9 @@ static gboolean __bt_launch_unable_to_pairing_syspopup(int result)
 	else
 		bundle_add(b, "error", "error");
 
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	ret = syspopup_launch("bt-syspopup", b);
+#endif
 	if (0 > ret) {
 		BT_ERR("Popup launch failed...retry %d \n", ret);
 		g_timeout_add(200, (GSourceFunc) __bt_syspopup_timer_cb,
@@ -606,10 +612,13 @@ static void __bt_bond_device_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 	bt_remote_dev_info_t *remote_dev_info;
 
 	/* Terminate ALL system popup */
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	syspopup_destroy_all();
+#endif
 
 	dbus_g_proxy_end_call(proxy, call, &err, G_TYPE_INVALID);
 
+	g_object_unref(proxy);
 
 	is_device_creating = FALSE;
 
@@ -621,6 +630,8 @@ static void __bt_bond_device_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 		return;
 	}
 
+	bonding_info->device_proxy = NULL;
+
 	req_info = _bt_get_request_info(bonding_info->req_id);
 	if (req_info == NULL) {
 		BT_ERR("req_info == NULL");
@@ -628,16 +639,16 @@ static void __bt_bond_device_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 	}
 
 	if (err != NULL) {
-		BT_ERR("Error occured in CreateBonding [%s]", err->message);
+		BT_ERR("Error occured in Pair [%s]", err->message);
 
 		if (!strcmp(err->message, "Already Exists")) {
 			BT_INFO("Existing Bond, remove and retry");
 			ret_if(__bt_remove_and_bond() == BLUETOOTH_ERROR_NONE);
 
 			result = BLUETOOTH_ERROR_PARING_FAILED;
-		} else if (_bt_agent_is_canceled() ||
-			!strcmp(err->message, "Authentication Canceled")) {
-			result = BLUETOOTH_ERROR_CANCEL_BY_USER;
+//		} else if (_bt_agent_is_canceled() ||
+//			!strcmp(err->message, "Authentication Canceled")) {
+//			result = BLUETOOTH_ERROR_CANCEL_BY_USER;
 		} else if (!strcmp(err->message, "Authentication Rejected")) {
 			result = BLUETOOTH_ERROR_ACCESS_DENIED;
 		} else if (!strcmp(err->message, "In Progress")) {
@@ -1188,18 +1199,19 @@ int _bt_search_device(int request_id,
 	}
 
 	device_proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
-				      device_path, BT_DEVICE_INTERFACE);
+				      device_path, BT_PROPERTIES_INTERFACE);
 	g_free(device_path);
 	if (device_proxy == NULL) {
 		result = BLUETOOTH_ERROR_INTERNAL;
 		goto fail;
 	}
 
-	if (!dbus_g_proxy_begin_call(device_proxy, "DiscoverServices",
-				(DBusGProxyCallNotify)__bt_discover_cb,
-				(gpointer)searching_info, NULL,
-				G_TYPE_STRING, "",
-				G_TYPE_INVALID)) {
+	if (!dbus_g_proxy_begin_call(device_proxy, "Get",
+			(DBusGProxyCallNotify)__bt_discover_cb,
+			(gpointer)searching_info, NULL,
+			G_TYPE_STRING, BT_DEVICE_INTERFACE,
+			G_TYPE_STRING, "UUIDs",
+			G_TYPE_INVALID)) {
 		BT_ERR("DiscoverServices failed");
 		goto fail;
 	}

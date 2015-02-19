@@ -25,6 +25,7 @@
 #include <glib.h>
 #include <dlog.h>
 #include <string.h>
+#include <privilege-control.h>
 #include <vconf.h>
 
 #include "bt-internal-types.h"
@@ -208,6 +209,10 @@ int main(void)
 	sigaction(SIGTERM, &sa, NULL);
 
 	g_type_init();
+
+	if (perm_app_set_privilege("bluetooth-frwk-service", NULL, NULL) !=
+								PC_OPERATION_SUCCESS)
+		BT_ERR("Failed to set app privilege.\n");
 
 	/* Event reciever Init */
 	if (_bt_init_service_event_receiver() != BLUETOOTH_ERROR_NONE) {

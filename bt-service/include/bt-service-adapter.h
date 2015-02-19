@@ -150,6 +150,10 @@ void _bt_adapter_set_status(bt_status_t status);
 
 bt_status_t _bt_adapter_get_status(void);
 
+void _bt_handle_flight_mode_noti(void);
+
+int _bt_get_remote_found_devices(GArray **dev_list);
+
 void _bt_adapter_set_le_status(bt_le_status_t status);
 
 bt_le_status_t _bt_adapter_get_le_status(void);

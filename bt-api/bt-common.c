@@ -26,7 +26,6 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <stdlib.h>
-#include <security-server.h>
 #include <sys/socket.h>
 
 
@@ -46,9 +45,6 @@
 static bt_user_info_t user_info[BT_MAX_USER_INFO];
 static DBusGConnection *system_conn = NULL;
 static GDBusConnection *system_gdbus_conn = NULL;
-
-static char *cookie;
-static size_t cookie_size;
 
 static guint bus_id;
 
@@ -1017,6 +1013,50 @@ void _bt_convert_device_path_to_address(const char *device_path,
 	}
 }
 
+static char *__bt_extract_adapter_path(DBusMessageIter *msg_iter)
+{
+	char *object_path = NULL;
+	DBusMessageIter value_iter;
+
+	/* Parse the signature:  oa{sa{sv}}} */
+	retv_if(dbus_message_iter_get_arg_type(msg_iter) !=
+				DBUS_TYPE_OBJECT_PATH, NULL);
+
+	dbus_message_iter_get_basic(msg_iter, &object_path);
+	retv_if(object_path == NULL, NULL);
+
+	/* object array (oa) */
+	retv_if(dbus_message_iter_next(msg_iter) == FALSE, NULL);
+	retv_if(dbus_message_iter_get_arg_type(msg_iter) !=
+				DBUS_TYPE_ARRAY, NULL);
+
+	dbus_message_iter_recurse(msg_iter, &value_iter);
+
+	/* string array (sa) */
+	while (dbus_message_iter_get_arg_type(&value_iter) ==
+					DBUS_TYPE_DICT_ENTRY) {
+		char *interface_name = NULL;
+		DBusMessageIter interface_iter;
+
+		dbus_message_iter_recurse(&value_iter, &interface_iter);
+
+		retv_if(dbus_message_iter_get_arg_type(&interface_iter) !=
+			DBUS_TYPE_STRING, NULL);
+
+		dbus_message_iter_get_basic(&interface_iter, &interface_name);
+
+		if (g_strcmp0(interface_name, "org.bluez.Adapter1") == 0) {
+			/* Tizen don't allow the multi-adapter */
+			BT_DBG("Found an adapter: %s", object_path);
+			return g_strdup(object_path);
+		}
+
+		dbus_message_iter_next(&value_iter);
+	}
+
+	return NULL;
+}
+
 static char *__bt_extract_device_path(DBusMessageIter *msg_iter, char *address)
 {
 	char *object_path = NULL;
@@ -1106,43 +1146,12 @@ char *_bt_get_device_object_path(char *address)
 
 DBusGProxy *_bt_get_adapter_proxy(DBusGConnection *conn)
 {
-	GError *err = NULL;
-	DBusGProxy *manager_proxy = NULL;
 	DBusGProxy *adapter_proxy = NULL;
-	char *adapter_path = NULL;
 
 	retv_if(conn == NULL, NULL);
 
-	manager_proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
-				BT_MANAGER_PATH, BT_MANAGER_INTERFACE);
-
-	retv_if(manager_proxy == NULL, NULL);
-
-	if (!dbus_g_proxy_call(manager_proxy, "DefaultAdapter", &err,
-				G_TYPE_INVALID, DBUS_TYPE_G_OBJECT_PATH,
-				&adapter_path,
-				G_TYPE_INVALID)) {
-		if (err != NULL) {
-			BT_ERR("Getting DefaultAdapter failed: [%s]\n", err->message);
-			g_error_free(err);
-		}
-		g_object_unref(manager_proxy);
-		return NULL;
-	}
-
-	if (adapter_path == NULL || strlen(adapter_path) >= BT_ADAPTER_OBJECT_PATH_MAX) {
-		BT_ERR("Adapter path is inproper\n");
-		g_free(adapter_path);
-		g_object_unref(manager_proxy);
-		return NULL;
-	}
-
-	adapter_proxy = dbus_g_proxy_new_for_name(conn,
-					BT_BLUEZ_NAME,
-					adapter_path,
-					BT_ADAPTER_INTERFACE);
-	g_free(adapter_path);
-	g_object_unref(manager_proxy);
+	adapter_proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
+			BT_BLUEZ_HCI_PATH, BT_PROPERTIES_INTERFACE);
 
 	return adapter_proxy;
 }
@@ -1214,39 +1223,6 @@ DBusConnection *_bt_get_system_conn(void)
 	retv_if(g_conn == NULL, NULL);
 
 	return dbus_g_connection_get_connection(g_conn);
-}
-
-void _bt_generate_cookie(void)
-{
-	int retval;
-
-	ret_if(cookie != NULL);
-
-	cookie_size = security_server_get_cookie_size();
-
-	cookie = g_malloc0((cookie_size*sizeof(char))+1);
-
-	retval = security_server_request_cookie(cookie, cookie_size);
-	if(retval < 0) {
-		BT_ERR("Fail to get cookie: %d", retval);
-	}
-}
-
-void _bt_destroy_cookie(void)
-{
-	g_free(cookie);
-	cookie = NULL;
-	cookie_size = 0;
-}
-
-char *_bt_get_cookie(void)
-{
-	return cookie;
-}
-
-int _bt_get_cookie_size(void)
-{
-	return cookie_size;
 }
 
 int _bt_register_osp_server_in_agent(int type, char *uuid, char *path, int fd)
@@ -1410,7 +1386,6 @@ BT_EXPORT_API int bluetooth_register_callback(bluetooth_cb_func_ptr callback_ptr
 		return ret;
 	}
 
-	_bt_generate_cookie();
 
 	_bt_set_user_data(BT_COMMON, (void *)callback_ptr, user_data);
 
@@ -1443,8 +1418,6 @@ fail:
 BT_EXPORT_API int bluetooth_unregister_callback(void)
 {
 	int ret;
-
-	_bt_destroy_cookie();
 
 	ret = _bt_deinit_event_handler();
 	if (ret != BLUETOOTH_ERROR_NONE) {

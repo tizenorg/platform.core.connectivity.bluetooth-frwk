@@ -73,7 +73,7 @@ char *src_addr = NULL;
 #define HFP_AGENT_SERVICE "org.bluez.ag_agent"
 
 
-#define HFP_AGENT_PATH "/org/bluez/hfp_agent"
+#define HFP_AGENT_PATH "/org/bluez/hfp_ag"
 #define HFP_AGENT_INTERFACE "Org.Hfp.App.Interface"
 
 #define CSD_CALL_APP_PATH "/org/tizen/csd/%d"
@@ -151,6 +151,10 @@ static DBusHandlerResult __bt_telephony_adapter_filter(DBusConnection *conn,
 
 static int __bt_telephony_get_object_path(DBusMessage *msg, char **path);
 
+static char *__bt_extract_device_path(DBusMessageIter *msg_iter, char *address);
+
+static char *__bt_get_default_adapter_path(DBusMessageIter *msg_iter);
+
 static int __bt_telephony_get_src_addr(DBusMessage *msg);
 
 static gboolean bluetooth_telephony_method_send_dtmf(
@@ -187,7 +191,8 @@ static int __bluetooth_telephony_proxy_init(void);
 static void __bluetooth_telephony_proxy_deinit(void);
 static int __bluetooth_telephony_register(void);
 static int __bluetooth_telephony_unregister(void);
-
+static int __bluetooth_get_default_adapter_path(DBusGConnection *GConn,
+							char *path);
 static gboolean __bluetooth_telephony_is_headset(uint32_t device_class);
 static int __bluetooth_telephony_get_connected_device(void);
 static DBusGProxy *__bluetooth_telephony_get_connected_device_proxy(void);
@@ -906,6 +911,83 @@ static  int __bluetooth_telephony_unregister(void)
 	return BLUETOOTH_TELEPHONY_ERROR_NONE;
 }
 
+static int __bluetooth_get_default_adapter_path(DBusGConnection *GConn,
+							char *path)
+{
+	DBusMessage *msg;
+	DBusMessage *reply;
+	DBusMessageIter reply_iter;
+	DBusMessageIter value_iter;
+	DBusError err;
+	DBusConnection *conn;
+	char *adapter_path = NULL;
+
+	BT_DBG("+");
+
+	conn = dbus_g_connection_get_connection(telephony_dbus_info.conn);
+
+	retv_if(conn == NULL, NULL);
+
+	msg = dbus_message_new_method_call(BT_BLUEZ_NAME, BT_MANAGER_PATH,
+			BT_MANAGER_INTERFACE,
+			"GetManagedObjects");
+
+	retv_if(msg == NULL, NULL);
+	/* Synchronous call */
+	dbus_error_init(&err);
+	reply = dbus_connection_send_with_reply_and_block(
+				conn, msg, -1, &err);
+	dbus_message_unref(msg);
+
+	if (!reply) {
+		BT_ERR("Can't get managed objects");
+
+		if (dbus_error_is_set(&err)) {
+			BT_ERR("%s", err.message);
+			dbus_error_free(&err);
+		}
+		return BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
+	}
+
+	if (dbus_message_iter_init(reply, &reply_iter) == FALSE) {
+        BT_ERR("Fail to iterate the reply");
+        return BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
+	}
+
+	dbus_message_iter_recurse(&reply_iter, &value_iter);
+
+	/* signature of GetManagedObjects:  a{oa{sa{sv}}} */
+	while (dbus_message_iter_get_arg_type(&value_iter) ==
+				DBUS_TYPE_DICT_ENTRY) {
+		DBusMessageIter msg_iter;
+
+		dbus_message_iter_recurse(&value_iter, &msg_iter);
+
+		adapter_path = __bt_get_default_adapter_path(&msg_iter);
+		if (adapter_path != NULL) {
+			BT_DBG("Found the adapter path");
+			break;
+		}
+		dbus_message_iter_next(&value_iter);
+	}
+
+	if (adapter_path == NULL) {
+		return BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
+	}
+
+	if (strlen(adapter_path) >= BT_ADAPTER_PATH_LEN) {
+		BT_ERR("Path too long.\n");
+		g_free(adapter_path);
+		return BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
+	}
+
+	BT_DBG("object path = %s", adapter_path);
+	g_strlcpy(path, adapter_path, BT_ADAPTER_PATH_LEN);
+	g_free(adapter_path);
+	BT_DBG("-");
+	return BLUETOOTH_TELEPHONY_ERROR_NONE;
+}
+
 #ifndef TIZEN_WEARABLE
 static void __bluetooth_telephony_init_headset_state(void)
 {
@@ -1223,6 +1305,7 @@ done:
 static DBusGProxy *__bluetooth_telephony_get_connected_device_proxy(void)
 {
 	DBusGProxy *proxy = NULL;
+	char *object_path = NULL;
 
 	FN_START;
 
@@ -1232,8 +1315,16 @@ static DBusGProxy *__bluetooth_telephony_get_connected_device_proxy(void)
 	if (strlen(telephony_info.address) == 0)
 		return NULL;
 
+	if (telephony_info.obj_path) {
+		g_free(telephony_info.obj_path);
+		telephony_info.obj_path = NULL;
+	}
+
+	object_path = _bt_get_device_object_path(telephony_info.address);
+	g_strlcpy(telephony_info.obj_path, object_path, BT_ADAPTER_PATH_LEN);
+
 	proxy = dbus_g_proxy_new_for_name(telephony_dbus_info.conn,
-			HFP_AGENT_SERVICE, HFP_AGENT_PATH,
+			HFP_AGENT_SERVICE, telephony_info.obj_path,
 			HFP_AGENT_INTERFACE);
 
 	FN_END;
@@ -1248,7 +1339,7 @@ BT_EXPORT_API int bluetooth_telephony_init(bt_telephony_func_ptr cb,
 	DBusConnection *conn;
 	int ret = BLUETOOTH_TELEPHONY_ERROR_NONE;
 	GError *error = NULL;
-
+	char object_path[BT_ADAPTER_PATH_LEN] = {0};
 	DBusConnection *dbus_conn;
 	bluetooth_device_address_t loc_address = { {0} };
 	char src_address[BT_ADDRESS_STRING_SIZE] = { 0 };
@@ -1375,6 +1466,12 @@ BT_EXPORT_API int bluetooth_telephony_init(bt_telephony_func_ptr cb,
 		dbus_error_free(&dbus_error);
 		goto fail;
 	}
+
+	/*Check for BT status*/
+	ret = __bluetooth_get_default_adapter_path(telephony_dbus_info.conn,
+								object_path);
+	if (ret != BLUETOOTH_TELEPHONY_ERROR_NONE)
+		return BLUETOOTH_TELEPHONY_ERROR_NONE;
 
 	dbus_error_init(&dbus_error);
 	dbus_bus_add_match(conn,
@@ -2523,3 +2620,66 @@ static int __bt_telephony_get_src_addr(DBusMessage *msg)
 	FN_END;
 	return BLUETOOTH_TELEPHONY_ERROR_NONE;
 }
+
+static char *__bt_extract_device_path(DBusMessageIter *msg_iter, char *address)
+{
+	char *object_path = NULL;
+	char device_address[BT_ADDRESS_STRING_SIZE] = { 0 };
+	BT_DBG("+");
+
+	/* Parse the signature:	oa{sa{sv}}} */
+	retv_if(dbus_message_iter_get_arg_type(msg_iter) !=
+				DBUS_TYPE_OBJECT_PATH, NULL);
+
+	dbus_message_iter_get_basic(msg_iter, &object_path);
+	retv_if(object_path == NULL, NULL);
+
+	_bt_convert_device_path_to_address(object_path, device_address);
+
+	if (g_strcmp0(address, device_address) == 0) {
+		return g_strdup(object_path);
+	}
+	BT_DBG("-");
+	return NULL;
+}
+
+static char *__bt_get_default_adapter_path(DBusMessageIter *msg_iter)
+{
+	char *object_path = NULL;
+	DBusMessageIter value_iter;
+	BT_DBG("+");
+
+	/* Parse the signature:  oa{sa{sv}}} */
+	retv_if(dbus_message_iter_get_arg_type(msg_iter) !=
+			DBUS_TYPE_OBJECT_PATH, NULL);
+
+	dbus_message_iter_get_basic(msg_iter, &object_path);
+
+	retv_if(dbus_message_iter_next(msg_iter) == FALSE, NULL);
+  	retv_if(dbus_message_iter_get_arg_type(msg_iter) !=
+			DBUS_TYPE_ARRAY, NULL);
+
+	dbus_message_iter_recurse(msg_iter, &value_iter);
+
+	while (dbus_message_iter_get_arg_type(&value_iter) ==
+		  DBUS_TYPE_DICT_ENTRY) {
+		char *interface_name = NULL;
+		DBusMessageIter interface_iter;
+
+		dbus_message_iter_recurse(&value_iter, &interface_iter);
+
+		retv_if(dbus_message_iter_get_arg_type(&interface_iter) !=
+	  			DBUS_TYPE_STRING, NULL);
+
+		dbus_message_iter_get_basic(&interface_iter, &interface_name);
+
+		if (g_strcmp0(interface_name, "org.bluez.Adapter1") == 0) {
+			return g_strdup(object_path);
+		}
+	dbus_message_iter_next(&value_iter);
+	}
+	BT_DBG("Adapter Not Found");
+	BT_DBG("-");
+	return NULL;
+}
+
