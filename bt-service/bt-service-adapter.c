@@ -28,10 +28,17 @@
 #include <dlog.h>
 #include <string.h>
 #include <vconf.h>
+#include <status.h>
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
+#endif
+#ifdef __TIZEN_MOBILE__
 #include <aul.h>
+#endif
 #include <notification.h>
-//#include <journal/device.h>
+#ifdef ENABLE_TIZEN_2_4
+#include <journal/device.h>
+#endif
 
 #include "alarm.h"
 
@@ -794,8 +801,10 @@ void _bt_handle_adapter_added(void)
 		return;
 	}
 
+#ifdef __TIZEN_MOBILE__
 	if (_bt_register_media_player() != BLUETOOTH_ERROR_NONE)
 		BT_ERR("Fail to register media player");
+#endif
 
 	if (_bt_register_obex_server() != BLUETOOTH_ERROR_NONE)
 		BT_ERR("Fail to init obex server");
@@ -819,7 +828,9 @@ void _bt_handle_adapter_added(void)
 		__bt_set_enabled();
 		_bt_adapter_set_status(BT_ACTIVATED);
 	}
-//	journal_bt_on();
+#ifdef ENABLE_TIZEN_2_4
+	journal_bt_on();
+#endif
 
 	_bt_service_register_vconf_handler();
 }
@@ -829,7 +840,9 @@ void _bt_handle_adapter_removed(void)
 	int ret;
 
 	_bt_adapter_set_status(BT_DEACTIVATED);
-//	journal_bt_off();
+#ifdef ENABLE_TIZEN_2_4
+	journal_bt_off();
+#endif
 
 	__bt_visibility_alarm_remove();
 

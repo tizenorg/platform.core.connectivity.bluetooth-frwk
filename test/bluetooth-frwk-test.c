@@ -1099,7 +1099,7 @@ int test_input_callback(void *data)
 		}
 		case 87:
 		{
-			ret = bluetooth_rfcomm_accept_connection(server_fd);
+			ret = bluetooth_rfcomm_accept_connection(server_fd, &client_fd);
 			if (ret < 0)
 				TC_PRT("Failed with [0x%04x]", ret);
 			TC_PRT("client fd: %d", client_fd);
@@ -1237,6 +1237,17 @@ void cleanup()
 		g_main_loop_unref(main_loop);
 	}
 }
+
+int timeout_callback(void *data)
+{
+	TC_PRT("timeout callback");
+	timeout_status = -1;
+
+	g_main_loop_quit(main_loop);
+
+	return FALSE;
+}
+
 
 void bt_hid_event_callback(int event, hid_event_param_t* param, void *user_data)
 {

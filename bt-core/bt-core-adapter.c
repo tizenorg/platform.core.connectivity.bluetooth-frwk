@@ -196,6 +196,54 @@ static int __execute_command(const char *cmd, char *const arg_list[])
 	return 0;
 }
 
+#if 0
+static DBusGProxy *_bt_get_connman_proxy(void)
+{
+	DBusGProxy *proxy;
+
+	if (conn == NULL) {
+		conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
+		retv_if(conn == NULL, NULL);
+	}
+
+	proxy = dbus_g_proxy_new_for_name(conn,
+			CONNMAN_DBUS_NAME,
+			CONNMAN_BLUETOOTH_TECHNOLOGY_PATH,
+			CONNMAN_BLUETOTOH_TECHNOLOGY_INTERFACE);
+	retv_if(proxy == NULL, NULL);
+
+	return proxy;
+}
+
+static int _bt_power_adapter(gboolean powered)
+{
+	GValue state = { 0 };
+	GError *error = NULL;
+	DBusGProxy *proxy;
+
+	proxy = _bt_get_connman_proxy();
+	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	g_value_init(&state, G_TYPE_BOOLEAN);
+	g_value_set_boolean(&state, powered);
+
+	BT_DBG("set power property state: %d to connman", powered);
+
+	dbus_g_proxy_call(proxy, "SetProperty", &error,
+				G_TYPE_STRING, "Powered",
+				G_TYPE_VALUE, &state,
+				G_TYPE_INVALID, G_TYPE_INVALID);
+
+	if (error != NULL) {
+		BT_ERR("Powered set err:[%s]", error->message);
+		g_error_free(error);
+		g_value_unset(&state);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+	return BLUETOOTH_ERROR_NONE;
+}
+#endif
+
 int _bt_enable_adapter(void)
 {
 	int ret;
@@ -203,7 +251,7 @@ int _bt_enable_adapter(void)
 	bt_le_status_t le_status;
 
 	BT_INFO("");
-
+#ifdef __TIZEN_MOBILE__
 	status = _bt_core_get_status();
 	if (status != BT_DEACTIVATED) {
 		BT_ERR("Invalid state %d", status);
@@ -228,6 +276,9 @@ int _bt_enable_adapter(void)
 		__bt_core_set_status(BT_DEACTIVATED);
 		return -1;
 	}
+#else
+//	_bt_power_adapter(TRUE);
+#endif
 
 	return 0;
 }
@@ -238,7 +289,7 @@ int _bt_disable_adapter(void)
 	bt_le_status_t le_status;
 
 	BT_INFO_C("Disable adapter");
-
+#ifdef __TIZEN_MOBILE__
 	le_status = _bt_core_get_le_status();
 	BT_DBG("le_status : %d", le_status);
 	if (le_status == BT_LE_ACTIVATED) {
@@ -268,14 +319,16 @@ int _bt_disable_adapter(void)
 		__bt_core_set_status( BT_ACTIVATED);
 		return -1;
 	}
-
+#else
+//	_bt_power_adapter(FALSE);
+#endif
 	return 0;
 }
 
 int _bt_enable_adapter_le(void)
 {
 	BT_DBG("");
-
+#ifdef __TIZEN_MOBILE__
 	int ret;
 	bt_status_t status;
 	bt_le_status_t le_status;
@@ -297,6 +350,9 @@ int _bt_enable_adapter_le(void)
 	} else {
 		__bt_core_set_le_status(BT_LE_ACTIVATED);
 	}
+#else
+//	_bt_power_adapter(TRUE);
+#endif
 	return 0;
 }
 
@@ -304,6 +360,7 @@ int _bt_disable_adapter_le(void)
 {
 	BT_DBG("+");
 
+#ifdef __TIZEN_MOBILE__
 	bt_status_t status;
 	bt_le_status_t le_status;
 
@@ -323,7 +380,9 @@ int _bt_disable_adapter_le(void)
 			return -1;
 		}
 	}
-
+#else
+//	_bt_power_adapter(FALSE);
+#endif
 	__bt_core_set_le_status(BT_LE_DEACTIVATED);
 
 	BT_DBG("-");

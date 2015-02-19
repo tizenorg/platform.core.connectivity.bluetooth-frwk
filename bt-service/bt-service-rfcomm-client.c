@@ -27,6 +27,7 @@
 #include <dlog.h>
 #include <string.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include "bluetooth-api.h"
 #include "bt-internal-types.h"
@@ -322,7 +323,7 @@ static void __bt_rfcomm_connected_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 		goto dbus_return;
 	}
 
-	BT_INFO("Succss Connect REMOTE Device RFCOMM Node[%s]", rfcomm_device_node);
+	BT_DBG("Success Connect REMOTE Device RFCOMM Node[%s]", rfcomm_device_node);
 
 	socket_fd = __bt_rfcomm_open_socket(rfcomm_device_node);
 

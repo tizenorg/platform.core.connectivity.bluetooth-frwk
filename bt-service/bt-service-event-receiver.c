@@ -29,7 +29,9 @@
 #include <dlog.h>
 #include <vconf.h>
 #include <vconf-internal-bt-keys.h>
-//#include <journal/device.h>
+#ifdef ENABLE_TIZEN_2_4
+#include <journal/device.h>
+#endif
 
 #include "bluetooth-api.h"
 #include "bt-internal-types.h"
@@ -49,8 +51,8 @@
 #include "bt-service-headset-connection.h"
 #include "bt-service-opp-client.h"
 
-static DBusGConnection *manager_conn;
-static DBusGConnection *obexd_conn;
+static DBusGConnection *manager_conn = NULL;
+static DBusGConnection *obexd_conn = NULL;
 static GList *p_cache_list = NULL;
 static DBusGConnection *opc_obexd_conn = NULL;
 
@@ -1842,7 +1844,9 @@ void _bt_handle_device_event(DBusMessage *msg)
 		BT_ERR_C("Connected [%s]", !addr_type ? "BREDR" : "LE");
 
 		_bt_logging_connection(TRUE, addr_type);
-//		journal_bt_connected();
+#ifdef ENABLE_TIZEN_2_4
+		journal_bt_connected();
+#endif
 
 		/*Send event to application*/
 		_bt_send_event(BT_DEVICE_EVENT,
@@ -1869,7 +1873,9 @@ void _bt_handle_device_event(DBusMessage *msg)
 		address = g_malloc0(BT_ADDRESS_STRING_SIZE);
 
 		_bt_convert_device_path_to_address(path, address);
-//		journal_bt_disconnected();
+#ifdef ENABLE_TIZEN_2_4
+		journal_bt_disconnected();
+#endif
 
 		/* 0x00 BDADDR_BRDER
 		      0x01 BDADDR_LE_PUBLIC

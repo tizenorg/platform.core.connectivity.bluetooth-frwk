@@ -26,7 +26,9 @@
 #include <glib.h>
 #include <dlog.h>
 #include <string.h>
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
+#endif
 
 #include "bluetooth-api.h"
 #include "bt-internal-types.h"
@@ -159,7 +161,9 @@ static gboolean __bt_syspopup_timer_cb(gpointer user_data)
 
 	b = (bundle *)user_data;
 
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	ret = syspopup_launch("bt-syspopup", b);
+#endif
 	if (ret < 0) {
 		BT_ERR("Sorry!! Cannot launch popup return = %d, Retrying...", ret);
 	} else {
@@ -193,7 +197,9 @@ static gboolean __bt_launch_unable_to_pairing_syspopup(int result)
 	else
 		bundle_add(b, "error", "error");
 
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	ret = syspopup_launch("bt-syspopup", b);
+#endif
 	if (0 > ret) {
 		BT_ERR("Popup launch failed...retry %d \n", ret);
 		g_timeout_add(200, (GSourceFunc) __bt_syspopup_timer_cb,
@@ -606,7 +612,9 @@ static void __bt_bond_device_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 	bt_remote_dev_info_t *remote_dev_info;
 
 	/* Terminate ALL system popup */
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	syspopup_destroy_all();
+#endif
 
 	dbus_g_proxy_end_call(proxy, call, &err, G_TYPE_INVALID);
 

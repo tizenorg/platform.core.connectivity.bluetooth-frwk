@@ -317,6 +317,7 @@ typedef struct {
 #define BT_DISCOVERY_STARTED "DiscoveryStarted"
 #define BT_DISCOVERY_FINISHED "DiscoveryFinished"
 #define BT_DEVICE_FOUND "DeviceFound"
+#define BT_DEVICE_DISAPPEARED "DeviceDisappeared"
 #define BT_LE_DISCOVERY_STARTED "LEDiscoveryStarted"
 #define BT_LE_DISCOVERY_FINISHED "LEDiscoveryFinished"
 #define BT_LE_DEVICE_FOUND "LEDeviceFound"

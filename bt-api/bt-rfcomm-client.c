@@ -407,7 +407,7 @@ static void __client_connected_cb(rfcomm_cb_data_t *cb_data, char *dev_address,
 		return;
 	}
 	conn_info.socket_fd = conn_list_info->fd;
-	conn_info.server_id = -1;
+//	conn_info.server_id = -1;
 
 	BT_DBG("Connection Result[%d] BT_ADDRESS[%s] UUID[%s] FD[%d]",
 			result, conn_list_info->bt_addr, cb_data->uuid, conn_list_info->fd);

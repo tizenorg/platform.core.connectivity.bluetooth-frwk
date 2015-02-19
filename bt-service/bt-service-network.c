@@ -27,7 +27,9 @@
 #include <dlog.h>
 #include <string.h>
 #include <stdio.h>
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
+#endif
 #include <net_connection.h>
 
 #include "bluetooth-api.h"

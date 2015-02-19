@@ -56,6 +56,7 @@ SET(PKG_MODULES
 	glib-2.0
 	gio-2.0
 	gio-unix-2.0
+	syspopup-caller
 )
 
 INCLUDE(FindPkgConfig)
@@ -91,8 +92,8 @@ SET_TARGET_PROPERTIES(bluetooth-api PROPERTIES SOVERSION ${VERSION_MAJOR})
 SET_TARGET_PROPERTIES(bluetooth-api PROPERTIES VERSION ${VERSION})
 TARGET_LINK_LIBRARIES(bluetooth-api ${packages_LDFLAGS})
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-api.pc.in ${CMAKE_CURRENT_BINARY_DIR}/bluetooth-api.pc @ONLY)
-INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/bluetooth-api.pc DESTINATION lib/pkgconfig)
-INSTALL(TARGETS bluetooth-api DESTINATION lib COMPONENT RuntimeLibraries)
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/bluetooth-api.pc DESTINATION ${LIB_INSTALL_DIR}/pkgconfig)
+INSTALL(TARGETS bluetooth-api DESTINATION ${LIB_INSTALL_DIR} COMPONENT RuntimeLibraries)
 
 FOREACH(hfile ${HEADERS})
 	INSTALL(FILES ${CMAKE_SOURCE_DIR}/include/${hfile} DESTINATION include/bt-service)
