@@ -2048,6 +2048,8 @@ static void add_to_gatt_service_head_list(struct _bluez_gatt_service *service,
 		next = g_list_next(list);
 
 		if (!g_strcmp0(head->device_path, device_path)) {
+			if (!head->device)
+				attach_device(head);
 
 			DBG("insert %s into %s", service->object_path,
 							device_path);
@@ -2099,6 +2101,8 @@ static void add_to_gatt_char_head_list(struct _bluez_gatt_char *characteristic,
 		next = g_list_next(list);
 
 		if (!g_strcmp0(head->gatt_service_path, gatt_service_path)) {
+			if (!head->service)
+				attach_gatt_service(head);
 
 			DBG("insert %s into %s", characteristic->object_path,
 							gatt_service_path);
@@ -2152,6 +2156,8 @@ static void add_to_gatt_desc_head_list(struct _bluez_gatt_desc *descriptor,
 		next = g_list_next(list);
 
 		if (!g_strcmp0(head->gatt_char_path, gatt_char_path)) {
+			if (!head->characteristic)
+				attach_gatt_char(head);
 
 			DBG("insert %s into %s", descriptor->object_path,
 							gatt_char_path);
@@ -2192,6 +2198,26 @@ static void add_to_gatt_desc_head_list(struct _bluez_gatt_desc *descriptor,
 					(gpointer) new_head);
 }
 
+static void attach_gatt_service_head(struct _bluez_device *device)
+{
+	GList *list, *next;
+
+	for (list = g_list_first(gatt_service_head_list); list; list = next) {
+		struct _gatt_service_head *head = list->data;
+
+		next = g_list_next(list);
+
+		if (head->device_path == NULL)
+			continue;
+
+		if (!g_strcmp0(head->device_path, device->object_path)) {
+			device->service_head = head;
+			head->device = device;
+			return;
+		}
+	}
+}
+
 static void register_bluez_device(struct _bluez_device *device)
 {
 	char *adapter_path;
@@ -2214,6 +2240,8 @@ static void register_bluez_device(struct _bluez_device *device)
 	*interface_list = g_list_prepend(*interface_list,
 					(gpointer) device);
 
+	attach_gatt_service_head(device);
+
 	if (!device->head)
 		return;
 
@@ -2225,6 +2253,26 @@ static void register_bluez_device(struct _bluez_device *device)
 	if (adapter->device_created_cb)
 		adapter->device_created_cb(device,
 				adapter->device_created_data);
+}
+
+static void attach_gatt_char_head(struct _bluez_gatt_service *service)
+{
+	GList *list, *next;
+
+	for (list = g_list_first(gatt_char_head_list); list; list = next) {
+		struct _gatt_char_head *head = list->data;
+
+		next = g_list_next(list);
+
+		if (head->gatt_service_path == NULL)
+			continue;
+
+		if (!g_strcmp0(head->gatt_service_path, service->object_path)) {
+			service->char_head = head;
+			head->service = service;
+			return;
+		}
+	}
 }
 
 static void register_bluez_gatt_service(struct _bluez_gatt_service *service)
@@ -2247,6 +2295,28 @@ static void register_bluez_gatt_service(struct _bluez_gatt_service *service)
 
 	*interface_list = g_list_prepend(*interface_list,
 					(gpointer) service);
+
+	attach_gatt_char_head(service);
+}
+
+static void attach_gatt_desc_head(struct _bluez_gatt_char *characteristic)
+{
+	GList *list, *next;
+
+	for (list = g_list_first(gatt_desc_head_list); list; list = next) {
+		struct _gatt_desc_head *head = list->data;
+
+		next = g_list_next(list);
+
+		if (head->gatt_char_path == NULL)
+			continue;
+
+		if (!g_strcmp0(head->gatt_char_path, characteristic->object_path)) {
+			characteristic->desc_head = head;
+			head->characteristic = characteristic;
+			return;
+		}
+	}
 }
 
 static void register_bluez_gatt_char(struct _bluez_gatt_char *characteristic)
@@ -2271,6 +2341,8 @@ static void register_bluez_gatt_char(struct _bluez_gatt_char *characteristic)
 
 	*interface_list = g_list_prepend(*interface_list,
 				(gpointer) characteristic);
+
+	attach_gatt_desc_head(characteristic);
 }
 
 static void register_bluez_gatt_desc(struct _bluez_gatt_desc *descriptor)
@@ -3703,6 +3775,9 @@ GList *bluez_device_get_primary_services(struct _bluez_device *device)
 	GList *primary_services = NULL;
 	GList *services, *list, *next;
 	int primary;
+
+	if (!service_head)
+		return primary_services;
 
 	services = g_hash_table_get_values(service_head->gatt_service_hash);
 
