@@ -1,15 +1,12 @@
 %define _dumpdir /opt/etc/dump.d/module.d
 %define _varlibdir /opt/var/lib
-#%bcond_with bluetooth_frwk_libnotify
-#%bcond_with bluetooth_frwk_libnotification
-#%bcond_with x
 
 Name:       bluetooth-frwk
 Summary:    Bluetooth framework for BlueZ and Obexd. This package is Bluetooth framework based on BlueZ and Obexd stack.
 Version:    0.2.146
 Release:    0
 Group:      Network & Connectivity/Bluetooth
-License:    Apache License, Version 2.0
+License:    Apache-2.0
 Source0:    %{name}-%{version}.tar.gz
 Source1001: bluetooth-frwk.manifest
 Source1002: bt-icon.png
@@ -37,7 +34,7 @@ BuildRequires:  pkgconfig(vconf)
 BuildRequires:  pkgconfig(libxml-2.0)
 BuildRequires:  pkgconfig(dbus-1)
 #%if %{with x}
-BuildRequires:  pkgconfig(utilX)
+#BuildRequires:  pkgconfig(utilX)
 #%endif
 BuildRequires:  pkgconfig(capi-network-connection)
 
@@ -50,10 +47,6 @@ BuildRequires:  pkgconfig(capi-content-mime-type)
 BuildRequires:  pkgconfig(appcore-efl)
 BuildRequires:  pkgconfig(pkgmgr)
 #BuildRequires:  pkgconfig(journal)
-
-%if "%{?tizen_profile_name}" == "mobile"
-BuildRequires:  pkgconfig(capi-network-tethering)
-%endif
 
 BuildRequires:  cmake
 BuildRequires:  pkgconfig(libtzplatform-config)
@@ -112,23 +105,6 @@ export CFLAGS="$CFLAGS -DTIZEN_DEBUG_ENABLE"
 export CXXFLAGS="$CXXFLAGS -DTIZEN_DEBUG_ENABLE"
 export FFLAGS="$FFLAGS -DTIZEN_DEBUG_ENABLE"
 
-%if "%{?tizen_profile_name}" == "mobile"
-export CFLAGS="$CFLAGS -DTIZEN_NETWORK_TETHERING_ENABLE"
-%endif
-
-%if "%{?tizen_profile_name}" == "wearable"
-export CFLAGS="$CFLAGS -DTIZEN_WEARABLE"
-%define _servicefile packaging/bluetooth-frwk-wearable.service
-%else
-%define _servicefile packaging/bluetooth-frwk-mobile.service
-%endif
-%define _servicedir multi-user.target.wants
-
-%if "%{?tizen_profile_name}" == "mobile"
-%else
-export CFLAGS="$CFLAGS -DTIZEN_TELEPHONY_ENABLED"
-%endif
-
 %ifarch x86_64
 export CFLAGS+=" -Wall -g -fvisibility=hidden -fPIC -DRFCOMM_DIRECT "
 export LDFLAGS+=" -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs"
@@ -154,11 +130,13 @@ export LDFLAGS+=" -Wl,--rpath=/usr/lib -Wl,--as-needed -Wl,--unresolved-symbols=
 %cmake \
 %if "%{?tizen_profile_name}" == "wearable"
 	-DTIZEN_WEARABLE=YES \
-%else
+%endif
+%if "%{?tizen_profile_name}" == "mobile"
 	-DTIZEN_WEARABLE=NO \
 %endif
-
-%__make
+%if "%{?tizen_profile_name}" == "common"
+	-DTIZEN_WEARABLE=NO \
+%endif
 
 %install
 rm -rf %{buildroot}
@@ -181,36 +159,32 @@ install -m 0644 %{SOURCE1002} %{buildroot}%{_datadir}/icons/default/bt-icon.png
 sed -i 's/%TZ_SYS_DEFAULT_USER/app/' %{buildroot}%{_datadir}/dbus-1/system-services/org.projectx.bt.service
 %endif
 
-mkdir -p %{buildroot}%{_dumpdir}
-install -m 0755 bluetooth_log_dump.sh %{buildroot}%{_dumpdir}
-
 %post
 /sbin/ldconfig
 %if "%{?tizen_profile_name}" == "wearable"
 vconftool set -f -t int db/bluetooth/status "1" -g 6520
-%else
+%endif
+%if "%{?tizen_profile_name}" == "mobile"
+vconftool set -f -t int db/bluetooth/status "0" -g 6520
+%endif
+%if "%{?tizen_profile_name}" == "common"
 vconftool set -f -t int db/bluetooth/status "0" -g 6520
 %endif
 
-vconftool set -f -t int db/bluetooth/lestatus "0" -g 6520 -i
-vconftool set -f -t int file/private/bt-service/flight_mode_deactivated "0" -g 6520 -i
-vconftool set -f -t int file/private/bt-core/flight_mode_deactivated "0" -g 6520 -i
-vconftool set -f -t int file/private/bt-core/powersaving_mode_deactivated "0" -g 6520 -i
-vconftool set -f -t int file/private/bt-service/bt_off_due_to_timeout "0" -g 6520 -i
+
+vconftool set -f -t int db/bluetooth/status "0" -s User
+vconftool set -f -t int db/bluetooth/lestatus "0" -s User
+vconftool set -f -t int file/private/bt-core/flight_mode_deactivated "0" -s User
+vconftool set -f -t int file/private/bt-core/powersaving_mode_deactivated "0" -s User
+vconftool set -f -t int file/private/bt-service/bt_off_due_to_timeout "0" -s User
 vconftool set -f -t string memory/bluetooth/sco_headset_name "" -g 6520 -i
 vconftool set -f -t int memory/bluetooth/device "0" -g 6520 -i
-vconftool set -f -t int memory/bluetooth/btsco "0" -g 6520 -i
+vconftool set -f -t bool memory/bluetooth/btsco "0" -g 6520 -i
 vconftool set -f -t bool memory/bluetooth/dutmode "0" -g 6520 -i
-# set 'User' smack label to vconf keys in order to allow bt-service to access them.
-chsmack -a 'User' %TZ_SYS_CONFIG/db/bluetooth/status
-chsmack -a 'User' %TZ_SYS_CONFIG/file/private/bt-service/flight_mode_deactivated
-chsmack -a 'User' %TZ_SYS_CONFIG/memory_init/memory/bluetooth/sco_headset_name
-chsmack -a 'User' %TZ_SYS_CONFIG/memory_init/memory/bluetooth/device
-chsmack -a 'User' %TZ_SYS_CONFIG/memory_init/memory/bluetooth/btsco
 
-%post service
-mkdir -p %{_sysconfdir}/systemd/default-extra-dependencies/ignore-units.d/
-ln -sf %{_libdir}/systemd/system/bluetooth-frwk.service %{_sysconfdir}/systemd/default-extra-dependencies/ignore-units.d/
+#%post service
+#mkdir -p %{_sysconfdir}/systemd/default-extra-dependencies/ignore-units.d/
+#ln -sf %{_libdir}/systemd/system/bluetooth-frwk.service %{_sysconfdir}/systemd/default-extra-dependencies/ignore-units.d/
 
 %postun -p /sbin/ldconfig
 
@@ -236,17 +210,15 @@ ln -sf %{_libdir}/systemd/system/bluetooth-frwk.service %{_sysconfdir}/systemd/d
 %manifest %{name}.manifest
 %defattr(-, root, root)
 %{_datadir}/dbus-1/system-services/org.projectx.bt.service
+
 %{_bindir}/bt-service
 %{_unitdir_user}/bluetooth-frwk-service.service
+%{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-service.conf
 %{_bindir}/bluetooth-frwk-test
-%{_bindir}/bluetooth-gatt-test
-%{_bindir}/bluetooth-advertising-test
+#%{_bindir}/bluetooth-gatt-test
+#%{_bindir}/bluetooth-advertising-test
 %{_varlibdir}/bluetooth
 %{_prefix}/etc/bluetooth
-#%attr(0666,-,-) %{_varlibdir}/bluetooth/auto-pair-blacklist
-#%{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-service.conf
-#%attr(0666,-,-) %{_prefix}/etc/bluetooth/stack_info
-%{_dumpdir}/bluetooth_log_dump.sh
 %{_datadir}/license/bluetooth-frwk-service
 %if %{with bluetooth_frwk_libnotify} || %{with bluetooth_frwk_libnotification}
 %{_datadir}/icons/default/bt-icon.png
@@ -257,11 +229,11 @@ ln -sf %{_libdir}/systemd/system/bluetooth-frwk.service %{_sysconfdir}/systemd/d
 %defattr(-, root, root)
 %{_datadir}/dbus-1/system-services/org.projectx.bt_core.service
 %{_bindir}/bt-core
-#%{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-core.conf
+%{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-core.conf
 
 %files test
 %manifest %{name}.manifest
 %defattr(-, root, root)
 %{_bindir}/bluetooth-frwk-test
-%{_bindir}/bluetooth-gatt-test
-%{_bindir}/bluetooth-advertising-test
+#%{_bindir}/bluetooth-gatt-test
+#%{_bindir}/bluetooth-advertising-test

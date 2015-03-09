@@ -201,6 +201,7 @@ gboolean _bt_get_adapter_power(void)
 	GValue powered_v = { 0 };
 	GError *err = NULL;
 
+	BT_DBG("_bt_check_adapter 4");
 	proxy = _bt_get_adapter_properties_proxy();
 	retv_if(proxy == NULL, FALSE);
 
@@ -211,7 +212,7 @@ gboolean _bt_get_adapter_power(void)
 			G_TYPE_VALUE, &powered_v,
 			G_TYPE_INVALID)) {
 		if (err != NULL) {
-			BT_ERR("Getting property failed: [%s]\n", err->message);
+			BT_ERR("Getting property failed \n: [%s]\n", err->message);
 			g_error_free(err);
 		}
 		return FALSE;
