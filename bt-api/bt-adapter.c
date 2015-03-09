@@ -69,22 +69,26 @@ static int __bt_fill_device_list(GArray *out_param2, GPtrArray **dev_list)
 
 BT_EXPORT_API int bluetooth_check_adapter(void)
 {
-	int result;
-	bluetooth_adapter_state_t state;
+	int ret;
+	int value;
 
-	BT_INIT_PARAMS();
-	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+	ret = _bt_get_adapter_path(_bt_gdbus_get_system_gconn(), NULL);
 
-	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_CHECK_ADAPTER,
-		in_param1, in_param2, in_param3, in_param4, &out_param);
-
-	if (result == BLUETOOTH_ERROR_NONE) {
-		state = g_array_index(out_param, bluetooth_adapter_state_t, 0);
+	if (ret != BLUETOOTH_ERROR_NONE) {
+		BT_ERR("error in get adapter ");
+		return BLUETOOTH_ADAPTER_DISABLED;
 	}
 
-	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+	/* check VCONFKEY_BT_STATUS */
+	if (vconf_get_int(VCONFKEY_BT_STATUS, &value) != 0) {
+		BT_ERR("fail to get vconf key! return disabled");
+		return BLUETOOTH_ADAPTER_DISABLED;
+	}
 
-	return state ? BLUETOOTH_ADAPTER_ENABLED : BLUETOOTH_ADAPTER_DISABLED;
+	BT_ERR("get status from vconf key \n");
+
+	return value == VCONFKEY_BT_STATUS_OFF ? BLUETOOTH_ADAPTER_DISABLED :
+						BLUETOOTH_ADAPTER_ENABLED;
 }
 
 BT_EXPORT_API int bluetooth_enable_adapter(void)
@@ -111,6 +115,7 @@ BT_EXPORT_API int bluetooth_disable_adapter(void)
 	int result;
 
 	BT_INFO("");
+
 	BT_CHECK_ENABLED(return);
 
 	BT_INIT_PARAMS();

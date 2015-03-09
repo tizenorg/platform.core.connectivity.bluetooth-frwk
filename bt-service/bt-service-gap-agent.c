@@ -944,10 +944,17 @@ gboolean _gap_agent_register(GapAgent *agent)
 		agent_manager = priv->agent_manager;
 	}
 
+#ifdef __TIZEN_MOBILE_
 	dbus_g_proxy_call(agent_manager, "RegisterAgent", &error,
 				DBUS_TYPE_G_OBJECT_PATH, priv->path,
 				G_TYPE_STRING, "DisplayYesNo", G_TYPE_INVALID,
 				G_TYPE_INVALID);
+else
+	dbus_g_proxy_call(agent_manager, "RegisterAgent", &error,
+			DBUS_TYPE_G_OBJECT_PATH, priv->path,
+			G_TYPE_STRING, "NoInputNoOutput", G_TYPE_INVALID,
+			G_TYPE_INVALID);
+#endif
 	if (error != NULL) {
 		BT_DBG("Agent registration failed: %s\n", error->message);
 		g_error_free(error);

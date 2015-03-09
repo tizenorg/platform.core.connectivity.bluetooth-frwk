@@ -32,7 +32,7 @@
 #if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
 #endif
-#ifdef __TIZEN_MOBILE__
+#if __TIZEN_MOBILE__
 #include <aul.h>
 #endif
 #include <notification.h>
@@ -674,7 +674,7 @@ static void __launch_bt_service(int status, int run_type)
 	bundle_add(kb, "status", status_val);
 	bundle_add(kb, "run-type", run_type_val);
 
-	aul_launch_app("com.samsung.bluetooth", kb);
+	aul_launch_app("org.tizen.bluetooth", kb);
 
 	bundle_free(kb);
 }
@@ -800,12 +800,13 @@ static void __bt_set_local_name(void)
 	free(phone_name);
 }
 
-static int __bt_set_enabled(void)
+int __bt_set_enabled(void)
 {
 	int adapter_status = BT_ADAPTER_DISABLED;
 	int result = BLUETOOTH_ERROR_NONE;
 
 	_bt_check_adapter(&adapter_status);
+	adapter_status = BT_ADAPTER_ENABLED;
 
 	if (adapter_status == BT_ADAPTER_DISABLED) {
 		BT_ERR("Bluetoothd is not running");
@@ -864,13 +865,17 @@ void _bt_set_disabled(int result)
 
 	_bt_adapter_set_status(BT_DEACTIVATED);
 
+		/* Send disabled event */
+	_bt_send_event(BT_ADAPTER_EVENT, BLUETOOTH_EVENT_DISABLED,
+			DBUS_TYPE_INT32, &result, DBUS_TYPE_INVALID);
+
+#if 0
 	if (_bt_adapter_get_le_status() != BT_LE_DEACTIVATED) {
 		/* Send disabled event */
 		_bt_send_event(BT_ADAPTER_EVENT, BLUETOOTH_EVENT_DISABLED,
 				DBUS_TYPE_INT32, &result, DBUS_TYPE_INVALID);
 	}
-
-	BT_INFO("Adapter disabled");
+#endif
 }
 
 static int __bt_set_le_enabled(void)
@@ -1022,6 +1027,41 @@ void _bt_service_unregister_vconf_handler(void)
 #endif
 }
 
+static int _bt_set_powered(gboolean is_powered)
+{
+	DBusGProxy *proxy;
+	GValue powered = { 0 };
+	GError *error = NULL;
+
+	if (__bt_is_factory_test_mode()) {
+		BT_ERR("Unable to set power in factory binary !!");
+		return BLUETOOTH_ERROR_NOT_SUPPORT;
+	}
+
+	proxy = _bt_get_adapter_properties_proxy();
+
+	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	g_value_init(&powered, G_TYPE_BOOLEAN);
+	g_value_set_boolean(&powered, is_powered);
+
+	dbus_g_proxy_call(proxy, "Set", &error,
+							G_TYPE_STRING, BT_ADAPTER_INTERFACE,
+							G_TYPE_STRING, "Powered",
+							G_TYPE_VALUE, &powered,
+							G_TYPE_INVALID, G_TYPE_INVALID);
+
+	g_value_unset(&powered);
+	if (error != NULL) {
+		BT_ERR("Powered set err:\n [%s]", error->message);
+		g_error_free(error);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	BT_INFO("Set powered [%d]", is_powered);
+	return BLUETOOTH_ERROR_NONE;
+}
+
 void _bt_handle_adapter_added(void)
 {
 	BT_DBG("+");
@@ -1043,15 +1083,16 @@ void _bt_handle_adapter_added(void)
 	adapter_agent = _bt_create_agent(BT_ADAPTER_AGENT_PATH, TRUE);
 	if (!adapter_agent) {
 		BT_ERR("Fail to register agent");
-		return;
+		//return;
 	}
 
 #ifdef __TIZEN_MOBILE__
-	if (!aul_app_is_running("com.samsung.bluetooth"))
+	if (!aul_app_is_running("org.tizen.bluetooth"))
 			__launch_bt_service(0, 0);
 
 	if (_bt_register_media_player() != BLUETOOTH_ERROR_NONE)
 		BT_ERR("Fail to register media player");
+
 #endif
 
 	if (_bt_register_obex_server() != BLUETOOTH_ERROR_NONE)
@@ -1074,6 +1115,9 @@ void _bt_handle_adapter_added(void)
 		__bt_set_le_enabled();
 		_bt_adapter_set_le_status(BT_LE_ACTIVATED);
 	}
+
+	BT_ERR("Activating BT ......");
+
 	if (status == BT_ACTIVATING) {
 		__bt_set_enabled();
 		_bt_adapter_set_status(BT_ACTIVATED);
@@ -1241,7 +1285,6 @@ int _bt_enable_adapter(void)
 			return BLUETOOTH_ERROR_INTERNAL;
 		}
 	}
-
 	 if (dbus_g_proxy_call_with_timeout(proxy, "EnableAdapter",
 					BT_ENABLE_TIMEOUT, &err,
 					G_TYPE_INVALID,
@@ -1389,7 +1432,6 @@ int __bt_disable_cb(void)
 
 int _bt_disable_adapter(void)
 {
-	BT_DBG("+");
 	int ret;
 
 	if (_bt_adapter_get_status() == BT_DEACTIVATING) {
@@ -1408,6 +1450,7 @@ int _bt_disable_adapter(void)
 	}
 
 	__bt_disconnect_all();
+
 	ret = __bt_disable_cb();
 
 	BT_DBG("-");
@@ -1472,12 +1515,19 @@ int _bt_reset_adapter(void)
 
 int _bt_check_adapter(int *status)
 {
+	char *adapter_path = NULL;
+
 	BT_CHECK_PARAMETER(status, return);
 
-	*status = 0; /* 0: disabled */
+	*status = BT_ADAPTER_DISABLED;
 
-	if (_bt_get_adapter_power())
-		*status = 1; /* 1: enabled */
+	adapter_path = _bt_get_adapter_path();
+
+
+	if (adapter_path != NULL)
+		*status = BT_ADAPTER_ENABLED;
+
+	g_free(adapter_path);
 
 	return BLUETOOTH_ERROR_NONE;
 }
@@ -1509,6 +1559,11 @@ int _bt_enable_adapter_le(void)
 
 	proxy = __bt_get_core_proxy();
 	retv_if(!proxy, BLUETOOTH_ERROR_INTERNAL);
+
+#if 0 // vconf key not found so commenting to resolve build issues.
+	if (vconf_set_int(VCONFKEY_BT_LE_STATUS, VCONFKEY_BT_LE_STATUS_ON) != 0)
+		BT_ERR("Set vconf failed");
+#endif
 
 	if (dbus_g_proxy_call_with_timeout(proxy, "EnableAdapterLe",
 				BT_ENABLE_TIMEOUT, &err,
@@ -1570,6 +1625,10 @@ int _bt_disable_adapter_le(void)
 	proxy = __bt_get_core_proxy();
 	if (!proxy)
 		return BLUETOOTH_ERROR_INTERNAL;
+#if 0 // vconf key not found so commenting to resolve build issues.
+	if (vconf_set_int(VCONFKEY_BT_LE_STATUS, VCONFKEY_BT_LE_STATUS_OFF) != 0)
+		BT_ERR("Set vconf failed");
+#endif
 
 	if (dbus_g_proxy_call(proxy, "DisableAdapterLe", NULL,
 	                               G_TYPE_INVALID, G_TYPE_INVALID) == FALSE) {
@@ -1976,6 +2035,7 @@ int _bt_start_discovery(void)
 	is_discovering = TRUE;
 	cancel_by_user = FALSE;
 	/* discovery status will be change in event */
+		BT_ERR("_bt_start_discovery 3");
 
 	return BLUETOOTH_ERROR_NONE;
 }

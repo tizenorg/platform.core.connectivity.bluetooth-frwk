@@ -29,7 +29,7 @@
 #include <dlog.h>
 #include <vconf.h>
 #include <vconf-internal-bt-keys.h>
-#ifdef ENABLE_TIZEN_2_4
+#if 0
 #include <journal/device.h>
 #endif
 
@@ -653,6 +653,12 @@ void _bt_handle_adapter_event(DBusMessage *msg)
 
 		_bt_convert_device_path_to_address(object_path, address);
 
+		_bt_send_event(BT_ADAPTER_EVENT,
+			BLUETOOTH_EVENT_BONDED_DEVICE_REMOVED,
+			DBUS_TYPE_INT32, &result,
+			DBUS_TYPE_STRING, &address,
+			DBUS_TYPE_INVALID);
+
 		node = g_list_first(p_cache_list);
 
 		while (node != NULL){
@@ -831,20 +837,10 @@ static void __bt_adapter_property_changed_event(DBusMessageIter *msg_iter, const
 					DBUS_TYPE_INT32, &result,
 					DBUS_TYPE_INVALID);
 			} else {
-				ret_if(event_id > 0);
-
-				adapter_proxy = _bt_get_adapter_proxy();
-				ret_if(adapter_proxy == NULL);
-
-				/* Need to stop searching */
-				dbus_g_proxy_call(adapter_proxy,
-							"StopDiscovery",
-							NULL,
-							G_TYPE_INVALID,
-							G_TYPE_INVALID);
-
-				event_id = g_timeout_add(BT_DISCOVERY_FINISHED_DELAY,
-						  (GSourceFunc)_bt_discovery_finished_cb, NULL);
+				if (event_id > 0){
+					g_source_remove(event_id);
+					event_id = 0;
+				}
 			}
 		} else if (strcasecmp(property, "LEDiscovering") == 0) {
 			gboolean le_discovering = FALSE;
@@ -967,22 +963,23 @@ static void __bt_adapter_property_changed_event(DBusMessageIter *msg_iter, const
 	/* TODO: Need to check this operation!! */
 			gboolean powered = FALSE;
 			int bt_state;
-
 			dbus_message_iter_recurse(&dict_iter, &value_iter);
 			dbus_message_iter_get_basic(&value_iter, &powered);
 			BT_DBG("Powered = %d", powered);
-			if (powered == FALSE) {
-				if (vconf_get_int(VCONFKEY_BT_STATUS, &bt_state) == 0 &&
-					bt_state != VCONFKEY_BT_STATUS_OFF) {
-					_bt_disable_adapter();
-				}
-#ifdef ENABLE_TIZEN_2_4
+
+			if (powered == TRUE) {
+				BT_ERR("calling _bt_handle_adapter_added ...........");
+				_bt_handle_adapter_added();
+			}
+			else {
+				_bt_set_disabled(BLUETOOTH_ERROR_NONE);
+			}
+#if 0
 				if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_state) == 0 &&
 					bt_state != VCONFKEY_BT_LE_STATUS_OFF) {
 					_bt_set_le_disabled(BLUETOOTH_ERROR_NONE);
 				}
 #endif
-			}
 		} else if (strcasecmp(property, "Connectable") == 0) {
 			gboolean connectable = FALSE;
 
@@ -1046,6 +1043,7 @@ static void __bt_device_property_changed_event(DBusMessageIter *msg_iter, const 
 	char *address;
 	bt_remote_dev_info_t *remote_dev_info;
 
+
 	dbus_message_iter_recurse(msg_iter, &item_iter);
 
 	if (dbus_message_iter_get_arg_type(&item_iter)
@@ -1061,6 +1059,8 @@ static void __bt_device_property_changed_event(DBusMessageIter *msg_iter, const 
 		ret_if(property == NULL);
 
 		ret_if(!dbus_message_iter_next(&dict_iter));
+
+		BT_ERR(" device property changed \n %s" , property);
 
 		if (strcasecmp(property, "Connected") == 0) {
 			gboolean connected = FALSE;
@@ -1193,13 +1193,14 @@ static void __bt_device_property_changed_event(DBusMessageIter *msg_iter, const 
 				BT_INFO("Paired: %s", address);
 				__bt_update_remote_cache_devinfo(address, TRUE);
 
+#if 0
 				if (_bt_is_device_creating() == TRUE) {
 					BT_DBG("Try to Pair by me");
 					_bt_free_device_info(remote_dev_info);
 					g_free(address);
 					return;
 				}
-
+#endif
 				_bt_send_event(BT_ADAPTER_EVENT,
 					BLUETOOTH_EVENT_BONDING_FINISHED,
 					DBUS_TYPE_INT32, &result,
@@ -1262,6 +1263,8 @@ static void __bt_device_property_changed_event(DBusMessageIter *msg_iter, const 
 
 			BT_DBG("trusted: %d", trusted);
 			BT_DBG("address: %s", address);
+
+			remote_dev_info = _bt_get_remote_device_info(address);
 
 			/* Send event to application */
 			_bt_send_event(BT_DEVICE_EVENT,
@@ -1427,6 +1430,7 @@ void _bt_handle_property_changed_event(DBusMessage *msg)
 	} else if (strcasecmp(interface_name, BT_DEVICE_INTERFACE) == 0) {
 		__bt_device_property_changed_event(&item_iter,
 					dbus_message_get_path(msg));
+
 	} else if (strcasecmp(interface_name, BT_OBEX_TRANSFER_INTERFACE) == 0) {
 		BT_DBG("BT_OBEX_TRANSFER_INTERFACE");
 		__bt_obex_property_changed_event(&item_iter,
@@ -1508,17 +1512,15 @@ void _bt_handle_input_event(DBusMessage *msg)
 			BT_DBG("HID device class [%x]", remote_dev_info->class);
 			if (remote_dev_info->class &
 					BLUETOOTH_DEVICE_MINOR_CLASS_KEY_BOARD) {
-#ifdef ENABLE_TIZEN_2_4
+#if 0
 				__bt_set_device_values(property_flag,
 						VCONFKEY_BT_DEVICE_HID_KEYBOARD_CONNECTED);
 #endif
-
 			}
-
 			if (remote_dev_info->class &
 					BLUETOOTH_DEVICE_MINOR_CLASS_POINTING_DEVICE)
 			{
-#ifdef ENABLE_TIZEN_2_4
+#if 0
 				__bt_set_device_values(property_flag,
 						VCONFKEY_BT_DEVICE_HID_MOUSE_CONNECTED);
 #endif
@@ -1790,7 +1792,7 @@ void _bt_handle_device_event(DBusMessage *msg)
 		BT_ERR_C("Connected [%s]", !addr_type ? "BREDR" : "LE");
 
 		_bt_logging_connection(TRUE, addr_type);
-#ifdef ENABLE_TIZEN_2_4
+#if 0
 		journal_bt_connected();
 #endif
 
@@ -1819,7 +1821,7 @@ void _bt_handle_device_event(DBusMessage *msg)
 		address = g_malloc0(BT_ADDRESS_STRING_SIZE);
 
 		_bt_convert_device_path_to_address(path, address);
-#ifdef ENABLE_TIZEN_2_4
+#if 0
 		journal_bt_disconnected();
 #endif
 
@@ -2513,9 +2515,11 @@ static int __bt_parse_event(DBusMessage *msg)
 		} else if (g_strcmp0(interface_name,
 				BT_MEDIATRANSPORT_INTERFACE) == 0) {
 			return BT_MEDIA_TRANSFER_EVENT;
+	#if 0
 		} else if (g_strcmp0(interface_name,
 				BT_PLAYER_CONTROL_INTERFACE) == 0) {
 			return BT_AVRCP_CONTROL_EVENT;
+#endif
 		}
 		dbus_message_iter_next(&value_iter);
 	}
@@ -2594,6 +2598,7 @@ static DBusHandlerResult __bt_manager_event_filter(DBusConnection *conn,
 	retv_if(member == NULL, DBUS_HANDLER_RESULT_NOT_YET_HANDLED);
 
 	if (strcasecmp(member, "InterfacesAdded") == 0) {
+
 		char *object_path = NULL;
 
 		BT_DBG("InterfacesAdded");
@@ -2657,29 +2662,22 @@ static DBusHandlerResult __bt_manager_event_filter(DBusConnection *conn,
 					DBUS_TYPE_INVALID);
 
 				p_cache_list = g_list_append(p_cache_list, cache_info);
-			} else if (bt_event == BT_AVRCP_CONTROL_EVENT) {
-				BT_DBG("Device path : %s ", object_path);
-				_bt_set_control_device_path(object_path);
 			}
 		}
 	} else if (strcasecmp(member, "InterfacesRemoved") == 0) {
+
 		bt_event = __bt_parse_remove_event(msg);
 
-		if ((bt_event != 0) && (bt_event != BT_MEDIA_TRANSFER_EVENT)) {
+		if ((bt_event != 0) && (bt_event != BT_MEDIA_TRANSFER_EVENT))
 			_bt_handle_adapter_event(msg);
-			if (bt_event == BT_AVRCP_CONTROL_EVENT) {
-				char *object_path = NULL;
-				result = __bt_get_object_path(msg, &object_path);
-				if (result == BLUETOOTH_ERROR_NONE)
-					_bt_remove_control_device_path(object_path);
-			}
-		}
 
 	} else if (strcasecmp(member, "NameOwnerChanged") == 0) {
 		gboolean value;
 		char *name = NULL;
 		char *previous = NULL;
 		char *current = NULL;
+
+		BT_DBG("NameOwnerChanged");
 
 		if (__bt_get_owner_info(msg, &name, &previous, &current)) {
 			BT_ERR("Fail to get the owner info");
@@ -2711,9 +2709,6 @@ static DBusHandlerResult __bt_manager_event_filter(DBusConnection *conn,
 			/* The obex server was terminated abnormally */
 			_bt_rfcomm_server_check_termination(name);
 		}
-
-		/* Stop advertising started by terminated process */
-		_bt_stop_advertising_by_terminated_process(name);
 	} else	if (dbus_message_has_interface(msg, BT_PROPERTIES_INTERFACE)) {
 		const char *path = dbus_message_get_path(msg);
 
@@ -3045,6 +3040,7 @@ int _bt_register_service_event(DBusGConnection *g_conn, int event_type)
 
 	switch (event_type) {
 	case BT_MANAGER_EVENT:
+		BT_ERR("BT_MANAGER_EVENT_REC:  \n register service event");
 		event_func = __bt_manager_event_filter;
 		match1 = g_strdup_printf(MANAGER_EVENT_MATCH_RULE,
 					BT_MANAGER_INTERFACE,
@@ -3257,7 +3253,7 @@ fail:
 		manager_conn = NULL;
 	}
 
-	BT_DBG("-");
+	BT_DBG("REGISTER successfull");
 
 	return BLUETOOTH_ERROR_INTERNAL;
 }

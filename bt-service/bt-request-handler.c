@@ -103,8 +103,8 @@ static int __bt_bluez_request(int function_name,
 		break;
 	case BT_CHECK_ADAPTER: {
 		int enabled = BT_ADAPTER_DISABLED;
-
 		result = _bt_check_adapter(&enabled);
+		BT_DBG("_bt_check_adapter result is %d", result);
 
 		g_array_append_vals(*out_param1, &enabled,
 				sizeof(int));
@@ -186,6 +186,7 @@ static int __bt_bluez_request(int function_name,
 		break;
 	}
 	case BT_START_DISCOVERY:
+		BT_DBG("_bt_start_discovery ");
 		result = _bt_start_discovery();
 
 		break;
