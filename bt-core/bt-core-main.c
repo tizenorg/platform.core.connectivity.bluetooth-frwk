@@ -174,16 +174,13 @@ int main(void)
 		goto fail;
 	}
 
-
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = __bt_core_sigterm_handler;
 	sigaction(SIGINT, &sa, NULL);
 	sigaction(SIGTERM, &sa, NULL);
 
 	g_timeout_add(500, (GSourceFunc)__bt_check_bt_core, NULL);
-
 	main_loop = g_main_loop_new(NULL, FALSE);
-
 	g_main_loop_run(main_loop);
 
 fail:

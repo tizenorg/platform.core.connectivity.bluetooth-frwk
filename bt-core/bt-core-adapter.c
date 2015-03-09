@@ -37,6 +37,8 @@ static gboolean is_recovery_mode = FALSE;
 static int bt_status_before[BT_MODE_MAX] = { VCONFKEY_BT_STATUS_OFF, };
 static int bt_le_status_before[BT_MODE_MAX] = { 0, };
 
+static DBusGConnection *conn = NULL;
+
 static void __bt_core_set_status(bt_status_t status)
 {
 	adapter_status = status;
@@ -196,7 +198,6 @@ static int __execute_command(const char *cmd, char *const arg_list[])
 	return 0;
 }
 
-#if 0
 static DBusGProxy *_bt_get_connman_proxy(void)
 {
 	DBusGProxy *proxy;
@@ -235,36 +236,31 @@ static int _bt_power_adapter(gboolean powered)
 				G_TYPE_INVALID, G_TYPE_INVALID);
 
 	if (error != NULL) {
-		BT_ERR("Powered set err:[%s]", error->message);
+		BT_ERR("Powered set err: \n [%s]", error->message);
 		g_error_free(error);
 		g_value_unset(&state);
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 	return BLUETOOTH_ERROR_NONE;
 }
-#endif
 
 int _bt_enable_adapter(void)
 {
 	int ret;
 	bt_status_t status;
 	bt_le_status_t le_status;
-
-	BT_INFO("");
 #ifdef __TIZEN_MOBILE__
-	int ret;
-
 	__bt_core_set_status(BT_ACTIVATING);
 
-	ret = system("/usr/etc/bluetooth/bt-stack-up.sh &");
+	ret = __execute_command("/usr/etc/bluetooth/bt-stack-up.sh", NULL);
 	if (ret < 0) {
-		BT_DBG("running script failed");
-		ret = system("/usr/etc/bluetooth/bt-dev-end.sh &");
+		BT_ERR("running script failed");
+		ret = __execute_command("/usr/etc/bluetooth/bt-dev-end.sh", NULL);
 		__bt_core_set_status(BT_DEACTIVATED);
 		return -1;
 	}
 #else
-//	_bt_power_adapter(TRUE);
+	_bt_power_adapter(TRUE);
 #endif
 
 	return 0;
@@ -273,16 +269,16 @@ int _bt_enable_adapter(void)
 int _bt_disable_adapter(void)
 {
 	BT_INFO_C("Disable adapter");
-#ifdef __TIZEN_MOBILE__
+#if __TIZEN_MOBILE__
 	__bt_core_set_status(BT_DEACTIVATING);
 
-	if (system("/usr/etc/bluetooth/bt-stack-down.sh &") < 0) {
-		BT_DBG("running script failed");
+	if (__execute_command("/usr/etc/bluetooth/bt-stack-down.sh", NULL) < 0) {
+		BT_ERR("running script failed");
 		__bt_core_set_status(BT_ACTIVATED);
 		return -1;
 	}
 #else
-//	_bt_power_adapter(FALSE);
+	_bt_power_adapter(FALSE);
 #endif
 	return 0;
 }
@@ -308,7 +304,7 @@ int _bt_enable_adapter_le(void)
 		__bt_core_set_le_status(BT_LE_ACTIVATED);
 	}
 #else
-//	_bt_power_adapter(TRUE);
+	_bt_power_adapter(TRUE);
 #endif
 	return 0;
 }
@@ -324,7 +320,7 @@ int _bt_disable_adapter_le(void)
 	if (status == BT_DEACTIVATED) {
 		__bt_core_set_le_status(BT_LE_DEACTIVATING);
 
-			if (system("/usr/etc/bluetooth/bt-stack-down.sh &") < 0) {
+		if (__execute_command("/usr/etc/bluetooth/bt-stack-down.sh", NULL) < 0) {
 			BT_ERR("running script failed");
 			__bt_core_set_le_status(BT_LE_ACTIVATED);
 			return -1;
@@ -332,7 +328,7 @@ int _bt_disable_adapter_le(void)
 	}
 	__bt_core_set_le_status(BT_LE_DEACTIVATED);
 #else
-//	_bt_power_adapter(FALSE);
+	_bt_power_adapter(FALSE);
 #endif
 
 	BT_DBG("-");

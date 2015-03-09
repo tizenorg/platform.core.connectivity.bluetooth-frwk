@@ -349,7 +349,6 @@ bt_remote_dev_info_t *_bt_get_remote_device_info(char *address)
 	adapter_proxy = _bt_get_adapter_proxy();
 	retv_if(adapter_proxy == NULL, NULL);
 
-
 	object_path = _bt_get_device_object_path(address);
 
 	retv_if(object_path == NULL, NULL);
@@ -613,7 +612,7 @@ static void __bt_bond_device_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 
 	/* Terminate ALL system popup */
 #if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
-	syspopup_destroy_all();
+	//syspopup_destroy_all();
 #endif
 
 	dbus_g_proxy_end_call(proxy, call, &err, G_TYPE_INVALID);
@@ -676,6 +675,7 @@ static void __bt_bond_device_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 
 			result = BLUETOOTH_ERROR_INTERNAL;
 		} else if (!strcmp(err->message, "Connection Timeout")) {
+			BT_INFO("pairing request timeout");
 			/* Pairing request timeout */
 			result = BLUETOOTH_ERROR_TIMEOUT;
 		} else if (!strcmp(err->message, "Authentication Timeout")) {
@@ -691,7 +691,9 @@ static void __bt_bond_device_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 			result == BLUETOOTH_ERROR_AUTHENTICATION_FAILED ||
 			result == BLUETOOTH_ERROR_TIMEOUT ||
 			result == BLUETOOTH_ERROR_HOST_DOWN) {
-		bonding_info->result = result;
+
+			BT_INFO("result error %d", result);
+			bonding_info->result = result;
 #ifdef TIZEN_WEARABLE
 		__bt_launch_unable_to_pairing_syspopup(result);
 #endif
@@ -728,6 +730,7 @@ static void __bt_bond_device_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 	}
 
 dbus_return:
+
 	if (req_info->context == NULL)
 		goto done;
 
@@ -738,8 +741,10 @@ dbus_return:
 	_bt_convert_addr_string_to_type(dev_info.device_address.addr,
 					bonding_info->addr);
 
+#if 0
 	if (_bt_adapter_get_status() != BT_ACTIVATED)
 		result = BLUETOOTH_ERROR_NOT_IN_OPERATION;
+#endif
 
 	g_array_append_vals(out_param1, &dev_info,
 				sizeof(bluetooth_device_info_t));
@@ -751,12 +756,14 @@ dbus_return:
 	g_array_free(out_param2, TRUE);
 
 	_bt_delete_request_list(req_info->req_id);
+
 done:
 	if (err)
 		g_error_free(err);
 
+#if 0
 	_bt_agent_set_canceled(FALSE);
-
+#endif
 
 	g_free(bonding_info->addr);
 	g_free(bonding_info);

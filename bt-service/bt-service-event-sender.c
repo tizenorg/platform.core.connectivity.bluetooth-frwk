@@ -511,7 +511,7 @@ int _bt_init_service_event_sender(void)
 
 	if (ret != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
 		if (dbus_error_is_set(&err) == TRUE) {
-			BT_ERR("Event init failed, %s", err.message);
+			BT_ERR(" Sudha 112 Event init failed \n \n, %s", err.message);
 			dbus_error_free(&err);
 		}
 		return BLUETOOTH_ERROR_INTERNAL;
@@ -537,7 +537,7 @@ int _bt_init_hf_local_term_event_sender(void)
 	int ret;
 
 	if (hf_local_term_event_conn) {
-		BT_ERR("Event handler is already exist");
+		BT_ERR(" Sudha Event handler is already exist");
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
@@ -551,7 +551,7 @@ int _bt_init_hf_local_term_event_sender(void)
 
 	if (ret != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
 		if (dbus_error_is_set(&err) == TRUE) {
-			BT_ERR("Event init failed, %s", err.message);
+			BT_ERR("Sudha Event init failed \n, %s ", err.message);
 			dbus_error_free(&err);
 		}
 		return BLUETOOTH_ERROR_INTERNAL;

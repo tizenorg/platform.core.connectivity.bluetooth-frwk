@@ -304,7 +304,10 @@ static DBusHandlerResult __bt_core_event_filter(DBusConnection *conn,
 		}
 
 		if (strcasecmp(object_path, "/org/bluez/hci0") == 0) {
-			_bt_core_adapter_removed_cb();
+#ifdef __TIZEN_MOBILE__
+		__bt_core_set_status(BT_DEACTIVATED);
+#endif
+			_bt_core_terminate();
 		}
 	} else if (strcasecmp(member, "NameOwnerChanged") == 0) {
 		char *name = NULL;
@@ -339,7 +342,6 @@ static DBusHandlerResult __bt_core_event_filter(DBusConnection *conn,
 			if (_bt_check_terminating_condition() == TRUE) {
 				_bt_disable_adapter();
 				_bt_disable_adapter_le();
-				_bt_core_terminate();
 			}
 		}
 	}

@@ -25,7 +25,6 @@
 #include <glib.h>
 #include <dlog.h>
 #include <string.h>
-#include <privilege-control.h>
 #include <vconf.h>
 
 #include "bt-internal-types.h"
@@ -35,7 +34,6 @@
 #include "bt-service-util.h"
 #include "bt-request-handler.h"
 #include "bt-service-adapter.h"
-#include "bt-service-adapter-le.h"
 
 static GMainLoop *main_loop;
 static gboolean terminated = FALSE;
@@ -44,7 +42,6 @@ static void __bt_release_service(void)
 {
 	_bt_service_unregister_vconf_handler();
 
-	_bt_service_adapter_le_deinit();
 	_bt_deinit_service_event_sender();
 	_bt_deinit_hf_local_term_event_sender();
 	_bt_deinit_service_event_receiver();
@@ -113,7 +110,6 @@ gboolean _bt_reliable_terminate_service(gpointer user_data)
 
 	_bt_set_disabled(BLUETOOTH_ERROR_NONE);
 
-	_bt_service_adapter_le_deinit();
 	_bt_deinit_service_event_sender();
 	_bt_deinit_hf_local_term_event_sender();
 
@@ -140,6 +136,9 @@ static gboolean __bt_check_bt_service(void *data)
 	bt_le_status_t le_status = BT_LE_DEACTIVATED;
 	int flight_mode_deactivation = 0;
 	int bt_off_due_to_timeout = 0;
+	_bt_enable_adapter();
+	return FALSE;
+
 #if 0
 	int ps_mode_deactivation = 0;
 #endif
@@ -191,7 +190,9 @@ static gboolean __bt_check_bt_service(void *data)
 
 		if ((status != BT_ACTIVATING && status != BT_ACTIVATED) &&
 				(le_status != BT_LE_ACTIVATING && le_status != BT_LE_ACTIVATED)){
+#ifndef USB_BLUETOOTH
 			_bt_terminate_service(NULL);
+#endif
 		}
 	}
 
@@ -210,10 +211,6 @@ int main(void)
 
 	g_type_init();
 
-	if (perm_app_set_privilege("bluetooth-frwk-service", NULL, NULL) !=
-								PC_OPERATION_SUCCESS)
-		BT_ERR("Failed to set app privilege.\n");
-
 	/* Event reciever Init */
 	if (_bt_init_service_event_receiver() != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Fail to init event reciever");
@@ -222,7 +219,7 @@ int main(void)
 
 	/* Event sender Init */
 	if (_bt_init_service_event_sender() != BLUETOOTH_ERROR_NONE) {
-		BT_ERR("Fail to init event sender");
+		BT_ERR(" Sudha 13 Fail to init event sender");
 		return 0;
 	}
 
@@ -233,11 +230,6 @@ int main(void)
 
 	if (_bt_service_register() != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Fail to register service");
-		return 0;
-	}
-
-	if (_bt_service_adapter_le_init() != BLUETOOTH_ERROR_NONE) {
-		BT_ERR("Fail to init le");
 		return 0;
 	}
 
