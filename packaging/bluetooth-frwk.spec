@@ -1,3 +1,4 @@
+%bcond_with x
 %define _dumpdir /opt/etc/dump.d/module.d
 %define _varlibdir /opt/var/lib
 
@@ -33,9 +34,9 @@ BuildRequires:  pkgconfig(syspopup-caller)
 BuildRequires:  pkgconfig(vconf)
 BuildRequires:  pkgconfig(libxml-2.0)
 BuildRequires:  pkgconfig(dbus-1)
-#%if %{with x}
-#BuildRequires:  pkgconfig(utilX)
-#%endif
+%if %{with x}
+BuildRequires:  pkgconfig(utilX)
+%endif
 BuildRequires:  pkgconfig(capi-network-connection)
 
 BuildRequires:  pkgconfig(libprivilege-control)
