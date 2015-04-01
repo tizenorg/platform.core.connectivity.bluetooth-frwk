@@ -8,10 +8,4 @@
       <arg type="v" name="value"/>
     </method>
   </interface>
-  <interface name="org.freedesktop.DBus.Properties">
-    <method name="Set">
-      <arg type="s" name="property"/>
-      <arg type="v" name="value"/>
-    </method>
-  </interface>
 </node>

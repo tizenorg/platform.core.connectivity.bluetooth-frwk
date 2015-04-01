@@ -1,17 +1,13 @@
 /*
- * Bluetooth-telephony
+ * bluetooth-frwk
  *
- * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
- *
- * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
- *		 Girishashok Joshi <girish.joshi@samsung.com>
- *		 Chanyeol Park <chanyeol.park@samsung.com>
+ * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *		http://www.apache.org/licenses/LICENSE-2.0
+ *              http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -68,9 +64,6 @@ tc_table_t tc_table[] = {
 	{"Voice Recognition Start", 83},
 	{"Voice Recognition Stop", 84},
 	{"NREC Status", 85},
-	{"WBS Status", 86},
-	{"Vendor dep AT CMD [+XSAT: 11,DUAL,DUAL]", 87},
-
 	/* -----------------------------------------*/
 	{"Finish", 0x00ff},
 	{NULL, 0x0000},
@@ -153,9 +146,6 @@ void telephony_event_handler(int event, void *data, void *user_data)
 		TC_PRT("BLUETOOTH_EVENT_TELEPHONY_NREC_CHANGED");
 		nrec = bt_event->param_data;
 		TC_PRT("NREC status = [%d]", *nrec);
-		break;
-	case BLUETOOTH_EVENT_TELEPHONY_VENDOR_AT_CMD:
-		TC_PRT("BLUETOOTH_EVENT_TELEPHONY_VENDOR_AT_CMD %s", bt_event->param_data);
 		break;
 	}
 
@@ -262,30 +252,6 @@ int test_input_callback(void *data)
 			break;
 		}
 
-		case 86: {
-			int ret;
-			gboolean status = FALSE;
-
-			ret = bluetooth_telephony_is_wbs_mode(&status);
-
-			if (ret != BLUETOOTH_TELEPHONY_ERROR_NONE)
-				TC_PRT("Error getting WBS Status\n");
-
-			TC_PRT("WBS status = %d\n", status);
-			break;
-		}
-		case 87: {
-			int ret = 0;
-
-			TC_PRT("Vendor dependent AT Command\n");
-
-			ret = bluetooth_telephony_send_vendor_cmd("+XSAT: 11,DUAL,DUAL");
-
-			if (ret == BLUETOOTH_TELEPHONY_ERROR_NONE) {
-				TC_PRT("No error\n");
-			}
-			break;
-		}
 		default:
 			break;
 	}
@@ -313,6 +279,16 @@ void cleanup()
 	if (main_loop != NULL) {
 		g_main_loop_unref(main_loop);
 	}
+}
+
+int timeout_callback(void *data)
+{
+	TC_PRT("timeout callback");
+	timeout_status = -1;
+
+	g_main_loop_quit(main_loop);
+
+	return FALSE;
 }
 
 static gboolean key_event_cb(GIOChannel *chan, GIOCondition cond ,

@@ -1,17 +1,13 @@
 /*
- * Bluetooth-frwk
+ * bluetooth-frwk
  *
- * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
- *
- * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
- *		 Girishashok Joshi <girish.joshi@samsung.com>
- *		 Chanyeol Park <chanyeol.park@samsung.com>
+ * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *		http://www.apache.org/licenses/LICENSE-2.0
+ *              http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -64,9 +60,9 @@ int _bt_rfcomm_listen(int socket_fd, int max_pending, gboolean is_native);
 
 int _bt_rfcomm_is_uuid_available(char *uuid, gboolean *available);
 
-int _bt_rfcomm_accept_connection(void);
+int _bt_rfcomm_accept_connection(int server_fd, int request_id);
 
-int _bt_rfcomm_reject_connection(void);
+int _bt_rfcomm_reject_connection(int server_fd);
 
 int _bt_rfcomm_server_disconnect(int data_fd);
 

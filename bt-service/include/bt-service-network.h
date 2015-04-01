@@ -1,17 +1,13 @@
 /*
- * Bluetooth-frwk
+ * bluetooth-frwk
  *
- * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
- *
- * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
- *		 Girishashok Joshi <girish.joshi@samsung.com>
- *		 Chanyeol Park <chanyeol.park@samsung.com>
+ * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *		http://www.apache.org/licenses/LICENSE-2.0
+ *              http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +16,6 @@
  * limitations under the License.
  *
  */
-
 
 #ifndef _BT_SERVICE_NETWORK_H_
 #define _BT_SERVICE_NETWORK_H_
@@ -48,13 +43,6 @@ int _bt_network_connect(int request_id, int role,
 int _bt_network_disconnect(int request_id,
 		bluetooth_device_address_t *device_address);
 
-int _bt_network_server_disconnect(int request_id,
-		bluetooth_device_address_t *device_address);
-
-void *_bt_network_connected_profile(void *connection, unsigned char *address);
-
-int _bt_is_network_connected(void *connection, unsigned char *address,
-						gboolean *is_connected);
 
 #ifdef __cplusplus
 }

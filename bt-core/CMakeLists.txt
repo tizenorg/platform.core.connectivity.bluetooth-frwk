@@ -1,13 +1,7 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 PROJECT(bt-core C)
 
-SET(SRCS
-bt-core-main.c
-bt-core-adapter.c
-bt-core-dbus-handler.c
-bt-core-noti-handler.c
-)
-
+SET(SRCS bt_core.c)
 SET(APP_VENDOR tizen)
 SET(APP_NAME bt-core)
 SET(APP_DIR ${CMAKE_INSTALL_PREFIX}/bin)
@@ -18,11 +12,11 @@ IF("${CMAKE_BUILD_TYPE}" STREQUAL "")
 ENDIF("${CMAKE_BUILD_TYPE}" STREQUAL "")
 MESSAGE("Build type: ${CMAKE_BUILD_TYPE}")
 
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include)
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 INCLUDE(FindPkgConfig)
-pkg_check_modules(pkgs REQUIRED dbus-glib-1 dlog vconf gio-2.0 gio-unix-2.0)
+pkg_check_modules(pkgs REQUIRED dbus-glib-1 dlog vconf)
 
 FOREACH(flag ${pkgs_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")
@@ -40,8 +34,7 @@ IF("${ARCH}" STREQUAL "arm")
 ENDIF("${ARCH}" STREQUAL "arm")
 
 FIND_PROGRAM(DBUS_BINDING_TOOL NAMES dbus-binding-tool)
-EXEC_PROGRAM("${DBUS_BINDING_TOOL}" ARGS "--prefix=bt ${CMAKE_CURRENT_SOURCE_DIR}/bt-request-service.xml --mode=glib-client --output=${CMAKE_CURRENT_SOURCE_DIR}/include/bt-request-service.h")
-EXEC_PROGRAM("${DBUS_BINDING_TOOL}" ARGS "--prefix=bt_core ${CMAKE_CURRENT_SOURCE_DIR}/bt-core-adapter.xml --mode=glib-server --output=${CMAKE_CURRENT_SOURCE_DIR}/include/bt-core-adapter-method.h")
+EXEC_PROGRAM("${DBUS_BINDING_TOOL}" ARGS "--prefix=bt_core ${CMAKE_CURRENT_SOURCE_DIR}/bt_core.xml --mode=glib-server --output=${CMAKE_CURRENT_SOURCE_DIR}/bt_core_glue.h")
 
 ADD_DEFINITIONS("-DPREFIX=\"${CMAKE_INSTALL_PREFIX}\"")
 ADD_DEFINITIONS("-DVENDOR=\"${APP_VENDOR}\"")
@@ -60,4 +53,5 @@ SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt_core.service DESTINATION share/dbus-1/system-services)
 
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-core.conf DESTINATION /etc/dbus-1/system.d)
+install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-core.conf DESTINATION /etc/dbus-1/system.d)
+

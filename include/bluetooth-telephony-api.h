@@ -1,17 +1,13 @@
 /*
- * Bluetooth-telephony
+ * bluetooth-frwk
  *
- * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
- *
- * Contact:	Hocheol Seo <hocheol.seo@samsung.com>
- * 		GirishAshok Joshi <girish.joshi@samsung.com>
- *		Chanyeol Park <chanyeol.park@samsung.com>
+ * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *              http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -65,8 +61,6 @@ typedef void (*bt_telephony_func_ptr)(int, void *, void *);
 				((int)BLUETOOTH_TELEPHONY_ERROR_NONE - 0x0D)
 #define BLUETOOTH_TELEPHONY_ERROR_OPERATION_NOT_AVAILABLE \
 				((int)BLUETOOTH_TELEPHONY_ERROR_NONE - 0x0E)
-#define BLUETOOTH_TELEPHONY_ERROR_PERMISSION_DENIED \
-					((int)BLUETOOTH_TELEPHONY_ERROR_NONE - 0x0F)
 
 #define BT_ADDRESS_STR_LEN 18
 #define BT_ADAPTER_PATH_LEN 50
@@ -121,7 +115,7 @@ typedef enum {
 	CSD_CALL_STATUS_SWAP_INITIATED,
 } bt_telephony_call_status_t;
 
-#define BLUETOOTH_EVENT_TYPE_TELEPHONY_BASE	(unsigned int)(0x00500)
+#define BLUETOOTH_EVENT_TYPE_TELEPHONY_BASE	(unsigned int)(0x00100)
 
 typedef enum {
 	BLUETOOTH_EVENT_TELEPHONY_ANSWER_CALL = BLUETOOTH_EVENT_TYPE_TELEPHONY_BASE,
@@ -140,7 +134,6 @@ typedef enum {
 	BLUETOOTH_EVENT_TELEPHONY_SET_SPEAKER_GAIN,
 	BLUETOOTH_EVENT_TELEPHONY_SET_MIC_GAIN,
 	BLUETOOTH_EVENT_TELEPHONY_NREC_CHANGED,
-	BLUETOOTH_EVENT_TELEPHONY_VENDOR_AT_CMD,
 } bluetooth_telephony_event_type;
 
 typedef enum {
@@ -157,7 +150,6 @@ typedef enum {
 typedef struct {
 	unsigned int call_id;
 	bt_telephony_call_state_t call_status;
-	char *phone_number;
 } bt_telephony_call_status_info_t;
 
 /**
@@ -310,23 +302,6 @@ gboolean bluetooth_telephony_is_sco_connected(void);
  *
  */
  int bluetooth_telephony_is_nrec_enabled(gboolean *status);
-
-/**
- * @brief	The function bluetooth_telephony_is_nrec_enabled  to check
- *		for wide band speech status
- *
- * @return	int	Zero on Success or reason for error if any.
- *
- */
- int bluetooth_telephony_is_wbs_mode(gboolean *status);
-
-/**
- * @brief This function send XSAT vendor specific AT command
- *
- * @return	int	Zero on Success or reason for error if any.
- */
- int bluetooth_telephony_send_vendor_cmd(const char *cmd);
-
 
 /**
  * @brief This function sends request to enable voice recognition feature

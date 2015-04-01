@@ -1,17 +1,13 @@
 /*
- * Bluetooth-frwk
+ * bluetooth-frwk
  *
- * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
- *
- * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
- *		 Girishashok Joshi <girish.joshi@samsung.com>
- *		 Chanyeol Park <chanyeol.park@samsung.com>
+ * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *		http://www.apache.org/licenses/LICENSE-2.0
+ *              http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,18 +17,15 @@
  *
  */
 
-
-#ifndef _BT_CORE_DBUS_HANDLER_H_
-#define _BT_CORE_DBUS_HANDLER_H_
+#ifndef _BT_CORE_H_
+#define _BT_CORE_H_
 
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <dlog.h>
 #include <dbus/dbus.h>
 #include <dbus/dbus-glib.h>
 #include <dbus/dbus-glib-lowlevel.h>
 #include <glib.h>
-#include <gio/gio.h>
 #include <glib-object.h>
 
 #ifdef __cplusplus
@@ -44,13 +37,25 @@ extern "C" {
 
 #define BT_DBG(fmt, args...) \
         SLOGD(fmt, ##args)
-#define BT_INFO(fmt, args...) \
-	SLOGI(fmt, ##args)
 #define BT_ERR(fmt, args...) \
         SLOGE(fmt, ##args)
 
+#define retv_if(expr, val) \
+	do { \
+		if (expr) { \
+			BT_ERR("(%s) return", #expr); \
+			return (val); \
+		} \
+	} while (0)
+
+#define CONNMAN_DBUS_NAME "net.connman"
+#define CONNMAN_BLUETOOTH_TECHNOLOGY_PATH "/net/connman/technology/bluetooth"
+#define CONNMAN_BLUETOTOH_TECHNOLOGY_INTERFACE "net.connman.Technology"
+
 #define BT_CORE_NAME "org.projectx.bt_core"
 #define BT_CORE_PATH "/org/projectx/bt_core"
+
+#define BT_CORE_TYPE (bt_core_get_type())
 
 typedef struct _BtCore
 {
@@ -62,19 +67,7 @@ typedef struct _BtCoreClass
     GObjectClass object_class;
 } BtCoreClass;
 
-
-DBusGProxy *_bt_core_register_event_filter(DBusGConnection *g_conn, BtCore *bt_core);
-void _bt_unregister_event_filter(DBusGConnection *g_conn, BtCore *bt_core, DBusGProxy *dbus_proxy);
-
-int _bt_core_service_request(int service_type, int service_function,
-			GArray *in_param1, GArray *in_param2,
-			GArray *in_param3, GArray *in_param4,
-			GArray **out_param1);
-void _bt_core_fill_garray_from_variant(GVariant *var, GArray *param);
-GDBusProxy *_bt_core_gdbus_get_service_proxy(void);
-void _bt_core_gdbus_deinit_proxys(void);
-
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
-#endif /*_BT_CORE_DBUS_HANDLER_H_*/
+#endif /*_BT_CORE_H_*/

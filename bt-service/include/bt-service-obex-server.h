@@ -1,17 +1,13 @@
 /*
- * Bluetooth-frwk
+ * bluetooth-frwk
  *
- * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
- *
- * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
- *		 Girishashok Joshi <girish.joshi@samsung.com>
- *		 Chanyeol Park <chanyeol.park@samsung.com>
+ * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *		http://www.apache.org/licenses/LICENSE-2.0
+ *              http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +16,6 @@
  * limitations under the License.
  *
  */
-
 
 #ifndef _BT_SERVICE_OBEX_SERVER_H_
 #define _BT_SERVICE_OBEX_SERVER_H_
@@ -67,18 +62,14 @@ int _bt_obex_server_reject_connection(void);
 
 int _bt_obex_server_is_receiving(gboolean *receiving);
 
+void _bt_obex_transfer_started(const char *transfer_path);
 
 void _bt_obex_transfer_progress(const char *transfer_path,
 					int transferred);
+
 void _bt_obex_transfer_completed(const char *transfer_path, gboolean success);
 
-void _bt_obex_transfer_started(const char *transfer_path);
 
-void _bt_obex_check_pending_transfer(const char *address);
-
-void _bt_obex_transfer_connected(void);
-
-void _bt_obex_transfer_disconnected(void);
 
 #ifdef __cplusplus
 }

@@ -1,17 +1,13 @@
 /*
- * Bluetooth-frwk
+ * bluetooth-frwk
  *
- * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
- *
- * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
- *		 Girishashok Joshi <girish.joshi@samsung.com>
- *		 Chanyeol Park <chanyeol.park@samsung.com>
+ * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *		http://www.apache.org/licenses/LICENSE-2.0
+ *              http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -71,17 +67,11 @@ BT_EXPORT_API int bluetooth_hid_connect(hid_device_address_t *device_address)
 	BT_CHECK_PARAMETER(device_address, return);
 	BT_CHECK_ENABLED(return);
 
-	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_HID_CONNECT)
-	     == BLUETOOTH_ERROR_PERMISSION_DEINED) {
-		BT_ERR("Don't have a privilege to use this API");
-		return BLUETOOTH_ERROR_PERMISSION_DEINED;
-	}
-
-	user_info = _bt_get_user_data(BT_HID);
-	retv_if(user_info->cb == NULL, BLUETOOTH_ERROR_INTERNAL);
-
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	user_info = _bt_get_user_data(BT_HID);
+	retv_if(user_info == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	g_array_append_vals(in_param1, device_address, sizeof(bluetooth_device_address_t));
 
@@ -102,17 +92,11 @@ BT_EXPORT_API int bluetooth_hid_disconnect(hid_device_address_t *device_address)
 	BT_CHECK_PARAMETER(device_address, return);
 	BT_CHECK_ENABLED(return);
 
-	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_HID_DISCONNECT)
-	     == BLUETOOTH_ERROR_PERMISSION_DEINED) {
-		BT_ERR("Don't have a privilege to use this API");
-		return BLUETOOTH_ERROR_PERMISSION_DEINED;
-	}
-
-	user_info = _bt_get_user_data(BT_HID);
-	retv_if(user_info->cb == NULL, BLUETOOTH_ERROR_INTERNAL);
-
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	user_info = _bt_get_user_data(BT_HID);
+	retv_if(user_info == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	g_array_append_vals(in_param1, device_address, sizeof(bluetooth_device_address_t));
 

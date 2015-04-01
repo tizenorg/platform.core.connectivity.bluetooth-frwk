@@ -1,17 +1,13 @@
 /*
- * Bluetooth-frwk
+ * bluetooth-frwk
  *
- * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
- *
- * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
- *		 Girishashok Joshi <girish.joshi@samsung.com>
- *		 Chanyeol Park <chanyeol.park@samsung.com>
+ * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *		http://www.apache.org/licenses/LICENSE-2.0
+ *              http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,12 +23,10 @@
 #include <vconf.h>
 #include <vconf-keys.h>
 
-#include "bt-internal-types.h"
 #include "bt-service-common.h"
 #include "bt-service-agent.h"
 #include "bt-service-gap-agent.h"
 #include "bt-service-adapter.h"
-#include "bt-service-device.h"
 
 static DBusGConnection *connection = NULL;
 
@@ -49,9 +43,7 @@ struct _GapAgentPrivate {
 	gchar *busname;
 	gchar *path;
 	DBusGProxy *adapter;
-
 	DBusGProxy *agent_manager;
-
 	DBusGProxy *dbus_proxy;
 
 	GapAgentExecType exec_type;
@@ -76,7 +68,7 @@ static gboolean gap_agent_request_passkey(GapAgent *agent, const char *path,
 						DBusGMethodInvocation *context);
 
 static gboolean gap_agent_display_passkey(GapAgent *agent, const char *path,
-						guint passkey, guint16 entered,
+						guint passkey,
 						DBusGMethodInvocation *context);
 
 static gboolean gap_agent_request_confirmation(GapAgent *agent,
@@ -89,8 +81,8 @@ static gboolean gap_agent_authorize_service(GapAgent *agent, const char *path,
 						DBusGMethodInvocation *context);
 
 static gboolean gap_agent_request_authorization(GapAgent *agent,
-						const char *path,
-						DBusGMethodInvocation *context);
+                                                const char *path,
+                                                DBusGMethodInvocation *context);
 
 static gboolean gap_agent_cancel(GapAgent *agent,
 						DBusGMethodInvocation *context);
@@ -133,12 +125,12 @@ static GError *gap_agent_error(GapAgentError error, const char *err_msg)
 
 static void gap_agent_init(GapAgent *agent)
 {
-	BT_DBG("agent %p", agent);
+	BT_DBG("agent %p\n", agent);
 }
 
 static void gap_agent_finalize(GObject *agent)
 {
-	BT_DBG("Free agent %p", agent);
+	BT_DBG("Free agent %p\n", agent);
 
 	G_OBJECT_CLASS(gap_agent_parent_class)->finalize(agent);
 }
@@ -148,7 +140,7 @@ static void gap_agent_class_init(GapAgentClass *klass)
 	GObjectClass *object_class = (GObjectClass *) klass;
 	GError *error = NULL;
 
-	BT_DBG("class %p", klass);
+	BT_DBG("class %p\n", klass);
 
 	g_type_class_add_private(klass, sizeof(GapAgentPrivate));
 
@@ -157,7 +149,7 @@ static void gap_agent_class_init(GapAgentClass *klass)
 	connection = dbus_g_bus_get(DBUS_BUS_SYSTEM, &error);
 
 	if (error != NULL) {
-		g_printerr("Connecting to system bus failed: %s",
+		g_printerr("Connecting to system bus failed: %s\n",
 								error->message);
 		g_error_free(error);
 	}
@@ -172,7 +164,7 @@ GapAgent *_gap_agent_new(void)
 
 	agent = GAP_GET_AGENT(g_object_new(GAP_TYPE_AGENT, NULL));
 
-	BT_DBG("agent %p", agent);
+	BT_DBG("agent %p\n", agent);
 
 	return agent;
 }
@@ -184,15 +176,15 @@ static gboolean gap_agent_request_pin_code(GapAgent *agent,
 	GapAgentPrivate *priv = GAP_AGENT_GET_PRIVATE(agent);
 	char *sender = dbus_g_method_get_sender(context);
 	DBusGProxy *device;
+	DBusGConnection *conn;
 	gboolean result;
 	char *addr;
-
-	DBusGConnection *conn;
 
 	if (sender == NULL)
 		return FALSE;
 
-	BT_INFO("Request pin code, Device Path :%s", path);
+	BT_DBG("Request PIN : agent %p sender %s priv->busname %s Device Path :%s\n",
+				agent, sender, priv->busname, path);
 
 	if (g_strcmp0(sender, priv->busname) != 0) {
 		g_free(sender);
@@ -212,10 +204,11 @@ static gboolean gap_agent_request_pin_code(GapAgent *agent,
 
 	device = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
 				path, BT_PROPERTIES_INTERFACE);
+
 	if (device == NULL) {
 		GError *error = gap_agent_error(GAP_AGENT_ERROR_REJECT,
 							"No proxy for device");
-		BT_ERR("Fail to make device proxy");
+		BT_DBG("Fail to make device proxy\n");
 		dbus_g_method_return_error(context, error);
 		g_error_free(error);
 		g_free(sender);
@@ -250,14 +243,14 @@ static gboolean gap_agent_request_passkey(GapAgent *agent, const char *path,
 	GapAgentPrivate *priv = GAP_AGENT_GET_PRIVATE(agent);
 	char *sender = dbus_g_method_get_sender(context);
 	DBusGProxy *device;
+	DBusGConnection *conn;
 	gboolean result;
 	char *addr;
-	DBusGConnection *conn;
 
 	if (sender == NULL)
 		return FALSE;
 
-	BT_INFO("Request passkey : agent %p sender %s priv->busname %s Device Path :%s", agent,
+	BT_DBG("Request passkey : agent %p sender %s priv->busname %s Device Path :%s\n", agent,
 	    sender, priv->busname, path);
 
 	if (g_strcmp0(sender, priv->busname) != 0) {
@@ -282,7 +275,7 @@ static gboolean gap_agent_request_passkey(GapAgent *agent, const char *path,
 	if (device == NULL) {
 		GError *error = gap_agent_error(GAP_AGENT_ERROR_REJECT,
 							"No proxy for device");
-		BT_ERR("Fail to make device proxy");
+		BT_DBG("Fail to make device proxy\n");
 		dbus_g_method_return_error(context, error);
 		g_error_free(error);
 		g_free(sender);
@@ -313,25 +306,20 @@ static gboolean gap_agent_request_passkey(GapAgent *agent, const char *path,
 }
 
 static gboolean gap_agent_display_passkey(GapAgent *agent, const char *path,
-						guint passkey, guint16 entered,
+						guint passkey,
 						DBusGMethodInvocation *context)
 {
 	GapAgentPrivate *priv = GAP_AGENT_GET_PRIVATE(agent);
 	char *sender = dbus_g_method_get_sender(context);
 	DBusGProxy *device;
-	gboolean result;
 	DBusGConnection *conn;
+	gboolean result;
 
 	if (sender == NULL)
 		return FALSE;
 
-	/* Do not show popup for Key event while typing*/
-	if (entered) {
-		g_free(sender);
-		return FALSE;
-	}
-	BT_INFO("Request passkey display : agent %p sender %s priv->busname %s Device Path :%s\n",
-			agent, sender, priv->busname, path);
+	BT_DBG("Request passkey display : agent %p sender %s priv->busname %s Device Path :%s\n",
+	    agent, sender, priv->busname, path);
 
 	if (g_strcmp0(sender, priv->busname) != 0) {
 		g_free(sender);
@@ -355,7 +343,7 @@ static gboolean gap_agent_display_passkey(GapAgent *agent, const char *path,
 	if (device == NULL) {
 		GError *error = gap_agent_error(GAP_AGENT_ERROR_REJECT,
 							"No proxy for device");
-		BT_ERR("Fail to make device proxy");
+		BT_DBG("Fail to make device proxy\n");
 		dbus_g_method_return_error(context, error);
 		g_error_free(error);
 		g_free(sender);
@@ -380,14 +368,15 @@ static gboolean gap_agent_request_confirmation(GapAgent *agent,
 	GapAgentPrivate *priv = GAP_AGENT_GET_PRIVATE(agent);
 	char *sender = dbus_g_method_get_sender(context);
 	DBusGProxy *device;
+	DBusGConnection *conn;
 	gboolean result;
 	char *addr;
-	DBusGConnection *conn;
 
 	if (sender == NULL)
 		return FALSE;
 
-	BT_INFO("Request passkey confirmation, Device Path :%s", path);
+	BT_DBG("Request passkey confirmation : agent %p sender %s priv->busname %s Device Path :%s\n",
+	    agent, sender, priv->busname, path);
 
 	if (g_strcmp0(sender, priv->busname) != 0) {
 		g_free(sender);
@@ -407,10 +396,11 @@ static gboolean gap_agent_request_confirmation(GapAgent *agent,
 
 	device = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
 				path, BT_PROPERTIES_INTERFACE);
+
 	if (device == NULL) {
 		GError *error = gap_agent_error(GAP_AGENT_ERROR_REJECT,
 							"No proxy for device");
-		BT_ERR("Fail to make device proxy");
+		BT_DBG("Fail to make device proxy\n");
 		dbus_g_method_return_error(context, error);
 		g_error_free(error);
 		g_free(sender);
@@ -453,7 +443,7 @@ static gboolean gap_agent_authorize_service(GapAgent *agent, const char *path,
 	if (sender == NULL)
 		return FALSE;
 
-	BT_DBG("Request authorization : agent %p sender %s priv->busname %s Device Path :%s", agent,
+	BT_DBG("Request authorization : agent %p sender %s priv->busname %s Device Path :%s\n", agent,
 	    sender, priv->busname, path);
 
 	if (g_strcmp0(sender, priv->busname) != 0) {
@@ -512,10 +502,11 @@ static gboolean gap_agent_request_authorization(GapAgent *agent,
 						const char *path,
 						DBusGMethodInvocation *context)
 {
+	BT_DBG("");
+
 	dbus_g_method_return(context);
 	return TRUE;
 }
-
 
 static gboolean gap_agent_confirm_mode_change(GapAgent *agent,
 						const char *mode,
@@ -537,7 +528,7 @@ static gboolean gap_agent_cancel(GapAgent *agent,
 	if (sender == NULL)
 		return FALSE;
 
-	BT_DBG("Cancelled : agent %p sender %s", agent, sender);
+	BT_DBG("Cancelled : agent %p sender %s\n", agent, sender);
 
 	if (g_strcmp0(sender, priv->busname) != 0) {
 		g_free(sender);
@@ -566,10 +557,6 @@ static gboolean gap_agent_cancel(GapAgent *agent,
 		g_error_free(error);
 	}
 
-	/* Canceled flag is set when user cancels pairing request
-	 * Since here bluez has cancelled pairing request, we set the flag to false
-	 */
-	priv->canceled = FALSE;
 	priv->exec_type = GAP_AGENT_EXEC_NO_OPERATION;
 	priv->reply_context = NULL;
 
@@ -647,10 +634,8 @@ static void __gap_agent_remove_osp_servers(GSList *osp_servers)
 }
 
 gboolean _gap_agent_register_osp_server(GapAgent *agent,
-					const gint type,
-					const char *uuid,
-					const char *path,
-					int fd)
+						const gint type,
+						const char *uuid)
 {
 	bt_agent_osp_server_t *server;
 
@@ -668,11 +653,9 @@ gboolean _gap_agent_register_osp_server(GapAgent *agent,
 	server = g_malloc0(sizeof(bt_agent_osp_server_t));
 
 	server->type = type;
-	if (type == BT_RFCOMM_SERVER) {
+
+	if (type == BT_RFCOMM_SERVER)
 		server->uuid = g_strdup(uuid);
-		server->path = g_strdup(path);
-		server->fd = fd;
-	}
 
 	priv->osp_servers = g_slist_append(priv->osp_servers, server);
 
@@ -717,7 +700,7 @@ gboolean gap_agent_reply_pin_code(GapAgent *agent, const guint accept,
 						const char *pin_code,
 				      		DBusGMethodInvocation *context)
 {
-	BT_DBG("+");
+	BT_DBG("+\n");
 
 	GapAgentPrivate *priv = GAP_AGENT_GET_PRIVATE(agent);
 
@@ -751,7 +734,7 @@ gboolean gap_agent_reply_pin_code(GapAgent *agent, const guint accept,
 	priv->reply_context = NULL;
 	memset(priv->pairing_addr, 0x00, sizeof(priv->pairing_addr));
 
-	BT_DBG("-");
+	BT_DBG("-\n");
 
 	return TRUE;
 }
@@ -760,7 +743,7 @@ gboolean gap_agent_reply_passkey(GapAgent *agent, const guint accept,
 						const char *passkey,
 				     		DBusGMethodInvocation *context)
 {
-	BT_DBG("+");
+	BT_DBG("+\n");
 
 	GapAgentPrivate *priv = GAP_AGENT_GET_PRIVATE(agent);
 
@@ -795,7 +778,7 @@ gboolean gap_agent_reply_passkey(GapAgent *agent, const guint accept,
 	priv->reply_context = NULL;
 	memset(priv->pairing_addr, 0x00, sizeof(priv->pairing_addr));
 
-	BT_DBG("-");
+	BT_DBG("-\n");
 
 	return TRUE;
 }
@@ -803,7 +786,7 @@ gboolean gap_agent_reply_passkey(GapAgent *agent, const guint accept,
 gboolean gap_agent_reply_confirmation(GapAgent *agent, const guint accept,
 					  DBusGMethodInvocation *context)
 {
-	BT_DBG("+");
+	BT_DBG("+\n");
 
 	GapAgentPrivate *priv = GAP_AGENT_GET_PRIVATE(agent);
 
@@ -837,7 +820,7 @@ gboolean gap_agent_reply_confirmation(GapAgent *agent, const guint accept,
 	priv->reply_context = NULL;
 	memset(priv->pairing_addr, 0x00, sizeof(priv->pairing_addr));
 
-	BT_DBG("-");
+	BT_DBG("-\n");
 
 	return TRUE;
 }
@@ -847,26 +830,13 @@ gboolean gap_agent_reply_authorize(GapAgent *agent, const guint accept,
 {
 	gboolean ret = TRUE;
 
-	BT_DBG("+");
+	BT_DBG("+\n");
 
 	GapAgentPrivate *priv = GAP_AGENT_GET_PRIVATE(agent);
 
 	if (priv->exec_type != GAP_AGENT_EXEC_NO_OPERATION &&
 						priv->reply_context != NULL) {
 		if (accept == GAP_AGENT_ACCEPT) {
-			dbus_g_method_return(priv->reply_context);
-		} else if (accept == GAP_AGENT_ACCEPT_ALWAYS) {
-			bluetooth_device_address_t addr = {{0,}};
-			int result;
-
-			_bt_convert_addr_string_to_type(addr.addr,
-							priv->authorize_addr);
-
-			result = _bt_set_authorization(&addr, TRUE);
-			if (result == BLUETOOTH_ERROR_NONE) {
-				BT_INFO("[%s] Device added to trusted", priv->authorize_addr);
-			}
-
 			dbus_g_method_return(priv->reply_context);
 		} else {
 			GError *error = NULL;
@@ -891,7 +861,7 @@ gboolean gap_agent_reply_authorize(GapAgent *agent, const guint accept,
 	} else {
 		GError *error = gap_agent_error(GAP_AGENT_ERROR_REJECT,
 							"No context");
-		BT_ERR("No context");
+		BT_DBG("No context");
 
 		if (context)
 			dbus_g_method_return_error(context, error);
@@ -904,7 +874,7 @@ gboolean gap_agent_reply_authorize(GapAgent *agent, const guint accept,
 	priv->reply_context = NULL;
 	memset(priv->authorize_addr, 0x00, sizeof(priv->authorize_addr));
 
-	BT_DBG("-");
+	BT_DBG("-\n");
 
 	return ret;
 }
@@ -912,7 +882,7 @@ gboolean gap_agent_reply_authorize(GapAgent *agent, const guint accept,
 static gboolean gap_agent_get_discoverable_timeout(GapAgent *agent,
 						DBusGMethodInvocation *context)
 {
-	BT_DBG("+");
+	BT_DBG("+\n");
 
 	int timeout;
 
@@ -920,7 +890,7 @@ static gboolean gap_agent_get_discoverable_timeout(GapAgent *agent,
 
 	dbus_g_method_return(context, timeout);
 
-	BT_DBG("-");
+	BT_DBG("-\n");
 
 	return TRUE;
 }
@@ -944,17 +914,10 @@ gboolean _gap_agent_register(GapAgent *agent)
 		agent_manager = priv->agent_manager;
 	}
 
-#ifdef __TIZEN_MOBILE_
 	dbus_g_proxy_call(agent_manager, "RegisterAgent", &error,
 				DBUS_TYPE_G_OBJECT_PATH, priv->path,
 				G_TYPE_STRING, "DisplayYesNo", G_TYPE_INVALID,
 				G_TYPE_INVALID);
-else
-	dbus_g_proxy_call(agent_manager, "RegisterAgent", &error,
-			DBUS_TYPE_G_OBJECT_PATH, priv->path,
-			G_TYPE_STRING, "NoInputNoOutput", G_TYPE_INVALID,
-			G_TYPE_INVALID);
-#endif
 	if (error != NULL) {
 		BT_DBG("Agent registration failed: %s\n", error->message);
 		g_error_free(error);
@@ -1040,13 +1003,12 @@ void _gap_agent_setup_dbus(GapAgent *agent, GAP_AGENT_FUNC_CB *func_cb,
 	memset(priv->authorize_addr, 0x00, sizeof(priv->authorize_addr));
 	priv->reply_context = NULL;
 
-	BT_DBG("patt: %s", path);
-
 	proxy = dbus_g_proxy_new_for_name_owner(connection,
 				BT_BLUEZ_NAME,
 				path,
 				BT_AGENT_INTERFACE,
 				NULL);
+
 	if (proxy != NULL) {
 		priv->busname = g_strdup(dbus_g_proxy_get_bus_name(proxy));
 		g_object_unref(proxy);
@@ -1096,23 +1058,6 @@ gboolean _gap_agent_exist_osp_server(GapAgent *agent, int type, char *uuid)
 	return FALSE;
 }
 
-bt_agent_osp_server_t *_gap_agent_get_osp_server(GapAgent *agent, int type,
-					char *uuid)
-{
-	GapAgentPrivate *priv = GAP_AGENT_GET_PRIVATE(agent);
-	bt_agent_osp_server_t *osp_serv = NULL;
-	if (priv == NULL)
-		return NULL;
-
-	osp_serv = __gap_agent_find_server(priv->osp_servers,
-			type, uuid);
-	if (!osp_serv) {
-		return NULL;
-	}
-
-	return osp_serv;
-}
-
 gchar* _gap_agent_get_path(GapAgent *agent)
 {
 	GapAgentPrivate *priv = GAP_AGENT_GET_PRIVATE(agent);
@@ -1125,11 +1070,4 @@ gboolean _gap_agent_is_canceled(GapAgent *agent)
 	GapAgentPrivate *priv = GAP_AGENT_GET_PRIVATE(agent);
 
 	return priv->canceled;
-}
-
-void _gap_agent_set_canceled(GapAgent *agent, gboolean value)
-{
-	GapAgentPrivate *priv = GAP_AGENT_GET_PRIVATE(agent);
-
-	priv->canceled = value;
 }

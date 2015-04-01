@@ -28,22 +28,10 @@
       <arg type="o" name="transfer"/>
       <arg type="s" name="message"/>
     </method>
-    <method name="Authorize">
+    <method name="AuthorizePush">
 	<annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
 		<arg type="o" name="objpath"/>
-		<arg type="s" name="bdaddress"/>
-		<arg type="s" name="name"/>
-		<arg type="s" name="type"/>
-		<arg type="i" name="length"/>
-		<arg type="i" name="time"/>
 		<arg type="s" name="filepath" direction="out"/>
 	</method>
-  </interface>
-  <interface name="org.bluez.obex.Agent1">
-    <method name="AuthorizePush">
-    <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
-        <arg type="o" name="objpath"/>
-        <arg type="s" name="filepath" direction="out"/>
-    </method>
   </interface>
 </node>
