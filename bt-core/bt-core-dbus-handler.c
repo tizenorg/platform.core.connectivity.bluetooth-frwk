@@ -305,9 +305,10 @@ static DBusHandlerResult __bt_core_event_filter(DBusConnection *conn,
 
 		if (strcasecmp(object_path, "/org/bluez/hci0") == 0) {
 #ifdef __TIZEN_MOBILE__
-		__bt_core_set_status(BT_DEACTIVATED);
-#endif
+			_bt_core_adapter_removed_cb();
+#else
 			_bt_core_terminate();
+#endif
 		}
 	} else if (strcasecmp(member, "NameOwnerChanged") == 0) {
 		char *name = NULL;

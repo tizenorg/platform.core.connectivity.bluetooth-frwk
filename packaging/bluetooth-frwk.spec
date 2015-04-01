@@ -113,6 +113,10 @@ export CFLAGS+=" -fpie -DRFCOMM_DIRECT "
 export LDFLAGS+=" -Wl,--rpath=/usr/lib -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs -pie"
 %endif
 
+%ifarch aarch64
+export CFLAGS="${CFLAGS} -D__TIZEN_MOBILE__ -DTIZEN_TELEPHONY_ENABLED"
+%endif
+
 %cmake . \
 -DTZ_SYS_USER_GROUP=%TZ_SYS_USER_GROUP \
 -DTZ_SYS_DEFAULT_USER=%TZ_SYS_DEFAULT_USER \

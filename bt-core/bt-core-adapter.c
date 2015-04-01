@@ -269,7 +269,7 @@ int _bt_enable_adapter(void)
 int _bt_disable_adapter(void)
 {
 	BT_INFO_C("Disable adapter");
-#if __TIZEN_MOBILE__
+#ifdef __TIZEN_MOBILE__
 	__bt_core_set_status(BT_DEACTIVATING);
 
 	if (__execute_command("/usr/etc/bluetooth/bt-stack-down.sh", NULL) < 0) {
@@ -288,6 +288,8 @@ int _bt_enable_adapter_le(void)
 	BT_DBG("");
 #ifdef __TIZEN_MOBILE__
 	int ret;
+	bt_status_t status;
+
 	status = _bt_core_get_status();
 	if (status == BT_DEACTIVATED) {
 		__bt_core_set_le_status(BT_LE_ACTIVATING);
@@ -314,6 +316,8 @@ int _bt_disable_adapter_le(void)
 	BT_DBG("+");
 
 #ifdef __TIZEN_MOBILE__
+	bt_status_t status;
+
 	status = _bt_core_get_status();
 	BT_DBG("status : %d", status);
 

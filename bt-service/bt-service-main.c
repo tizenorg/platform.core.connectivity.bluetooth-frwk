@@ -222,12 +222,12 @@ int main(void)
 		BT_ERR(" Sudha 13 Fail to init event sender");
 		return 0;
 	}
-
+/*
 	if (_bt_init_hf_local_term_event_sender() != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Fail to init core event sender");
 		return 0;
 	}
-
+*/
 	if (_bt_service_register() != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Fail to register service");
 		return 0;
