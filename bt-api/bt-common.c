@@ -1228,39 +1228,6 @@ DBusConnection *_bt_get_system_conn(void)
 	return dbus_g_connection_get_connection(g_conn);
 }
 
-void _bt_generate_cookie(void)
-{
-	int retval;
-
-	ret_if(cookie != NULL);
-
-	cookie_size = security_server_get_cookie_size();
-
-	cookie = g_malloc0((cookie_size*sizeof(char))+1);
-
-	retval = security_server_request_cookie(cookie, cookie_size);
-	if(retval < 0) {
-		BT_ERR("Fail to get cookie: %d", retval);
-	}
-}
-
-void _bt_destroy_cookie(void)
-{
-	g_free(cookie);
-	cookie = NULL;
-	cookie_size = 0;
-}
-
-char *_bt_get_cookie(void)
-{
-	return cookie;
-}
-
-int _bt_get_cookie_size(void)
-{
-	return cookie_size;
-}
-
 int _bt_register_osp_server_in_agent(int type, char *uuid, char *path, int fd)
 {
 	int ret;

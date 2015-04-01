@@ -27,7 +27,6 @@
 #include <dbus/dbus-glib-lowlevel.h>
 #include <glib.h>
 #include <dlog.h>
-#include <security-server.h>
 
 #include "bluetooth-api.h"
 #include "bt-service-common.h"

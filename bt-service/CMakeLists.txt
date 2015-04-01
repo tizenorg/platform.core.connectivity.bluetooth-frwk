@@ -60,7 +60,6 @@ SET(PKG_MODULES
 #	libnotify
 #	gdk-pixbuf-2.0
 #	gtk+-3.0
-	security-server
 	capi-content-mime-type
 	capi-network-connection
 	pkgmgr
