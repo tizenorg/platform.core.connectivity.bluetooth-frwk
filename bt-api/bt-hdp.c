@@ -1,13 +1,17 @@
 /*
- * bluetooth-frwk
+ * Bluetooth-frwk
  *
- * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
+ *
+ * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
+ *		 Girishashok Joshi <girish.joshi@samsung.com>
+ *		 Chanyeol Park <chanyeol.park@samsung.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *              http://www.apache.org/licenses/LICENSE-2.0
+ *		http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +24,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <dbus/dbus.h>
+#include <dbus/dbus-glib-lowlevel.h>
 #include <string.h>
 
 #include "bluetooth-api.h"
@@ -27,19 +32,28 @@
 #include "bt-internal-types.h"
 
 #define HDP_BUFFER_SIZE 1024
-#define BLUEZ_HDP_MANAGER_INTERFACE  "org.bluez.HealthManager"
-#define BLUEZ_HDP_DEVICE_INTERFACE  "org.bluez.HealthDevice"
-#define BLUEZ_HDP_CHANNEL_INTERFACE  "org.bluez.HealthChannel"
+#define BLUEZ_HDP_MANAGER_INTERFACE  "org.bluez.HealthManager1"
+#define BLUEZ_HDP_DEVICE_INTERFACE  "org.bluez.HealthDevice1"
+#define BLUEZ_HDP_CHANNEL_INTERFACE  "org.bluez.HealthChannel1"
 
 typedef struct {
 	char *obj_channel_path;
 	int fd;
+	guint watch_id;
 } hdp_obj_info_t;
 
 typedef struct {
 	void *app_handle;
 	GSList *obj_info;
 } hdp_app_list_t;
+
+/* Variable for privilege, only for write API,
+  before we should reduce time to bt-service dbus calling
+  -1 : Don't have a permission to access API
+  0 : Initial value, not yet check
+  1 : Have a permission to access API
+*/
+static int privilege_token;
 
 
 /**********************************************************************
@@ -64,7 +78,7 @@ static int __bt_hdp_internal_add_filter(void);
 
 static int __bt_hdp_internal_acquire_fd(const char *path);
 
-static void __bt_hdp_internal_watch_fd(int file_desc, const char *path);
+static guint __bt_hdp_internal_watch_fd(int file_desc, const char *path);
 
 static gboolean __bt_hdp_internal_data_received(GIOChannel *gio,
 						GIOCondition cond,
@@ -102,7 +116,7 @@ BT_EXPORT_API int bluetooth_hdp_activate(unsigned short data_type,
 
 	/*For source role is mandatory */
 	if (role == HDP_ROLE_SOURCE && channel_type == HDP_QOS_ANY) {
-		BT_DBG("For source, type is mandatory - Reliable/Streaming");
+		BT_ERR("For source, type is mandatory - Reliable/Streaming");
 		return BLUETOOTH_ERROR_INVALID_PARAM;
 	}
 
@@ -115,6 +129,7 @@ BT_EXPORT_API int bluetooth_hdp_activate(unsigned short data_type,
 static void __bt_hdp_obj_info_free(hdp_obj_info_t *info)
 {
 	if (info) {
+		g_source_remove(info->watch_id);
 		close(info->fd);
 		g_free(info->obj_channel_path);
 		g_free(info);
@@ -196,9 +211,9 @@ static int __bt_hdp_internal_create_application(unsigned int data_type,
 	if (role == HDP_ROLE_SOURCE) {
 		key_type = "ChannelType";
 		if (channel_type == HDP_QOS_RELIABLE)
-			svalue = "Reliable";
+			svalue = "reliable";
 		else if (channel_type == HDP_QOS_STREAMING)
-			svalue = "Streaming";
+			svalue = "streaming";
 
 		dbus_message_iter_open_container(&array_iter,
 			DBUS_TYPE_DICT_ENTRY, NULL, &entry);
@@ -227,9 +242,15 @@ static int __bt_hdp_internal_create_application(unsigned int data_type,
 
 		if (dbus_error_is_set(&err)) {
 			BT_ERR("%s", err.message);
+
+			if (g_strrstr(err.message, BT_ACCESS_DENIED_MSG))
+				ret = BLUETOOTH_ERROR_ACCESS_DENIED;
+			else
+				ret = BLUETOOTH_ERROR_INTERNAL;
+
 			dbus_error_free(&err);
 		}
-		return BLUETOOTH_ERROR_INTERNAL;
+		return ret;
 	}
 
 	if (!dbus_message_get_args(reply, &err, DBUS_TYPE_OBJECT_PATH,
@@ -336,10 +357,9 @@ static void __bt_hdp_internal_handle_connect(DBusMessage *msg)
 	const char *path = dbus_message_get_path(msg);
 	const char *obj_channel_path;
 	bt_user_info_t *user_info;
-	bt_hdp_connected_t conn_ind;
 	int ret;
 
-	BT_DBG("+********Signal - ChannelConnected******\n\n");
+	BT_INFO("+********Signal - ChannelConnected******\n\n");
 	BT_DBG("Path = %s", path);
 
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_OBJECT_PATH,
@@ -348,14 +368,21 @@ static void __bt_hdp_internal_handle_connect(DBusMessage *msg)
 		return;
 	}
 
-	BT_DBG("Channel connected, Path = %s", obj_channel_path);
+	BT_INFO("Channel connected, Path = %s", obj_channel_path);
+
+	user_info = _bt_get_user_data(BT_COMMON);
+	if (user_info == NULL || user_info->cb == NULL)
+		return;
 
 	ret = __bt_hdp_internal_acquire_fd(obj_channel_path);
 	if (ret != BLUETOOTH_ERROR_NONE) {
-		user_info = _bt_get_user_data(BT_COMMON);
-		if (user_info) {
+		_bt_common_event_cb(BLUETOOTH_EVENT_HDP_CONNECTED,
+				BLUETOOTH_ERROR_CONNECTION_ERROR, NULL,
+				user_info->cb, user_info->user_data);
+	} else {
+		if (user_info->cb) {
 			_bt_common_event_cb(BLUETOOTH_EVENT_HDP_CONNECTED,
-					BLUETOOTH_ERROR_CONNECTION_ERROR, &conn_ind,
+					BLUETOOTH_ERROR_NONE, NULL,
 					user_info->cb, user_info->user_data);
 		}
 	}
@@ -373,7 +400,7 @@ static void __bt_hdp_internal_handle_disconnect(DBusMessage *msg)
 	hdp_obj_info_t *info;
 	bt_user_info_t *user_info;
 
-	BT_DBG("+********Signal - ChannelDeleted ******\n\n");
+	BT_INFO("+********Signal - ChannelDeleted ******\n\n");
 	BT_DBG("Path = %s", path);
 
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_OBJECT_PATH,
@@ -382,7 +409,7 @@ static void __bt_hdp_internal_handle_disconnect(DBusMessage *msg)
 		return;
 	}
 
-	BT_DBG("Channel Deleted, Path = %s", obj_channel_path);
+	BT_INFO("Channel Deleted, Path = %s", obj_channel_path);
 
 	info = __bt_hdp_internal_gslist_obj_find_using_path(obj_channel_path);
 	if (!info) {
@@ -400,7 +427,7 @@ static void __bt_hdp_internal_handle_disconnect(DBusMessage *msg)
 
 	user_info = _bt_get_user_data(BT_COMMON);
 
-	if (user_info) {
+	if (user_info->cb) {
 		_bt_common_event_cb(BLUETOOTH_EVENT_HDP_DISCONNECTED,
 				BLUETOOTH_ERROR_NONE, &dis_ind,
 				user_info->cb, user_info->user_data);
@@ -426,7 +453,7 @@ static void __bt_hdp_internal_handle_property_changed(DBusMessage *msg)
 	dbus_message_iter_init(msg, &item_iter);
 
 	if (dbus_message_iter_get_arg_type(&item_iter) != DBUS_TYPE_STRING) {
-		BT_DBG("This is bad format dbus");
+		BT_ERR("This is bad format dbus");
 		return;
 	}
 
@@ -437,7 +464,7 @@ static void __bt_hdp_internal_handle_property_changed(DBusMessage *msg)
 	BT_DBG("Property (%s)\n", property);
 
 	if (0 == g_strcmp0(property, "MainChannel")) {
-		BT_DBG("Property MainChannel received");
+		BT_INFO("Property MainChannel received");
 
 		dbus_message_iter_next(&item_iter);
 
@@ -470,6 +497,7 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 	DBusError err;
 	int fd;
 	bt_user_info_t *user_info;
+	char *dev_path;
 
 	BT_DBG("+");
 
@@ -516,7 +544,11 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 	BT_DBG("File Descriptor = %d, Dev_path = %s \n", fd, path);
 
 	msg = dbus_message_new_method_call(BT_BLUEZ_NAME, path,
-			BLUEZ_HDP_CHANNEL_INTERFACE, "GetProperties");
+			BT_PROPERTIES_INTERFACE, "GetAll");
+	dev_path = g_strdup(BLUEZ_HDP_CHANNEL_INTERFACE);
+	dbus_message_append_args(msg, DBUS_TYPE_STRING, &dev_path,
+					DBUS_TYPE_INVALID);
+	g_free(dev_path);
 
 	retv_if(msg == NULL, BLUETOOTH_ERROR_INTERNAL);
 
@@ -597,16 +629,15 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 
 	/*Only process register with app handle receive the Connected event */
 	if (NULL == list) {
-		BT_DBG("**** Could not locate the list for %s*****\n", app_handle);
+		BT_ERR("**** Could not locate the list for %s*****\n", app_handle);
 		goto error;
 	}
 
 	hdp_obj_info_t *info = g_new0(hdp_obj_info_t, 1);
 	info->fd = fd;
 	info->obj_channel_path = g_strdup(path);
+	info->watch_id = __bt_hdp_internal_watch_fd(fd, info->obj_channel_path);
 	list->obj_info = g_slist_append(list->obj_info, info);
-
-	__bt_hdp_internal_watch_fd(fd, info->obj_channel_path);
 
 	_bt_device_path_to_address(path, address);
 
@@ -622,7 +653,7 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 
 	user_info = _bt_get_user_data(BT_COMMON);
 
-	if (user_info) {
+	if (user_info->cb) {
 		_bt_common_event_cb(BLUETOOTH_EVENT_HDP_CONNECTED,
 				BLUETOOTH_ERROR_NONE, &conn_ind,
 				user_info->cb, user_info->user_data);
@@ -639,9 +670,10 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 	return BLUETOOTH_ERROR_INTERNAL;
 }
 
-static void __bt_hdp_internal_watch_fd(int file_desc, const char *path)
+static guint __bt_hdp_internal_watch_fd(int file_desc, const char *path)
 {
 	GIOChannel *gio;
+	guint id;
 
 	BT_DBG("+");
 
@@ -649,9 +681,10 @@ static void __bt_hdp_internal_watch_fd(int file_desc, const char *path)
 
 	g_io_channel_set_close_on_unref(gio, TRUE);
 
-	g_io_add_watch(gio, G_IO_IN | G_IO_ERR | G_IO_HUP | G_IO_NVAL,
+	id = g_io_add_watch(gio, G_IO_IN | G_IO_ERR | G_IO_HUP | G_IO_NVAL,
 			__bt_hdp_internal_data_received, (void *)path);
 	BT_DBG("-");
+	return id;
 }
 
 
@@ -663,7 +696,7 @@ static void __bt_hdp_internal_handle_disconnect_cb(int sk, const char *path)
 	hdp_obj_info_t *info;
 	bt_user_info_t *user_info;
 
-	BT_DBG("******** Socket Error  ******\n");
+	BT_INFO("******** Socket Error  ******\n");
 
 	info = __bt_hdp_internal_gslist_obj_find_using_path(path);
 	ret_if(info == NULL);
@@ -678,7 +711,7 @@ static void __bt_hdp_internal_handle_disconnect_cb(int sk, const char *path)
 
 	user_info = _bt_get_user_data(BT_COMMON);
 
-	if (user_info) {
+	if (user_info->cb) {
 		_bt_common_event_cb(BLUETOOTH_EVENT_HDP_DISCONNECTED,
 				BLUETOOTH_ERROR_NONE, &dis_ind,
 				user_info->cb, user_info->user_data);
@@ -714,7 +747,7 @@ static gboolean __bt_hdp_internal_data_received(GIOChannel *gio,
 	if (act_read > 0) {
 		BT_DBG("Received data of %d\n", act_read);
 	} else {
-		BT_DBG("Read failed.....\n");
+		BT_ERR("Read failed.....\n");
 		return FALSE;
 	}
 
@@ -724,7 +757,7 @@ static gboolean __bt_hdp_internal_data_received(GIOChannel *gio,
 
 	user_info = _bt_get_user_data(BT_COMMON);
 
-	if (user_info) {
+	if (user_info->cb) {
 		_bt_common_event_cb(BLUETOOTH_EVENT_HDP_DATA_RECEIVED,
 				BLUETOOTH_ERROR_NONE, &data_ind,
 				user_info->cb, user_info->user_data);
@@ -829,7 +862,7 @@ static gboolean  __bt_hdp_internal_destroy_application_cb(gpointer data)
 
 	list = __bt_hdp_internal_gslist_find_app_handler((void *)app_handle);
 	if (NULL == list) {
-		BT_DBG("**** list not found for %s ******\n", app_handle);
+		BT_ERR("**** list not found for %s ******\n", app_handle);
 		return FALSE;
 	}
 
@@ -853,6 +886,7 @@ static int __bt_hdp_internal_destroy_application(const char *app_handle)
 	DBusMessage *reply;
 	DBusError err;
 	DBusConnection *conn;
+	int result = BLUETOOTH_ERROR_NONE;
 
 	conn = _bt_get_system_conn();
 	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -875,10 +909,16 @@ static int __bt_hdp_internal_destroy_application(const char *app_handle)
 
 		if (dbus_error_is_set(&err)) {
 			BT_ERR("%s", err.message);
+
+			if (g_strrstr(err.message, BT_ACCESS_DENIED_MSG))
+				result  = BLUETOOTH_ERROR_ACCESS_DENIED;
+			else
+				result  = BLUETOOTH_ERROR_INTERNAL;
+
 			dbus_error_free(&err);
 		}
 
-		return BLUETOOTH_ERROR_INTERNAL;
+		return result ;
 	}
 
 	dbus_message_unref(reply);
@@ -911,23 +951,48 @@ BT_EXPORT_API int bluetooth_hdp_send_data(unsigned int channel_id,
 {
 	int wbytes = 0;
 	int written = 0;
+	int result;
 
 	BT_DBG("+");
 
 	BT_CHECK_ENABLED(return);
 
 	if ((channel_id == 0) || (NULL == buffer) || (size == 0)) {
-		BT_DBG("Invalid arguments..\n");
+		BT_ERR("Invalid arguments..\n");
 		return BLUETOOTH_ERROR_INVALID_PARAM;
-	} else {
-		while (wbytes < size) {
-			written = write(channel_id, buffer + wbytes, size - wbytes);
-			if (written <= 0) {
-				BT_DBG("write failed..\n");
-				return BLUETOOTH_ERROR_NOT_IN_OPERATION;
-			}
-			wbytes += written;
+	}
+
+	switch (privilege_token) {
+	case 0:
+		result = _bt_check_privilege(BT_BLUEZ_SERVICE, BT_HDP_SEND_DATA);
+
+		if (result == BLUETOOTH_ERROR_NONE) {
+			privilege_token = 1; /* Have a permission */
+		} else if (result == BLUETOOTH_ERROR_PERMISSION_DEINED) {
+			BT_ERR("Don't have a privilege to use this API");
+			privilege_token = -1; /* Don't have a permission */
+			return BLUETOOTH_ERROR_PERMISSION_DEINED;
+		} else {
+			/* Just break - It is not related with permission error */
 		}
+		break;
+	case 1:
+		/* Already have a privilege */
+		break;
+	case -1:
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	default:
+		/* Invalid privilge token value */
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	while (wbytes < size) {
+		written = write(channel_id, buffer + wbytes, size - wbytes);
+		if (written <= 0) {
+			BT_ERR("write failed..\n");
+			return BLUETOOTH_ERROR_NOT_IN_OPERATION;
+		}
+		wbytes += written;
 	}
 
 	return BLUETOOTH_ERROR_NONE;
@@ -953,13 +1018,20 @@ static void __bt_hdp_connect_request_cb(DBusGProxy *hdp_proxy, DBusGProxyCall *c
 
 		user_info = _bt_get_user_data(BT_COMMON);
 
-		if (user_info) {
+		if (user_info->cb) {
 			_bt_common_event_cb(BLUETOOTH_EVENT_HDP_CONNECTED,
 					BLUETOOTH_ERROR_CONNECTION_ERROR, conn_ind,
 					user_info->cb, user_info->user_data);
 		}
 	} else {
 		BT_DBG("Obj Path returned = %s\n", obj_connect_path);
+		user_info = _bt_get_user_data(BT_COMMON);
+
+		if (user_info->cb) {
+			_bt_common_event_cb(BLUETOOTH_EVENT_HDP_CONNECTED,
+					BLUETOOTH_ERROR_NONE, conn_ind,
+					user_info->cb, user_info->user_data);
+		}
 		g_free(obj_connect_path);
 	}
 	g_free((void *)conn_ind->app_handle);
@@ -986,6 +1058,12 @@ BT_EXPORT_API int bluetooth_hdp_connect(const char *app_handle,
 	BT_CHECK_PARAMETER(app_handle, return);
 	BT_CHECK_PARAMETER(device_address, return);
 
+	if (_bt_check_privilege(BT_BLUEZ_SERVICE, BT_HDP_CONNECT)
+	     == BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have a privilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
+
 	if (channel_type == HDP_QOS_RELIABLE) {
 		role = "Reliable";
 	} else if (channel_type == HDP_QOS_STREAMING) {
@@ -1000,13 +1078,14 @@ BT_EXPORT_API int bluetooth_hdp_connect(const char *app_handle,
 	conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, &err);
 
 	if (err != NULL) {
-		BT_DBG("ERROR: Can't get on system bus [%s]", err->message);
+		BT_ERR("ERROR: Can't get on system bus [%s]", err->message);
 		g_error_free(err);
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
 	/* If the adapter path is wrong, we can think the BT is not enabled. */
-	if (_bt_get_adapter_path(conn, default_adapter_path) < 0) {
+	if (_bt_get_adapter_path(_bt_gdbus_get_system_gconn(),
+					default_adapter_path) < 0) {
 		BT_ERR("Could not get adapter path\n");
 		dbus_g_connection_unref(conn);
 		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
@@ -1033,7 +1112,7 @@ BT_EXPORT_API int bluetooth_hdp_connect(const char *app_handle,
 	dbus_g_connection_unref(conn);
 
 	if (hdp_proxy == NULL) {
-		BT_DBG("Failed to get the HDP server proxy\n");
+		BT_ERR("Failed to get the HDP server proxy\n");
 		g_free(dev_path);
 		return BLUETOOTH_ERROR_NOT_PAIRED;
 	}
@@ -1075,19 +1154,28 @@ static void __bt_hdp_disconnect_request_cb(DBusGProxy *hdp_proxy, DBusGProxyCall
 
 	g_object_unref(hdp_proxy);
 
+	user_info = _bt_get_user_data(BT_COMMON);
+	if (user_info == NULL || user_info->cb == NULL) {
+		g_free(disconn_ind);
+		if (g_error)
+			g_error_free(g_error);
+		return;
+	}
+
 	if (g_error != NULL) {
 		BT_ERR("HDP disconnection Dbus Call Error: %s\n", g_error->message);
 		g_error_free(g_error);
 
-		user_info = _bt_get_user_data(BT_COMMON);
-
-		if (user_info) {
+		_bt_common_event_cb(BLUETOOTH_EVENT_HDP_DISCONNECTED,
+				BLUETOOTH_ERROR_CONNECTION_ERROR, disconn_ind,
+				user_info->cb, user_info->user_data);
+	} else {
+		if (user_info->cb) {
 			_bt_common_event_cb(BLUETOOTH_EVENT_HDP_DISCONNECTED,
-					BLUETOOTH_ERROR_CONNECTION_ERROR, disconn_ind,
+					BLUETOOTH_ERROR_NONE, disconn_ind,
 					user_info->cb, user_info->user_data);
 		}
-	} else {
-		BT_DBG("HDP disconnection Dbus Call is done\n");
+		BT_INFO("HDP disconnection Dbus Call is done\n");
 	}
 
 	g_free(disconn_ind);
@@ -1109,6 +1197,12 @@ BT_EXPORT_API int bluetooth_hdp_disconnect(unsigned int channel_id,
 	BT_CHECK_ENABLED(return);
 	BT_CHECK_PARAMETER(device_address, return);
 
+	if (_bt_check_privilege(BT_BLUEZ_SERVICE, BT_HDP_DISCONNECT)
+	     == BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have a privilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
+
 	hdp_obj_info_t *info = __bt_hdp_internal_gslist_obj_find_using_fd(channel_id);
 	if (NULL == info) {
 		BT_ERR("*** Could not locate the list for %d*****\n", channel_id);
@@ -1124,7 +1218,8 @@ BT_EXPORT_API int bluetooth_hdp_disconnect(unsigned int channel_id,
 	}
 
 	/* If the adapter path is wrong, we can think the BT is not enabled. */
-	if (_bt_get_adapter_path(conn, default_adapter_path) < 0) {
+	if (_bt_get_adapter_path(_bt_gdbus_get_system_gconn(),
+					default_adapter_path) < 0) {
 		BT_ERR("Could not get adapter path\n");
 		dbus_g_connection_unref(conn);
 		return BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;

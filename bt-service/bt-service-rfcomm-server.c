@@ -1,13 +1,17 @@
 /*
- * bluetooth-frwk
+ * Bluetooth-frwk
  *
- * Copyright (c) 2012 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
+ *
+ * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
+ *		 Girishashok Joshi <girish.joshi@samsung.com>
+ *		 Chanyeol Park <chanyeol.park@samsung.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *              http://www.apache.org/licenses/LICENSE-2.0
+ *		http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -67,7 +71,7 @@ int __bt_rfcomm_assign_server_id(void)
 	while (server_id_used[index] == TRUE) {
 		if (index == latest_id) {
 			/* No available ID */
-			BT_DBG("All request ID is used");
+			BT_ERR("All request ID is used");
 			return -1;
 		}
 
@@ -219,7 +223,7 @@ int __bt_rfcomm_get_socket(int server_id)
 	result = _bt_set_socket_non_blocking(socket_fd);
 
 	if (result != BLUETOOTH_ERROR_NONE) {
-		BT_DBG("Cannot set the tty");
+		BT_ERR("Cannot set the tty");
 		goto fail;
 	}
 
@@ -277,13 +281,12 @@ int _bt_rfcomm_create_socket(char *sender, char *uuid)
 			BT_ERR("Enable Error: %s\n", error->message);
 			g_error_free(error);
 		}
-		g_object_unref(serial_proxy);
 		goto fail;
 	}
 
 	socket_fd = __bt_rfcomm_get_socket(server_id);
 	if (socket_fd < 0) {
-		BT_DBG("Can't get socket");
+		BT_ERR("Can't get socket");
 		goto fail;
 	}
 
@@ -556,7 +559,7 @@ static gboolean __bt_rfcomm_server_connected_cb(GIOChannel *chan,
 
 		req_info = _bt_get_request_info(server_info->accept_id);
 		if (req_info == NULL || req_info->context == NULL) {
-			BT_DBG("info is NULL");
+			BT_ERR("info is NULL");
 			goto done;
 		}
 
@@ -603,7 +606,7 @@ int _bt_rfcomm_listen(int socket_fd, int max_pending, gboolean is_native)
 	retv_if(server_info->control_io != NULL, BLUETOOTH_ERROR_DEVICE_BUSY);
 
 	if (listen(socket_fd, max_pending) != 0) {
-		BT_DBG("Fail to listen");
+		BT_ERR("Fail to listen");
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
@@ -628,7 +631,7 @@ int _bt_rfcomm_listen(int socket_fd, int max_pending, gboolean is_native)
 	} else {
 		server_info->server_type = BT_CUSTOM_SERVER;
 		_bt_register_osp_server_in_agent(BT_RFCOMM_SERVER,
-						server_info->uuid);
+						server_info->uuid, NULL, -1);
 	}
 
 	return BLUETOOTH_ERROR_NONE;
@@ -649,7 +652,7 @@ int _bt_rfcomm_remove_socket(int socket_fd)
 					NULL,
 					G_TYPE_INVALID,
 					G_TYPE_INVALID)) {
-			BT_DBG("Fail to disable");
+			BT_ERR("Fail to disable");
 		}
 	}
 
@@ -659,7 +662,7 @@ int _bt_rfcomm_remove_socket(int socket_fd)
 				G_TYPE_STRING, server_info->serial_path,
 				G_TYPE_INVALID,
 				G_TYPE_INVALID)) {
-			BT_DBG("Fail to remove proxy");
+			BT_ERR("Fail to remove proxy");
 		}
 	}
 
@@ -785,78 +788,25 @@ int _bt_rfcomm_is_uuid_available(char *uuid, gboolean *available)
 	return BLUETOOTH_ERROR_NONE;
 }
 
-gboolean __bt_rfcomm_server_accept_timeout_cb(gpointer user_data)
-{
-	bt_rfcomm_server_info_t *server_info;
-	request_info_t *req_info;
-	GArray *out_param1;
-	GArray *out_param2;
-	int result = BLUETOOTH_ERROR_TIMEOUT;
-
-	server_info = (bt_rfcomm_server_info_t *)user_data;
-
-	/* Already reply in __bt_rfcomm_server_connected_cb */
-	retv_if(server_info == NULL, FALSE);
-	retv_if(server_info->accept_id == 0, FALSE);
-
-	req_info = _bt_get_request_info(server_info->accept_id);
-	if (req_info == NULL || req_info->context == NULL) {
-		BT_ERR("info is NULL");
-		return FALSE;
-	}
-
-	server_info->accept_id = 0;
-
-	out_param1 = g_array_new(FALSE, FALSE, sizeof(gchar));
-	out_param2 = g_array_new(FALSE, FALSE, sizeof(gchar));
-
-	g_array_append_vals(out_param2, &result, sizeof(int));
-
-	dbus_g_method_return(req_info->context, out_param1, out_param2);
-
-	g_array_free(out_param1, TRUE);
-	g_array_free(out_param2, TRUE);
-
-	_bt_delete_request_list(req_info->req_id);
-
-	return FALSE;
-}
-
 /* To support the BOT  */
-int _bt_rfcomm_accept_connection(int server_fd, int request_id)
+int _bt_rfcomm_accept_connection(void)
 {
-	bt_rfcomm_server_info_t *server_info;
-
-	server_info = __bt_rfcomm_get_server_info(server_fd);
-	retv_if(server_info == NULL, BLUETOOTH_ERROR_INVALID_PARAM);
-	retv_if(server_info->server_type != BT_CUSTOM_SERVER,
-					BLUETOOTH_ERROR_INVALID_PARAM);
-
+	BT_DBG("+");
 	if (!_bt_agent_reply_authorize(TRUE))
 		return BLUETOOTH_ERROR_INTERNAL;
 
-	server_info->accept_id = request_id;
-
-	g_timeout_add(BT_SERVER_ACCEPT_TIMEOUT,
-			(GSourceFunc)__bt_rfcomm_server_accept_timeout_cb,
-			server_info);
-
+	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
 }
 
 /* To support the BOT  */
-int _bt_rfcomm_reject_connection(int server_fd)
+int _bt_rfcomm_reject_connection(void)
 {
-	bt_rfcomm_server_info_t *server_info;
-
-	server_info = __bt_rfcomm_get_server_info(server_fd);
-	retv_if(server_info == NULL, BLUETOOTH_ERROR_INVALID_PARAM);
-	retv_if(server_info->server_type != BT_CUSTOM_SERVER,
-					BLUETOOTH_ERROR_INVALID_PARAM);
-
+	BT_DBG("+");
 	if (!_bt_agent_reply_authorize(FALSE))
 		return BLUETOOTH_ERROR_INTERNAL;
 
+	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
 }
 

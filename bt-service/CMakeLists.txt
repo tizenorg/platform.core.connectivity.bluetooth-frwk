@@ -5,10 +5,12 @@ SET(SRCS
 marshal.c
 bt-service-main.c
 bt-service-event-sender.c
+bt-service-headset-connection.c
 bt-service-event-receiver.c
 bt-service-common.c
 bt-service-util.c
 bt-service-adapter.c
+bt-service-adapter-le.c
 bt-service-device.c
 bt-service-hid.c
 bt-service-network.c
@@ -23,6 +25,7 @@ bt-service-avrcp.c
 bt-request-handler.c
 bt-service-agent.c
 bt-service-gap-agent.c
+bt-service-pbap.c
 )
 
 IF(LIBNOTIFY_SUPPORT)
@@ -45,15 +48,33 @@ MESSAGE("Build type: ${CMAKE_BUILD_TYPE}")
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-INCLUDE(FindPkgConfig)
+SET(PKG_MODULES
+	vconf
+	aul
+	vconf
+	syspopup-caller
+	dbus-glib-1
+	status
+	alarm-service
+	notification
+#	libnotify
+#	gdk-pixbuf-2.0
+#	gtk+-3.0
+	capi-content-mime-type
+	capi-network-connection
+	pkgmgr
+#	journal
+	libprivilege-control
+)
 
-IF(LIBNOTIFY_SUPPORT)
-	pkg_check_modules(service_pkgs REQUIRED vconf aul vconf dbus-glib-1 capi-network-tethering libprivilege-control status alarm-service notification libnotify gdk-pixbuf-2.0 gtk+-3.0)
-ELSEIF(LIBNOTIFICATION_SUPPORT)
-	pkg_check_modules(service_pkgs REQUIRED vconf aul dbus-glib-1 capi-network-tethering libprivilege-control status alarm-service notification)
-ELSE()
-	pkg_check_modules(service_pkgs REQUIRED vconf aul vconf syspopup-caller dbus-glib-1 capi-network-tethering libprivilege-control status alarm-service notification)
-ENDIF(LIBNOTIFY_SUPPORT)
+IF("$ENV{CFLAGS}" MATCHES "-DTIZEN_NETWORK_TETHERING_ENABLE")
+SET(PKG_MODULES ${PKG_MODULES}
+	capi-network-tethering
+)
+ENDIF()
+
+INCLUDE(FindPkgConfig)
+pkg_check_modules(service_pkgs REQUIRED ${PKG_MODULES})
 
 FOREACH(flag ${service_pkgs_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag} -Wall")
@@ -78,7 +99,9 @@ EXEC_PROGRAM("${MARSHALTOOL}" ARGS "--prefix=marshal ${CMAKE_CURRENT_SOURCE_DIR}
 FIND_PROGRAM(DBUS_BINDING_TOOL NAMES dbus-binding-tool)
 EXEC_PROGRAM("${DBUS_BINDING_TOOL}" ARGS "--prefix=bt ${CMAKE_CURRENT_SOURCE_DIR}/bt-request-service.xml --mode=glib-server --output=${CMAKE_CURRENT_SOURCE_DIR}/include/bt-service-method.h")
 EXEC_PROGRAM("${DBUS_BINDING_TOOL}" ARGS "--prefix=bt_obex_agent ${CMAKE_CURRENT_SOURCE_DIR}/bt-service-obex-agent.xml --mode=glib-server --output=${CMAKE_CURRENT_SOURCE_DIR}/include/bt-obex-agent-method.h")
-EXEC_PROGRAM("${DBUS_BINDING_TOOL}" ARGS "--prefix=gap_agent ${CMAKE_CURRENT_SOURCE_DIR}/bt-service-gap-agent.xml --mode=glib-server --output=${CMAKE_CURRENT_SOURCE_DIR}/include/bt-gap-agent-method.h")
+
+EXEC_PROGRAM("${DBUS_BINDING_TOOL}" ARGS "--prefix=gap_agent ${CMAKE_CURRENT_SOURCE_DIR}/bt-service-gap-agent1.xml --mode=glib-server --output=${CMAKE_CURRENT_SOURCE_DIR}/include/bt-gap-agent-method.h")
+
 EXEC_PROGRAM("${DBUS_BINDING_TOOL}" ARGS "--prefix=bt_media_agent ${CMAKE_CURRENT_SOURCE_DIR}/bt-service-media-agent.xml --mode=glib-server --output=${CMAKE_CURRENT_SOURCE_DIR}/include/bt-media-agent-method.h")
 
 ADD_DEFINITIONS("-DPREFIX=\"${CMAKE_INSTALL_PREFIX}\"")
@@ -105,16 +128,22 @@ ELSE(LIBNOTIFY_SUPPORT)
 	TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS})
 ENDIF(LIBNOTIFY_SUPPORT)
 
-
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service.in ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service DESTINATION share/dbus-1/system-services)
 INSTALL(TARGETS ${PROJECT_NAME} DESTINATION bin)
 
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/auto-pair-blacklist DESTINATION /opt/var/lib/bluetooth)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/auto-pair-blacklist DESTINATION /opt/var/lib/bluetooth/)
 
 # install booting script
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service.conf.in ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service.conf)
-install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service.conf DESTINATION /etc/dbus-1/system.d)
+
+IF (TIZEN_WEARABLE)
+	INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/wearable/stack_info DESTINATION /usr/etc/bluetooth/)
+ELSE ()
+	INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/mobile/stack_info DESTINATION /usr/etc/bluetooth/)
+ENDIF (TIZEN_WEARABLE)
+
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service.conf DESTINATION /etc/dbus-1/system.d)
+
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
-

@@ -1,13 +1,17 @@
 /*
- * bluetooth-frwk
+ * Bluetooth-frwk
  *
- * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
+ *
+ * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
+ *		 Girishashok Joshi <girish.joshi@samsung.com>
+ *		 Chanyeol Park <chanyeol.park@samsung.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *              http://www.apache.org/licenses/LICENSE-2.0
+ *		http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +20,7 @@
  * limitations under the License.
  *
  */
+
 
 #ifndef _BT_SERVICE_COMMON_H_
 #define _BT_SERVICE_COMMON_H_
@@ -34,10 +39,35 @@ extern "C" {
 #undef LOG_TAG
 #define LOG_TAG "BLUETOOTH_FRWK_SERVICE"
 
+#ifdef FUNCTION_TRACE
+#define	FN_START BT_DBG("[ENTER FUNC]")
+#define	FN_END BT_DBG("[EXIT FUNC]")
+#else
+#define	FN_START
+#define	FN_END
+#endif
+
+#define LOG_COLOR_RESET    "\033[0m"
+#define LOG_COLOR_RED      "\033[31m"
+#define LOG_COLOR_YELLOW   "\033[33m"
+#define LOG_COLOR_GREEN         "\033[32m"
+#define LOG_COLOR_BLUE          "\033[36m"
+#define LOG_COLOR_PURPLE   "\033[35m"
+
 #define BT_DBG(fmt, args...) \
         SLOGD(fmt, ##args)
+#define BT_INFO(fmt, args...) \
+        SLOGI(fmt, ##args)
 #define BT_ERR(fmt, args...) \
         SLOGE(fmt, ##args)
+
+#define BT_INFO_C(fmt, arg...) \
+	SLOGI_IF(TRUE,  LOG_COLOR_GREEN" "fmt" "LOG_COLOR_RESET, ##arg)
+#define BT_ERR_C(fmt, arg...) \
+	SLOGI_IF(TRUE,  LOG_COLOR_RED" "fmt" "LOG_COLOR_RESET, ##arg)
+
+#define DBG_SECURE(fmt, args...) SECURE_SLOGD(fmt, ##args)
+#define ERR_SECURE(fmt, args...) SECURE_SLOGE(fmt, ##args)
 
 #define ret_if(expr) \
 	do { \
@@ -74,7 +104,7 @@ extern "C" {
 #define BT_AGENT_NEW_LINE "\r\n"
 
 #define BT_MAX_DBUS_TIMEOUT 45000
-#define BT_ENABLE_TIMEOUT 5000 /* 5 seconds */
+#define BT_ENABLE_TIMEOUT 20000 /* 20 seconds */
 #define BT_DISCOVERY_FINISHED_DELAY 200
 
 #define MANAGER_EVENT_MATCH_RULE \
@@ -95,6 +125,7 @@ extern "C" {
 			"was broken."
 
 #define BT_BLUEZ_NAME "org.bluez"
+
 #define BT_BLUEZ_PATH "/org/bluez"
 #define BT_BLUEZ_HCI_PATH "/org/bluez/hci0"
 #define BT_BLUEZ_HCI_DEV_PATH "/org/bluez/hci0/dev"
@@ -103,14 +134,22 @@ extern "C" {
 #define BT_DEVICE_AGENT_PATH "/org/tizen/device_agent"
 #define BT_ADAPTER_AGENT_PATH "/org/tizen/adapter_agent"
 #define BT_MANAGER_PATH "/"
+
+
 #define BT_MANAGER_INTERFACE "org.freedesktop.DBus.ObjectManager"
 #define BT_ADAPTER_INTERFACE "org.bluez.Adapter1"
 #define BT_AGENT_INTERFACE "org.bluez.Agent1"
 #define BT_AGENT_MANAGER_INTERFACE "org.bluez.AgentManager1"
 #define BT_DEVICE_INTERFACE "org.bluez.Device1"
-#define BT_INPUT_INTERFACE "org.bluez.Input"
-#define BT_NETWORK_INTERFACE "org.bluez.Network1"
 #define BT_NETWORK_SERVER_INTERFACE "org.bluez.NetworkServer1"
+#define BT_MEDIA_INTERFACE "org.bluez.Media1"
+#define BT_MEDIA_PLAYER_INTERFACE "org.mpris.MediaPlayer2.Player"
+#define BT_MEDIATRANSPORT_INTERFACE "org.bluez.MediaTransport1"
+#define BT_MEDIA_CONTROL_INTERFACE "org.bluez.MediaControl1"
+#define BT_PLAYER_CONTROL_INTERFACE "org.bluez.MediaPlayer1"
+
+#define BT_INPUT_INTERFACE "org.bluez.Input"
+#define BT_NETWORK_INTERFACE "org.bluez.Network"
 #define BT_NETWORK_CLIENT_INTERFACE "org.bluez.Network1"
 #define BT_SERIAL_INTERFACE "org.bluez.Serial"
 #define BT_SERIAL_MANAGER_INTERFACE "org.bluez.SerialProxyManager"
@@ -118,29 +157,35 @@ extern "C" {
 #define BT_HFP_AGENT_INTERFACE "Org.Hfp.App.Interface"
 #define BT_SINK_INTERFACE "org.bluez.AudioSink"
 #define BT_AUDIO_INTERFACE "org.bluez.Audio"
+#define BT_HEADSET_INTERFACE "org.bluez.Headset"
 #define BT_OOB_INTERFACE "org.bluez.OutOfBand"
-#define BT_MEDIA_INTERFACE "org.bluez.Media1"
-#define BT_MEDIA_PLAYER_INTERFACE "org.mpris.MediaPlayer2.Player"
+#define BT_HANDSFREE_GATEWAY_INTERFACE "org.bluez.HandsfreeGateway"
 #define BT_OBEXD_DBUS_NAME "org.bluez.obex"
 #define BT_OBEXD_MANAGER_INTERFACE "org.bluez.obex.AgentManager1"
 #define BT_OBEXD_TRANSFER_INTERFACE "org.bluez.obex.Transfer1"
+
 #define BT_PROPERTIES_INTERFACE "org.freedesktop.DBus.Properties"
-#define BT_MEDIA_CONTROL_INTERFACE "org.bluez.MediaControl1"
+
 #define MPRIS_PLAYER_INTERFACE "org.mpris.MediaPlayer2.Player"
 
 #define BT_OBEX_SERVICE_NAME "org.bluez.obex"
-
 #define BT_OBEX_CLIENT_PATH "/org/bluez/obex"
 #define BT_OBEX_CLIENT_INTERFACE "org.bluez.obex.Client1"
-#define BT_OBEX_OBJECT_PUSH_INTERFACE "org.bluez.obex.ObjectPush1"
+
+
+
 #define BT_OBEX_TRANSFER_INTERFACE "org.bluez.obex.Transfer1"
 #define BT_OBEX_AGENT_INTERFACE "org.bluez.obex.Agent1"
 
-#define BT_SESSION_BASEPATH_SERVER "/org/bluez/obex/server"
-#define BT_SESSION_BASEPATH_CLIENT "/org/bluez/obex/client"
+
+
+#define BT_OBEXD_DBUS_NAME "org.bluez.obex"
+#define BT_OBEX_OBJECT_PUSH_INTERFACE "org.bluez.obex.ObjectPush1"
+
 
 #define BT_FREEDESKTOP_INTERFACE "org.freedesktop.DBus"
 #define BT_FREEDESKTOP_PATH "/org/freedesktop/DBus"
+
 
 #define BT_INTERFACES_ADDED "InterfacesAdded"
 #define BT_INTERFACES_REMOVED "InterfacesRemoved"
@@ -148,6 +193,14 @@ extern "C" {
 #define BT_PROPERTIES_CHANGED "PropertiesChanged"
 #define DBUS_INTERFACE_OBJECT_MANAGER "/"
 
+
+
+#define BT_SESSION_BASEPATH_SERVER "/org/bluez/obex/server"
+#define BT_SESSION_BASEPATH_CLIENT "/org/bluez/obex/client"
+
+#define BT_SERVICE_ERR_MSG_NOT_SUPPORTED "Operation is not supported"
+
+/* UUID */
 #define GENERIC_AUDIO_UUID      "00001203-0000-1000-8000-00805f9b34fb"
 
 #define HSP_HS_UUID             "00001108-0000-1000-8000-00805f9b34fb"
@@ -166,13 +219,64 @@ extern "C" {
 
 #define HID_UUID                "00001124-0000-1000-8000-00805f9b34fb"
 #define PNP_UUID                "00001200-0000-1000-8000-00805f9b34fb"
+#define RFCOMM_UUID_STR		"00000003-0000-1000-8000-00805f9b34fb"
+#define PANU_UUID		"00001115-0000-1000-8000-00805f9b34fb"
+#define NAP_UUID		"00001116-0000-1000-8000-00805f9b34fb"
+#define OBEX_PSE_UUID		"0000112f-0000-1000-8000-00805f9b34fb"
+#define GATT_UUID		"00001801-0000-1000-8000-00805f9b34fb"
+
+/* Privilege */
+#define BT_PRIVILEGE_PUBLIC "bt-service::public"
+#define BT_PRIVILEGE_PLATFORM "bt-service::platform"
+
+/* BD Address type */
+#define BDADDR_BREDR           0x00
+#define BDADDR_LE_PUBLIC       0x01
+#define BDADDR_LE_RANDOM       0x02
+
+/* Advertising report event types */
+#define BT_LE_ADV_IND		0x00
+#define BT_LE_ADV_DIRECT_IND	0x01
+#define BT_LE_ADV_SCAN_IND		0x02
+#define BT_LE_ADV_NONCONN_IND	0x03
+#define BT_LE_ADV_SCAN_RSP		0x04
 
 #define BT_STOP_DISCOVERY_TIMEOUT 1000*15
 
+/* Profile states matched to btd_service_state_t of bluez service.h */
 typedef enum {
-	BT_OBEX_SERVER = 0x00,
-	BT_RFCOMM_SERVER = 0x01,
-} bt_osp_server_type_t;
+	BT_PROFILE_STATE_UNAVAILABLE,
+	BT_PROFILE_STATE_DISCONNECTED,
+	BT_PROFILE_STATE_CONNECTING,
+	BT_PROFILE_STATE_CONNECTED,
+	BT_PROFILE_STATE_DISCONNECTING,
+} bt_profile_state_t;
+
+typedef enum {
+	BT_ADV_IND_INFO = 0x00,
+	BT_SCAN_RSP_INFO = 0x01,
+} bt_le_device_info_type_t;
+
+typedef enum {
+	BT_PROFILE_CONN_RFCOMM= 0x01,
+	BT_PROFILE_CONN_A2DP= 0x02,
+	BT_PROFILE_CONN_HSP= 0x04,
+	BT_PROFILE_CONN_HID= 0x08,
+	BT_PROFILE_CONN_NAP= 0x10,
+	BT_PROFILE_CONN_HFG= 0x20,
+	BT_PROFILE_CONN_GATT= 0x40,
+	BT_PROFILE_CONN_ALL= 0x80,
+} bt_profile_type_t;
+
+typedef struct {
+	char *address;
+	int addr_type;
+	int rssi;
+	int adv_type;
+	bt_le_device_info_type_t dev_type;
+	int adv_data_len;
+	char *adv_data;
+} bt_remote_le_dev_info_t;
 
 typedef struct {
 	int rssi;
@@ -184,6 +288,12 @@ typedef struct {
 	gboolean paired;
 	gboolean connected;
 	gboolean trust;
+	char *manufacturer_data;
+	int manufacturer_data_len;
+	guchar addr_type;
+#if 0 /* Should match with bt_dev_info_t in bluetooth-api.h */
+	bt_remote_le_dev_info_t le_dev_info;
+#endif
 } bt_remote_dev_info_t;
 
 /* RFCOMM client /server will use this structure*/
@@ -207,11 +317,23 @@ DBusGConnection *_bt_get_system_gconn(void);
 
 DBusGConnection *_bt_get_session_gconn(void);
 
+void *_bt_get_net_conn(void);
+
 DBusGProxy *_bt_get_manager_proxy(void);
 
 DBusGProxy *_bt_get_adapter_proxy(void);
 
 DBusGProxy *_bt_get_adapter_properties_proxy(void);
+
+char *_bt_get_device_object_path(char *address);
+
+char *_bt_get_profile_uuid128(bt_profile_type_t profile_type);
+
+char *_bt_convert_error_to_string(int error);
+
+char * _bt_convert_disc_reason_to_string(int reason);
+
+void _bt_logging_connection(gboolean connect, int addr_type);
 
 char *_bt_get_adapter_path(void);
 
@@ -235,7 +357,13 @@ void _bt_divide_device_class(bluetooth_device_class_t *device_class,
 
 void _bt_free_device_info(bt_remote_dev_info_t *dev_info);
 
-int _bt_register_osp_server_in_agent(int type, char *uuid);
+void _bt_free_le_device_info(bt_remote_le_dev_info_t *le_dev_info);
+
+int _bt_copy_utf8_string(char *dest, const char *src, unsigned int length);
+
+gboolean _bt_utf8_validate(char *name);
+
+int _bt_register_osp_server_in_agent(int type, char *uuid, char *path, int fd);
 
 int _bt_unregister_osp_server_in_agent(int type, char *uuid);
 

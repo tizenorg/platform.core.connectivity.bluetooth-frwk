@@ -1,13 +1,17 @@
 /*
- * bluetooth-frwk
+ * Bluetooth-frwk
  *
- * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
+ *
+ * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
+ *		 Girishashok Joshi <girish.joshi@samsung.com>
+ *		 Chanyeol Park <chanyeol.park@samsung.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *              http://www.apache.org/licenses/LICENSE-2.0
+ *		http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -38,13 +42,18 @@ extern "C" {
  */
 
 #define BLUETOOTH_ADDRESS_LENGTH            6 /**< This specifies bluetooth device address length */
+#define BLUETOOTH_VERSION_LENGTH_MAX       30 /**< This specifies bluetooth device version length */
 #define BLUETOOTH_INTERFACE_NAME_LENGTH        16
 #define BLUETOOTH_DEVICE_NAME_LENGTH_MAX       248 /**< This specifies maximum device name length */
+#define BLUETOOTH_ADVERTISING_DATA_LENGTH_MAX	31 /**< This specifies maximum AD data length */
+#define BLUETOOTH_SCAN_RESP_DATA_LENGTH_MAX     31 /**< This specifies maximum LE Scan response data length */
+#define BLUETOOTH_MANUFACTURER_DATA_LENGTH_MAX	240 /**< This specifies maximum manufacturer data length */
 
 #define BLUETOOTH_MAX_SERVICES_FOR_DEVICE       40  /**< This specifies maximum number of services
 							a device can support */
 
 #define BLUETOOTH_UUID_STRING_MAX 50
+#define BLUETOOTH_PATH_STRING 50
 
 #define BLUETOOTH_OOB_DATA_LENGTH		16
 /**
@@ -52,6 +61,17 @@ extern "C" {
  */
 #define RFCOMM_ROLE_SERVER 1
 #define RFCOMM_ROLE_CLIENT 2
+
+/**
+ * This is RFCOMM default Channel Value
+ */
+#define RFCOMM_DEFAULT_PROFILE_CHANNEL 0
+
+/**
+ * This is maximum length for search value string for PBAP Phonebook Search
+ */
+#define BLUETOOTH_PBAP_MAX_SEARCH_VALUE_LENGTH 100
+
 
 /**
  * This is Bluetooth error code
@@ -135,6 +155,24 @@ extern "C" {
 #define BLUETOOTH_ERROR_ALREADY_INITIALIZED    ((int)BLUETOOTH_ERROR_BASE - 0x23)
 								/**< Already initialized */
 
+#define BLUETOOTH_ERROR_PERMISSION_DEINED    ((int)BLUETOOTH_ERROR_BASE - 0x24)
+								/**< Permission deined */
+
+#define BLUETOOTH_ERROR_ALREADY_DEACTIVATED    ((int)BLUETOOTH_ERROR_BASE - 0x25)
+								/**< Nap already done */
+
+#define BLUETOOTH_ERROR_NOT_INITIALIZED    ((int)BLUETOOTH_ERROR_BASE - 0x26)
+								/**< Not initialized */
+
+/**
+* Device disconnect reason
+*/
+typedef enum {
+	BLUETOOTH_DEVICE_DISCONNECT_UNKNOWN,
+	BLUETOOTH_DEVICE_DISCONNECT_TIMEOUT,
+	BLUETOOTH_DEVICE_DISCONNECT_LOCAL_HOST,
+	BLUETOOTH_DEVICE_DISCONNECT_REMOTE,
+} bluetooth_device_disconnect_reason_t;
 
 /**
  * This is Bluetooth device address type, fixed to 6 bytes ##:##:##:##:##:##
@@ -144,11 +182,35 @@ typedef struct {
 } bluetooth_device_address_t;
 
 /**
+ * This is Bluetooth device address type
+ */
+typedef enum
+{
+	BLUETOOTH_DEVICE_PUBLIC_ADDRESS = 0x00,
+	BLUETOOTH_DEVICE_RANDOM_ADDRESS
+} bluetooth_device_address_type_t;
+
+/**
+ * This is Bluetooth version
+ */
+typedef struct {
+	char version[BLUETOOTH_VERSION_LENGTH_MAX + 1];
+} bluetooth_version_t;
+
+/**
  * This is Bluetooth device name type, maximum size of Bluetooth device name is 248 bytes
  */
 typedef struct {
 	char name[BLUETOOTH_DEVICE_NAME_LENGTH_MAX + 1];
 } bluetooth_device_name_t;
+
+/**
+ * This is Bluetooth manufacturer specific data, maximum size of data is 240 bytes
+ */
+typedef struct {
+	int data_len;		/**< manafacturer specific data length */
+	char data[BLUETOOTH_MANUFACTURER_DATA_LENGTH_MAX];
+} bluetooth_manufacturer_data_t;
 
 /**
  * Adapter state
@@ -159,6 +221,16 @@ typedef enum {
 	BLUETOOTH_ADAPTER_CHANGING_ENABLE,  /**< Bluetooth adapter is currently enabling */
 	BLUETOOTH_ADAPTER_CHANGING_DISABLE, /**< Bluetooth adapter is currently disabling */
 } bluetooth_adapter_state_t;
+
+/**
+ * Adapter state
+ */
+typedef enum {
+	BLUETOOTH_ADAPTER_LE_DISABLED,	    /**< Bluetooth adapter le is disabled */
+	BLUETOOTH_ADAPTER_LE_ENABLED,	    /**< Bluetooth adapter le is enabled */
+	BLUETOOTH_ADAPTER_LE_CHANGING_ENABLE,  /**< Bluetooth adapter le is currently enabling */
+	BLUETOOTH_ADAPTER_LE_CHANGING_DISABLE, /**< Bluetooth adapter le is currently disabling */
+} bluetooth_adapter_le_state_t;
 
 /**
  * Discoverable mode
@@ -192,7 +264,122 @@ typedef enum {
 	BLUETOOTH_A2DP_SERVICE = 0x02,
 	BLUETOOTH_HSP_SERVICE = 0x04,
 	BLUETOOTH_HID_SERVICE = 0x08,
+	BLUETOOTH_NAP_SERVICE = 0x10,
+	BLUETOOTH_HFG_SERVICE = 0x20,
+	BLUETOOTH_GATT_SERVICE = 0x40,
+	BLUETOOTH_NAP_SERVER_SERVICE = 0x80,
 } bluetooth_service_type_t;
+
+/**
+ * Service type
+ */
+typedef enum {
+        BLUETOOTH_DEV_CONN_DEFAULT = 0xFF, /* represents that connection
+                                        * type can both BR/EDR and LE */
+        BLUETOOTH_DEV_CONN_BREDR = 0x00,
+        BLUETOOTH_DEV_CONN_LE = 0x01,
+} bluetooth_conn_type_t;
+
+/**
+ * Service type
+ */
+typedef enum {
+	BLUETOOTH_CODEC_ID_CVSD = 0x01,
+	BLUETOOTH_CODEC_ID_MSBC = 0x02,
+} bluetooth_codec_type_t;
+
+/**
+ * Service type
+ */
+typedef enum {
+	BLUETOOTH_HF_AUDIO_DISCONNECTED = 0x00,
+	BLUETOOTH_HF_AUDIO_CONNECTED = 0x01,
+} bluetooth_hf_audio_connected_type_t;
+
+/**
+ * Advertising data
+ */
+typedef struct {
+	guint8 data[BLUETOOTH_ADVERTISING_DATA_LENGTH_MAX];
+} bluetooth_advertising_data_t;
+
+/**
+ * Scan response data
+ */
+typedef struct {
+	guint8 data[BLUETOOTH_SCAN_RESP_DATA_LENGTH_MAX];
+} bluetooth_scan_resp_data_t;
+
+/**
+ * Advertising filter policy
+ */
+typedef enum {
+	BLUETOOTH_ALLOW_SCAN_CONN_ALL = 0x00,
+	BLUETOOTH_ALLOW_CONN_ALL_SCAN_WHITE_LIST = 0x01,
+	BLUETOOTH_ALLOW_SCAN_ALL_CONN_WHITE_LIST = 0x02,
+	BLUETOOTH_ALLOW_SCAN_CONN_WHITE_LIST = 0x03,
+} bluetooth_advertising_filter_policy_t;
+
+/**
+ * Advertising type
+ */
+typedef enum {
+	BLUETOOTH_ADV_CONNECTABLE = 0x00, /* ADV_IND */
+	BLUETOOTH_ADV_CONNECTABLE_DIRECT_HIGH = 0x01, /* ADV_DIRECT_IND, high duty cycle */
+	BLUETOOTH_ADV_SCANNABLE = 0x02, /* ADV_SCAN_IND */
+	BLUETOOTH_ADV_NON_CONNECTABLE = 0x03, /* ADV_NONCOND_IND */
+	BLUETOOTH_ADV_CONNECTABLE_DIRECT_LOW = 0x04, /* ADV_DIRECT_IND, low duty cycle */
+} bluetooth_advertising_type_t;
+
+typedef enum
+{
+	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_BROADCAST = 0x01,
+	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ = 0x02,
+	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE_NO_RESPONSE = 0x04,
+	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE = 0x08,
+	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_NOTIFY = 0x10,
+	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_INDICATE = 0x20,
+	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_SIGNED_WRITE = 0x40,
+	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_EXTENDED_PROPS = 0x80
+}bt_gatt_characteristic_property_t;
+
+/**
+* Advertising parameters
+*/
+typedef struct {
+	float interval_min;
+	float interval_max;
+	guint8 filter_policy;
+	guint8 type;
+} bluetooth_advertising_params_t;
+
+/**
+* LE Scan parameters
+*/
+typedef struct {
+	int type;  /**< passive 0, active 1 */
+	float interval;  /**< LE scan interval */
+	float window;  /**< LE scan window */
+} bluetooth_le_scan_params_t;
+
+/*
+	LE Connection Update
+ */
+typedef struct {
+	guint16 interval_min;
+	guint16 interval_max;
+	guint16 latency;
+	guint16 time_out;
+} bluetooth_le_conn_update_t;
+
+/**
+ * Samsung XSAT Vendor dependent command
+ */
+typedef struct {
+	gint app_id;
+	char *message;
+} bluetooth_vendor_dep_at_cmd_t;
+
 
 #define BLUETOOTH_EVENT_BASE            ((int)(0x0000))		/**< No event */
 #define BLUETOOTH_EVENT_GAP_BASE        ((int)(BLUETOOTH_EVENT_BASE + 0x0010))
@@ -216,6 +403,12 @@ typedef enum {
 								/**< Base ID for Audio events */
 #define BLUETOOTH_EVENT_HID_BASE ((int)(BLUETOOTH_EVENT_AUDIO_BASE + 0x0020))
 								/**< Base ID for HID events */
+#define BLUETOOTH_EVENT_ADVERTISING_BASE ((int)(BLUETOOTH_EVENT_HID_BASE + 0x0020))
+								/**< Base ID for Advertising events */
+#define BLUETOOTH_EVENT_PBAP_CLIENT_BASE ((int)(BLUETOOTH_EVENT_ADVERTISING_BASE + 0x0020))
+								/**< Base ID for PBAP Client events */
+#define BLUETOOTH_EVENT_AVRCP_CONTROL_BASE ((int)(BLUETOOTH_EVENT_PBAP_CLIENT_BASE + 0x0020))
+								/**< Base ID for AVRCP events */
 
 /**
  * Bluetooth event type
@@ -225,6 +418,8 @@ typedef enum {
 
 	BLUETOOTH_EVENT_ENABLED,		    /**< Bluetooth event adpater enabled */
 	BLUETOOTH_EVENT_DISABLED,		    /**< Bluetooth event adpater disabled */
+	BLUETOOTH_EVENT_LE_ENABLED,		    /**< Bluetooth event adpater enabled */
+	BLUETOOTH_EVENT_LE_DISABLED,		    /**< Bluetooth event adpater disabled */
 	BLUETOOTH_EVENT_LOCAL_NAME_CHANGED,	    /**< Bluetooth event local name changed*/
 	BLUETOOTH_EVENT_DISCOVERABLE_TIMEOUT_REQUESTED,
 					/**< Bluetooth event Discoverable timeout requested*/
@@ -232,8 +427,10 @@ typedef enum {
 	BLUETOOTH_EVENT_DISCOVERY_OPTION_REQUESTED, /**< Bluetooth event discovery option */
 	BLUETOOTH_EVENT_DISCOVERY_STARTED,	    /**< Bluetooth event discovery started */
 	BLUETOOTH_EVENT_DISCOVERY_FINISHED,	    /**< Bluetooth event discovery finished */
-
 	BLUETOOTH_EVENT_REMOTE_DEVICE_FOUND,	    /**< Bluetooth event remote deice found */
+	BLUETOOTH_EVENT_LE_DISCOVERY_STARTED,		/**< Bluetooth event LE discovery started */
+	BLUETOOTH_EVENT_LE_DISCOVERY_FINISHED, 	/**< Bluetooth event LE discovery finished */
+	BLUETOOTH_EVENT_REMOTE_LE_DEVICE_FOUND,	    /**< Bluetooth event remote deice found (LE dev) */
 	BLUETOOTH_EVENT_REMOTE_DEVICE_NAME_UPDATED,/**< Bluetooth event remote device name updated*/
 	BLUETOOTH_EVENT_BONDING_FINISHED,	    /**< Bluetooth event bonding completed */
 	BLUETOOTH_EVENT_BONDED_DEVICE_REMOVED,	    /**< Bluetooth event bonding removed */
@@ -242,7 +439,12 @@ typedef enum {
 	BLUETOOTH_EVENT_DEVICE_AUTHORIZED,	    /**< Bluetooth event authorize device */
 	BLUETOOTH_EVENT_DEVICE_UNAUTHORIZED,	    /**< Bluetooth event unauthorize device */
 	BLUETOOTH_EVENT_DISCOVERABLE_TIMEOUT_CHANGED,  /**< Bluetooth event mode changed */
-	BLUETOOTH_EVENT_REMOTE_DEVICE_DISAPPEARED, /**< Bluetooth event remote device disappeared*/
+		BLUETOOTH_EVENT_REMOTE_DEVICE_DISAPPEARED, /**< Bluetooth event remote device disappeared*/
+	BLUETOOTH_EVENT_CONNECTABLE_CHANGED,	    /**< Bluetooth event connectable changed */
+
+	BLUETOOTH_EVENT_RSSI_ENABLED,		/**< Bluetooth event RSSI monitoring enabled */
+	BLUETOOTH_EVENT_RSSI_ALERT,				/**< Bluetooth event RSSI Alert */
+	BLUETOOTH_EVENT_RAW_RSSI,				/**< Bluetooth event Raw RSSI */
 
 	BLUETOOTH_EVENT_SERVICE_SEARCHED = BLUETOOTH_EVENT_SDP_BASE,
 						    /**< Bluetooth event serice search base id */
@@ -287,12 +489,22 @@ typedef enum {
 	BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_PROGRESS,/* Obex Server transfer progress event*/
 	BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_COMPLETED,/* Obex Server transfer complete event*/
 	BLUETOOTH_EVENT_OBEX_SERVER_CONNECTION_AUTHORIZE,
+	BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_CONNECTED, /* Obex Transfer connected event */
+	BLUETOOTH_EVENT_OBEX_SERVER_TRANSFER_DISCONNECTED, /* Obex Transfer disconnected event */
 
 	BLUETOOTH_EVENT_GATT_SVC_CHAR_DISCOVERED = BLUETOOTH_EVENT_GATT_BASE,
 				/**<Discovered GATT service characteristics event*/
 	BLUETOOTH_EVENT_GATT_CHAR_VAL_CHANGED,
 				/**<Remote GATT charateristic value changed event*/
 	BLUETOOTH_EVENT_GATT_GET_CHAR_FROM_UUID,
+	BLUETOOTH_EVENT_GATT_READ_CHAR, /**<Gatt Read Characteristic Value */
+	BLUETOOTH_EVENT_GATT_WRITE_CHAR, /**<Gatt Write Characteristic Value */
+	BLUETOOTH_EVENT_GATT_READ_DESC, /**<Gatt Read Characteristic Descriptor Value */
+	BLUETOOTH_EVENT_GATT_WRITE_DESC, /**<Gatt Write Characteristic Descriptor Value */
+	BLUETOOTH_EVENT_GATT_SVC_CHAR_DESC_DISCOVERED, /**<Gatt Char Descriptors Discovered Event*/
+	BLUETOOTH_EVENT_GATT_CONNECTED,/**<Gatt connected event */
+	BLUETOOTH_EVENT_GATT_DISCONNECTED, /**<Gatt Disconnected event */
+	BLUETOOTH_EVENT_GATT_SERVER_CHARACTERISTIC_VALUE_CHANGED, /**<Gatt Char write callback event */
 
 	BLUETOOTH_EVENT_AG_CONNECTED = BLUETOOTH_EVENT_AUDIO_BASE, /**<AG service connected event*/
 	BLUETOOTH_EVENT_AG_DISCONNECTED, /**<AG service disconnected event*/
@@ -308,10 +520,52 @@ typedef enum {
 	BLUETOOTH_EVENT_AVRCP_SETTING_EQUALIZER_STATUS, /**<AVRCP service player equalizer status event*/
 	BLUETOOTH_EVENT_AVRCP_SETTING_REPEAT_STATUS, /**<AVRCP service player repeat status event*/
 	BLUETOOTH_EVENT_AVRCP_SETTING_SCAN_STATUS, /**<AVRCP service player scan status event*/
+	BLUETOOTH_EVENT_HF_CONNECTED,
+	BLUETOOTH_EVENT_HF_DISCONNECTED,
+	BLUETOOTH_EVENT_HF_AUDIO_CONNECTED,
+	BLUETOOTH_EVENT_HF_AUDIO_DISCONNECTED,
+	BLUETOOTH_EVENT_HF_RING_INDICATOR,
+	BLUETOOTH_EVENT_HF_CALL_WAITING,
+	BLUETOOTH_EVENT_HF_CALL_TERMINATED,
+	BLUETOOTH_EVENT_HF_CALL_STARTED,
+	BLUETOOTH_EVENT_HF_CALL_ENDED,
+	BLUETOOTH_EVENT_HF_CALL_UNHOLD,
+	BLUETOOTH_EVENT_HF_CALL_SWAPPED,
+	BLUETOOTH_EVENT_HF_CALL_ON_HOLD,
+	BLUETOOTH_EVENT_HF_CALL_STATUS,
+	BLUETOOTH_EVENT_HF_VOICE_RECOGNITION_ENABLED,
+	BLUETOOTH_EVENT_HF_VOICE_RECOGNITION_DISABLED,
+	BLUETOOTH_EVENT_HF_VOLUME_SPEAKER,
+	BLUETOOTH_EVENT_HF_VENDOR_DEP_CMD,
 
 	BLUETOOTH_HID_CONNECTED = BLUETOOTH_EVENT_HID_BASE, /**< Input connectd event*/
 	BLUETOOTH_HID_DISCONNECTED, /**< Input disconnectd event*/
+
+	BLUETOOTH_EVENT_ADVERTISING_STARTED = BLUETOOTH_EVENT_ADVERTISING_BASE, /**< Advertising started event */
+	BLUETOOTH_EVENT_ADVERTISING_STOPPED, /**< Advertising stopped event */
+	BLUETOOTH_EVENT_ADVERTISING_MANUFACTURER_DATA_CHANGED, /**< Advertising manufacturer data changed event */
+	BLUETOOTH_EVENT_SCAN_RESPONSE_MANUFACTURER_DATA_CHANGED, /**< Scan response manufacturer data changed event */
+	BLUETOOTH_EVENT_MANUFACTURER_DATA_CHANGED, /**< Manufacturer data changed event */
+	BLUETOOTH_EVENT_DEVICE_ERROR, /**< Hardware error */
+	BLUETOOTH_EVENT_TX_TIMEOUT_ERROR, /** TX Timeout Error*/
 	BLUETOOTH_EVENT_MAX, /**< Bluetooth event Max value */
+
+	BLUETOOTH_PBAP_CONNECTED = BLUETOOTH_EVENT_PBAP_CLIENT_BASE, /**< PBAP connected/disconnectd event*/
+	BLUETOOTH_PBAP_PHONEBOOK_SIZE, /**< PBAP Phonebook Size event*/
+	BLUETOOTH_PBAP_PHONEBOOK_PULL, /**< PBAP Phonebook Pull event*/
+	BLUETOOTH_PBAP_VCARD_LIST, /**< PBAP vCard List event*/
+	BLUETOOTH_PBAP_VCARD_PULL, /**< PBAP vCard Pull event*/
+	BLUETOOTH_PBAP_PHONEBOOK_SEARCH, /**< PBAP Phonebook Search event*/
+
+	BLUETOOTH_EVENT_AVRCP_CONTROL_CONNECTED = BLUETOOTH_EVENT_AVRCP_CONTROL_BASE, /**<AVRCP service connected event*/
+	BLUETOOTH_EVENT_AVRCP_CONTROL_DISCONNECTED, /**<AVRCP service disconnected event*/
+	BLUETOOTH_EVENT_AVRCP_CONTROL_SHUFFLE_STATUS, /**<AVRCP control suffle  status event*/
+	BLUETOOTH_EVENT_AVRCP_CONTROL_EQUALIZER_STATUS, /**<AVRCP control equalizer status event*/
+	BLUETOOTH_EVENT_AVRCP_CONTROL_REPEAT_STATUS, /**<AVRCP control repeat status event*/
+	BLUETOOTH_EVENT_AVRCP_CONTROL_SCAN_STATUS, /**<AVRCP control scan status event*/
+	BLUETOOTH_EVENT_AVRCP_SONG_POSITION_STATUS, /**<AVRCP control play Postion status event*/
+	BLUETOOTH_EVENT_AVRCP_PLAY_STATUS_CHANGED, /**<AVRCP control play status event*/
+	BLUETOOTH_EVENT_AVRCP_TRACK_CHANGED, /**<AVRCP control song metadata event*/
 } bluetooth_event_type_t;
 
  /**
@@ -552,6 +806,15 @@ typedef struct {
 } bluetooth_device_class_t;
 
 /**
+ * Discovery Role types
+ */
+typedef enum {
+	DISCOVERY_ROLE_BREDR = 0x1,
+	DISCOVERY_ROLE_LE,
+	DISCOVERY_ROLE_LE_BREDR
+} bt_discovery_role_type_t;
+
+/**
 * structure to hold the device information
 */
 typedef struct {
@@ -565,7 +828,24 @@ typedef struct {
 	gboolean paired;		/**< paired flag */
 	gboolean connected;	/**< connected flag */
 	gboolean trust;		/**< connected flag */
+	bluetooth_manufacturer_data_t manufacturer_data;	/**< manafacturer specific class */
 } bluetooth_device_info_t;
+
+/**
+* structure to hold the LE device information
+*/
+typedef struct {
+	int data_len;		/**< manafacturer specific data length */
+	bluetooth_advertising_data_t data;		/**< manafacturer specific data */
+} bluetooth_le_advertising_data_t;
+
+typedef struct {
+	bluetooth_device_address_t device_address;	/**< device address */
+	int addr_type;			/**< address type*/
+	int rssi;			/**< received strength signal*/
+	bluetooth_le_advertising_data_t adv_ind_data;
+	bluetooth_le_advertising_data_t scan_resp_data;
+} bluetooth_le_device_info_t;
 
 /**
  * structure to hold the paired device information
@@ -615,6 +895,12 @@ typedef struct {
 	unsigned int service_name_array[BLUETOOTH_MAX_SERVICES_FOR_DEVICE];
 	int service_index;
 } bt_sdp_info_t;
+
+typedef struct {
+	bluetooth_device_address_t device_addr;
+	unsigned char addr_type;
+	int disc_reason;
+} bt_connection_info_t;
 
 /**
  * Stucture to rfcomm receive data
@@ -726,15 +1012,25 @@ typedef struct {
 } bt_obex_server_authorize_into_t;
 
 /**
+ * Server type
+ */
+typedef enum {
+	OPP_SERVER = 0x0,
+	FTP_SERVER
+} bt_obex_server_type_t;
+
+/**
  * Stucture to OPP/FTP server transfer information
  */
 typedef struct {
 	char *filename;
 	char *device_name;
+	char *file_path;
 	char *type;
 	int transfer_id;
 	unsigned long file_size;
 	int percentage;
+	bt_obex_server_type_t server_type;
 } bt_obex_server_transfer_info_t;
 
 /**
@@ -764,7 +1060,9 @@ typedef struct {
 typedef struct {
 	char *uuid;
 	char *handle;
+	gboolean primary;
 	bt_gatt_handle_info_t handle_info;
+	bt_gatt_handle_info_t char_handle;
 } bt_gatt_service_property_t;
 
 /**
@@ -800,8 +1098,21 @@ typedef struct {
 	bt_gatt_char_format_t format;
 	unsigned char *val;
 	unsigned int val_len;
+	unsigned int permission;
 	char *representation;
+	bt_gatt_handle_info_t char_desc_handle;
 } bt_gatt_char_property_t;
+
+/**
+ * Structure to GATT Characteristic descriptor property
+ */
+
+typedef struct {
+	char *handle;
+	char *uuid;
+	unsigned char *val;
+	unsigned int val_len;
+} bt_gatt_char_descriptor_property_t;
 
 /**
  * Structure to GATT Characteristic value
@@ -812,6 +1123,167 @@ typedef struct {
 	guint8 *char_value;
 	guint32 val_len;
 } bt_gatt_char_value_t;
+
+
+/**
+ * Structure to RSSI Signal Strength Alert
+ */
+
+typedef struct {
+	char *address;
+	int link_type;
+	int alert_type;
+	int rssi_dbm;
+} bt_rssi_alert_t;
+
+/**
+ * Structure to RSSI Signal Strength
+ */
+
+typedef struct {
+	char *address;
+	int link_type;
+	int rssi_dbm;
+} bt_raw_rssi_t;
+
+/**
+ * Structure for RSSI Enabled or Disabled
+ */
+
+typedef struct {
+	char *address;
+	int link_type;
+	gboolean rssi_enabled;
+} bt_rssi_enabled_t;
+
+/**
+ * Structure for RSSI Threshold
+ */
+
+typedef struct {
+	int low_threshold;
+	int in_range_threshold;
+	int high_threshold;
+} bt_rssi_threshold_t;
+
+/**
+ * Structure for PBAP Folder Parameters
+ */
+typedef struct {
+	unsigned char addressbook;
+	unsigned char folder_type;
+} bt_pbap_folder_t;
+
+/**
+ * Structure for PBAP Pull application Parameters
+ */
+typedef struct {
+	unsigned char format;
+	unsigned char order;
+	unsigned short offset;
+	unsigned short maxlist;
+	long long unsigned fields;
+} bt_pbap_pull_parameters_t;
+
+/**
+ * Structure for PBAP List application Parameters
+ */
+typedef struct {
+	unsigned char order;
+	unsigned short offset;
+	unsigned short maxlist;
+} bt_pbap_list_parameters_t;
+
+/**
+ * Structure for PBAP Pull vCard application Parameters
+ */
+typedef struct {
+	unsigned char format;
+	long long unsigned fields;
+	int index;
+} bt_pbap_pull_vcard_parameters_t;
+
+/**
+ * Structure for PBAP Search application Parameters
+ */
+typedef struct {
+	unsigned char order;
+	unsigned short offset;
+	unsigned short maxlist;
+	unsigned char search_attribute;
+	char search_value[BLUETOOTH_PBAP_MAX_SEARCH_VALUE_LENGTH];
+} bt_pbap_search_parameters_t;
+
+/**
+ * Structure for PBAP Connection Status
+ */
+typedef struct {
+	bluetooth_device_address_t btaddr;
+	int connected;
+} bt_pbap_connected_t;
+
+/**
+ * Structure for PBAP Phonebook Size
+ */
+typedef struct {
+	bluetooth_device_address_t btaddr;
+	int size;
+} bt_pbap_phonebook_size_t;
+
+/**
+ * Structure for PBAP Phonebook Pull
+ */
+typedef struct {
+	bluetooth_device_address_t btaddr;
+	char *vcf_file;
+	int success;
+} bt_pbap_phonebook_pull_t;
+
+/**
+ * Structure for PBAP vCard List
+ */
+typedef struct {
+	bluetooth_device_address_t btaddr;
+	char **vcards;
+	int length;
+	int success;
+} bt_pbap_vcard_list_t;
+
+/**
+ * Structure for PBAP vCard Pull
+ */
+typedef struct {
+	bluetooth_device_address_t btaddr;
+	char *vcf_file;
+	int success;
+} bt_pbap_vcard_pull_t;
+
+/**
+ * Structure for PBAP Phonebook search List
+ */
+typedef struct {
+	bluetooth_device_address_t btaddr;
+	char **vcards;
+	int length;
+	int success;
+} bt_pbap_phonebook_search_list_t;
+
+/**
+ * Stucture to HF Call status information
+ */
+
+typedef struct {
+	char *number; /*Phone Number */
+	int direction; /*Direction :Incoming(1), Outgoing(0)*/
+	int status; /* Call Status :Active(0), Held(1), Waiting(5), Dailing(2)*/
+	int mpart; /*Multiparty/conf call: Yes(1), No(0) */
+	int idx; /*Call index/ID */
+} bt_hf_call_status_info_t;
+
+typedef struct {
+	GList *list;
+	int count;
+} bt_hf_call_list_s;
 
 /**
  * Callback pointer type
@@ -871,6 +1343,49 @@ int main()
 @endcode
  */
 int bluetooth_register_callback(bluetooth_cb_func_ptr callback_ptr, void *user_data);
+
+/**
+ * @fn int bluetooth_le_register_callback(bluetooth_cb_func_ptr callback_ptr, void *user_data)
+ * @brief Set the callback function pointer for bluetooth le event
+ *
+ *
+ * This API will register the callback function, when any response and event are received from
+ * bluetooth framework. @n
+ * this registered callback function will be get called with appropriate event and data structures.
+ * This function is a synchronous call. An application developer can call
+ * bluetooth_le_register_callback() function to register a callback function of bluetooth_cb_func_ptr
+ * type. This registered function will receive events of bluetooth_event_type_t type along with
+ * data any.
+ *
+ *
+ * @param[in]   callback_ptr    A pointer to the callback function
+ * @param[in]   user_data    A pointer to user data
+ * @return      BLUETOOTH_ERROR_NONE - Success
+ * @remark      None
+ * @see         None
+ * */
+int bluetooth_le_register_callback(bluetooth_cb_func_ptr callback_ptr, void *user_data);
+
+/**
+ * @fn int bluetooth_le_unregister_callback(void)
+ * @brief Set the callback function pointer for bluetooth le event
+ *
+ *
+ * This API will register the callback function, when any response and event are received from
+ * bluetooth framework. @n
+ * this registered callback function will be get called with appropriate event and data structures.
+ * This function is a synchronous call. An application developer can call
+ * bluetooth_le_register_callback() function to register a callback function of bluetooth_cb_func_ptr
+ * type. This registered function will receive events of bluetooth_event_type_t type along with
+ * data any.
+ *
+ *
+ * @param[in]   none
+ * @return      BLUETOOTH_ERROR_NONE - Success
+ * @remark      None
+ * @see         None
+ * */
+int bluetooth_le_unregister_callback(void);
 
 /**
  * @fn int bluetooth_deregister_callback(bluetooth_cb_func_ptr callback_ptr)
@@ -1033,6 +1548,11 @@ ret = bluetooth_disable_adapter();
 @endcode
  */
 int bluetooth_disable_adapter(void);
+int bluetooth_recover_adapter(void);
+int bluetooth_check_adapter_le(void);
+int bluetooth_enable_adapter_le(void);
+
+int bluetooth_disable_adapter_le(void);
 
 /**
  * @fn int bluetooth_reset_adapter(void)
@@ -1066,7 +1586,6 @@ int bluetooth_reset_adapter(void);
  *
  * This API checks whether the bluetooth is supported or not.
  * This API only run by root permission.
- * This API was made for the MDM service.
  *
  * This function is a synchronous call.
  *
@@ -1139,6 +1658,29 @@ ret = bluetooth_get_local_address(&local_address);
 @endcode
  */
 int bluetooth_get_local_address(bluetooth_device_address_t *local_address);
+
+/**
+ * @fn int bluetooth_get_local_version(bluetooth_version_t *version)
+ * @brief Get the hci version
+ *
+ *
+ * This function is used to get the bluetooth hci version
+ * Before calling this API make sure that the adapter is enabled.
+ *
+ * This function is a synchronous call.
+ *
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal IPC error \n
+ * @param[out]  timeout   remain visibility timeout value
+ * @remark      None
+ @code
+bluetooth_version_t *version;
+ int ret = 0;
+ ret = bluetooth_get_local_version (&version);
+ @endcode
+ */
+int bluetooth_get_local_version(bluetooth_version_t *version);
 
 /**
  * @fn int bluetooth_get_local_name(bluetooth_device_name_t* local_name)
@@ -1348,16 +1890,16 @@ int bluetooth_get_timeout_value(int *timeout);
 /**
  * @fn int bluetooth_start_discovery(unsigned short max_response, unsigned short discovery_duration,
  *					unsigned int  classOfDeviceMask)
- * @brief Start the device discovery
+ * @brief Start the generic device discovery which finds both the BR/EDR and LE devices.
  *
  * To connect connect to peer bluetooth device, you will need to know its bluetooth address and its
  * name. You can search for Bluetooth devices in vicinity by bluetooth_start_discovery() API. It
- * first performs an inquiry. For each device found from the inquiry it gets the remote name of the
- * device. Bluetooth device address and name are given to Application via
- * BLUETOOTH_EVENT_REMOTE_DEVICE_FOUND event. In param_data of bluetooth_event_param_t, you will
- * receive a pointer to a structure of bluetooth_device_info_t type. you will receive device
- * address, device name, device class, rssi (received signal strength indicator). please see
- * bluetooth_device_info_t for more details.
+ * first performs an inquiry and try to find both the BREDR and LE devices. For each device found
+ * from the inquiry it gets the remote name of the device. Bluetooth device address and name are
+ * given to Application via BLUETOOTH_EVENT_REMOTE_DEVICE_FOUND event. In param_data of
+ * bluetooth_event_param_t, you will receive a pointer to a structure of bluetooth_device_info_t type.
+ * You will receive device address, device name, device class, rssi (received signal strength indicator).
+ * please see bluetooth_device_info_t for more details.
  *
  *
  * This API provides searching options like max responses, discovery duration in seconds and class
@@ -1370,7 +1912,7 @@ int bluetooth_get_timeout_value(int *timeout);
  * Also note that search will end after 180 seconds automatically if you pass 0 in discovery
  * duration.
  *
- * sometimes user may want to search for a perticular kind of device. for ex, mobile or pc. in such
+ * Sometimes user may want to search for a particular kind of device. for ex, mobile or pc. in such
  * case, you can use classOfDeviceMask parameter. please see bluetooth_device_service_class_t,
  * bluetooth_device_major_class_t and bluetooth_device_minor_class_t enums
  *
@@ -1379,8 +1921,7 @@ int bluetooth_get_timeout_value(int *timeout);
  * through registered callback function.
  *
  * The discovery is responded by an BLUETOOTH_EVENT_REMOTE_DEVICE_FOUND event for each device it
- * finds and an BLUETOOTH_EVENT_REMOTE_DEVICE_NAME_UPDATED event for each fount device its name
- * finds.
+ * found and a BLUETOOTH_EVENT_REMOTE_DEVICE_NAME_UPDATED event for its name updation.
  *
  * The completion or cancellation of the discovery is indicated by an
  * BLUETOOTH_EVENT_DISCOVERY_FINISHED event.
@@ -1400,7 +1941,7 @@ int bluetooth_get_timeout_value(int *timeout);
  * @param[in] classOfDeviceMask		define classes of the device mask which user wants
 					(refer to class of device)
  * @remark      None
- * @see         bluetooth_cancel_discovery, bluetooth_device_info_t
+ * @see         bluetooth_start_custom_discovery(), bluetooth_cancel_discovery, bluetooth_device_info_t
 
 @code
 void bt_event_callback(int event, bluetooth_event_param_t *param)
@@ -1463,10 +2004,73 @@ ret = bluetooth_start_discovery(max_response,discovery_duration,classOfDeviceMas
 @endcode
  *
  */
-
 int bluetooth_start_discovery(unsigned short max_response,
 				      unsigned short discovery_duration,
 				      unsigned int classOfDeviceMask);
+
+/**
+ * @fn int bluetooth_start_custom_discovery(bt_discovery_role_type_t role
+ *					unsigned short max_response,
+ *					unsigned short discovery_duration,
+ *					unsigned int  classOfDeviceMask)
+ * @brief Start the custom device discovery with specific type such as BR/EDR, LE, LE+BR/EDR etc.
+ *
+ * Sometimes user may want to search for a particular kind of device. for ex, LE only or BR/EDR only.
+ * In such case, you can use type parameter. This API is similar to that of bluetooth_start_discovery().
+ * Please see bluetooth_start_discovery() for other parameters description.
+ *
+ * This function is a asynchronous call.
+ * If the call is success then the application will receive BLUETOOTH_EVENT_DISCOVERY_STARTED event
+ * through registered callback function.
+ *
+ * The discovery is responded by an BLUETOOTH_EVENT_REMOTE_DEVICE_FOUND event for each device it
+ * found and a BLUETOOTH_EVENT_REMOTE_DEVICE_NAME_UPDATED event for its name updation.
+ *
+ * The completion or cancellation of the discovery is indicated by an
+ * BLUETOOTH_EVENT_DISCOVERY_FINISHED event.
+ *
+ * The device discovery can be cancelled by calling bluetooth_stop_discovery().
+ *
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Bluetooth adapter is not enabled \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter \n
+ *		BLUETOOTH_ERROR_IN_PROGRESS - Bluetooth adapter is busy with another discovery \n
+ *		BLUETOOTH_ERROR_INTERNAL - System error like heap full has occured or bluetooth
+						agent is not running \n
+ *
+ * @param[in] role		define the role type of devices to be discovered. See enum bt_discovery_role_type_t.
+					(DISCOVERY_ROLE_BREDR means BREDR only, DISCOVERY_ROLE_LE mean Low Energy only,
+					DISCOVERY_ROLE_LE_BREDR means LE & BREDR - same as bluetooth_start_discovery())
+ * @param[in] max_response		define the maximum response of the number of founded devices
+					(0 means unlimited)
+ * @param[in] discovery_duration	define bluetooth discovery duration (0 means 180s )
+ * @param[in] classOfDeviceMask		define classes of the device mask which user wants
+					(refer to class of device)
+ * @remark      None
+ * @see         bluetooth_start_discovery(), bluetooth_cancel_discovery, bluetooth_device_info_t
+
+@code
+unsigned short type;
+unsigned short max_response;
+unsigned short discovery_duration;
+unsigned classOfDeviceMask;
+int ret = 0;
+
+type = 1;
+max_response =0;
+discovery_duration =0;
+classOfDeviceMask =0;
+
+ret = bluetooth_start_custom_discovery(type, max_response, discovery_duration, classOfDeviceMask);
+
+@endcode
+ *
+ */
+int bluetooth_start_custom_discovery(bt_discovery_role_type_t role,
+						unsigned short max_response,
+						unsigned short discovery_duration,
+						unsigned int classOfDeviceMask);
 
 /**
  * @fn int bluetooth_cancel_discovery (void)
@@ -1517,6 +2121,122 @@ ret = bluetooth_cancel_discovery();
 int bluetooth_cancel_discovery(void);
 
 /**
+ * @fn int bluetooth_start_le_discovery(void)
+ * @brief Start the generic device discovery which finds the LE devices.
+ *
+ * To connect connect to peer bluetooth device, you will need to know its bluetooth address and its
+ * name. You can search for Bluetooth devices in vicinity by bluetooth_start_le_discovery() API.
+ * It try to find LE devices. Bluetooth device address and name are
+ * given to Application via BLUETOOTH_EVENT_REMOTE_LE_DEVICE_FOUND event. In param_data of
+ * bluetooth_event_param_t, you will receive a pointer to a structure of bluetooth_device_info_t type.
+ * You will receive device address, device name, device class, rssi (received signal strength indicator).
+ * please see bluetooth_device_info_t for more details.
+ *
+ * This function is a asynchronous call.
+ * If the call is success then the application will receive BLUETOOTH_EVENT_LE_DISCOVERY_STARTED event
+ * through registered callback function.
+ *
+ * The discovery is responded by an BLUETOOTH_EVENT_REMOTE_LE_DEVICE_FOUND event for each device it
+ * found.
+ *
+ * The completion or cancellation of the discovery is indicated by an
+ * BLUETOOTH_EVENT_LE_DISCOVERY_FINISHED event.
+ *
+ * The device discovery can be cancelled by calling bluetooth_stop_le_discovery().
+ *
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Bluetooth adapter is not enabled \n
+ *		BLUETOOTH_ERROR_DEVICE_BUSY - Bluetooth adapter is busy doing some operation \n
+ *		BLUETOOTH_ERROR_INTERNAL - System error like heap full has occured or bluetooth
+						agent is not running \n
+ *
+ * @remark      None
+ * @see         bluetooth_stop_le_discovery, bluetooth_device_info_t
+
+@code
+void bt_event_callback(int event, bluetooth_event_param_t *param)
+{
+	switch(event)
+	{
+		case BLUETOOTH_EVENT_REMOTE_LE_DEVICE_FOUND:
+		{
+			bluetooth_device_info_t *device_info = NULL;
+			printf("BLUETOOTH_EVENT_REMOTE_DEVICE_FOUND, result [0x%04x]",
+					param->result);
+			device_info  = (bluetooth_device_info_t *)param->param_data;
+			memcpy(&searched_device, &device_info->device_address,
+						sizeof(bluetooth_device_address_t));
+			printf("dev [%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X]",
+				device_info->device_address.addr[0],
+				device_info->device_address.addr[1],
+				device_info->device_address.addr[2],
+				device_info->device_address.addr[3],
+				device_info->device_address.addr[4],
+				device_info->device_address.addr[5]);
+			break;
+		}
+
+		case BLUETOOTH_EVENT_LE_DISCOVERY_FINISHED:
+			printf("BLUETOOTH_EVENT_LE_DISCOVERY_FINISHED, result[0x%04x]", param->result);
+			break;
+	}
+}
+
+int ret = 0;
+ret = bluetooth_start_discovery();
+
+@endcode
+ *
+ */
+int bluetooth_start_le_discovery(void);
+
+/**
+ * @fn int bluetooth_stop_le_discovery (void)
+ * @brief Cancel the on-going device LE discovery operation
+ *
+ *
+ * This function stops the on-going device discovery operation. This API has to be called after the
+ * bluetooth_start_le_discovery API and before the BLUETOOTH_EVENT_LE_DISCOVERY_FINISHED event comes of
+ * the bluetooth_start_le_discovery API
+ *
+ *
+ * This function is a asynchronous call.
+ * If the call is success to cancel discovey then the application will receive
+ * BLUETOOTH_EVENT_LE_DISCOVERY_FINISHED event through registered callback function
+ * with an error code BLUETOOTH_ERROR_CANCEL. In the case of failure the error code will be
+ * BLUETOOTH_ERROR_NONE
+ *
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *		BLUETOOTH_ERROR_NOT_IN_OPERATION - No Discovery operation in progess to cancel \n
+ *		BLUETOOTH_ERROR_ACCESS_DENIED - Currently in discovery but it is requested from
+						other application \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internel IPC error \n
+ * @remark      None
+ * @see		bluetooth_start_discovery
+@code
+void bt_event_callback(int event, bluetooth_event_param_t *param)
+{
+	switch(event)
+	{
+		case BLUETOOTH_EVENT_LE_DISCOVERY_FINISHED:
+			TC_PRT("BLUETOOTH_EVENT_LE_DISCOVERY_FINISHED, result[0x%04x]", param->result);
+			break;
+	}
+}
+
+..
+
+int ret = 0;
+
+ret = bluetooth_stop_le_discovery();
+@endcode
+ */
+int bluetooth_stop_le_discovery(void);
+
+/**
  * @fn int bluetooth_is_discovering(void)
  * @brief Check for the device discovery is in-progress or not.
  *
@@ -1548,6 +2268,71 @@ ret = bluetooth_is_discovering ();
 @endcode
  */
 int bluetooth_is_discovering(void);
+
+/**
+ * @fn int bluetooth_is_le_discovering(void)
+ * @brief Check for the device LE discovery is in-progress or not.
+ *
+ * This API is used to check the current status of the LE Discovery operation.If discovery is in\
+ * progress normally other operations are not allowed.
+ * If a device discovery is in progress, we have to either cancel the discovery operation or wait
+ * for the BLUETOOTH_EVENT_LE_DISCOVERY_FINISHED
+ * event before performing other operations. This API is used to get for the current discovery
+ * operation status and using bluetooth_stop_le_discovery()
+ * we can cancell the ongoing LE discovery process.
+ * Before calling this API, make sure that the adapter is enabled. There is no callback event for
+ * this API.
+ *
+ * This function checks whether the device  LE discovery is started or not.
+ *
+ * This function is a synchronous call.
+ *
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Discovery is not in progress \n
+ *		BLUETOOTH_ERROR_NONE+1 - Discovery in progress \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *
+ * @remark      None
+ * @see         bluetooth_start_le_discovery, bluetooth_stop_le_discovery
+
+@code
+int ret = 0;
+ret = bluetooth_is_le_discovering ();
+@endcode
+ */
+int bluetooth_is_le_discovering(void);
+
+/**
+ * @fn int bluetooth_enable_rssi(const bluetooth_device_address_t *remote_address,
+		int link_type, bt_rssi_threshold_t rssi_threshold)
+ * @brief Enable RSSI monitoring
+ *
+ * This function enables RSSI monitoring and sets threshold for a connection
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *
+ * @remark      None
+ * @see bluetooth_get_rssi_strength
+ */
+int bluetooth_enable_rssi(const bluetooth_device_address_t *remote_address,
+		int link_type, bt_rssi_threshold_t *rssi_threshold);
+
+/**
+ * @fn int bluetooth_get_rssi_strength(const bluetooth_device_address_t *remote_address, int link_type)
+ * @brief Gets Raw RSSI signal Strength
+ *
+ * This function gives the Raw RSSI signal strength for a connection.
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *
+ * @remark      None
+ * @see bluetooth_enable_rssi
+ */
+int bluetooth_get_rssi_strength(const bluetooth_device_address_t *remote_address, int link_type);
+
+int bluetooth_set_connectable(gboolean is_connectable);
+
+int bluetooth_is_connectable(gboolean *is_connectable);
 
 /**
  * @fn int bluetooth_bond_device(const bluetooth_device_address_t *device_address)
@@ -1632,6 +2417,52 @@ ret = bluetooth_bond_device(&device_address);
 @endcode
  */
 int bluetooth_bond_device(const bluetooth_device_address_t *device_address);
+
+/**
+ * @fn int bluetooth_bond_device_by_type(const bluetooth_device_address_t *device_address,
+ *				bluetooth_conn_type_t conn_type)
+ * @brief Initiate a bonding process
+ *
+ *
+ * This function initiates a bonding procedure with a peer device on the basis of connection type (BLE or BREDR).
+ * The bonding procedure enables authentication and optionally encryption on the Bluetooth link.
+ *
+ * Bonding is applied to the discovered device to which we need a secure connection. We cannot
+ * inititate the bonding request to the devices already in the paired list.
+ *
+ * Usually we call this API after the device discovery.
+ * This function is a asynchronous call.
+ *
+ * Response will be received through BLUETOOTH_EVENT_BONDING_FINISHED event. It can any of the below
+ * mentioed result code
+ * BLUETOOTH_ERROR_PARING_FAILED - Pairing faied \n
+ * BLUETOOTH_ERROR_ACCESS_DENIED - Authetication rejected \n
+ * BLUETOOTH_ERROR_CANCEL_BY_USER - Cancelled by the user \n
+ * BLUETOOTH_ERROR_PARING_FAILED - Pairing failed \n
+ * BLUETOOTH_ERROR_TIMEOUT - Timeout has haapened \n
+ *
+ * If the remote user is not responding with in a specific time(60 seconds), then a timeout happens
+ * and BLUETOOTH_EVENT_BONDING_FINISHED callback event is called with and BLUETOOTH_ERROR_TIMEOUT
+ * result code
+ *
+ * The bonding operation can be cancelled by calling bluetooth_cancel_bonding().
+ *
+ *
+ * @return BLUETOOTH_ERROR_NONE - Success \n
+ *             BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter \n
+ *             BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *             BLUETOOTH_ERROR_DEVICE_BUSY - Adapter is busy or Discovery is in Progress \n
+ *             BLUETOOTH_ERROR_INVALID_DATA - Invalid BD address \n
+ * @exception None
+ * @param[in] device_address This indicates an address of the device with which pairing
+ *                                        should be initiated
+ * @param[in] conn_type This Indicates the connection type to be used for pairing in case of
+ *                                 dual mode devices
+ * @remark None
+ * @see bluetooth_cancel_bonding
+ */
+int bluetooth_bond_device_by_type(const bluetooth_device_address_t *device_address,
+				bluetooth_conn_type_t conn_type);
 
 /**
  * @fn int bluetooth_cancel_bonding(void)
@@ -2425,6 +3256,8 @@ int bluetooth_rfcomm_write(int fd, const char *buf, int length);
  * @remark       None
  */
 gboolean bluetooth_rfcomm_is_client_connected(void);
+int bluetooth_rfcomm_client_is_connected(bluetooth_device_address_t *device_address, gboolean *connected);
+int bluetooth_rfcomm_server_is_connected(bluetooth_device_address_t *device_address, gboolean *connected);
 
 /**
  * @fn int bluetooth_network_activate_server(void)
@@ -2510,6 +3343,26 @@ int bluetooth_network_connect(const bluetooth_device_address_t *device_address,
  * @see		bluetooth_network_connect
  */
 int bluetooth_network_disconnect(const bluetooth_device_address_t *device_address);
+
+/**
+ * @fn int bluetooth_network_server_disconnect(const bluetooth_device_address_t *device_address)
+ * @brief Disconnect the device from the network
+ *
+ * This function is an asynchronous call.
+ * The network server disconnect request is responded by
+ * BLUETOOTH_EVENT_NETWORK_SERVER_DISCONNECTED event.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *              BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter \n
+ *              BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *              BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Not enabled \n
+ *
+ * @exception   None
+ * @param[in]   device_address   This indicates an address of the connected client device
+ * @remark       None
+ * @see		bluetooth_network_activate_server
+ */
+int bluetooth_network_server_disconnect(const bluetooth_device_address_t *device_address);
 
 /*HDP - API's*/
 
@@ -3245,6 +4098,31 @@ int bluetooth_gatt_get_characteristics_property(const char *char_handle,
 						bt_gatt_char_property_t *characteristic);
 
 /**
+ * @fn int bluetooth_gatt_get_char_descriptor_property(const char *char_handle,
+ *						bt_gatt_char_property_t *characteristic);
+ *
+ * @brief Provides characteristic descriptor value along with its UUID.
+ *
+ * This function is a synchronous call.
+ * The output parameter needs to be freed by calling bluetooth_gatt_free_desc_property()
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+ *
+ * @exception	None
+ * @param[in]	desc_handle - Handle for Characteristic descriptor.
+ * @param[out] descriptor - Structure containing remote characteristic descriptor property.
+ *
+ * @remark	None
+ * @see		bluetooth_gatt_free_desc_property()
+ */
+int bluetooth_gatt_get_char_descriptor_property(const char *desc_handle,
+						bt_gatt_char_descriptor_property_t *descriptor);
+
+
+/**
  * @fn int bluetooth_gatt_set_characteristics_value(const char *char_handle,
  *						const guint8 *value, int length)
  *
@@ -3267,6 +4145,50 @@ int bluetooth_gatt_get_characteristics_property(const char *char_handle,
  */
 int bluetooth_gatt_set_characteristics_value(const char *char_handle,
 						const guint8 *value, int length);
+
+/**
+ * @fn int bluetooth_gatt_set_characteristics_value_request(const char *char_handle,
+ *						const guint8 *value, int length)
+ *
+ * @brief Set characteristic value request.
+ *
+ * This function is an asynchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+ *
+ * @exception	None
+ * @param[in]	char_handle - Handle for Characteristic property.
+ * @param[in]	value - New value to set for characteristic property.
+ * @param[in]	length - Length of the value to be set.
+  *
+ * @remark	None
+ * @see		None
+ */
+int bluetooth_gatt_set_characteristics_value_request(const char *char_handle,
+						const guint8 *value, int length);
+
+/**
+ * @fn int bluetooth_gatt_read_characteristic_value(const char *char_handle)
+ *
+ * @brief Read characteristic value.
+ *
+ * This function is a asynchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *             BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *             BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *             BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+ *
+ * @exception  None
+ * @param[in]  char_handle - Handle for Characteristic property.
+ *
+ * @remark     None
+ * @see        None
+ */
+int bluetooth_gatt_read_characteristic_value(const char *char_handle);
 
 /**
  * @fn int bluetooth_gatt_get_service_from_uuid(bluetooth_device_address_t *address,
@@ -3375,6 +4297,689 @@ int bluetooth_gatt_free_service_property(bt_gatt_service_property_t *svc_pty);
  */
  int bluetooth_gatt_free_char_property(bt_gatt_char_property_t *char_pty);
 
+/**
+ * @fn int bluetooth_gatt_free_desc_property(bt_gatt_char_descriptor_property_t *desc_pty);
+ *
+ * @brief Releases the memory allocated by bluetooth_gatt_get_char_descriptor_property()
+ *
+ * This function is a synchronous call.
+ * The input parameter is obtained by calling bluetooth_gatt_get_char_descriptor_property()
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *
+ * @exception	None
+ * @param[in]	desc_pty - GATT characteristics descriptor property structure.
+ *
+ * @remark	None
+ * @see		bluetooth_gatt_get_char_descriptor_property()
+ */
+ int bluetooth_gatt_free_desc_property(bt_gatt_char_descriptor_property_t *desc_pty);
+
+
+ int bluetooth_connect_le(const bluetooth_device_address_t *device_address, gboolean auto_connect);
+
+ int bluetooth_disconnect_le(const bluetooth_device_address_t *device_address);
+
+ /**
+ * @fn int bluetooth_gatt_discover_characteristic_descriptor(const char *characteristic_handle);
+ *
+ * @brief Discovers the characteristic descriptor value of a characteristic within its definition, asynchronously
+ *
+ * The input parameter is obtained by calling bluetooth_gatt_get_characteristics_property()
+ *
+ * @return  BLUETOOTH_ERROR_NONE  - Success \n
+ *			BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *
+ * @exception	None
+ * @param[in]	characteristic_handle - The characteristic handle for which characteristic descriptor has to be discovered.
+ *
+ * @remark	None
+ */
+int bluetooth_gatt_discover_characteristic_descriptor(const char *characteristic_handle);
+
+/**
+ * @fn int bluetooth_gatt_read_descriptor_value(const char *desc_handle)
+ *
+ * @brief Read characteristic descriptor value.
+ *
+ * This function is a asynchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *             BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *             BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *             BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+ *
+ * @exception  None
+ * @param[in]  desc_handle - Handle for Characteristic descriptor
+ *
+ * @remark     None
+ * @see        None
+ */
+ int bluetooth_gatt_read_descriptor_value(const char *desc_handle);
+
+/**
+ * @fn int bluetooth_gatt_write_descriptor_value(const char *desc_handle,
+ *			const guint8 *value, int length);
+ *
+ * @brief Set characteristic descriptor value.
+ *
+ * This function is a asynchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *             BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *             BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *             BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+ *
+ * @exception  None
+ * @param[in]  desc_handle - Handle for Characteristic descriptor
+ * @param[in]  value - New value to set for characteristic descriptor
+ * @param[in]  length - Length of the value to be set.
+ *
+ * @remark     None
+ * @see        None
+ */
+ int bluetooth_gatt_write_descriptor_value(const char *desc_handle,
+			const guint8 *value, int length);
+
+/* @fn int bluetooth_gatt_init(void)
+*
+* @brief Initializes the gatt service.
+*
+* This function is a synchronous call.
+* @return   BLUETOOTH_ERROR_NONE	- Success \n
+* 	 BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+*	 BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+*	 BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+*
+* @exception	 None
+* @remark  Adapter should be enabled
+* @see  bluetooth_gatt_deinit()
+*/
+int bluetooth_gatt_init(void);
+
+/* @fn int bluetooth_gatt_init(void)
+*
+* @brief DeInitializes the gatt service.
+*
+* This function is a synchronous call.
+* @return   BLUETOOTH_ERROR_NONE	- Success \n
+* 	 BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+*	 BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+*	 BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+*
+* @exception	 None
+* @remark  Adapter should be enabled
+* @see  bluetooth_gatt_init()
+*/
+int bluetooth_gatt_deinit(void);
+
+/* @fn int bluetooth_gatt_add_service(const char *svc_uuid,
+			unsigned char **svc_path)
+*
+* @brief Exports a new gatt service to the service interface.
+*
+* This function is a synchronous call.
+*
+* @return	BLUETOOTH_ERROR_NONE	- Success \n
+*	 BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+*	 BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+*	 BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+*
+* @exception	 None
+* @param[in]   svc_uuid  Gatt service uuid.
+* @param[out] svc_path  service object path of the exported service.
+* @remark  Adapter should be enabled
+* @see	bluetooth_gatt_init()
+*/
+int bluetooth_gatt_add_service(const char *svc_uuid,
+			char **svc_path);
+
+/* @fn int bluetooth_gatt_add_new_characteristic(
+			const char *svc_path, const char *char_uuid,
+			bt_gatt_characteristic_property_t *properties,
+			int flags_length, char **char_path);;
+*
+* @brief Exports a new gatt characteristic to the characteristic interface.
+*
+* This function is a synchronous call.
+* @return	BLUETOOTH_ERROR_NONE	- Success \n
+*	 BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+*	 BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+*	 BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+* @exception	 None
+* @param[in]   svc_path	service object path of the exported service.
+* @param[in]   char_uuid  Gatt service uuid.
+* @param[in]   properties	GATT characteristic properties.
+* @param[out] char_path	characteristic object path of the exported characteristic.
+*
+* @remark  Adapter should be enabled
+* @see	bluetooth_gatt_add_service()
+*/
+int bluetooth_gatt_add_new_characteristic(
+			const char *svc_path, const char *char_uuid,
+			bt_gatt_characteristic_property_t properties,
+			char **char_path);
+
+/* @fn bluetooth_gatt_set_characteristic_value(
+			const char *characteristic, const char *char_value,
+			int value_length);
+*
+* @brief adds gatt charactertisic value to the given charactertistic path.
+*
+* This function is a synchronous call.
+* @return	BLUETOOTH_ERROR_NONE	- Success \n
+*	 BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+*	 BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+*	 BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+* @exception	 None
+* @param[in]   char_value Value of the GATT characteristic to be added.
+* @param[in]   value_length length of the chantacteristic value..
+* @param[out] characteristic characteristic object path..
+*
+* @remark  Adapter should be enabled
+* @see	bluetooth_gatt_add_service()
+*/
+int bluetooth_gatt_set_characteristic_value(
+			const char *characteristic, const char *char_value,
+			int value_length);
+
+/* @fn int bluetooth_gatt_add_descriptor(const char *desc_uuid,
+			const char *desc_value, int value_length,
+			const char *permissions, const char *char_path,
+			char **desc_path);
+*
+* @brief Exports a new gatt descriptor to the descriptor interface.
+*
+* This function is a synchronous call.
+*
+* @return	BLUETOOTH_ERROR_NONE	- Success \n
+*	 BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+*	 BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+*	 BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+*
+* @exception	 None
+* @param[in]   desc_uuid  Gatt descriptor uuid.
+* @param[in]   desc_value	GATT descriptor value.
+* @param[in]   value_length 	Length of GATT descriptor value.
+* @param[in]   permissions	descriptor permissions.
+* @param[in]  char_path	characteristics object path of the exported character.
+*
+* @remark  Adapter should be enabled
+* @see	bluetooth_gatt_add_service()
+* @see	bluetooth_gatt_add_characteristics()
+*/
+int bluetooth_gatt_add_descriptor(const char *char_path,
+			const char *desc_uuid,
+			char **desc_path);
+
+/* @fn int bluetooth_gatt_set_descriptor_value(
+		   const char *desc_path, const char *desc_value,
+		   int value_length);
+*
+* @brief Adds value to the given descriptor handle.
+*
+* This function is a synchronous call.
+*
+* @return	BLUETOOTH_ERROR_NONE	- Success \n
+*	 BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+*	 BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+*	 BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+*
+* @exception	 None
+* @param[in]   desc_value	GATT descriptor value.
+* @param[in]   value_length 	Length of GATT descriptor value.
+* @param[in]  desc_path descriptor path to which the value needs to be added.
+*
+* @remark  Adapter should be enabled
+* @see	bluetooth_gatt_add_service()
+* @see	bluetooth_gatt_add_characteristics()
+*/
+int bluetooth_gatt_set_descriptor_value(
+		   const char *desc_path, const char *desc_value,
+		   int value_length);
+
+/* @fn int bluetooth_gatt_get_service(const char *svc_uuid);
+*
+* @brief Reads the Service registered on manager interface.
+*
+* This function is a synchronous call.
+*
+* @return	BLUETOOTH_ERROR_NONE	- Success \n
+*	 BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+*	 BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+*	 BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+*
+* @exception	 None
+* @param[in]   svc_uuid  Gatt Service uuid.
+*
+* @remark  Adapter should be enabled and service should be registered.
+* @see	bluetooth_gatt_register_service()
+*/
+int bluetooth_gatt_get_service(const char *svc_uuid);
+
+/* @fn int bluetooth_gatt_register_service(const  char *svc_path)
+*
+* @brief Registers the given service path with the bluez gatt server.
+*
+* This function is a synchronous call.
+*
+* @return	BLUETOOTH_ERROR_NONE	- Success \n
+*	 BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+*	 BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+*	 BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+*
+* @exception	 None
+* @param[in] svc_path	service object path of the exported service.
+*
+* @remark  Adapter should be enabled
+* @see	bluetooth_gatt_add_service()
+* @see	bluetooth_gatt_add_characteristics()
+* @see	bluetooth_gatt_add_descriptor()
+*/
+int bluetooth_gatt_register_service(const char *svc_path);
+
+/* @fn int bluetooth_gatt_unregister_service(const  char *svc_path)
+*
+* @brief Removes(unregister) service from the bluez gatt server db.
+*
+* This function is a synchronous call.
+*
+* @return	BLUETOOTH_ERROR_NONE	- Success \n
+*	 BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+*	 BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+*	 BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+*
+* @exception	 None
+* @param[in] svc_path	service object path of the exported service.
+*
+* @remark  Adapter should be enabled
+* @see	bluetooth_gatt_add_service()
+* @see	bluetooth_gatt_add_characteristics()
+* @see	bluetooth_gatt_add_descriptor()
+* @see bluetooth_gatt_register_service()
+*/
+int bluetooth_gatt_unregister_service(const char *svc_path);
+
+/* @fn int bluetooth_gatt_delete_services(void)
+*
+* @brief deletes (unregisters) all services from the gatt server database..
+*
+* This function is a synchronous call.
+*
+* @return	BLUETOOTH_ERROR_NONE	- Success \n
+*	 BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+*	 BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+*	 BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+*
+* @exception	 None
+*
+* @remark  Adapter should be enabled
+* @see	bluetooth_gatt_add_service()
+* @see	bluetooth_gatt_add_characteristics()
+* @see	bluetooth_gatt_add_descriptor()
+* @see bluetooth_gatt_register_service()
+* @see bluetooth_gatt_unregister_service()
+*/
+int bluetooth_gatt_delete_services(void);
+
+/* @fn int bluetooth_gatt_update_characteristic(void)
+*
+* @brief updates the given characteristic with a new value
+*
+* This function is a synchronous call.
+*
+* @return	BLUETOOTH_ERROR_NONE	- Success \n
+*	 BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+*	 BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+*	 BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+*
+* @exception	 None
+*
+* @remark  Adapter should be enabled
+* @see	bluetooth_gatt_add_service()
+* @see	bluetooth_gatt_add_characteristics()
+* @see	bluetooth_gatt_add_descriptor()
+* @see bluetooth_gatt_register_service()
+* @see bluetooth_gatt_unregister_service()
+*/
+int bluetooth_gatt_update_characteristic(const char *char_path,
+		const char* char_value, int value_length);
+
+/**
+ * @fn int bluetooth_set_advertising(gboolean enable);
+ *
+ * @brief Set advertising status.
+ *
+ * This function is used to enable or disable LE advertising.
+ * Once advertising is enabled, Advertising data is transmitted in the advertising packets
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal IPC error \n
+ *
+ * @exception	None
+ * @param[in]	enable - The status of advertising
+ *
+ * @remark	None
+ * @see		bluetooth_set_advertising_data
+ */
+int bluetooth_set_advertising(gboolean enable);
+
+/**
+ * @fn int bluetooth_set_custom_advertising(gboolean enable, float interval_min, float interval_max,
+ * 					guint8 filter_policy);
+ *
+ * @brief Set advertising status along with interval value.
+ *
+ * This function is used to enable or disable LE advertising.
+ * Interval_min and Interval_max is used to set the best advertising interval.
+ * Once advertising is enabled, Advertising data is transmitted in the advertising packets
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal IPC error \n
+ *
+ * @exception	None
+ * @param[in]	enable - The status of advertising
+ * @param[in]	interval_min - Minimum interval of advertising (msec)
+ * @param[in]	interval_max - Maximum interval of advertising (msec)
+ * @param[in]	filter_policy - Advertising filter policy
+ *
+ * @remark	None
+ * @see		bluetooth_set_advertising_data
+ */
+int bluetooth_set_custom_advertising(gboolean enable,
+					bluetooth_advertising_params_t *params);
+
+/**
+ * @fn int bluetooth_get_advertising_data(bluetooth_advertising_data_t *value, int *length);
+ * @brief Get the advertising data
+ *
+ * This function is used to get advertising data.
+ * Before calling this API, the adapter should be enabled.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter (NULL buffer)\n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal IPC error \n
+ *
+ * @param[out]	value - Advertising data structure.
+ * @param[out]	length - The length of Advertising data.
+ *
+ * @remark	None
+@code
+bluetooth_advertising_data_t *value = { {0} };
+int length;
+int ret = 0;
+ret = bluetooth_get_advertising_data(&value, &length);
+@endcode
+ */
+int bluetooth_get_advertising_data(bluetooth_advertising_data_t *value, int *length);
+
+/**
+ * @fn int bluetooth_set_advertising_data(const bluetooth_advertising_data_t *value, int length);
+ *
+ * @brief Set advertising data with value
+ *
+ * This function is used to set advertising data and Maximum size of advertising data
+ *  is 28 byte (Except Flag)
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal IPC error \n
+ *
+ * @exception	None
+ * @param[in]	value - Advertising data structure.
+ *
+ * @remark	None
+ */
+int bluetooth_set_advertising_data(const bluetooth_advertising_data_t *value, int length);
+
+/**
+ * @fn int bluetooth_get_scan_response_data(bluetooth_scan_resp_data_t *value, int *length);
+ * @brief Get the LE scan response data
+ *
+ * This function is used to get scan response data.
+ * Before calling this API, the adapter should be enabled.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter (NULL buffer)\n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal IPC error \n
+ *
+ * @param[out]	value - Scan response data structure.
+ * @param[out]	length - The length of Scan response data.
+ *
+ * @remark	None
+@code
+bluetooth_scan_resp_data_t *value = { {0} };
+int length;
+int ret = 0;
+ret = bluetooth_get_scan_response_data(&value, &length);
+@endcode
+ */
+int bluetooth_get_scan_response_data(bluetooth_scan_resp_data_t *value, int *length);
+
+/**
+ * @fn int bluetooth_set_scan_response_data(const bluetooth_scan_resp_data_t *value, int length);
+ *
+ * @brief Set scan response data with value
+ *
+ * This function is used to set scan response data and Maximum size of scan response data is 31 byte
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal IPC error \n
+ *
+ * @exception	None
+ * @param[in]	value - LE Scan response data structure.
+ *
+ * @remark	None
+ */
+int bluetooth_set_scan_response_data(const bluetooth_scan_resp_data_t *value, int length);
+
+/**
+ * @fn int bluetooth_set_scan_parameters(bluetooth_le_scan_params_t *params);
+ *
+ * @brief Set scan interval and window
+ *
+ * This function is used to set LE scan interval and window size
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal IPC error \n
+ *
+ * @exception	None
+ * @param[in]	interval - Interval of LE scan (msec)
+ * @param[in]	window - Window size of LE scan (msec)
+ *
+ * @remark	None
+ */
+int bluetooth_set_scan_parameters(bluetooth_le_scan_params_t *params);
+
+/**
+ * @fn int bluetooth_is_advertising(void)
+ * @brief Check for the advertising is in-progress or not.
+ *
+ * This API is used to check the current status of the advertising procedure.
+ * Before calling this API, make sure that the adapter is enabled. There is no callback event for
+ * this API.
+ *
+ * This function checks whether the advertising is started or not.
+ *
+ * This function is a synchronous call.
+ *
+ * @param[out] is_advertising The advertising status: (@c TRUE = in progress, @c  false = not in progress)
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *
+ * @remark      None
+ * @see         bluetooth_set_advertising, bluetooth_set_custom_advertising
+
+@code
+int ret;
+gboolean is_advertising = 0;
+
+ret = bluetooth_is_advertising(&is_advertising);
+@endcode
+ */
+int bluetooth_is_advertising(gboolean *is_advertising);
+
+/**
+ * @fn int bluetooth_add_white_list(bluetooth_device_address_t *address, bluetooth_device_address_type_t address_type)
+ * @brief Add LE device to white list
+ *
+ * This API is used to add LE device to white list
+ * Before calling this API, make sure that the adapter is enabled. There is no callback event for
+ * this API.
+ *
+ *
+ * This function is a synchronous call.
+ *
+ * @param[in] address The address of remote device
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *
+ * @remark      None
+ * @see         bluetooth_set_custom_advertising
+ */
+int bluetooth_add_white_list(bluetooth_device_address_t *address, bluetooth_device_address_type_t address_type);
+
+/**
+ * @fn int bluetooth_remove_white_list(bluetooth_device_address_t *address, bluetooth_device_address_type_t address_type)
+ * @brief Remove LE device from white list
+ *
+ * This API is used to remove LE device from white list
+ * Before calling this API, make sure that the adapter is enabled. There is no callback event for
+ * this API.
+ *
+ *
+ * This function is a synchronous call.
+ *
+ * @param[in] address The address of remote device
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *
+ * @remark      None
+ * @see         bluetooth_set_custom_advertising
+ */
+int bluetooth_remove_white_list(bluetooth_device_address_t *address, bluetooth_device_address_type_t address_type);
+
+/**
+ * @fn int bluetooth_clear_white_list(void)
+ * @brief Clear white list
+ *
+ * This API is used to clear white list
+ * Before calling this API, make sure that the adapter is enabled. There is no callback event for
+ * this API.
+ *
+ *
+ * This function is a synchronous call.
+ *
+ * @param[in] address The address of remote device
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *
+ * @remark      None
+ * @see         bluetooth_set_custom_advertising
+ */
+int bluetooth_clear_white_list(void);
+
+/**
+ * @fn int bluetooth_le_conn_update(bluetooth_device_address_t *address,
+ *          const bluetooth_le_conn_update_t *parameters)
+ * @brief update connection paramter of LE connection.
+ *
+ * This function is a synchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *           BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *
+ * @exception  None
+ * @param[in]  address - remote device address value.
+ * @param[in]  parameters - new connection parameters.
+ *
+ * @remark       None
+ * @see     bluetooth_bond_device
+ */
+int bluetooth_le_conn_update(const bluetooth_device_address_t *address,
+            const bluetooth_le_conn_update_t *parameters);
+
+
+/**
+ * @fn int bluetooth_enable_le_privacy(gboolean enable_privacy);
+ *
+ * @brief Enable/Disable LE Privacy feature.
+ *
+ * This function is used to enable or disable LE Privacy feature.
+ * Once Privacy feature is enabled, Adapter can use Random Address for more security.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal IPC error \n
+ *
+ * @exception	None
+ * @param[in]	enable_privacy - The status of Privacy feature to be activated/deactivated[True/False].
+ *
+ * @remark	None
+ */
+int bluetooth_enable_le_privacy(gboolean enable_privacy);
+
+int bluetooth_pbap_init(void);
+int bluetooth_pbap_deinit(void);
+int bluetooth_pbap_connect(const bluetooth_device_address_t *address);
+int bluetooth_pbap_disconnect(const bluetooth_device_address_t *address);
+int bluetooth_pbap_get_phonebook_size(const bluetooth_device_address_t *address,
+		bt_pbap_folder_t *folder);
+int bluetooth_pbap_get_phonebook(const bluetooth_device_address_t *address,
+		bt_pbap_folder_t *folder, bt_pbap_pull_parameters_t *app_param);
+int bluetooth_pbap_get_list(const bluetooth_device_address_t *address,
+		bt_pbap_folder_t *folder, bt_pbap_list_parameters_t *app_param);
+int bluetooth_pbap_pull_vcard(const bluetooth_device_address_t *address,
+		bt_pbap_folder_t *folder, bt_pbap_pull_vcard_parameters_t *app_param);
+int bluetooth_pbap_phonebook_search(const bluetooth_device_address_t *address,
+		bt_pbap_folder_t *folder, bt_pbap_search_parameters_t *app_param);
+
+/**
+ * @fn int bluetooth_set_manufacturer_data(const bluetooth_manufacturer_data_t *value);
+ *
+ * @brief Set manufacturer data with value
+ *
+ * This function is used to set manufacturer data.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal IPC error \n
+ *
+ * @exception	None
+ * @param[in]	value - Manufacturer data structure.
+ *
+ * @remark	None
+ */
+int bluetooth_set_manufacturer_data(const bluetooth_manufacturer_data_t *value);
 /**
  * @}
  */

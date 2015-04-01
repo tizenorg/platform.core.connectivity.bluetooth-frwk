@@ -1,13 +1,17 @@
 /*
- * bluetooth-frwk
+ * Bluetooth-frwk
  *
- * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
+ *
+ * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
+ *		 Girishashok Joshi <girish.joshi@samsung.com>
+ *		 Chanyeol Park <chanyeol.park@samsung.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *              http://www.apache.org/licenses/LICENSE-2.0
+ *		http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +20,6 @@
  * limitations under the License.
  *
  */
-
 #include <dbus/dbus-glib-lowlevel.h>
 #include <dbus/dbus-glib.h>
 #include <dbus/dbus.h>
@@ -60,6 +63,7 @@ typedef struct {
 
 G_DEFINE_TYPE(BtObexAgent, bt_obex_agent, G_TYPE_OBJECT)
 
+
 gboolean bt_obex_agent_authorize_push(BtObexAgent *agent, const char *path,
 			     DBusGMethodInvocation *context)
 {
@@ -78,6 +82,27 @@ gboolean bt_obex_agent_authorize_push(BtObexAgent *agent, const char *path,
 				info->authorize_data);
 
 	return result;
+fail:
+	dbus_g_method_return(context, "");
+	return FALSE;
+}
+
+gboolean bt_obex_agent_authorize(BtObexAgent *agent, const char *path,
+			const char *bdaddress, const char *name,
+			const char *type, gint length, gint time,
+			     DBusGMethodInvocation *context)
+{
+	bt_obex_agent_info *info;
+
+	info = BT_OBEX_AGENT_GET_PRIVATE(agent);
+
+	if (info == NULL)
+		goto fail;
+
+	if (info->authorize_cb == NULL)
+		goto fail;
+
+	return TRUE;
 fail:
 	dbus_g_method_return(context, "");
 	return FALSE;
@@ -132,6 +157,8 @@ fail:
 gboolean bt_obex_agent_progress(BtObexAgent *agent, const char *path,
 		    guint64 transferred, DBusGMethodInvocation *context)
 {
+	BT_DBG("+");
+
 	bt_obex_agent_info *info;
 	char *sender;
 	gboolean result;
@@ -164,10 +191,13 @@ gboolean bt_obex_agent_progress(BtObexAgent *agent, const char *path,
 
 	g_object_unref(proxy);
 
+	BT_DBG("-");
+
 	return result;
 fail:
 	BT_ERR("Fail case");
 	dbus_g_method_return(context, "");
+	BT_DBG("-");
 	return FALSE;
 }
 

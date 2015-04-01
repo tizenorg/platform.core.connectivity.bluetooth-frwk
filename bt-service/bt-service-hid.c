@@ -1,13 +1,17 @@
 /*
- * bluetooth-frwk
+ * Bluetooth-frwk
  *
- * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
+ * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
+ *
+ * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
+ *		 Girishashok Joshi <girish.joshi@samsung.com>
+ *		 Chanyeol Park <chanyeol.park@samsung.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *              http://www.apache.org/licenses/LICENSE-2.0
+ *		http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,7 +30,9 @@
 #include <syspopup_caller.h>
 #endif
 #include "bluetooth-api.h"
+
 #include "bt-service-common.h"
+#include "bt-service-device.h"
 #include "bt-service-hid.h"
 #include "bt-service-event.h"
 #include "bt-service-util.h"
@@ -63,10 +69,8 @@ static void __bt_hid_connect_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 	if (g_error != NULL) {
 		BT_ERR("Hidh Connect Dbus Call Error: %s\n", g_error->message);
 		result = BLUETOOTH_ERROR_INTERNAL;
-		goto dbus_return;
 	}
 
-dbus_return:
 	if (req_info->context == NULL)
 		goto done;
 
@@ -86,6 +90,7 @@ dbus_return:
 	g_array_free(out_param2, TRUE);
 
 	_bt_delete_request_list(req_info->req_id);
+	BT_DBG("HID Connected..");
 done:
 	if (g_error)
 		g_error_free(g_error);
@@ -128,10 +133,8 @@ static void __bt_hid_disconnect_cb(DBusGProxy *proxy, DBusGProxyCall *call,
 	if (g_error != NULL) {
 		BT_ERR("Hidh Connect Dbus Call Error: %s\n", g_error->message);
 		result = BLUETOOTH_ERROR_INTERNAL;
-		goto dbus_return;
 	}
 
-dbus_return:
 	if (req_info->context == NULL)
 		goto done;
 
@@ -169,100 +172,71 @@ done:
 int _bt_hid_connect(int request_id,
 		bluetooth_device_address_t *device_address)
 {
-	gchar *device_path = NULL;
 	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
 	bt_function_data_t *func_data;
 	DBusGProxy *adapter_proxy;
-	DBusGProxy *hid_proxy;
 	DBusGConnection *conn;
 
-	BT_CHECK_PARAMETER(device_address, return);
+	int ret;
+	char *uuid;
 
-	_bt_convert_addr_type_to_string(address, device_address->addr);
+	BT_CHECK_PARAMETER(device_address, return);
 
 	adapter_proxy = _bt_get_adapter_proxy();
 	retv_if(adapter_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	device_path = _bt_get_device_object_path(address);
-	if (device_path == NULL) {
-		BT_ERR("No paired device");
-		return BLUETOOTH_ERROR_NOT_PAIRED;
-	}
-
 	conn = _bt_get_system_gconn();
 	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	hid_proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
-					device_path, BT_DEVICE_INTERFACE);
+	_bt_convert_addr_type_to_string(address, device_address->addr);
 
-	g_free(device_path);
-	retv_if(hid_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 	func_data = g_malloc0(sizeof(bt_function_data_t));
 
 	func_data->address = g_strdup(address);
 	func_data->req_id = request_id;
+	uuid = HID_UUID;
 
-	if (!dbus_g_proxy_begin_call(hid_proxy, "Connect",
-			(DBusGProxyCallNotify)__bt_hid_connect_cb,
-			func_data, NULL,
-			G_TYPE_INVALID)) {
-				BT_ERR("Hidh connect Dbus Call Error");
-				g_object_unref(hid_proxy);
+	ret = _bt_connect_profile(address, uuid,
+			__bt_hid_connect_cb, func_data);
 
-				g_free(func_data->address);
-				g_free(func_data);
-				return BLUETOOTH_ERROR_INTERNAL;
+	if (ret != BLUETOOTH_ERROR_NONE) {
+		BT_ERR("_bt_connect_profile Error");
+		return ret;
 	}
-
 	return BLUETOOTH_ERROR_NONE;
 }
 
 int _bt_hid_disconnect(int request_id,
 		bluetooth_device_address_t *device_address)
 {
-	gchar *device_path = NULL;
 	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
 	bt_function_data_t *func_data;
 	DBusGProxy *adapter_proxy;
-	DBusGProxy *hid_proxy;
 	DBusGConnection *conn;
 
-	BT_CHECK_PARAMETER(device_address, return);
+	int ret;
 
-	_bt_convert_addr_type_to_string(address, device_address->addr);
+	BT_CHECK_PARAMETER(device_address, return);
 
 	adapter_proxy = _bt_get_adapter_proxy();
 	retv_if(adapter_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	device_path = _bt_get_device_object_path(address);
-	if (device_path == NULL) {
-		BT_ERR("No paired device");
-		return BLUETOOTH_ERROR_NOT_PAIRED;
-	}
-
 	conn = _bt_get_system_gconn();
 	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	hid_proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
-					device_path, BT_DEVICE_INTERFACE);
+	_bt_convert_addr_type_to_string(address, device_address->addr);
 
-	g_free(device_path);
-	retv_if(hid_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 	func_data = g_malloc0(sizeof(bt_function_data_t));
 
 	func_data->address = g_strdup(address);
 	func_data->req_id = request_id;
 
-	if (!dbus_g_proxy_begin_call(hid_proxy, "Disconnect",
-			(DBusGProxyCallNotify)__bt_hid_disconnect_cb,
-			func_data, NULL,
-			G_TYPE_INVALID)) {
-				BT_ERR("Hidh disconnect Dbus Call Error");
-				g_object_unref(hid_proxy);
+	ret = _bt_disconnect_profile(address, HID_UUID,
+			__bt_hid_disconnect_cb, func_data);
 
-				g_free(func_data->address);
-				g_free(func_data);
-				return BLUETOOTH_ERROR_INTERNAL;
+	if (ret != BLUETOOTH_ERROR_NONE) {
+		BT_ERR("_bt_disconnect_profile Error");
+		return ret;
 	}
 
 	return BLUETOOTH_ERROR_NONE;
