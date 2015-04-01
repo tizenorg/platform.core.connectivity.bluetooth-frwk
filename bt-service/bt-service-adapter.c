@@ -32,7 +32,7 @@
 #if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
 #endif
-#if __TIZEN_MOBILE__
+#ifdef __TIZEN_MOBILE__
 #include <aul.h>
 #endif
 #include <notification.h>
