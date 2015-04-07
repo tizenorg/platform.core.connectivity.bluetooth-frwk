@@ -264,9 +264,13 @@ void tc_usage_print(void)
 int test_input_callback(void *data)
 {
 	int ret = 0;
+	int i = 0;
 	int test_id = (int)data;
 
-	TC_PRT("TC : %s", tc_table[test_id - 1].tc_name);
+	while(tc_table[i].tc_code != test_id) {
+		i++;
+	}
+	TC_PRT("TC : %s", tc_table[i].tc_name);
 	switch (test_id)
 	{
 		case 0x00ff:
@@ -278,8 +282,8 @@ int test_input_callback(void *data)
 			bluetooth_register_callback(bt_event_callback, NULL);
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[0].tc_name, ret);
-				tc_result(TC_FAIL, 1);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
+				tc_result(TC_FAIL, i);
 			}
 			break;
 
@@ -287,8 +291,8 @@ int test_input_callback(void *data)
 			bluetooth_unregister_callback();
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[1].tc_name, ret);
-				tc_result(TC_FAIL, 1);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
+				tc_result(TC_FAIL, i);
 			}
 			break;
 
@@ -296,8 +300,8 @@ int test_input_callback(void *data)
 			ret = bluetooth_enable_adapter();
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[2].tc_name, ret);
-				tc_result(TC_FAIL, 1);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
+				tc_result(TC_FAIL, i);
 			}
 			break;
 
@@ -305,8 +309,8 @@ int test_input_callback(void *data)
 			ret = bluetooth_disable_adapter();
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[3].tc_name, ret);
-				tc_result(TC_FAIL, 2);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
+				tc_result(TC_FAIL, i);
 			}
 			break;
 
@@ -323,7 +327,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_get_local_address(&address);
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[5].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			} else {
 				TC_PRT("dev [%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X]", \
 					address.addr[0], address.addr[1], address.addr[2], \
@@ -339,7 +343,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_get_local_name(&local_name);
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[6].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			} else {
 				TC_PRT("name: %s", local_name.name);
 			}
@@ -355,7 +359,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_set_local_name(&local_name);
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[7].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			}
 			break;
 		}
@@ -368,7 +372,7 @@ int test_input_callback(void *data)
 
 			ret = bluetooth_get_local_version(&local_version);
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[89].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			else
 				TC_PRT("version: %s", local_version.version);
 			break;
@@ -381,7 +385,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_is_service_used(rfcomm_test_uuid_spp, &used);
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[8].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			} else {
 				TC_PRT("used: %d", used);
 			}
@@ -394,7 +398,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_get_discoverable_mode(&mode);
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[9].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			}
 			else
 			{
@@ -409,7 +413,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_set_discoverable_mode(mode, 0);
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[10].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			}
 			else
 			{
@@ -424,7 +428,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_set_discoverable_mode(mode, 0);
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[11].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			}
 			else
 			{
@@ -439,7 +443,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_set_discoverable_mode(mode, 5);
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[12].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			}
 			else
 			{
@@ -452,7 +456,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_start_discovery(0,0,0);
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[13].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			}
 			break;
 
@@ -460,7 +464,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_cancel_discovery();
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[14].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			}
 			break;
 
@@ -469,7 +473,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_is_discovering();
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[15].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			}
 			else
 			{
@@ -487,7 +491,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_get_bonded_device_list(&devinfo);
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[16].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			}
 			else
 			{
@@ -519,6 +523,7 @@ int test_input_callback(void *data)
 			/* Apple wireless keyboard */
 			//bluetooth_device_address_t device_address={{0xE8,0x06,0x88,0x3B,0x18,0xBA}};
 			//bluetooth_device_address_t device_address={{0x00,0x19,0x0E,0x01,0x61,0x17}}; /* DO-DH79-PYUN04 */
+			//bluetooth_device_address_t device_address={{0xF4,0x7B,0x5E,0x7D,0xD9,0xBC}}; /* ANUPAM - SoundShare*/
 			//bluetooth_device_address_t device_address={{0x00,0x16,0x38,0xC3,0x1F,0xD2}}; /* DO-DH79-PYUN03 */
 			//bluetooth_device_address_t device_address={{0x58,0x17,0x0C,0xEC,0x6A,0xF3}}; /* MW600 */
 			bluetooth_device_address_t device_address={{0x00,0x0D,0xFD,0x24,0x5E,0xFF}}; /* Motorola S9 */
@@ -530,7 +535,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_bond_device(&device_address);
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[17].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			}
 			break;
 		}
@@ -541,7 +546,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_cancel_bonding();
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[18].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			}
 
 			break;
@@ -551,10 +556,11 @@ int test_input_callback(void *data)
 		{
 			bluetooth_device_address_t device_address={{0x00,0x19,0x0E,0x01,0x61,0x17}}; /* DO-DH79-PYUN04 */
 			//bluetooth_device_address_t device_address={{0x00,0x16,0x38,0xC3,0x1F,0xD2}};
+			//bluetooth_device_address_t device_address={{0xF4,0x7B,0x5E,0x7D,0xD9,0xBC}}; /* ANUPAM - SoundShare*/
 			ret = bluetooth_unbond_device(&device_address);
 			if (ret < 0)
 			{
-				TC_PRT("%s failed with [0x%04x]", tc_table[19].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			}
 
 			break;
@@ -563,6 +569,7 @@ int test_input_callback(void *data)
 		case 21: /*Get paired device */
 		{
 			bluetooth_device_info_t devinfo;
+			//bluetooth_device_address_t device_address={{0xF4,0x7B,0x5E,0x7D,0xD9,0xBC}}; /* ANUPAM - SoundShare*/
 			bluetooth_device_address_t device_address={{0x00,0x16,0x38,0xC3,0x1F,0xD2}};
 
 			memset(&devinfo, 0x00, sizeof(bluetooth_device_info_t));
@@ -590,7 +597,7 @@ int test_input_callback(void *data)
 
 			ret = bluetooth_set_alias(&device_address, "Renamed device");
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[21].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 
@@ -600,7 +607,7 @@ int test_input_callback(void *data)
 
 			ret = bluetooth_authorize_device(&device_address, TRUE);
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[22].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 24:
@@ -609,7 +616,7 @@ int test_input_callback(void *data)
 
 			ret = bluetooth_authorize_device(&device_address, FALSE);
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[23].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 25:
@@ -618,14 +625,14 @@ int test_input_callback(void *data)
 
 			ret = bluetooth_search_service(&device_address);
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[24].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 26:
 		{
 			ret = bluetooth_cancel_service_search();
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[24].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 27:
@@ -635,7 +642,7 @@ int test_input_callback(void *data)
 
 			ret = bluetooth_is_device_connected(&device_address, BLUETOOTH_A2DP_SERVICE, &connected);
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[24].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 
 			TC_PRT("connected : %d", connected);
 			break;
@@ -644,7 +651,7 @@ int test_input_callback(void *data)
 		{
 			ret = bluetooth_reset_adapter();
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[27].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 91:
@@ -658,43 +665,45 @@ int test_input_callback(void *data)
 			m_data.data_len = sizeof(data) - 2;
 			ret = bluetooth_set_manufacturer_data(&m_data);
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[90].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 29:
 		{
 			ret = bluetooth_audio_init(bt_audio_event_callback, NULL);
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[28].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 30:
 		{
 			ret = bluetooth_audio_deinit();
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[29].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 31:
 		{
 			/* MW600 */
 			//bluetooth_device_address_t device_address={{0x58,0x17,0x0C,0xEC,0x6A,0xF3}};
+			//bluetooth_device_address_t device_address={{0xF4,0x7B,0x5E,0x7D,0xD9,0xBC}}; /* ANUPAM - SoundShare*/
 			bluetooth_device_address_t device_address={{0x00,0x0D,0xFD,0x24,0x5E,0xFF}}; /* Motorola S9 */
 
 			ret = bluetooth_audio_connect(&device_address);
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[30].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 32:
 		{
 			/* MW600 */
 			//bluetooth_device_address_t device_address={{0x58,0x17,0x0C,0xEC,0x6A,0xF3}};
+			//bluetooth_device_address_t device_address={{0xF4,0x7B,0x5E,0x7D,0xD9,0xBC}}; /* ANUPAM - SoundShare*/
 			bluetooth_device_address_t device_address={{0x00,0x0D,0xFD,0x24,0x5E,0xFF}}; /* Motorola S9 */
 
 			ret = bluetooth_audio_disconnect(&device_address);
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[31].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 33:
@@ -704,7 +713,7 @@ int test_input_callback(void *data)
 
 			ret = bluetooth_ag_connect(&device_address);
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[32].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 34:
@@ -714,27 +723,29 @@ int test_input_callback(void *data)
 
 			ret = bluetooth_ag_disconnect(&device_address);
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[33].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 35:
 		{
 			/* MW600 */
 			bluetooth_device_address_t device_address={{0x58,0x17,0x0C,0xEC,0x6A,0xF3}};
+			//bluetooth_device_address_t device_address={{0xF4,0x7B,0x5E,0x7D,0xD9,0xBC}}; /* ANUPAM - SoundShare*/
 
 			ret = bluetooth_av_connect(&device_address);
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[34].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 36:
 		{
 			/* MW600 */
 			bluetooth_device_address_t device_address={{0x58,0x17,0x0C,0xEC,0x6A,0xF3}};
+			//bluetooth_device_address_t device_address={{0xF4,0x7B,0x5E,0x7D,0xD9,0xBC}}; /* ANUPAM - SoundShare*/
 
 			ret = bluetooth_av_disconnect(&device_address);
 			if (ret < 0)
-				TC_PRT("%s failed with [0x%04x]", tc_table[35].tc_name, ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 37:
@@ -958,14 +969,14 @@ int test_input_callback(void *data)
 		{
 			ret = bluetooth_hid_init(bt_hid_event_callback, NULL);
 			if (ret < 0)
-				TC_PRT("Failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 66:
 		{
 			ret = bluetooth_hid_deinit();
 			if (ret < 0)
-				TC_PRT("Failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 67:
@@ -975,7 +986,7 @@ int test_input_callback(void *data)
 
 			ret = bluetooth_hid_connect(&device_address);
 			if (ret < 0)
-				TC_PRT("Failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 68:
@@ -985,7 +996,7 @@ int test_input_callback(void *data)
 
 			ret = bluetooth_hid_disconnect(&device_address);
 			if (ret < 0)
-				TC_PRT("Failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 
@@ -997,7 +1008,7 @@ int test_input_callback(void *data)
 			//ret = bluetooth_rfcomm_connect(&device_address, "1");
 
 			if (ret < 0)
-				TC_PRT("Failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 71:
@@ -1005,7 +1016,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_rfcomm_disconnect(-1);
 
 			if (ret < 0)
-				TC_PRT("Failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 72:
@@ -1013,7 +1024,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_rfcomm_disconnect(g_ret_client_fd1);
 
 			if (ret < 0)
-				TC_PRT("Failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 73:
@@ -1022,7 +1033,7 @@ int test_input_callback(void *data)
 			ret = bluetooth_rfcomm_write(g_ret_client_fd1, rd_data, sizeof(rd_data));
 
 			if (ret < 0)
-				TC_PRT("Failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 74:
@@ -1038,7 +1049,7 @@ int test_input_callback(void *data)
 		{
 			ret = bluetooth_rfcomm_create_socket(rfcomm_test_uuid_spp);
 			if (ret < 0)
-				TC_PRT("Failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 
 			TC_PRT("Returned FD = %d", ret);
 			server_fd = ret;
@@ -1048,7 +1059,7 @@ int test_input_callback(void *data)
 		{
 			ret = bluetooth_rfcomm_create_socket(rfcomm_test_uuid_custom);
 			if (ret < 0)
-				TC_PRT("Failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 
 			TC_PRT("Returned FD = %d", ret);
 			server_fd = ret;
@@ -1058,7 +1069,7 @@ int test_input_callback(void *data)
 		{
 			ret = bluetooth_rfcomm_remove_socket(server_fd);
 			if (ret < 0)
-				TC_PRT("Failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 83: /*Listen and accept */
@@ -1066,7 +1077,7 @@ int test_input_callback(void *data)
 
 			ret = bluetooth_rfcomm_listen_and_accept(server_fd, 1);
 			if (ret < 0)
-				TC_PRT("Failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 
 			TC_PRT("result = %d", ret);
 			break;
@@ -1076,7 +1087,7 @@ int test_input_callback(void *data)
 
 			ret = bluetooth_rfcomm_listen(server_fd, 1);
 			if (ret < 0)
-				TC_PRT("Failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 
 			TC_PRT("result = %d", ret);
 			break;
@@ -1085,7 +1096,7 @@ int test_input_callback(void *data)
 		{
 			ret = bluetooth_rfcomm_server_disconnect(client_fd);
 			if (ret < 0)
-				TC_PRT("Failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 86:
@@ -1101,7 +1112,7 @@ int test_input_callback(void *data)
 		{
 			ret = bluetooth_rfcomm_accept_connection(server_fd, &client_fd);
 			if (ret < 0)
-				TC_PRT("Failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			TC_PRT("client fd: %d", client_fd);
 			break;
 		}
@@ -1109,7 +1120,7 @@ int test_input_callback(void *data)
 		{
 			ret = bluetooth_rfcomm_reject_connection(server_fd);
 			if (ret < 0)
-				TC_PRT("Failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			break;
 		}
 		case 89:
@@ -1117,7 +1128,7 @@ int test_input_callback(void *data)
 									0,0,0);
 			if (ret < 0)
 			{
-				TC_PRT("failed with [0x%04x]", ret);
+				TC_PRT("%s failed with [0x%04x]", tc_table[i].tc_name, ret);
 			}
 			break;
 		case 92: {
@@ -1286,12 +1297,12 @@ void bt_event_callback(int event, bluetooth_event_param_t* param, void *user_dat
 			if (param->result == BLUETOOTH_ERROR_NONE)
 			{
 				bluetooth_device_name_t *local_name = (bluetooth_device_name_t *)param->param_data;
-				tc_result(TC_PASS, 6);
+				tc_result(TC_PASS, 7);
 				TC_PRT("Changed Name : [%s]", local_name->name);
 			}
 			else
 			{
-				tc_result(TC_FAIL, 6);
+				tc_result(TC_FAIL, 7);
 			}
 			break;
 
@@ -1369,7 +1380,7 @@ void bt_event_callback(int event, bluetooth_event_param_t* param, void *user_dat
 			if (param->result >= BLUETOOTH_ERROR_NONE)
 			{
 				bluetooth_device_info_t *device_info = NULL;
-				tc_result(TC_PASS, 12);
+				tc_result(TC_PASS, 18);
 				device_info  = (bluetooth_device_info_t *)param->param_data;
 				if (device_info == NULL)
 					break;
@@ -1381,7 +1392,7 @@ void bt_event_callback(int event, bluetooth_event_param_t* param, void *user_dat
 			}
 			else
 			{
-				tc_result(TC_FAIL, 12);
+				tc_result(TC_FAIL, 18);
 			}
 			break;
 		}
@@ -1424,7 +1435,7 @@ void bt_event_callback(int event, bluetooth_event_param_t* param, void *user_dat
 			TC_PRT("BLUETOOTH_EVENT_SERVICE_SEARCHED, result [0x%04x]", param->result);
 			if (param->result >= BLUETOOTH_ERROR_NONE)
 			{
-				tc_result(TC_PASS, 18);
+				tc_result(TC_PASS, 25);
 				bt_sdp_info_t * bt_sdp_info=param->param_data;
 
 				TC_PRT("Dev add = %2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X\n",
@@ -1438,7 +1449,7 @@ void bt_event_callback(int event, bluetooth_event_param_t* param, void *user_dat
 			}
 			else
 			{
-				tc_result(TC_FAIL, 18);
+				tc_result(TC_FAIL, 25);
 			}
 			break;
 		}
