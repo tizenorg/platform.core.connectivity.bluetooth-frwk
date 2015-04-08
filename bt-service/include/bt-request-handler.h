@@ -67,6 +67,11 @@ int _bt_service_register(void);
 
 void _bt_service_unregister(void);
 
+int _bt_service_cynara_init(void);
+
+void _bt_service_cynara_deinit(void);
+
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
