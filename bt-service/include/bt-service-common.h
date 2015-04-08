@@ -226,8 +226,8 @@ extern "C" {
 #define GATT_UUID		"00001801-0000-1000-8000-00805f9b34fb"
 
 /* Privilege */
-#define BT_PRIVILEGE_PUBLIC "bt-service::public"
-#define BT_PRIVILEGE_PLATFORM "bt-service::platform"
+#define BT_PRIVILEGE_PUBLIC "http://tizen.org/privilege/bluetooth"
+#define BT_PRIVILEGE_PLATFORM "http://tizen.org/privilege/bluetooth.admin"
 
 /* BD Address type */
 #define BDADDR_BREDR           0x00
