@@ -47,9 +47,10 @@ BuildRequires:  pkgconfig(capi-content-mime-type)
 BuildRequires:  pkgconfig(appcore-efl)
 BuildRequires:  pkgconfig(pkgmgr)
 #BuildRequires:  pkgconfig(journal)
-
 BuildRequires:  cmake
 BuildRequires:  pkgconfig(libtzplatform-config)
+BuildRequires:  pkgconfig(cynara-client)
+BuildRequires:  pkgconfig(cynara-creds-dbus)
 
 Requires(post): /usr/bin/vconftool
 Requires(post): /sbin/ldconfig
