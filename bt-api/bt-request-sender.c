@@ -106,6 +106,14 @@ void _bt_gdbus_deinit_proxys(void)
 	}
 }
 
+const gchar *__bt_get_unique_name(void)
+{
+	if (service_gconn)
+		return g_dbus_connection_get_unique_name(service_gconn);
+	else
+		return NULL;
+}
+
 static void __bt_get_event_info(int service_function, GArray *output,
 			int *event, int *event_type, void **param_data)
 {
@@ -366,7 +374,6 @@ int _bt_sync_send_request(int service_type, int service_function,
 	GError *error = NULL;
 	GArray *in_param5 = NULL;
 	GArray *out_param2 = NULL;
-
 	GDBusProxy  *proxy;
 	GVariant *ret;
 	GVariant *param1;
@@ -374,6 +381,7 @@ int _bt_sync_send_request(int service_type, int service_function,
 	GVariant *param3;
 	GVariant *param4;
 	GVariant *param5;
+	char *unique_name = NULL;
 
 	switch (service_type) {
 	case BT_BLUEZ_SERVICE:
@@ -385,6 +393,16 @@ int _bt_sync_send_request(int service_type, int service_function,
 			return BLUETOOTH_ERROR_INTERNAL;
 
 		in_param5 = g_array_new(TRUE, TRUE, sizeof(gchar));
+
+		unique_name = g_strdup(__bt_get_unique_name());
+
+		if (unique_name) {
+			BT_DBG("unique name: %s", unique_name);
+			/* Include NULL pointer */
+			g_array_append_vals(in_param5, unique_name,
+					strlen(unique_name) + 1);
+			g_free(unique_name);
+		}
 
 		param1 = g_variant_new_from_data((const GVariantType *)"ay",
 					in_param1->data, in_param1->len,
@@ -476,6 +494,7 @@ int _bt_async_send_request(int service_type, int service_function,
 	GVariant *param3;
 	GVariant *param4;
 	GVariant *param5;
+	char *unique_name = NULL;
 
 	BT_DBG("service_function : %x", service_function);
 
@@ -504,6 +523,16 @@ int _bt_async_send_request(int service_type, int service_function,
 			timeout = BT_DBUS_TIMEOUT_MAX;
 
 		in_param5 = g_array_new(TRUE, TRUE, sizeof(gchar));
+
+		unique_name = g_strdup(__bt_get_unique_name());
+
+		if (unique_name) {
+			BT_DBG("unique name: %s", unique_name);
+			/* Include NULL pointer */
+			g_array_append_vals(in_param5, unique_name,
+					strlen(unique_name) + 1);
+			g_free(unique_name);
+		}
 
 		param1 = g_variant_new_from_data((const GVariantType *)"ay",
 					in_param1->data, in_param1->len,

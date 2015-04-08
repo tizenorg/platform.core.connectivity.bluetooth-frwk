@@ -52,6 +52,8 @@ static void __bt_release_service(void)
 
 	_bt_clear_request_list();
 
+	_bt_service_cynara_deinit();
+
 	BT_DBG("Terminating the bt-service daemon");
 }
 
@@ -231,6 +233,10 @@ int main(void)
 	if (_bt_service_register() != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Fail to register service");
 		return 0;
+	}
+
+	if (_bt_service_cynara_init() != BLUETOOTH_ERROR_NONE) {
+		BT_ERR("Fail to init cynara");
 	}
 
 	_bt_init_request_id();
