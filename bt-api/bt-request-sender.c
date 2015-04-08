@@ -366,7 +366,6 @@ int _bt_sync_send_request(int service_type, int service_function,
 	GError *error = NULL;
 	GArray *in_param5 = NULL;
 	GArray *out_param2 = NULL;
-
 	GDBusProxy  *proxy;
 	GVariant *ret;
 	GVariant *param1;

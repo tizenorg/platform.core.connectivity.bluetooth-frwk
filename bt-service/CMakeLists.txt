@@ -65,6 +65,8 @@ SET(PKG_MODULES
 	pkgmgr
 #	journal
 	libprivilege-control
+	cynara-client
+	cynara-creds-dbus
 )
 
 IF("$ENV{CFLAGS}" MATCHES "-DTIZEN_NETWORK_TETHERING_ENABLE")
