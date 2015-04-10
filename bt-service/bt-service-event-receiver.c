@@ -837,10 +837,20 @@ static void __bt_adapter_property_changed_event(DBusMessageIter *msg_iter, const
 					DBUS_TYPE_INT32, &result,
 					DBUS_TYPE_INVALID);
 			} else {
-				if (event_id > 0){
-					g_source_remove(event_id);
-					event_id = 0;
-				}
+				ret_if(event_id > 0);
+
+				adapter_proxy = _bt_get_adapter_proxy();
+				ret_if(adapter_proxy == NULL);
+
+				/* Need to stop searching */
+				dbus_g_proxy_call(adapter_proxy,
+							"StopDiscovery",
+							NULL,
+							G_TYPE_INVALID,
+							G_TYPE_INVALID);
+
+				event_id = g_timeout_add(BT_DISCOVERY_FINISHED_DELAY,
+						  (GSourceFunc)_bt_discovery_finished_cb, NULL);
 			}
 		} else if (strcasecmp(property, "LEDiscovering") == 0) {
 			gboolean le_discovering = FALSE;
