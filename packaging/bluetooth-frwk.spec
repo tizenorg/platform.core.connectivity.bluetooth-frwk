@@ -14,7 +14,10 @@ Source1002: bt-icon.png
 URL:        https://review.tizen.org/git/?p=platform/core/connectivity/bluetooth-frwk.git;a=summary
 Requires: dbus
 Requires: syspopup
+%if "%{?profile}" != "mobile"
 Requires: bluetooth-tools
+%endif
+
 BuildRequires:  pkgconfig(aul)
 BuildRequires:  pkgconfig(dbus-glib-1)
 BuildRequires:  pkgconfig(dlog)
