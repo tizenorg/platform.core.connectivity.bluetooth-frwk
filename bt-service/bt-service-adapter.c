@@ -806,7 +806,6 @@ int __bt_set_enabled(void)
 	int result = BLUETOOTH_ERROR_NONE;
 
 	_bt_check_adapter(&adapter_status);
-	adapter_status = BT_ADAPTER_ENABLED;
 
 	if (adapter_status == BT_ADAPTER_DISABLED) {
 		BT_ERR("Bluetoothd is not running");
