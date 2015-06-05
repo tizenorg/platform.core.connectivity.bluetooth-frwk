@@ -61,6 +61,20 @@ typedef enum {
 } media_player_repeat_status;
 
 typedef enum {
+	SHUFFLE_MODE_OFF = 0x01,
+	SHUFFLE_ALL_TRACK,
+	SHUFFLE_GROUP,
+	SHUFFLE_INVALID,
+} media_player_shuffle_status;
+
+typedef enum {
+	SCAN_MODE_OFF = 0x01,
+	SCAN_ALL_TRACK,
+	SCAN_GROUP,
+	SCAN_INVALID,
+} media_player_scan_status;
+
+typedef enum {
 	STATUS_STOPPED = 0x00,
 	STATUS_PLAYING,
 	STATUS_PAUSED,
@@ -69,21 +83,6 @@ typedef enum {
 	STATUS_ERROR,
 	STATUS_INVALID
 } media_player_status;
-
-typedef enum {
-	SHUFFLE_MODE_OFF = 0x01,
-	SHUFFLE_ALL_TRACK,
-	SHUFFLE_GROUP,
-	SHUFFLE_INVALID,
-} media_player_shuffle_status;
-
-/* bluez 4.101 */
-typedef enum {
-	SCAN_MODE_OFF = 0x01,
-	SCAN_ALL_TRACK,
-	SCAN_GROUP,
-	SCAN_INVALID,
-} media_player_scan_status;
 
 typedef enum {
 	PLAY = 0x01,

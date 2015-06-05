@@ -1,11 +1,11 @@
 /*
  * Bluetooth-frwk
  *
- * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
+ * Copyright (c) 2014 - 2015 Samsung Electronics Co., Ltd. All rights reserved.
  *
  * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
- *		 Girishashok Joshi <girish.joshi@samsung.com>
  *		 Chanyeol Park <chanyeol.park@samsung.com>
+  *		 Rakesh M K<rakesh.mk@samsung.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,46 +22,40 @@
  */
 
 
-#ifndef _BT_SERVICE_UTIL_H_
-#define _BT_SERVICE_UTIL_H_
+#ifndef _BT_SERVICE_AVRCP_CONTROLLER_H_
+#define _BT_SERVICE_AVRCP_CONTROLLER_H_
 
+#include <glib.h>
 #include <sys/types.h>
 #include <gio/gio.h>
 
+#include "bluetooth-api.h"
+#include "bluetooth-media-control.h"
+
 #ifdef __cplusplus
 extern "C" {
-#endif /* __cplusplus */
-
-#define BT_NODE_NAME_LEN 50
-
-typedef struct {
-	int req_id;
-	int service_function;
-	char name[BT_NODE_NAME_LEN];
-	GDBusMethodInvocation *context;
-} request_info_t;
+#endif
 
 
-void _bt_init_request_id(void);
+#define BT_MEDIA_CONTROL_PATH "%s/player0"
 
-int _bt_assign_request_id(void);
+int _bt_avrcp_control_cmd(int type);
 
-void _bt_delete_request_id(int request_id);
+int _bt_avrcp_control_set_property(int type, unsigned int value);
 
+int _bt_avrcp_control_get_property(int type, unsigned int *value);
 
-void _bt_init_request_list(void);
+int _bt_avrcp_control_get_track_info(media_metadata_attributes_t *metadata);
 
-int _bt_insert_request_list(int req_id, int service_function,
-			char *name, GDBusMethodInvocation *context);
+void _bt_handle_avrcp_control_event(GVariant *reply, const char *path);
 
-int _bt_delete_request_list(int req_id);
+void _bt_set_control_device_path(const char *path);
 
-request_info_t *_bt_get_request_info(int req_id);
-
-void _bt_clear_request_list(void);
+void _bt_remove_control_device_path(const char *path);
 
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
-#endif /*_BT_SERVICE_UTIL_H_*/
+#endif /*_BT_SERVICE_AVRCP_CONTROLLER_H_*/
+
 

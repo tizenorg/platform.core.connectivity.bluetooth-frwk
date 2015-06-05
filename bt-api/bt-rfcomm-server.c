@@ -93,6 +93,20 @@ static rfcomm_info_t *__find_rfcomm_info_with_path(const gchar *path)
 	return NULL;
 }
 
+static rfcomm_info_t *__find_rfcomm_info_with_uuid(const char *uuid)
+{
+	GSList *l;
+
+	for (l = rfcomm_nodes; l != NULL; l = l->next) {
+		rfcomm_info_t *info = l->data;
+
+		if (g_strcmp0(info->uuid, uuid) == 0)
+			return info;
+	}
+
+	return NULL;
+}
+
 gboolean _check_uuid_path(char *path, char *uuid)
 {
 	rfcomm_info_t *info = NULL;
@@ -115,7 +129,7 @@ static void __connected_cb(rfcomm_info_t *info, bt_event_info_t *event_info)
 	g_strlcpy(conn_info.uuid, info->uuid, BLUETOOTH_UUID_STRING_MAX);
 	conn_info.socket_fd = info->fd;
 	conn_info.device_addr = info->addr;
-//	conn_info.server_id = info->id;
+	conn_info.server_id = info->id;
 
 	BT_INFO_C("Connected [RFCOMM Server]");
 	_bt_common_event_cb(BLUETOOTH_EVENT_RFCOMM_CONNECTED,
@@ -302,6 +316,26 @@ static rfcomm_info_t *__register_method()
 	return info;
 }
 
+static rfcomm_info_t *__register_method_2(const char *path,const char *bus_name)
+{
+	rfcomm_info_t *info;
+	int object_id;
+
+	object_id = _bt_register_new_conn_ex(path, bus_name, new_server_connection);
+	if (object_id < 0) {
+		return NULL;
+	}
+	info = g_new(rfcomm_info_t, 1);
+	info->object_id = (guint)object_id;
+	info->path = g_strdup(path);
+	info->id = -1;
+	info->fd = -1;
+
+	rfcomm_nodes = g_slist_append(rfcomm_nodes, info);
+
+	return info;
+}
+
 void free_rfcomm_info(rfcomm_info_t *info)
 {
 	bt_event_info_t *event_info;
@@ -391,6 +425,35 @@ BT_EXPORT_API int bluetooth_rfcomm_create_socket(const char *uuid)
 #endif
 }
 
+BT_EXPORT_API int bluetooth_rfcomm_create_socket_ex(const char *uuid, const char *bus_name, const char *path)
+{
+#ifdef RFCOMM_DIRECT
+	rfcomm_info_t *info;
+
+	BT_CHECK_ENABLED(return);
+	BT_CHECK_PARAMETER(path, return);
+	BT_INFO("PATH Provided %s", path);
+
+	if (_bt_check_privilege(BT_BLUEZ_SERVICE, BT_RFCOMM_CREATE_SOCKET_EX)
+		== BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have a privilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
+
+	BT_INFO("<<<<<<<<< RFCOMM Create socket from app >>>>>>>>>");
+	info = __register_method_2(path, bus_name);
+	if (info == NULL)
+		return BLUETOOTH_ERROR_IN_PROGRESS;
+	info->uuid = g_strdup(uuid);
+	info->disconnect_idle_id = 0;
+
+	return BLUETOOTH_ERROR_NONE;
+#else
+	return BLUETOOTH_ERROR_NOT_SUPPORT;
+#endif
+}
+
+
 BT_EXPORT_API int bluetooth_rfcomm_remove_socket(int socket_fd)
 {
 #ifdef RFCOMM_DIRECT
@@ -442,6 +505,37 @@ BT_EXPORT_API int bluetooth_rfcomm_remove_socket(int socket_fd)
 #endif
 }
 
+BT_EXPORT_API int bluetooth_rfcomm_remove_socket_ex(const char *uuid)
+{
+#ifdef RFCOMM_DIRECT
+	rfcomm_info_t *info;
+
+	BT_CHECK_ENABLED(return);
+
+	if (_bt_check_privilege(BT_BLUEZ_SERVICE, BT_RFCOMM_REMOVE_SOCKET)
+		== BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have a privilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
+
+	BT_INFO("<<<<<<<<< RFCOMM Remove socket request from app, uuid=[%s] >>>>>>>>>>>", uuid);
+
+	info = __find_rfcomm_info_with_uuid(uuid);
+	if (info == NULL)
+		return BLUETOOTH_ERROR_INVALID_PARAM;
+
+	_bt_unregister_osp_server_in_agent(BT_RFCOMM_SERVER, info->uuid);
+	_bt_unregister_profile(info->path);
+
+	rfcomm_nodes = g_slist_remove(rfcomm_nodes, info);
+	free_rfcomm_info(info);
+
+	return BLUETOOTH_ERROR_NONE;
+#else
+	return BLUETOOTH_ERROR_NOT_SUPPORT;
+#endif
+}
+
 BT_EXPORT_API int bluetooth_rfcomm_server_disconnect(int socket_fd)
 {
 #ifdef RFCOMM_DIRECT
@@ -466,7 +560,8 @@ BT_EXPORT_API int bluetooth_rfcomm_server_disconnect(int socket_fd)
 	BT_DBG("Address %s", address);
 	_bt_disconnect_profile(address, info->uuid, NULL,NULL);
 
-	info->disconnect_idle_id = g_idle_add(__rfcomm_server_disconnect, info);
+	info->disconnect_idle_id = g_idle_add((GSourceFunc)
+							__rfcomm_server_disconnect, info);
 	BT_DBG("-");
 
 	return BLUETOOTH_ERROR_NONE;
@@ -523,7 +618,7 @@ BT_EXPORT_API gboolean bluetooth_rfcomm_is_server_uuid_available(const char *uui
 	return available;
 }
 
-BT_EXPORT_API int bluetooth_rfcomm_server_is_connected(bluetooth_device_address_t *device_address, gboolean *connected)
+BT_EXPORT_API int bluetooth_rfcomm_server_is_connected(const bluetooth_device_address_t *device_address, gboolean *connected)
 {
 	GSList *l;
 	rfcomm_info_t *info;
@@ -533,7 +628,7 @@ BT_EXPORT_API int bluetooth_rfcomm_server_is_connected(bluetooth_device_address_
 	BT_CHECK_PARAMETER(device_address, return);
 	BT_CHECK_PARAMETER(connected, return);
 
-	_bt_convert_addr_type_to_string(input_addr, device_address->addr);
+	_bt_convert_addr_type_to_string(input_addr, (unsigned char *)device_address->addr);
 
 	*connected = FALSE;
 
@@ -580,6 +675,7 @@ BT_EXPORT_API int bluetooth_rfcomm_listen_and_accept(int socket_fd, int max_pend
 	profile_info.role = NULL;
 	profile_info.service = info->uuid;
 	profile_info.uuid = info->uuid;
+
 	BT_INFO("uuid %s", profile_info.uuid);
 	result = _bt_register_profile(&profile_info, TRUE);
 
@@ -600,6 +696,38 @@ BT_EXPORT_API int bluetooth_rfcomm_listen_and_accept(int socket_fd, int max_pend
 	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
 	return result;
+#endif
+}
+
+BT_EXPORT_API int bluetooth_rfcomm_listen_and_accept_ex(const char *uuid, int max_pending_connection, const char *bus_name, const char *path)
+{
+#ifdef RFCOMM_DIRECT
+	rfcomm_info_t *info;
+
+	BT_CHECK_ENABLED(return);
+
+	BT_INFO("<<<<<<<<< RFCOMM Listen & accept from app >>>>>>>>>>>");
+
+	info = __find_rfcomm_info_with_uuid(uuid);
+	if (info == NULL)
+		return BLUETOOTH_ERROR_INVALID_PARAM;
+
+	bt_register_profile_info_t profile_info;
+	int result;
+
+	profile_info.authentication = TRUE;
+	profile_info.authorization = TRUE;
+	profile_info.obj_path = info->path;
+	profile_info.role = NULL;
+	profile_info.service = info->uuid;
+	profile_info.uuid = info->uuid;
+
+	BT_INFO("uuid %s", profile_info.uuid);
+	result = _bt_register_profile_ex(&profile_info, TRUE, bus_name, path);
+
+	return result;
+#else
+	return BLUETOOTH_ERROR_NOT_SUPPORT;
 #endif
 }
 
@@ -662,7 +790,7 @@ BT_EXPORT_API int bluetooth_rfcomm_listen(int socket_fd, int max_pending_connect
 #endif
 }
 
-BT_EXPORT_API int bluetooth_rfcomm_accept_connection(int server_fd, int *client_fd)
+BT_EXPORT_API int bluetooth_rfcomm_accept_connection(int server_fd)
 {
 	int result;
 
@@ -678,13 +806,7 @@ BT_EXPORT_API int bluetooth_rfcomm_accept_connection(int server_fd, int *client_
 
 	BT_DBG("result: %x", result);
 
-	if (result == BLUETOOTH_ERROR_NONE) {
-		*client_fd = g_array_index(out_param, int, 0);
-	}
-
 	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
-
-	BT_DBG("client_fd: %d", *client_fd);
 
 	return result;
 }

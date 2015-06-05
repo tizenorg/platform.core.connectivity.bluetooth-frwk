@@ -80,7 +80,7 @@ static void __bt_core_sigterm_handler(int signo)
 static gboolean __bt_check_bt_core(void *data)
 {
 	int bt_status = VCONFKEY_BT_STATUS_OFF;
-	int bt_le_status = 0;
+	int bt_le_status = VCONFKEY_BT_LE_STATUS_OFF;
 	bt_status_t status = BT_DEACTIVATED;
 	bt_le_status_t le_status = BT_LE_DEACTIVATED;
 	int flight_mode_deactivation = 0;
@@ -95,11 +95,9 @@ static gboolean __bt_check_bt_core(void *data)
 		BT_DBG("no bluetooth device info, so BT was disabled at previous session");
 	}
 
-#ifdef ENABLE_TIZEN_2_4
 	if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_le_status) < 0) {
 		BT_ERR("no bluetooth le info, so BT LE was disabled at previous session");
 	}
-#endif
 
 	if (vconf_get_int(BT_OFF_DUE_TO_FLIGHT_MODE, &flight_mode_deactivation) != 0)
 		BT_ERR("Fail to get the flight_mode_deactivation value");
@@ -110,8 +108,8 @@ static gboolean __bt_check_bt_core(void *data)
 	if (vconf_get_int(BT_OFF_DUE_TO_TIMEOUT, &bt_off_due_to_timeout) != 0)
 		BT_ERR("Fail to get BT_OFF_DUE_TO_TIMEOUT");
 
-	if ((bt_status != VCONFKEY_BT_STATUS_OFF || bt_off_due_to_timeout)
-		&& (status == BT_DEACTIVATED)) {
+	if ((bt_status != VCONFKEY_BT_STATUS_OFF || bt_off_due_to_timeout) &&
+		(status == BT_DEACTIVATED)) {
 		BT_DBG("Previous session was enabled.");
 
 		/* Enable the BT */
@@ -126,7 +124,7 @@ static gboolean __bt_check_bt_core(void *data)
 		_bt_core_set_bt_status(BT_POWER_SAVING_MODE, ps_mode_deactivation);
 	}
 
-	if ((bt_le_status == 1) && (le_status == BT_LE_DEACTIVATED)) {
+	if ((bt_le_status == VCONFKEY_BT_LE_STATUS_ON) && (le_status == BT_LE_DEACTIVATED)) {
 		BT_DBG("Previous session was le enabled. Turn BT LE on automatically.");
 
 		/* Enable the BT LE */
@@ -147,32 +145,18 @@ static gboolean __bt_check_bt_core(void *data)
 
 int main(void)
 {
-	DBusGConnection *conn = NULL;
-	GError *error = NULL;
-	BtCore *bt_core = NULL;
-
-	DBusGProxy *dbus_proxy = NULL;
+	gboolean ret;
 	struct sigaction sa;
 
 	g_type_init();
 	BT_INFO_C("Starting bt-core daemeon");
 
-	conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, &error);
-	if (error != NULL) {
-		BT_ERR("ERROR: Can't get on system bus [%s]", error->message);
-		g_error_free(error);
+	ret = _bt_core_register_dbus();
+	if (!ret) {
+		BT_ERR("_bt_core_register_dbus failed");
 		goto fail;
 	}
 
-	bt_core = g_object_new(BT_CORE_TYPE, NULL);
-
-	dbus_proxy = _bt_core_register_event_filter(conn, bt_core);
-	if (!dbus_proxy) {
-		BT_ERR("__bt_core_register_event_filter failed");
-		g_object_unref(bt_core);
-		bt_core = NULL;
-		goto fail;
-	}
 
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = __bt_core_sigterm_handler;
@@ -180,17 +164,20 @@ int main(void)
 	sigaction(SIGTERM, &sa, NULL);
 
 	g_timeout_add(500, (GSourceFunc)__bt_check_bt_core, NULL);
+
 	main_loop = g_main_loop_new(NULL, FALSE);
+	if (!main_loop) {
+		BT_ERR("creating main loop failed");
+		goto fail;
+	}
+
 	g_main_loop_run(main_loop);
 
 fail:
-
-	_bt_unregister_event_filter(conn, bt_core, dbus_proxy);
+	_bt_core_unregister_dbus();
 
 	if (main_loop)
 		g_main_loop_unref(main_loop);
-
-	dbus_g_connection_unref(conn);
 
 	BT_INFO_C("Terminating bt-core daemon");
 

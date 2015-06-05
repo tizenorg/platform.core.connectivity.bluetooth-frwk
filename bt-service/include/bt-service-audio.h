@@ -42,6 +42,11 @@ typedef struct {
 	GArray **out_param1;
 } bt_headset_wait_t;
 
+typedef struct {
+	int key;
+	const char *property;
+} bt_player_settinngs_t;
+
 typedef enum {
 	BT_PENDING_NONE = 0x00,
 	BT_PENDING_CONNECT,
@@ -60,7 +65,8 @@ typedef enum {
 	BT_AUDIO_HSP = 0x01,
 	BT_AUDIO_A2DP,
 	BT_AUDIO_ALL,
-	BT_AVRCP
+	BT_AVRCP,
+	BT_AUDIO_A2DP_SOURCE
 } bt_audio_type_t;
 
 typedef enum {

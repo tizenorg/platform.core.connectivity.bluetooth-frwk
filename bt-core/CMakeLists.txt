@@ -22,15 +22,15 @@ INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 INCLUDE(FindPkgConfig)
-pkg_check_modules(pkgs REQUIRED dbus-glib-1 dlog vconf gio-2.0 gio-unix-2.0)
+pkg_check_modules(pkgs REQUIRED dbus-glib-1 dlog vconf gio-2.0 gio-unix-2.0 eventsystem)
 
 FOREACH(flag ${pkgs_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")
 ENDFOREACH(flag)
 
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${EXTRA_CFLAGS}")
-SET(CMAKE_C_FLAGS_DEBUG "-O0 -g")
-SET(CMAKE_C_FLAGS_RELEASE "-O2")
+SET(CMAKE_C_FLAGS_DEBUG "-O0 -g -fPIE")
+SET(CMAKE_C_FLAGS_RELEASE "-O2 -fPIE")
 
 FIND_PROGRAM(UNAME NAMES uname)
 EXEC_PROGRAM("${UNAME}" ARGS "-m" OUTPUT_VARIABLE "ARCH")
@@ -39,17 +39,13 @@ IF("${ARCH}" STREQUAL "arm")
 	MESSAGE("add -DTARGET")
 ENDIF("${ARCH}" STREQUAL "arm")
 
-FIND_PROGRAM(DBUS_BINDING_TOOL NAMES dbus-binding-tool)
-EXEC_PROGRAM("${DBUS_BINDING_TOOL}" ARGS "--prefix=bt ${CMAKE_CURRENT_SOURCE_DIR}/bt-request-service.xml --mode=glib-client --output=${CMAKE_CURRENT_SOURCE_DIR}/include/bt-request-service.h")
-EXEC_PROGRAM("${DBUS_BINDING_TOOL}" ARGS "--prefix=bt_core ${CMAKE_CURRENT_SOURCE_DIR}/bt-core-adapter.xml --mode=glib-server --output=${CMAKE_CURRENT_SOURCE_DIR}/include/bt-core-adapter-method.h")
-
 ADD_DEFINITIONS("-DPREFIX=\"${CMAKE_INSTALL_PREFIX}\"")
 ADD_DEFINITIONS("-DVENDOR=\"${APP_VENDOR}\"")
 ADD_DEFINITIONS("-DAPPNAME=\"${APP_NAME}\"")
 ADD_DEFINITIONS("-DAPP_DIR=\"${APP_DIR}\"")
 ADD_DEFINITIONS("-DAPP_SYSCONFDIR=\"${APP_SYSCONFDIR}\"")
 
-SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed")
+SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed -pie")
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SRCS})
 TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${pkgs_LDFLAGS})
@@ -60,4 +56,3 @@ SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt_core.service DESTINATION share/dbus-1/system-services)
 
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-core.conf DESTINATION /etc/dbus-1/system.d)

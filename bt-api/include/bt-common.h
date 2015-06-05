@@ -60,6 +60,12 @@ extern "C" {
 #define BT_ERR(fmt, args...) \
         SLOGE(fmt, ##args)
 
+#define BT_DBG_UUID(uuids, len, i) \
+	BT_DBG("***UUIDs***"); \
+	for (i = 0; i < len; i++) { \
+		BT_DBG("%s", uuids[i]); \
+	}
+
 #define BT_INFO_C(fmt, arg...) \
 	SLOGI_IF(TRUE,  LOG_COLOR_GREEN" "fmt" "LOG_COLOR_RESET, ##arg)
 #define BT_ERR_C(fmt, arg...) \
@@ -143,7 +149,7 @@ extern "C" {
 	do { \
 		if (arg == NULL) \
 		{ \
-			BT_ERR("INVALID PARAMETER"); \
+			BT_ERR("%s is NULL", #arg); \
 			func BLUETOOTH_ERROR_INVALID_PARAM; \
 		} \
 	} while (0)
@@ -186,6 +192,7 @@ extern "C" {
 #define BT_EVENT_FREEDESKTOP "org.freedesktop.DBus"
 #define BT_FREEDESKTOP_PATH "/org/freedesktop/DBus"
 
+#define BT_EVENT_MANAGER "org.bluez.Manager"
 #define BT_MANAGER_PATH "/"
 
 
@@ -193,7 +200,6 @@ extern "C" {
 #define BT_ADAPTER_INTERFACE "org.bluez.Adapter1"
 #define BT_DEVICE_INTERFACE "org.bluez.Device1"
 #define BT_PROPERTIES_INTERFACE "org.freedesktop.DBus.Properties"
-#define BT_BLUEZ_HCI_PATH "/org/bluez/hci0"
 
 
 #define BT_SERIAL_INTERFACE "org.bluez.Serial"
@@ -260,6 +266,9 @@ void _bt_input_event_cb(int event, int result, void *param,
 void _bt_headset_event_cb(int event, int result, void *param,
 					void *callback, void *user_data);
 
+void _bt_a2dp_source_event_cb(int event, int result, void *param,
+					void *callback, void *user_data);
+
 void _bt_hf_event_cb(int event, int result, void *param,
 					void *callback, void *user_data);
 
@@ -304,18 +313,24 @@ int _bt_cancel_discovers(char *address);
 int _bt_discover_services(char *address, char *uuid, void *cb,
 		gpointer func_data);
 int _bt_discover_service_uuids(char *address, char *remote_uuid);
+int _bt_get_cod_by_address(char *address, bluetooth_device_class_t *dev_class);
+
+void _bt_set_le_scan_status(gboolean mode);
 
 int _bt_register_profile(bt_register_profile_info_t *info, gboolean use_default_rfcomm);
 int _bt_register_profile_platform(bt_register_profile_info_t *info, gboolean use_default_rfcomm);
+int _bt_register_profile_ex(bt_register_profile_info_t *info, gboolean use_default_rfcomm, const char *name, const char *path);
 
 void _bt_unregister_profile(char *path);
 GDBusNodeInfo * _bt_get_gdbus_node(const gchar *xml_data);
+GDBusNodeInfo * _bt_get_gdbus_node_ex(const gchar *xml_data, const char *bus_name);
 int __rfcomm_assign_id(void);
 void __rfcomm_delete_id(int id);
 void _bt_unregister_gdbus(int object_id);
 typedef int (*bt_new_connection_cb) (const char *path, int fd,
 					bluetooth_device_address_t *address);
 int _bt_register_new_conn(const char *path, bt_new_connection_cb cb);
+int _bt_register_new_conn_ex(const char *path, const char *bus_name,bt_new_connection_cb cb);
 void _bt_swap_addr(unsigned char *dst, const unsigned char *src);
 
 DBusGProxy *_bt_get_adapter_proxy(DBusGConnection *conn);
@@ -330,8 +345,16 @@ DBusConnection *_bt_get_system_conn(void);
 
 GDBusConnection *_bt_init_system_gdbus_conn(void);
 
+char *_bt_get_cookie(void);
+
+int _bt_get_cookie_size(void);
+
 int _bt_register_osp_server_in_agent(int type, char *uuid, char *path, int fd);
 int _bt_unregister_osp_server_in_agent(int type, char *uuid);
+
+void _bt_generate_cookie(void);
+
+void _bt_destroy_cookie(void);
 
 int _bt_check_privilege(int service_type, int service_function);
 

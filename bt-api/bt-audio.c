@@ -57,13 +57,20 @@ BT_EXPORT_API int bluetooth_audio_init(bt_audio_func_ptr cb, void *user_data)
 		return ret;
 	}
 
+	ret = _bt_register_event(BT_A2DP_SOURCE_EVENT, (void *)cb, user_data);
+	if (ret != BLUETOOTH_ERROR_NONE &&
+			ret != BLUETOOTH_ERROR_ALREADY_INITIALIZED) {
+		_bt_deinit_event_handler();
+		return ret;
+	}
+
 	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_audio_deinit(void)
 {
 	_bt_unregister_event(BT_HEADSET_EVENT);
-
+	_bt_unregister_event(BT_A2DP_SOURCE_EVENT);
 	_bt_set_user_data(BT_AUDIO, NULL, NULL);
 
 	return BLUETOOTH_ERROR_NONE;
@@ -225,6 +232,37 @@ BT_EXPORT_API int bluetooth_av_connect(bluetooth_device_address_t *remote_addres
 	return result;
 }
 
+BT_EXPORT_API int bluetooth_av_source_connect(bluetooth_device_address_t *remote_address)
+{
+	int result;
+	bt_user_info_t *user_info;
+
+	BT_CHECK_PARAMETER(remote_address, return);
+	BT_CHECK_ENABLED(return);
+
+	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_AV_SOURCE_CONNECT)
+		 == BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have a privilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
+
+	user_info = _bt_get_user_data(BT_AUDIO);
+	retv_if(user_info->cb == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	BT_INIT_PARAMS();
+	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	g_array_append_vals(in_param1, remote_address, sizeof(bluetooth_device_address_t));
+
+	result = _bt_send_request_async(BT_BLUEZ_SERVICE, BT_AV_SOURCE_CONNECT,
+		in_param1, in_param2, in_param3, in_param4,
+		user_info->cb, user_info->user_data);
+
+	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	return result;
+}
+
 BT_EXPORT_API int bluetooth_av_disconnect(bluetooth_device_address_t *remote_address)
 {
 	int result;
@@ -248,6 +286,37 @@ BT_EXPORT_API int bluetooth_av_disconnect(bluetooth_device_address_t *remote_add
 	g_array_append_vals(in_param1, remote_address, sizeof(bluetooth_device_address_t));
 
 	result = _bt_send_request_async(BT_BLUEZ_SERVICE, BT_AV_DISCONNECT,
+		in_param1, in_param2, in_param3, in_param4,
+		user_info->cb, user_info->user_data);
+
+	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	return result;
+}
+
+BT_EXPORT_API int bluetooth_av_source_disconnect(bluetooth_device_address_t *remote_address)
+{
+	int result;
+	bt_user_info_t *user_info;
+
+	BT_CHECK_PARAMETER(remote_address, return);
+	BT_CHECK_ENABLED(return);
+
+	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_AV_SOURCE_DISCONNECT)
+	     == BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have a privilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
+
+	user_info = _bt_get_user_data(BT_AUDIO);
+	retv_if(user_info->cb == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	BT_INIT_PARAMS();
+	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	g_array_append_vals(in_param1, remote_address, sizeof(bluetooth_device_address_t));
+
+	result = _bt_send_request_async(BT_BLUEZ_SERVICE, BT_AV_SOURCE_DISCONNECT,
 		in_param1, in_param2, in_param3, in_param4,
 		user_info->cb, user_info->user_data);
 
@@ -356,6 +425,9 @@ static int __bt_hf_agent_read_call_list(DBusMessage *reply,
 	BT_DBG("Call count = %d", call_count);
 
 	*call_list = g_malloc0(sizeof(bt_hf_call_list_s));
+	/* Fix : NULL_RETURNS */
+	retv_if(*call_list == NULL, BLUETOOTH_ERROR_MEMORY_ALLOCATION);
+
 	(*call_list)->count = call_count;
 	dbus_message_iter_next(&iter);
 	dbus_message_iter_recurse(&iter, &iter_struct);
@@ -367,6 +439,8 @@ static int __bt_hf_agent_read_call_list(DBusMessage *reply,
 		DBusMessageIter entry_iter;
 
 		call_info = g_malloc0(sizeof(bt_hf_call_status_info_t));
+		/* Fix : NULL_RETURNS */
+		retv_if(call_info == NULL, BLUETOOTH_ERROR_MEMORY_ALLOCATION);
 
 		dbus_message_iter_recurse(&iter_struct,&entry_iter);
 
@@ -690,7 +764,8 @@ BT_EXPORT_API int bluetooth_hf_send_xsat_cmd(int app_id, char *xsat_cmd)
 	BT_CHECK_ENABLED(return);
 
 	strcpy(buffer, "AT+XSAT=");
-	snprintf(buffer + strlen(buffer), sizeof(buffer), "%d,", app_id);
+	/* Fix : OVERRUN */
+	snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%d,", app_id);
 	strncat(buffer, xsat_cmd, (sizeof(buffer) - 1) - strlen(buffer));
 	BT_DBG("Xsat cmd received = %s", buffer);
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
@@ -940,7 +1015,7 @@ BT_EXPORT_API int bluetooth_hf_get_audio_connected(unsigned int *audio_connected
 	return BLUETOOTH_ERROR_NONE;
 }
 
-BT_EXPORT_API int bluetooth_hf_is_hf_connected(gboolean *hf_connected)
+BT_EXPORT_API int bluetooth_hf_is_connected(gboolean *hf_connected)
 {
 	DBusMessage *reply;
 	DBusError err;

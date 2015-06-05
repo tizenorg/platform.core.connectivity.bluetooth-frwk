@@ -31,10 +31,12 @@
 #include "bt-request-sender.h"
 #include "bt-event-handler.h"
 
+static gboolean is_le_scanning = FALSE;
+
 BT_EXPORT_API int bluetooth_check_adapter_le(void)
 {
 	int ret;
-	int value = 1;
+	int value;
 
 	ret = _bt_get_adapter_path(_bt_gdbus_get_system_gconn(), NULL);
 
@@ -42,7 +44,6 @@ BT_EXPORT_API int bluetooth_check_adapter_le(void)
 		return BLUETOOTH_ADAPTER_LE_DISABLED;
 	}
 
-#ifdef ENABLE_TIZEN_2_4
 	ret = vconf_get_int(VCONFKEY_BT_LE_STATUS, &value);
 	if (ret != 0) {
 		BT_ERR("fail to get vconf key!");
@@ -52,9 +53,6 @@ BT_EXPORT_API int bluetooth_check_adapter_le(void)
 	BT_DBG("value : %d", value);
 	return value == VCONFKEY_BT_LE_STATUS_ON ? BLUETOOTH_ADAPTER_LE_ENABLED :
 						BLUETOOTH_ADAPTER_LE_DISABLED;
-#else
-	return value = BLUETOOTH_ADAPTER_LE_DISABLED;
-#endif
 }
 
 BT_EXPORT_API int bluetooth_enable_adapter_le(void)
@@ -91,6 +89,17 @@ BT_EXPORT_API int bluetooth_disable_adapter_le(void)
 	return result;
 }
 
+void _bt_set_le_scan_status(gboolean mode)
+{
+	BT_DBG("set LE scan mode : %d", mode);
+	is_le_scanning = mode;
+}
+
+BT_EXPORT_API gboolean bluetooth_is_le_scanning(void)
+{
+	return is_le_scanning;
+}
+
 BT_EXPORT_API int bluetooth_start_le_discovery(void)
 {
 	int result;
@@ -104,6 +113,9 @@ BT_EXPORT_API int bluetooth_start_le_discovery(void)
 		in_param1, in_param2, in_param3, in_param4, &out_param);
 
 	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	if (result == BLUETOOTH_ERROR_NONE)
+		_bt_set_le_scan_status(TRUE);
 
 	return result;
 }
@@ -120,8 +132,10 @@ BT_EXPORT_API int bluetooth_stop_le_discovery(void)
 	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_STOP_LE_DISCOVERY,
 		in_param1, in_param2, in_param3, in_param4, &out_param);
 
-
 	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	if (result == BLUETOOTH_ERROR_NONE)
+		_bt_set_le_scan_status(FALSE);
 
 	return result;
 }
@@ -151,6 +165,67 @@ BT_EXPORT_API int bluetooth_is_le_discovering(void)
 	return is_discovering;
 }
 
+BT_EXPORT_API int bluetooth_register_scan_filter(bluetooth_le_scan_filter_t *filter, int *slot_id)
+{
+	int result;
+
+	BT_CHECK_ENABLED_ANY(return);
+
+	BT_INIT_PARAMS();
+	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	g_array_append_vals(in_param1, filter, sizeof(bluetooth_le_scan_filter_t));
+
+	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_REGISTER_SCAN_FILTER,
+		in_param1, in_param2, in_param3, in_param4, &out_param);
+
+	if (result == BLUETOOTH_ERROR_NONE) {
+		*slot_id = g_array_index(out_param, int, 0);
+	} else {
+		BT_ERR("Fail to send request");
+	}
+
+	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	return result;
+}
+
+BT_EXPORT_API int bluetooth_unregister_scan_filter(int slot_id)
+{
+	int result;
+
+	BT_CHECK_ENABLED_ANY(return);
+
+	BT_INIT_PARAMS();
+	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	g_array_append_vals(in_param1, &slot_id, sizeof(int));
+
+	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_UNREGISTER_SCAN_FILTER,
+		in_param1, in_param2, in_param3, in_param4, &out_param);
+
+	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	return result;
+}
+
+BT_EXPORT_API int bluetooth_unregister_all_scan_filters(void)
+{
+	int result;
+
+	BT_CHECK_ENABLED_ANY(return);
+
+	BT_INIT_PARAMS();
+	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_UNREGISTER_ALL_SCAN_FILTERS,
+		in_param1, in_param2, in_param3, in_param4, &out_param);
+
+	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	return result;
+}
+
 #ifdef TIZEN_WEARABLE
 gboolean __bluetooth_is_privileged_process(void)
 {
@@ -175,7 +250,7 @@ gboolean __bluetooth_is_privileged_process(void)
 }
 #endif
 
-BT_EXPORT_API int bluetooth_set_advertising(gboolean enable)
+BT_EXPORT_API int bluetooth_set_advertising(int handle, gboolean enable)
 {
 	int result;
 	gboolean use_reserved_slot = FALSE;
@@ -189,8 +264,9 @@ BT_EXPORT_API int bluetooth_set_advertising(gboolean enable)
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
-	g_array_append_vals(in_param1, &enable, sizeof(gboolean));
-	g_array_append_vals(in_param2, &use_reserved_slot, sizeof(gboolean));
+	g_array_append_vals(in_param1, &handle, sizeof(int));
+	g_array_append_vals(in_param2, &enable, sizeof(gboolean));
+	g_array_append_vals(in_param3, &use_reserved_slot, sizeof(gboolean));
 
 	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_SET_ADVERTISING,
 		in_param1, in_param2, in_param3, in_param4, &out_param);
@@ -200,7 +276,7 @@ BT_EXPORT_API int bluetooth_set_advertising(gboolean enable)
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_set_custom_advertising(gboolean enable,
+BT_EXPORT_API int bluetooth_set_custom_advertising(int handle, gboolean enable,
 						bluetooth_advertising_params_t *params)
 {
 	int result;
@@ -215,9 +291,10 @@ BT_EXPORT_API int bluetooth_set_custom_advertising(gboolean enable,
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
-	g_array_append_vals(in_param1, &enable, sizeof(gboolean));
-	g_array_append_vals(in_param2, params, sizeof(bluetooth_advertising_params_t));
-	g_array_append_vals(in_param3, &use_reserved_slot, sizeof(gboolean));
+	g_array_append_vals(in_param1, &handle, sizeof(int));
+	g_array_append_vals(in_param2, &enable, sizeof(gboolean));
+	g_array_append_vals(in_param3, params, sizeof(bluetooth_advertising_params_t));
+	g_array_append_vals(in_param4, &use_reserved_slot, sizeof(gboolean));
 
 	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_SET_CUSTOM_ADVERTISING,
 		in_param1, in_param2, in_param3, in_param4, &out_param);
@@ -255,7 +332,7 @@ BT_EXPORT_API int bluetooth_get_advertising_data(bluetooth_advertising_data_t *a
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_set_advertising_data(const bluetooth_advertising_data_t *value, int length)
+BT_EXPORT_API int bluetooth_set_advertising_data(int handle, const bluetooth_advertising_data_t *value, int length)
 {
 	int result;
 	gboolean use_reserved_slot = FALSE;
@@ -273,9 +350,10 @@ BT_EXPORT_API int bluetooth_set_advertising_data(const bluetooth_advertising_dat
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
-	g_array_append_vals(in_param1, value, sizeof(bluetooth_advertising_data_t));
-	g_array_append_vals(in_param2, &length, sizeof(int));
-	g_array_append_vals(in_param3, &use_reserved_slot, sizeof(gboolean));
+	g_array_append_vals(in_param1, &handle, sizeof(int));
+	g_array_append_vals(in_param2, value, sizeof(bluetooth_advertising_data_t));
+	g_array_append_vals(in_param3, &length, sizeof(int));
+	g_array_append_vals(in_param4, &use_reserved_slot, sizeof(gboolean));
 
 	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_SET_ADVERTISING_DATA,
 		in_param1, in_param2, in_param3, in_param4, &out_param);
@@ -313,7 +391,7 @@ BT_EXPORT_API int bluetooth_get_scan_response_data(bluetooth_scan_resp_data_t *v
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_set_scan_response_data(
+BT_EXPORT_API int bluetooth_set_scan_response_data(int handle,
 			const bluetooth_scan_resp_data_t *value, int length)
 {
 	int result;
@@ -332,9 +410,10 @@ BT_EXPORT_API int bluetooth_set_scan_response_data(
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
-	g_array_append_vals(in_param1, value, length);
-	g_array_append_vals(in_param2, &length, sizeof(int));
-	g_array_append_vals(in_param3, &use_reserved_slot, sizeof(gboolean));
+	g_array_append_vals(in_param1, &handle, sizeof(int));
+	g_array_append_vals(in_param2, value, length);
+	g_array_append_vals(in_param3, &length, sizeof(int));
+	g_array_append_vals(in_param4, &use_reserved_slot, sizeof(gboolean));
 
 	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_SET_SCAN_RESPONSE_DATA,
 		in_param1, in_param2, in_param3, in_param4, &out_param);
@@ -462,6 +541,17 @@ BT_EXPORT_API int bluetooth_enable_le_privacy(gboolean enable_privacy)
 	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
 	return result;
+}
+
+BT_EXPORT_API int bluetooth_check_privilege_advertising_parameter(void)
+{
+	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_SET_ADVERTISING_PARAMETERS)
+		     == BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have a privilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
+
+	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_le_register_callback(bluetooth_cb_func_ptr callback_ptr, void *user_data)

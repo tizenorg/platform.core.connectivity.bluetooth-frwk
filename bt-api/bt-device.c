@@ -415,3 +415,29 @@ BT_EXPORT_API int bluetooth_le_conn_update(const bluetooth_device_address_t *add
 
 	return result;
 }
+
+BT_EXPORT_API int bluetooth_get_connected_link_type(
+		const bluetooth_device_address_t *device_address,
+		bluetooth_connected_link_t *connected)
+{
+	int result;
+
+	BT_CHECK_PARAMETER(device_address, return);
+	BT_CHECK_ENABLED(return);
+
+	BT_INIT_PARAMS();
+	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	g_array_append_vals(in_param1, device_address, sizeof(bluetooth_device_address_t));
+
+	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_GET_CONNECTED_LINK_TYPE,
+			in_param1, in_param2, in_param3, in_param4, &out_param);
+
+	if (result == BLUETOOTH_ERROR_NONE) {
+		*connected = g_array_index(out_param, guint, 0);
+	}
+
+	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	return result;
+}

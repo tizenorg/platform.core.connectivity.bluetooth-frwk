@@ -4,6 +4,9 @@ After=dbus.socket dbus.service
 Requires=dbus.socket
 
 [Service]
+User=system
+Group=system
+SmackProcessLabel=bt-service
 Type=dbus
 BusName=org.projectx.bt
 ExecStart=/usr/bin/bt-service

@@ -23,6 +23,8 @@
 
 #include <vconf.h>
 #include <vconf-keys.h>
+#include <bundle.h>
+#include <eventsystem.h>
 
 #include "bt-core-main.h"
 #include "bt-core-adapter.h"
@@ -35,9 +37,7 @@ static bt_le_status_t adapter_le_status = BT_LE_DEACTIVATED;
 static gboolean is_recovery_mode = FALSE;
 
 static int bt_status_before[BT_MODE_MAX] = { VCONFKEY_BT_STATUS_OFF, };
-static int bt_le_status_before[BT_MODE_MAX] = { 0, };
-
-static DBusGConnection *conn = NULL;
+static int bt_le_status_before[BT_MODE_MAX] = { VCONFKEY_BT_LE_STATUS_OFF, };
 
 static void __bt_core_set_status(bt_status_t status)
 {
@@ -86,7 +86,7 @@ gboolean _bt_core_is_recovery_mode(void)
 
 gboolean _bt_core_is_flight_mode_enabled(void)
 {
-#ifdef TIZEN_TELEPHONY_ENABLED
+#ifdef TIZEN_BT_FLIGHTMODE_ENABLED
 	int isFlightMode = 0;
 	int ret = -1;
 
@@ -98,70 +98,6 @@ gboolean _bt_core_is_flight_mode_enabled(void)
 #else
 	return FALSE;
 #endif
-}
-
-static gboolean bt_core_enable_adapter(BtCore *agent,
-						DBusGMethodInvocation *context);
-
-static gboolean bt_core_disable_adapter(BtCore *agent,
-						DBusGMethodInvocation *context);
-
-static gboolean bt_core_recover_adapter(BtCore *agent,
-						DBusGMethodInvocation *context);
-
-static gboolean bt_core_enable_adapter_le(BtCore *agent,
-						DBusGMethodInvocation *context);
-
-static gboolean bt_core_disable_adapter_le(BtCore *agent,
-						DBusGMethodInvocation *context);
-
-static gboolean bt_core_reset_adapter(BtCore *agent,
-						DBusGMethodInvocation *context);
-
-static gboolean bt_core_enable_core(BtCore *agent,
-						DBusGMethodInvocation *context);
-
-static int __execute_command(const char *cmd, char *const arg_list[]);
-
-#include "bt-core-adapter-method.h"
-
-
-G_DEFINE_TYPE(BtCore, bt_core, G_TYPE_OBJECT);
-
-/*This is part of platform provided code skeleton for client server model*/
-static void bt_core_class_init (BtCoreClass *bt_core_class)
-{
-	dbus_g_object_type_install_info(G_TYPE_FROM_CLASS(bt_core_class),
-					&dbus_glib_bt_core_object_info);
-}
-
-/*This is part of platform provided code skeleton for client server model*/
-static void bt_core_init (BtCore *core)
-{
-}
-
-typedef enum {
-	BT_CORE_ERROR_REJECT,
-	BT_CORE_ERROR_CANCEL,
-	BT_CORE_ERROR_TIMEOUT,
-} BtCoreError;
-
-#define BT_CORE_ERROR (bt_core_error_quark())
-
-static GQuark bt_core_error_quark(void)
-{
-	static GQuark quark = 0;
-	if (!quark)
-		quark = g_quark_from_static_string("BtCore");
-
-	return quark;
-}
-
-#define ENUM_ENTRY(NAME, DESC) { NAME, "" #NAME "", DESC }
-
-static GError *bt_core_error(BtCoreError error, const char *err_msg)
-{
-	return g_error_new(BT_CORE_ERROR, error, err_msg, NULL);
 }
 
 static int __execute_command(const char *cmd, char *const arg_list[])
@@ -198,58 +134,29 @@ static int __execute_command(const char *cmd, char *const arg_list[])
 	return 0;
 }
 
-static DBusGProxy *_bt_get_connman_proxy(void)
-{
-	DBusGProxy *proxy;
-
-	if (conn == NULL) {
-		conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
-		retv_if(conn == NULL, NULL);
-	}
-
-	proxy = dbus_g_proxy_new_for_name(conn,
-			CONNMAN_DBUS_NAME,
-			CONNMAN_BLUETOOTH_TECHNOLOGY_PATH,
-			CONNMAN_BLUETOTOH_TECHNOLOGY_INTERFACE);
-	retv_if(proxy == NULL, NULL);
-
-	return proxy;
-}
-
-static int _bt_power_adapter(gboolean powered)
-{
-	GValue state = { 0 };
-	GError *error = NULL;
-	DBusGProxy *proxy;
-
-	proxy = _bt_get_connman_proxy();
-	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
-
-	g_value_init(&state, G_TYPE_BOOLEAN);
-	g_value_set_boolean(&state, powered);
-
-	BT_DBG("set power property state: %d to connman", powered);
-
-	dbus_g_proxy_call(proxy, "SetProperty", &error,
-				G_TYPE_STRING, "Powered",
-				G_TYPE_VALUE, &state,
-				G_TYPE_INVALID, G_TYPE_INVALID);
-
-	if (error != NULL) {
-		BT_ERR("Powered set err: \n [%s]", error->message);
-		g_error_free(error);
-		g_value_unset(&state);
-		return BLUETOOTH_ERROR_INTERNAL;
-	}
-	return BLUETOOTH_ERROR_NONE;
-}
-
 int _bt_enable_adapter(void)
 {
 	int ret;
 	bt_status_t status;
 	bt_le_status_t le_status;
-#ifdef __TIZEN_MOBILE__
+
+	BT_INFO("");
+
+	status = _bt_core_get_status();
+	if (status != BT_DEACTIVATED) {
+		BT_ERR("Invalid state %d", status);
+		return -1;
+	}
+
+	le_status = _bt_core_get_le_status();
+	if (le_status == BT_LE_ACTIVATED) {
+		/* Turn on PSCAN, (ISCAN if needed) */
+		/* Return with 0 for the Enabled response. */
+		__bt_core_set_status(BT_ACTIVATED);
+		BT_INFO("BR/EDR is enabled.");
+		return 0;
+	}
+
 	__bt_core_set_status(BT_ACTIVATING);
 
 	ret = __execute_command("/usr/etc/bluetooth/bt-stack-up.sh", NULL);
@@ -259,42 +166,65 @@ int _bt_enable_adapter(void)
 		__bt_core_set_status(BT_DEACTIVATED);
 		return -1;
 	}
-#else
-	_bt_power_adapter(TRUE);
-#endif
 
 	return 0;
 }
 
 int _bt_disable_adapter(void)
 {
+	bt_status_t status;
+	bt_le_status_t le_status;
+
 	BT_INFO_C("Disable adapter");
-#ifdef __TIZEN_MOBILE__
+
+	le_status = _bt_core_get_le_status();
+	BT_DBG("le_status : %d", le_status);
+	if (le_status == BT_LE_ACTIVATED) {
+		/* Turn off PSCAN, (ISCAN if needed) */
+		/* Return with 0 for the Disabled response. */
+		__bt_core_set_status(BT_DEACTIVATED);
+		BT_INFO("BR/EDR is disabled. now LE only mode");
+		return 0;
+	}
+
+	status = _bt_core_get_status();
+	if (status == BT_ACTIVATING) {
+		/* Forcely terminate */
+		if (__execute_command("/usr/etc/bluetooth/bt-stack-down.sh", NULL) < 0) {
+			BT_ERR("running script failed");
+		}
+		_bt_core_terminate();
+		return 0;
+	} else if (status != BT_ACTIVATED) {
+		BT_ERR("Invalid state %d", status);
+	}
+
 	__bt_core_set_status(BT_DEACTIVATING);
 
 	if (__execute_command("/usr/etc/bluetooth/bt-stack-down.sh", NULL) < 0) {
 		BT_ERR("running script failed");
-		__bt_core_set_status(BT_ACTIVATED);
+		__bt_core_set_status( BT_ACTIVATED);
 		return -1;
 	}
-#else
-	_bt_power_adapter(FALSE);
-#endif
+
 	return 0;
 }
 
 int _bt_enable_adapter_le(void)
 {
 	BT_DBG("");
-#ifdef __TIZEN_MOBILE__
+
 	int ret;
 	bt_status_t status;
+	bt_le_status_t le_status;
+	le_status = _bt_core_get_le_status();
+	retv_if(le_status != BT_LE_DEACTIVATED, -1);
 
 	status = _bt_core_get_status();
 	if (status == BT_DEACTIVATED) {
 		__bt_core_set_le_status(BT_LE_ACTIVATING);
 		BT_DBG("Activate BT");
-		ret = system("/usr/etc/bluetooth/bt-stack-up.sh &");
+		ret = __execute_command("/usr/etc/bluetooth/bt-stack-up.sh", NULL);
 		if (ret < 0) {
 			BT_ERR("running script failed");
 			ret = __execute_command("/usr/etc/bluetooth/bt-dev-end.sh &", NULL);
@@ -305,9 +235,6 @@ int _bt_enable_adapter_le(void)
 	} else {
 		__bt_core_set_le_status(BT_LE_ACTIVATED);
 	}
-#else
-	_bt_power_adapter(TRUE);
-#endif
 	return 0;
 }
 
@@ -315,8 +242,12 @@ int _bt_disable_adapter_le(void)
 {
 	BT_DBG("+");
 
-#ifdef __TIZEN_MOBILE__
 	bt_status_t status;
+	bt_le_status_t le_status;
+
+	le_status = _bt_core_get_le_status();
+	retv_if(le_status == BT_LE_DEACTIVATED, 0);
+	retv_if(le_status == BT_LE_DEACTIVATING, -1);
 
 	status = _bt_core_get_status();
 	BT_DBG("status : %d", status);
@@ -330,10 +261,8 @@ int _bt_disable_adapter_le(void)
 			return -1;
 		}
 	}
+
 	__bt_core_set_le_status(BT_LE_DEACTIVATED);
-#else
-	_bt_power_adapter(FALSE);
-#endif
 
 	BT_DBG("-");
 	return 0;
@@ -364,14 +293,12 @@ int _bt_core_service_request_adapter(int service_function)
 static void __bt_core_update_status(void)
 {
 	int bt_status = VCONFKEY_BT_STATUS_OFF;
-	int bt_le_status = 0;
+	int bt_le_status = VCONFKEY_BT_LE_STATUS_OFF;
 
 	if (vconf_get_int(VCONFKEY_BT_STATUS, &bt_status) < 0)
 		BT_ERR("no bluetooth device info, so BT was disabled at previous session");
-#ifdef ENABLE_TIZEN_2_4
 	if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_le_status) < 0)
 		BT_ERR("no bluetooth le info, so BT LE was disabled at previous session");
-#endif
 
 	BT_INFO("bt_status = %d, bt_le_status = %d", bt_status, bt_le_status);
 
@@ -380,79 +307,48 @@ static void __bt_core_update_status(void)
 	else
 		__bt_core_set_status(BT_ACTIVATED);
 
-	if (bt_le_status == 0)
+	if (bt_le_status == VCONFKEY_BT_LE_STATUS_OFF)
 		__bt_core_set_le_status(BT_LE_DEACTIVATED);
 	else
 		__bt_core_set_le_status(BT_LE_ACTIVATED);
 }
 
-static gboolean bt_core_enable_adapter(BtCore *agent,
-						DBusGMethodInvocation *context)
+gboolean _bt_core_enable_adapter(void)
 {
-	char *sender = dbus_g_method_get_sender(context);
 	int ret;
-
-	if (sender == NULL)
-		return FALSE;
 
 	_bt_set_flightmode_request(FALSE);
 	if (vconf_set_int(BT_OFF_DUE_TO_FLIGHT_MODE, 0) != 0)
 		BT_ERR("Set vconf failed");
 
 	ret = _bt_enable_adapter();
-	if (ret < 0) {
-		GError *error = bt_core_error(BT_CORE_ERROR_REJECT,
-							"Activation failed");
-		dbus_g_method_return_error(context, error);
-		g_error_free(error);
-		g_free(sender);
+	if (ret < 0)
 		return FALSE;
-	} else {
-		dbus_g_method_return(context);
-	}
-
-	g_free(sender);
-	return TRUE;
+	else
+		return TRUE;
 }
 
-static gboolean bt_core_disable_adapter(BtCore *agent,
-						DBusGMethodInvocation *context)
+gboolean _bt_core_disable_adapter(void)
 {
-	char *sender = dbus_g_method_get_sender(context);
 	int ret;
-
-	if (sender == NULL)
-		return FALSE;
 
 	_bt_set_flightmode_request(FALSE);
 	if (vconf_set_int(BT_OFF_DUE_TO_FLIGHT_MODE, 0) != 0)
 		BT_ERR("Set vconf failed");
 
 	ret = _bt_disable_adapter();
-	if (ret < 0) {
-		GError *error = bt_core_error(BT_CORE_ERROR_REJECT,
-							"Deactivation failed");
-		dbus_g_method_return_error(context, error);
-		g_error_free(error);
-		g_free(sender);
+	if (ret < 0)
 		return FALSE;
-	} else {
-		dbus_g_method_return(context);
-	}
-
-	g_free(sender);
-	return TRUE;
+	else
+		return TRUE;
 }
 
-static gboolean bt_core_recover_adapter(BtCore *agent,
-						DBusGMethodInvocation *context)
+gboolean _bt_core_recover_adapter(void)
 {
 	int ret;
 	int ret_le;
 
 	BT_INFO_C("Recover bt adapter");
-
-	dbus_g_method_return(context);
 
 	_bt_set_flightmode_request(FALSE);
 	if (vconf_set_int(BT_OFF_DUE_TO_FLIGHT_MODE, 0) != 0)
@@ -481,94 +377,38 @@ static gboolean bt_core_recover_adapter(BtCore *agent,
 	return TRUE;
 }
 
-static gboolean bt_core_enable_adapter_le(BtCore *agent,
-						DBusGMethodInvocation *context)
+gboolean _bt_core_enable_adapter_le(void)
 {
-	char *sender = dbus_g_method_get_sender(context);
 	int ret;
 
-	if (sender == NULL)
-		return FALSE;
-
 	ret = _bt_enable_adapter_le();
-	if (ret < 0) {
-		GError *error = bt_core_error(BT_CORE_ERROR_REJECT,
-							"LE Activation failed");
-		dbus_g_method_return_error(context, error);
-		g_error_free(error);
-		g_free(sender);
-		BT_DBG("-");
+	if (ret < 0)
 		return FALSE;
-	} else {
-		dbus_g_method_return(context);
-	}
-
-	g_free(sender);
-	BT_DBG("-");
-	return TRUE;
+	else
+		return TRUE;
 }
 
-static gboolean bt_core_disable_adapter_le(BtCore *agent,
-						DBusGMethodInvocation *context)
+gboolean _bt_core_disable_adapter_le(void)
 {
 	BT_DBG("+");
 
-	char *sender = dbus_g_method_get_sender(context);
-	BT_DBG("sender : %s", sender);
 	int ret;
 
-	if (sender == NULL)
-		return FALSE;
-
 	ret = _bt_disable_adapter_le();
-	if (ret < 0) {
-		GError *error = bt_core_error(BT_CORE_ERROR_REJECT,
-							"LE Deactivation failed");
-		dbus_g_method_return_error(context, error);
-		g_error_free(error);
-		g_free(sender);
+	if (ret < 0)
 		return FALSE;
-	} else {
-		dbus_g_method_return(context);
-	}
-
-	g_free(sender);
-	BT_DBG("-");
-	return TRUE;
+	else
+		return TRUE;
 }
 
-static int __bt_reset_adapter(void)
+gboolean __bt_core_reset_adapter(void)
 {
 	/* Forcely terminate */
 	if (__execute_command("/usr/etc/bluetooth/bt-reset-env.sh", NULL) < 0) {
 		BT_ERR("running script failed");
 	}
 	_bt_core_terminate();
-	return 0;
-}
 
-static gboolean bt_core_reset_adapter(BtCore *agent,
-						DBusGMethodInvocation *context)
-{
-	char *sender = dbus_g_method_get_sender(context);
-	int ret;
-
-	if (sender == NULL)
-		return FALSE;
-
-	ret = __bt_reset_adapter();
-	if (ret < 0) {
-		GError *error = bt_core_error(BT_CORE_ERROR_REJECT,
-							"Deactivation failed");
-		dbus_g_method_return_error(context, error);
-		g_error_free(error);
-		g_free(sender);
-		return FALSE;
-	} else {
-		dbus_g_method_return(context);
-	}
-
-	g_free(sender);
 	return TRUE;
 }
 
@@ -581,25 +421,57 @@ static gboolean __bt_core_enable_core_timeout_cb(gpointer data)
 	return FALSE;
 }
 
-static gboolean bt_core_enable_core(BtCore *agent,
-						DBusGMethodInvocation *context)
+gboolean _bt_core_enable_core(void)
 {
-	char *sender = dbus_g_method_get_sender(context);
-
-	if (sender == NULL)
-		return FALSE;
-
 	BT_DBG("+");
 
 	__bt_core_update_status();
 
 	g_timeout_add(200, (GSourceFunc)__bt_core_enable_core_timeout_cb, NULL);
 
-	dbus_g_method_return(context);
-
-	g_free(sender);
-
 	BT_DBG("-");
+	return TRUE;
+}
+
+gboolean _bt_core_factory_test_mode(const char *type, const char *arg)
+{
+
+	char *cmd = NULL;
+	char *arg_list[3] = { NULL, NULL, NULL };
+
+	BT_DBG("Test item : %s", type);
+
+	if (g_strcmp0(type, "Enable_RF_Test") == 0) {
+		cmd = "/usr/etc/bluetooth/bt-edutm-on.sh";
+		arg_list[0] = "bt-edutm-on.sh";
+	} else if (g_strcmp0(type, "Disable_RF_Test") == 0) {
+		cmd = "/usr/etc/bluetooth/bt-edutm-off.sh";
+		arg_list[0] = "bt-edutm-off.sh";
+	} else if (g_strcmp0(type, "Slave_Mode") == 0) {
+		cmd = "/usr/etc/bluetooth/bt-mode-slave.sh";
+		arg_list[0] = "bt-mode-slave.sh";
+	} else if (g_strcmp0(type, "Master_Mode") == 0) {
+		cmd = "/usr/etc/bluetooth/bt-mode-master.sh";
+		arg_list[0] = "bt-mode-master.sh";
+	} else if (g_strcmp0(type, "SSP_Debug_Mode") == 0) {
+		cmd = "/usr/etc/bluetooth/bt-set-ssp-debug-mode.sh";
+		arg_list[0] = "bt-set-ssp-debug-mode.sh";
+		arg_list[1] = (char *)arg;
+	} else if (g_strcmp0(type, "RF_Channel") == 0) {
+		cmd = "/usr/etc/bluetooth/bt-enable-rf-channel.sh";
+		arg_list[0] = "bt-enable-rf-channel.sh";
+		arg_list[1] = (char *)arg;
+	} else {
+		_bt_core_terminate();
+		return FALSE;
+	}
+
+	BT_DBG("Run %s", cmd);
+	if (__execute_command(cmd, arg_list) < 0) {
+		BT_ERR("running script failed");
+	}
+
+	_bt_core_terminate();
 	return TRUE;
 }
 
@@ -712,16 +584,32 @@ static gboolean __bt_core_disable_timeout_cb(gpointer data)
 	if (adapter_status_le == BT_LE_ACTIVATED) {
 		int bt_le_status_before_mode = 0;
 
-#ifdef ENABLE_TIZEN_2_4
 		if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_le_status_before_mode) == 0)
 			_bt_core_set_bt_le_status(BT_FLIGHT_MODE, bt_le_status_before_mode);
-#endif
 
 		_bt_core_service_request_adapter(BT_DISABLE_ADAPTER_LE);
 		_bt_disable_adapter_le();
 	}
 
 	return FALSE;
+}
+
+static int __bt_eventsystem_set_value(const char *event, const char *key, const char *value)
+{
+	int ret;
+	bundle *b = NULL;
+
+	b = bundle_create();
+
+	bundle_add_str(b, key, value);
+
+	ret = eventsystem_request_sending_system_event(event, b);
+
+	BT_DBG("request_sending_system_event result: %d", ret);
+
+	bundle_free(b);
+
+	return ret;
 }
 
 void _bt_core_adapter_added_cb(void)
@@ -750,7 +638,6 @@ void _bt_core_adapter_added_cb(void)
 		return;
 	}
 	_bt_set_flightmode_request(FALSE);
-
 	_bt_core_terminate();
 }
 
@@ -767,10 +654,16 @@ void _bt_core_adapter_removed_cb(void)
 	__bt_core_set_le_status(BT_LE_DEACTIVATED);
 	if (vconf_set_int(VCONFKEY_BT_STATUS, VCONFKEY_BT_STATUS_OFF) != 0)
 		BT_ERR("Set vconf failed");
-#ifdef ENABLE_TIZEN_2_4
 	if (vconf_set_int(VCONFKEY_BT_LE_STATUS, VCONFKEY_BT_LE_STATUS_OFF) != 0)
 		BT_ERR("Set vconf failed");
-#endif
+
+	if (__bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_STATE,
+						EVT_VAL_BT_OFF) != ES_R_OK)
+		BT_ERR("Fail to set value");
+
+	if (__bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_LE_STATE,
+						EVT_VAL_BT_LE_OFF) != ES_R_OK)
+		BT_ERR("Fail to set value");
 
 	if (is_recovery_mode == TRUE)
 	{
@@ -794,7 +687,7 @@ void _bt_core_adapter_removed_cb(void)
 		return;
 	}
 	_bt_set_flightmode_request(FALSE);
-	
+
 	if (flight_mode_value == 1 || power_saving_mode == 1){
 		BT_DBG("Bt Core not terminated");
 		return;
@@ -802,4 +695,3 @@ void _bt_core_adapter_removed_cb(void)
 
 	_bt_core_terminate();
 }
-

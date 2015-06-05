@@ -158,6 +158,16 @@ int bluetooth_ag_disconnect(bluetooth_device_address_t *remote_address);
 int bluetooth_av_connect(bluetooth_device_address_t *remote_address);
 
 /**
+ * @brief	The function bluetooth_av_source_connect is called to establish an AV Source
+ *	connection with  the specified device.
+ *
+ * @param[in]	remote_address	Bluetooth device address.
+ * @return	int	Zero on Success or reason for error if any.
+ *
+ */
+int bluetooth_av_source_connect(bluetooth_device_address_t *remote_address);
+
+/**
  * @brief	The function bluetooth_av_disconnect is called to disconnect an
  *	existing AV connection with the specified device.
  *
@@ -166,6 +176,16 @@ int bluetooth_av_connect(bluetooth_device_address_t *remote_address);
  *
  */
 int bluetooth_av_disconnect(bluetooth_device_address_t *remote_address);
+
+/**
+ * @brief	The function bluetooth_av_source_disconnect is called to disconnect an
+ *	existing AV connection with the specified device.
+ *
+ * @param[in]	remote_address	Bluetooth device address.
+ * @return	int	Zero on Success or reason for error if any.
+ *
+ */
+int bluetooth_av_source_disconnect(bluetooth_device_address_t *remote_address);
 
 /**
  * @brief	The function bluetooth_ag_get_headset_volume is called to get
@@ -239,7 +259,7 @@ int bluetooth_hf_get_codec(unsigned int *codec_id);
 
 int bluetooth_hf_get_audio_connected(unsigned int *audio_connected);
 
-int bluetooth_hf_is_hf_connected(gboolean *hf_connected);
+int bluetooth_hf_is_connected(gboolean *hf_connected);
 
 #ifdef __cplusplus
 }

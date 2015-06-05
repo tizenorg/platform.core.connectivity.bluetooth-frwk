@@ -175,6 +175,18 @@ static void __bt_get_event_info(int service_function, GArray *output,
 		ret_if(output == NULL);
 		*param_data = &g_array_index(output, char, 0);
 		break;
+	case BT_AV_SOURCE_CONNECT:
+		*event_type = BT_A2DP_SOURCE_EVENT;
+		*event = BLUETOOTH_EVENT_AV_SOURCE_CONNECTED;
+		ret_if(output == NULL);
+		*param_data = &g_array_index(output, char, 0);
+		break;
+	case BT_AV_SOURCE_DISCONNECT:
+		*event_type = BT_A2DP_SOURCE_EVENT;
+		*event = BLUETOOTH_EVENT_AV_SOURCE_DISCONNECTED;
+		ret_if (output == NULL);
+		*param_data = &g_array_index (output, char, 0);
+		break;
 	case BT_HF_CONNECT:
 		*event_type = BT_HF_AGENT_EVENT;
 		*event = BLUETOOTH_EVENT_HF_CONNECTED;
@@ -257,9 +269,9 @@ static void __send_request_cb(GDBusProxy *proxy,
 	GError *error = NULL;
 	GVariant *value;
 	GVariant *param1;
-	GVariant *param2;
+//	GVariant *param2;
 	GArray *out_param1 = NULL;
-	GArray *out_param2 = NULL;
+//	GArray *out_param2 = NULL;
 
 	BT_DBG("+");
 	memset(&bt_event, 0x00, sizeof(bluetooth_event_param_t));
@@ -280,7 +292,7 @@ static void __send_request_cb(GDBusProxy *proxy,
 				&bt_event.event, &event_type,
 				&bt_event.param_data);
 	} else {
-		g_variant_get(value, "(@ay@ay)", &param1, &param2);
+		g_variant_get(value, "(iv)", &result, &param1);
 		g_variant_unref(value);
 
 		if (param1) {
@@ -289,15 +301,15 @@ static void __send_request_cb(GDBusProxy *proxy,
 			g_variant_unref(param1);
 		}
 
-		if (param2) {
-			out_param2 = g_array_new(TRUE, TRUE, sizeof(gchar));
-			__bt_fill_garray_from_variant(param2, out_param2);
-			result = g_array_index(out_param2, int, 0);
-			g_variant_unref(param2);
-			g_array_free(out_param2, TRUE);
-		} else {
-			result = BLUETOOTH_ERROR_INTERNAL;
-		}
+//		if (param2) {
+//			out_param2 = g_array_new(TRUE, TRUE, sizeof(gchar));
+//			__bt_fill_garray_from_variant(param2, out_param2);
+//			result = g_array_index(out_param2, int, 0);
+//			g_variant_unref(param2);
+//			g_array_free(out_param2, TRUE);
+//		} else {
+//			result = BLUETOOTH_ERROR_INTERNAL;
+//		}
 
 		ret_if(cb_data == NULL);
 
@@ -344,6 +356,10 @@ static void __send_request_cb(GDBusProxy *proxy,
 		((media_cb_func_ptr)cb_data->cb)(bt_event.event,
 				(media_event_param_t *)&bt_event,
 				cb_data->user_data);
+	} else if (event_type == BT_A2DP_SOURCE_EVENT) {
+		((bt_audio_func_ptr)cb_data->cb)(bt_event.event,
+				(bt_audio_event_param_t *)&bt_event,
+				cb_data->user_data);
 	} else {
 		BT_INFO("Not handled event type : %d", event_type);
 	}
@@ -363,9 +379,11 @@ int _bt_sync_send_request(int service_type, int service_function,
 			GArray **out_param1)
 {
 	int result = BLUETOOTH_ERROR_NONE;
+	char *cookie;
 	GError *error = NULL;
 	GArray *in_param5 = NULL;
-	GArray *out_param2 = NULL;
+//	GArray *out_param2 = NULL;
+
 	GDBusProxy  *proxy;
 	GVariant *ret;
 	GVariant *param1;
@@ -384,6 +402,13 @@ int _bt_sync_send_request(int service_type, int service_function,
 			return BLUETOOTH_ERROR_INTERNAL;
 
 		in_param5 = g_array_new(TRUE, TRUE, sizeof(gchar));
+
+		cookie = _bt_get_cookie();
+
+		if (cookie) {
+			g_array_append_vals(in_param5, cookie,
+					_bt_get_cookie_size());
+		}
 
 		param1 = g_variant_new_from_data((const GVariantType *)"ay",
 					in_param1->data, in_param1->len,
@@ -431,9 +456,9 @@ int _bt_sync_send_request(int service_type, int service_function,
 		}
 
 		param1 = NULL;
-		param2 = NULL;
+//		param2 = NULL;
 
-		g_variant_get(ret, "(@ay@ay)", &param1, &param2);
+		g_variant_get(ret, "(iv)", &result, &param1);
 
 		if (param1) {
 			*out_param1 = g_array_new(TRUE, TRUE, sizeof(gchar));
@@ -441,15 +466,15 @@ int _bt_sync_send_request(int service_type, int service_function,
 			g_variant_unref(param1);
 		}
 
-		if (param2) {
-			out_param2 = g_array_new(TRUE, TRUE, sizeof(gchar));
-			__bt_fill_garray_from_variant(param2, out_param2);
-			result = g_array_index(out_param2, int, 0);
-			g_variant_unref(param2);
-			g_array_free(out_param2, TRUE);
-		} else {
-			result = BLUETOOTH_ERROR_INTERNAL;
-		}
+//		if (param2) {
+//			out_param2 = g_array_new(TRUE, TRUE, sizeof(gchar));
+//			__bt_fill_garray_from_variant(param2, out_param2);
+//			result = g_array_index(out_param2, int, 0);
+//			g_variant_unref(param2);
+//			g_array_free(out_param2, TRUE);
+//		} else {
+//			result = BLUETOOTH_ERROR_INTERNAL;
+//		}
 
 		g_variant_unref(ret);
 		break;
@@ -468,6 +493,8 @@ int _bt_async_send_request(int service_type, int service_function,
 {
 	GArray* in_param5 = NULL;
 	bt_req_info_t *cb_data;
+	char *cookie;
+
 	GDBusProxy *proxy;
 	int timeout;
 	GVariant *param1;
@@ -504,6 +531,12 @@ int _bt_async_send_request(int service_type, int service_function,
 
 		in_param5 = g_array_new(TRUE, TRUE, sizeof(gchar));
 
+		cookie = _bt_get_cookie();
+
+		if (cookie) {
+			g_array_append_vals(in_param5, cookie,
+					_bt_get_cookie_size());
+		}
 		param1 = g_variant_new_from_data((const GVariantType *)"ay",
 					in_param1->data, in_param1->len,
 					TRUE, NULL, NULL);

@@ -111,11 +111,11 @@ int test_input_callback(void *data)
 		break;
 	case 1:
 		TC_PRT("SetAdvertising ON");
-		ret = bluetooth_set_advertising(TRUE);
+		ret = bluetooth_set_advertising(0, TRUE);
 		break;
 	case 2:
 		TC_PRT("SetAdvertising OFF");
-		ret = bluetooth_set_advertising(FALSE);
+		ret = bluetooth_set_advertising(0, FALSE);
 		break;
 	case 3:
 		TC_PRT("SetCustomAdvertising ON, Filter 0x03");
@@ -123,7 +123,7 @@ int test_input_callback(void *data)
 		params.interval_max = 1280;
 		params.filter_policy = 0x03;
 		params.type = 0x00;
-		ret = bluetooth_set_custom_advertising(TRUE, &params);
+		ret = bluetooth_set_custom_advertising(0, TRUE, &params);
 		break;
 	case 4:
 		TC_PRT("SetCustomAdvertising ON, Filter 0x00");
@@ -131,7 +131,7 @@ int test_input_callback(void *data)
 		params.interval_max = 1280;
 		params.filter_policy = 0x00;
 		params.type = 0x00;
-		ret = bluetooth_set_custom_advertising(TRUE, &params);
+		ret = bluetooth_set_custom_advertising(0, TRUE, &params);
 		break;
 	case 5: {
 		TC_PRT("SetAdvertisingData");
@@ -141,7 +141,7 @@ int test_input_callback(void *data)
 		TC_PRT("%x %x %x %x %x %x", data[0], data[1], data[2], data[3],
 				data[4], data[5]);
 		memcpy(adv.data, data, sizeof(data));
-		ret = bluetooth_set_advertising_data(&adv, sizeof(data));
+		ret = bluetooth_set_advertising_data(0, &adv, sizeof(data));
 		break;
 	}
 	case 6:
@@ -156,7 +156,7 @@ int test_input_callback(void *data)
 		TC_PRT("%x %x %x %x %x %x %x", data[0], data[1], data[2],
 				data[3], data[4], data[5], data[6]);
 		memcpy(rsp.data, data, sizeof(data));
-		ret = bluetooth_set_scan_response_data(&rsp, sizeof(data));
+		ret = bluetooth_set_scan_response_data(0, &rsp, sizeof(data));
 		break;
 	}
 	case 8:
@@ -336,8 +336,8 @@ static gboolean key_event_cb(GIOChannel *chan, GIOCondition cond, gpointer data)
 	unsigned int len = 0;
 	int test_id;
 
-	if (g_io_channel_read(chan, buf, sizeof(buf), &len) !=
-							G_IO_ERROR_NONE) {
+	if (g_io_channel_read_chars(chan, buf, sizeof(buf), 
+			&len, NULL) ==  G_IO_STATUS_ERROR) {
 		printf("IO Channel read error");
 		return FALSE;
 	}

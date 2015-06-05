@@ -27,8 +27,8 @@
 
 #include <sys/types.h>
 #include <dlog.h>
-#include <dbus/dbus-glib.h>
-#include <dbus/dbus.h>
+#include <glib.h>
+#include <gio/gio.h>
 
 #include "bluetooth-api.h"
 
@@ -89,12 +89,12 @@ extern "C" {
 	do { \
 		if (arg == NULL) \
 		{ \
-			BT_ERR("INVALID PARAMETER"); \
+			BT_ERR("%s is NULL", #arg); \
 			func BLUETOOTH_ERROR_INVALID_PARAM; \
 		} \
 	} while (0)
 
-#define BT_CHANNEL_LENGTH_MAX 5
+
 #define BT_ADDRESS_LENGTH_MAX 6
 #define BT_ADDRESS_STRING_SIZE 18
 #define BT_RFCOMM_BUFFER_MAX 1024
@@ -128,7 +128,6 @@ extern "C" {
 
 #define BT_BLUEZ_PATH "/org/bluez"
 #define BT_BLUEZ_HCI_PATH "/org/bluez/hci0"
-#define BT_BLUEZ_HCI_DEV_PATH "/org/bluez/hci0/dev"
 #define BT_AGENT_NAME "org.bluez.frwk_agent"
 #define BT_AGENT_PATH "/org/bluez/agent/frwk_agent"
 #define BT_DEVICE_AGENT_PATH "/org/tizen/device_agent"
@@ -147,26 +146,26 @@ extern "C" {
 #define BT_MEDIATRANSPORT_INTERFACE "org.bluez.MediaTransport1"
 #define BT_MEDIA_CONTROL_INTERFACE "org.bluez.MediaControl1"
 #define BT_PLAYER_CONTROL_INTERFACE "org.bluez.MediaPlayer1"
+#define BT_GATT_CHAR_INTERFACE "org.bluez.GattCharacteristic1"
 
-#define BT_INPUT_INTERFACE "org.bluez.Input"
+#define BT_INPUT_INTERFACE "org.bluez.Input1"
 #define BT_NETWORK_INTERFACE "org.bluez.Network"
 #define BT_NETWORK_CLIENT_INTERFACE "org.bluez.Network1"
 #define BT_SERIAL_INTERFACE "org.bluez.Serial"
 #define BT_SERIAL_MANAGER_INTERFACE "org.bluez.SerialProxyManager"
 #define BT_SERIAL_PROXY_INTERFACE "org.bluez.SerialProxy"
-#define BT_HFP_AGENT_INTERFACE "Org.Hfp.App.Interface"
 #define BT_SINK_INTERFACE "org.bluez.AudioSink"
 #define BT_AUDIO_INTERFACE "org.bluez.Audio"
 #define BT_HEADSET_INTERFACE "org.bluez.Headset"
 #define BT_OOB_INTERFACE "org.bluez.OutOfBand"
 #define BT_HANDSFREE_GATEWAY_INTERFACE "org.bluez.HandsfreeGateway"
-#define BT_OBEXD_DBUS_NAME "org.bluez.obex"
-#define BT_OBEXD_MANAGER_INTERFACE "org.bluez.obex.AgentManager1"
-#define BT_OBEXD_TRANSFER_INTERFACE "org.bluez.obex.Transfer1"
+#define BT_OBEXD_INTERFACE "org.openobex"
+#define BT_OBEXD_MANAGER_INTERFACE "org.openobex.Manager"
+#define BT_OBEXD_TRANSFER_INTERFACE "org.openobex.Transfer"
+#define BT_A2DP_SOURCE_INTERFACE "org.bluez.AudioSource"
 
 #define BT_PROPERTIES_INTERFACE "org.freedesktop.DBus.Properties"
 
-#define MPRIS_PLAYER_INTERFACE "org.mpris.MediaPlayer2.Player"
 
 #define BT_OBEX_SERVICE_NAME "org.bluez.obex"
 #define BT_OBEX_CLIENT_PATH "/org/bluez/obex"
@@ -191,7 +190,6 @@ extern "C" {
 #define BT_INTERFACES_REMOVED "InterfacesRemoved"
 #define BT_NAME_OWNER_CHANGED "NameOwnerChanged"
 #define BT_PROPERTIES_CHANGED "PropertiesChanged"
-#define DBUS_INTERFACE_OBJECT_MANAGER "/"
 
 
 
@@ -202,6 +200,8 @@ extern "C" {
 
 /* UUID */
 #define GENERIC_AUDIO_UUID      "00001203-0000-1000-8000-00805f9b34fb"
+
+#define OBEX_OPP_UUID		"00001105-0000-1000-8000-00805f9b34fb"
 
 #define HSP_HS_UUID             "00001108-0000-1000-8000-00805f9b34fb"
 #define HSP_AG_UUID             "00001112-0000-1000-8000-00805f9b34fb"
@@ -226,8 +226,8 @@ extern "C" {
 #define GATT_UUID		"00001801-0000-1000-8000-00805f9b34fb"
 
 /* Privilege */
-#define BT_PRIVILEGE_PUBLIC "http://tizen.org/privilege/bluetooth"
-#define BT_PRIVILEGE_PLATFORM "http://tizen.org/privilege/bluetooth.admin"
+#define BT_PRIVILEGE_PUBLIC "bt-service::public"
+#define BT_PRIVILEGE_PLATFORM "bt-service::platform"
 
 /* BD Address type */
 #define BDADDR_BREDR           0x00
@@ -240,8 +240,6 @@ extern "C" {
 #define BT_LE_ADV_SCAN_IND		0x02
 #define BT_LE_ADV_NONCONN_IND	0x03
 #define BT_LE_ADV_SCAN_RSP		0x04
-
-#define BT_STOP_DISCOVERY_TIMEOUT 1000*15
 
 /* Profile states matched to btd_service_state_t of bluez service.h */
 typedef enum {
@@ -265,7 +263,9 @@ typedef enum {
 	BT_PROFILE_CONN_NAP= 0x10,
 	BT_PROFILE_CONN_HFG= 0x20,
 	BT_PROFILE_CONN_GATT= 0x40,
-	BT_PROFILE_CONN_ALL= 0x80,
+	BT_PROGILE_CONN_NAP = 0x80,
+	BT_PROFILE_CONN_A2DP_SINK= 0x100,
+	BT_PROFILE_CONN_ALL= 0xffffffff,
 } bt_profile_type_t;
 
 typedef struct {
@@ -284,9 +284,9 @@ typedef struct {
 	char *address;
 	char *name;
 	char **uuids;
-	int uuid_count;
+	unsigned int uuid_count;
 	gboolean paired;
-	gboolean connected;
+	bluetooth_connected_link_t connected;
 	gboolean trust;
 	char *manufacturer_data;
 	int manufacturer_data_len;
@@ -311,19 +311,19 @@ typedef struct {
 	char *address;
 } bt_function_data_t;
 
-DBusConnection *_bt_get_system_conn(void);
+GDBusConnection *_bt_get_system_conn(void);
 
-DBusGConnection *_bt_get_system_gconn(void);
+GDBusConnection *_bt_get_system_gconn(void);
 
-DBusGConnection *_bt_get_session_gconn(void);
+GDBusConnection *_bt_get_session_gconn(void);
 
 void *_bt_get_net_conn(void);
 
-DBusGProxy *_bt_get_manager_proxy(void);
+GDBusProxy *_bt_get_manager_proxy(void);
 
-DBusGProxy *_bt_get_adapter_proxy(void);
+GDBusProxy *_bt_get_adapter_proxy(void);
 
-DBusGProxy *_bt_get_adapter_properties_proxy(void);
+GDBusProxy *_bt_get_adapter_properties_proxy(void);
 
 char *_bt_get_device_object_path(char *address);
 
@@ -337,8 +337,6 @@ void _bt_logging_connection(gboolean connect, int addr_type);
 
 char *_bt_get_adapter_path(void);
 
-gboolean _bt_get_adapter_power(void);
-
 void _bt_deinit_proxys(void);
 
 void _bt_convert_device_path_to_address(const char *device_path,
@@ -349,6 +347,13 @@ void _bt_convert_addr_string_to_type(unsigned char *addr,
 
 void _bt_convert_addr_type_to_string(char *address,
 				unsigned char *addr);
+
+void _bt_swap_byte_ordering(char *data, int data_len);
+
+int _bt_byte_arr_cmp(const char *data1, const char *data2, int data_len);
+
+int _bt_byte_arr_cmp_with_mask(const char *data1, const char *data2,
+				const char *mask, int data_len);
 
 void _bt_print_device_address_t(const bluetooth_device_address_t *addr);
 
@@ -371,11 +376,9 @@ int _bt_set_socket_non_blocking(int socket_fd);
 
 int _bt_set_non_blocking_tty(int sk);
 
-gboolean _bt_is_headset_class(int dev_class);
-
-char *_bt_get_device_object_path(char *address);
-
 void _bt_deinit_bluez_proxy(void);
+
+int _bt_eventsystem_set_value(const char *event, const char *key, const char *value);
 
 #ifdef __cplusplus
 }

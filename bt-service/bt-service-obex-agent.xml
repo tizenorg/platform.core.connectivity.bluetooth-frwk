@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
 <node name="/">
-  <interface name="org.bluez.obex.Agent1">
+  <interface name="org.openobex.Agent">
     <method name="Request">
       <annotation name="org.freedesktop.DBus.GLib.Async" value=""/>
       <arg type="o" name="transfer"/>

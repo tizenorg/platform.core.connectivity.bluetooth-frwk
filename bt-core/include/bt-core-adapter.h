@@ -28,20 +28,10 @@
 #include <sys/wait.h>
 #include <dlog.h>
 #include <glib.h>
-#include <glib-object.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define CONNMAN_DBUS_NAME "net.connman"
-#define CONNMAN_BLUETOOTH_TECHNOLOGY_PATH "/net/connman/technology/bluetooth"
-#define CONNMAN_BLUETOTOH_TECHNOLOGY_INTERFACE "net.connman.Technology"
-
-#define BT_CORE_NAME "org.projectx.bt_core"
-#define BT_CORE_PATH "/org/projectx/bt_core"
-
-#define BT_CORE_TYPE (bt_core_get_type())
 
 typedef enum {
 	BT_DEACTIVATED,
@@ -82,7 +72,16 @@ int _bt_core_service_request_adapter(int service_function);
 
 void _bt_core_adapter_added_cb(void);
 void _bt_core_adapter_removed_cb(void);
-GType bt_core_get_type (void);
+
+gboolean _bt_core_enable_adapter(void);
+gboolean _bt_core_disable_adapter(void);
+gboolean _bt_core_recover_adapter(void);
+gboolean _bt_core_enable_adapter_le(void);
+gboolean _bt_core_disable_adapter_le(void);
+gboolean __bt_core_reset_adapter(void);
+gboolean _bt_core_enable_core(void);
+gboolean _bt_core_factory_test_mode(const char *type, const char *arg);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

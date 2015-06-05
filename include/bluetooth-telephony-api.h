@@ -363,6 +363,15 @@ int bluetooth_telephony_get_headset_volume(unsigned int *speaker_gain);
  */
 int bluetooth_telephony_set_speaker_gain(unsigned short speaker_gain);
 
+/**
+ * @brief	The function bluetooth_telephony_is_connected is called to get
+ *	the connection state on AG.
+ *
+ * @param[in]	ag_connnected	Connection state.
+ * @return	int	Zero on Success or reason for error if any.
+ *
+ */
+int bluetooth_telephony_is_connected(gboolean *ag_connected);
 
 #ifdef __cplusplus
 }

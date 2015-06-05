@@ -67,6 +67,8 @@ typedef enum {
 	BT_MEDIA_TRANSFER_EVENT,
 	BT_HF_AGENT_EVENT,
 	BT_AVRCP_CONTROL_EVENT,
+	BT_A2DP_SOURCE_EVENT,
+	BT_HID_DEVICE_EVENT,
 	/* Will be added */
 } bt_event_type_t;
 
@@ -158,6 +160,7 @@ typedef enum {
 	BT_RESET_ADAPTER,
 	BT_SET_ADVERTISING,
 	BT_SET_CUSTOM_ADVERTISING,
+	BT_SET_ADVERTISING_PARAMETERS,
 	BT_GET_ADVERTISING_DATA,
 	BT_SET_ADVERTISING_DATA,
 	BT_SET_SCAN_PARAMETERS,
@@ -169,6 +172,9 @@ typedef enum {
 	BT_ADD_WHITE_LIST,
 	BT_REMOVE_WHITE_LIST,
 	BT_CLEAR_WHITE_LIST,
+	BT_REGISTER_SCAN_FILTER,
+	BT_UNREGISTER_SCAN_FILTER,
+	BT_UNREGISTER_ALL_SCAN_FILTERS,
 	BT_BOND_DEVICE = BT_FUNC_DEVICE_BASE,
 	BT_BOND_DEVICE_BY_TYPE,
 	BT_CANCEL_BONDING,
@@ -180,8 +186,16 @@ typedef enum {
 	BT_SET_AUTHORIZATION,
 	BT_UNSET_AUTHORIZATION,
 	BT_IS_DEVICE_CONNECTED,
+	BT_GET_CONNECTED_LINK_TYPE,
 	BT_HID_CONNECT = BT_FUNC_HID_BASE,
 	BT_HID_DISCONNECT,
+	BT_HID_DEVICE_ACTIVATE,
+	BT_HID_DEVICE_DEACTIVATE,
+	BT_HID_DEVICE_CONNECT,
+	BT_HID_DEVICE_DISCONNECT,
+	BT_HID_DEVICE_SEND_MOUSE_EVENT,
+	BT_HID_DEVICE_SEND_KEY_EVENT,
+	BT_HID_DEVICE_SEND_REPLY_TO_REPORT,
 	BT_NETWORK_ACTIVATE = BT_FUNC_NETWORK_BASE,
 	BT_NETWORK_DEACTIVATE,
 	BT_NETWORK_CONNECT,
@@ -193,6 +207,8 @@ typedef enum {
 	BT_AG_DISCONNECT,
 	BT_AV_CONNECT,
 	BT_AV_DISCONNECT,
+	BT_AV_SOURCE_CONNECT,
+	BT_AV_SOURCE_DISCONNECT,
 	BT_HF_CONNECT,
 	BT_HF_DISCONNECT,
 	BT_GET_SPEAKER_GAIN,
@@ -236,6 +252,8 @@ typedef enum {
 	BT_RFCOMM_IS_UUID_AVAILABLE,
 	BT_RFCOMM_ACCEPT_CONNECTION,
 	BT_RFCOMM_REJECT_CONNECTION,
+	BT_RFCOMM_CREATE_SOCKET_EX,
+	BT_RFCOMM_REMOVE_SOCKET_EX,
 	BT_PBAP_CONNECT = BT_FUNC_PBAP_BASE,
 	BT_PBAP_DISCONNECT,
 	BT_PBAP_GET_PHONEBOOK_SIZE,
@@ -305,6 +323,8 @@ typedef struct {
 #define BT_CORE_EVENT_PATH "/org/projectx/bt/bt_core"
 #define BT_HF_LOCAL_TERM_EVENT_PATH "/org/projectx/bt/hf_local_term"
 #define BT_AVRCP_CONTROL_PATH "/org/projectx/bt/avrcp_control"
+#define BT_A2DP_SOURCE_PATH "/org/projectx/bt/a2dp_source"
+#define BT_HID_DEVICE_PATH "/org/projectx/bt/hid_device"
 
 #define BT_ENABLED "Enabled"
 #define BT_DISABLED "Disabled"
@@ -317,7 +337,6 @@ typedef struct {
 #define BT_DISCOVERY_STARTED "DiscoveryStarted"
 #define BT_DISCOVERY_FINISHED "DiscoveryFinished"
 #define BT_DEVICE_FOUND "DeviceFound"
-#define BT_DEVICE_DISAPPEARED "DeviceDisappeared"
 #define BT_LE_DISCOVERY_STARTED "LEDiscoveryStarted"
 #define BT_LE_DISCOVERY_FINISHED "LEDiscoveryFinished"
 #define BT_LE_DEVICE_FOUND "LEDeviceFound"
@@ -340,6 +359,7 @@ typedef struct {
 #define BT_INPUT_CONNECTED "InputConnected"
 #define BT_INPUT_DISCONNECTED "InputDisconnected"
 #define BT_PBAP_CONNECTED "PbapConnected"
+#define BT_PBAP_DISCONNECTED "PbapDisconnected"
 #define BT_PBAP_PHONEBOOK_SIZE "PbapPhonebookSize"
 #define BT_PBAP_PHONEBOOK_PULL "PbapPhonebookPull"
 #define BT_PBAP_VCARD_LIST "PbapvCardList"
@@ -349,6 +369,8 @@ typedef struct {
 #define BT_HEADSET_DISCONNECTED "HeadsetDisconnected"
 #define BT_STEREO_HEADSET_CONNECTED "StereoHeadsetConnected"
 #define BT_STEREO_HEADSET_DISCONNECTED "StereoHeadsetDisconnected"
+#define BT_A2DP_SOURCE_CONNECTED "A2DPSourceConnected"
+#define BT_A2DP_SOURCE_DISCONNECTED "A2DPSourceDisconnected"
 #define BT_SCO_CONNECTED "ScoConnected"
 #define BT_SCO_DISCONNECTED "ScoDisconnected"
 #define BT_SPEAKER_GAIN "SpeakerGain"
@@ -386,9 +408,12 @@ typedef struct {
 #define BT_NAME_OWNER_CHANGED "NameOwnerChanged"
 #define BT_GATT_CONNECTED "GattConnected"
 #define BT_GATT_DISCONNECTED "GattDisconnected"
+#define BT_GATT_CHAR_VAL_CHANGED "GattCharValueChanged"
 #define BT_HARDWARE_ERROR "HardwareError"
 #define BT_TX_TIMEOUT_ERROR "TxTimeoutError"
 #define BT_HF_LOCAL_TERM "HandsfreeLocalTermination"
+#define BT_HID_DEVICE_CONNECTED "HIDConnected"
+#define BT_HID_DEVICE_DISCONNECTED "HIDDisconnected"
 
 #ifdef __cplusplus
 }

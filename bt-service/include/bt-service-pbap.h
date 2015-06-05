@@ -26,15 +26,9 @@
 
 #include <stdint.h>
 #include <glib.h>
-#include <dbus/dbus-glib.h>
-#include <dbus/dbus-glib-lowlevel.h>
-
 #include <unistd.h>
 #include <dlog.h>
-
 #include <stdio.h>
-
-#include <dbus/dbus-glib.h>
 
 #undef LOG_TAG
 #define LOG_TAG	"BLUETOOTH_FRWK_SERVICE"
@@ -60,4 +54,6 @@ int _bt_pbap_phonebook_search(const bluetooth_device_address_t *address,
 		int source, int type, bt_pbap_search_parameters_t *app_param);
 
 void _bt_pbap_obex_transfer_completed(const char *transfer_path, gboolean transfer_status);
+
+void _bt_obex_pbap_client_disconnect(char *path);
 #endif

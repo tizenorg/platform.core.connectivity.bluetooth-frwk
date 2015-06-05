@@ -26,6 +26,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <security-server.h>
 #include <sys/socket.h>
 
 
@@ -46,12 +47,14 @@ static bt_user_info_t user_info[BT_MAX_USER_INFO];
 static DBusGConnection *system_conn = NULL;
 static GDBusConnection *system_gdbus_conn = NULL;
 
-static guint bus_id;
-
 static char *cookie;
 static size_t cookie_size;
 
+static guint bus_id;
+
 static GDBusConnection *system_gconn = NULL;
+
+#define DBUS_TIMEOUT 20 * 1000 /* 20 Seconds */
 
 GDBusConnection *_bt_gdbus_init_system_gconn(void)
 {
@@ -151,6 +154,18 @@ void _bt_headset_event_cb(int event, int result, void *param,
 	bt_event.result = result;
 	bt_event.param_data = param;
 
+	if (callback)
+		((bt_audio_func_ptr)callback)(bt_event.event, &bt_event,
+					user_data);
+}
+
+void _bt_a2dp_source_event_cb(int event, int result, void *param,
+					void *callback, void *user_data)
+{
+	bt_audio_event_param_t bt_event = { 0, };
+	bt_event.event = event;
+	bt_event.result = result;
+	bt_event.param_data = param;
 	if (callback)
 		((bt_audio_func_ptr)callback)(bt_event.event, &bt_event,
 					user_data);
@@ -293,30 +308,11 @@ static const gchar rfcomm_agent_xml[] =
 "          <arg type='h' name='fd' direction='in'/>"
 "          <arg type='a{sv}' name='properties' direction='in'/>"
 "     </method>"
+"     <method name='RequestDisconnection'>"
+"          <arg type='o' name='device' direction='in'/>"
+"     </method>"
 "  </interface>"
 "</node>";
-
-/* Remote socket address */
-struct sockaddr_remote {
-	sa_family_t	family;
-	bluetooth_device_address_t	remote_bdaddr;
-	unsigned char	channel;
-};
-
-static void __get_remote_address(int fd, bluetooth_device_address_t *bdaddr)
-{
-	struct sockaddr_remote address;
-	socklen_t address_len;
-
-	address_len = sizeof(address);
-	if (getpeername(fd, (struct sockaddr *) &address, &address_len) != 0) {
-		BT_DBG("getpeername failed");
-		return;
-	}
-
-	memcpy(bdaddr->addr, address.remote_bdaddr.addr,
-					BLUETOOTH_ADDRESS_LENGTH);
-}
 
 static void __new_connection_method(GDBusConnection *connection,
 					    const gchar *sender,
@@ -335,7 +331,7 @@ static void __new_connection_method(GDBusConnection *connection,
 		GVariantBuilder *properties;
 		char *obj_path;
 		char addr[20];
-		bluetooth_device_address_t remote_addr, remote_addr1;
+		bluetooth_device_address_t  remote_addr1;
 		bt_new_connection_cb cb = user_data;
 		int fd;
 
@@ -362,16 +358,18 @@ static void __new_connection_method(GDBusConnection *connection,
 			g_error_free(err);
 			return;
 		}
+		BT_INFO("Object Path %s", obj_path);
 
-		__get_remote_address(fd, &remote_addr);
-		_bt_swap_addr(remote_addr1.addr, remote_addr.addr);
-		_bt_convert_addr_type_to_string(addr, remote_addr1.addr);
+		_bt_device_path_to_address(obj_path, addr);
+		_bt_convert_addr_string_to_type(remote_addr1.addr, (const char *)addr);
 		BT_INFO("fd: %d, address %s", fd, addr);
 
 		g_dbus_method_invocation_return_value(invocation, NULL);
 
 		if (cb)
 			cb(object_path, fd, &remote_addr1);
+	} else if (g_strcmp0(method_name, "RequestDisconnection") == 0) {
+		g_dbus_method_invocation_return_value(invocation, NULL);
 	}
 }
 
@@ -473,9 +471,35 @@ static GDBusProxy *__bt_gdbus_get_profile_proxy(void)
 	if (err) {
 		BT_ERR("Unable to create proxy: %s", err->message);
 		g_clear_error(&err);
+		return NULL;
 	}
 
 	return profile_gproxy;
+}
+
+static GDBusProxy *__bt_gdbus_get_device_proxy(char *object_path)
+{
+	GDBusConnection *gconn;
+	GError *err = NULL;
+	GDBusProxy *device_gproxy;
+
+	gconn = __get_gdbus_connection();
+	if (gconn == NULL)
+		return NULL;
+
+	device_gproxy = g_dbus_proxy_new_sync(gconn, G_DBUS_PROXY_FLAGS_NONE,
+						NULL, BT_BLUEZ_NAME,
+						object_path,
+						BT_DEVICE_INTERFACE,
+						NULL, &err);
+
+	if (err) {
+		BT_ERR("Unable to create proxy: %s", err->message);
+		g_clear_error(&err);
+		return NULL;
+	}
+
+	return device_gproxy;
 }
 
 void _bt_unregister_gdbus(int object_id)
@@ -520,6 +544,105 @@ int _bt_register_new_conn(const char *path, bt_new_connection_cb cb)
 	return id;
 }
 
+static GDBusProxy * __bt_gdbus_get_adapter_proxy()
+{
+	GError *err = NULL;
+	GDBusProxy *manager_proxy = NULL;
+	GDBusProxy *adapter_proxy = NULL;
+	GDBusConnection *conn;
+	GVariant *result = NULL;
+	char *adapter_path = NULL;
+
+	conn = __get_gdbus_connection();
+	retv_if(conn == NULL, NULL);
+
+	manager_proxy =  g_dbus_proxy_new_sync(conn,
+			G_DBUS_PROXY_FLAGS_NONE, NULL,
+			BT_BLUEZ_NAME,
+			BT_MANAGER_PATH,
+			BT_MANAGER_INTERFACE,
+			NULL, &err);
+
+	if (!manager_proxy) {
+		BT_ERR("Unable to create proxy: %s", err->message);
+		goto fail;
+	}
+
+	result = g_dbus_proxy_call_sync(manager_proxy, "DefaultAdapter", NULL,
+			G_DBUS_CALL_FLAGS_NONE, -1, NULL, &err);
+	if (!result) {
+		if (err != NULL)
+			BT_ERR("Fail to get DefaultAdapter (Error: %s)", err->message);
+		else
+			BT_ERR("Fail to get DefaultAdapter");
+
+		goto fail;
+	}
+
+	if (g_strcmp0(g_variant_get_type_string(result), "(o)")) {
+		BT_ERR("Incorrect result\n");
+		goto fail;
+	}
+
+	g_variant_get(result, "(&o)", &adapter_path);
+
+	if (adapter_path == NULL ||
+		strlen(adapter_path) >= BT_ADAPTER_OBJECT_PATH_MAX) {
+		BT_ERR("Adapter path is inproper\n");
+		goto fail;
+	}
+
+	BT_INFO("Adapter Path %s", adapter_path);
+
+	adapter_proxy = g_dbus_proxy_new_sync(conn,
+					G_DBUS_PROXY_FLAGS_NONE, NULL,
+					BT_BLUEZ_NAME,
+					adapter_path,
+					BT_ADAPTER_INTERFACE,
+					NULL, &err);
+	if (err) {
+		BT_ERR("DBus Error message: [%s]", err->message);
+		g_clear_error(&err);
+	}
+
+fail:
+	if (manager_proxy)
+		g_object_unref(manager_proxy);
+	if (result)
+		g_variant_unref(result);
+	return adapter_proxy;
+}
+
+int _bt_register_new_conn_ex(const char *path, const char *bus_name,bt_new_connection_cb cb)
+{
+	GDBusConnection *gconn;
+	int id;
+	GError *error = NULL;
+
+	gconn = __get_gdbus_connection();
+	if (gconn == NULL)
+		return -1;
+
+	if (new_conn_node == NULL)
+		new_conn_node = _bt_get_gdbus_node_ex(rfcomm_agent_xml, bus_name);
+
+	if (new_conn_node == NULL)
+		return -1;
+
+	id = g_dbus_connection_register_object(gconn, path,
+						new_conn_node->interfaces[0],
+						&method_table,
+						cb, NULL, &error);
+	if (id == 0) {
+		BT_ERR("Failed to register: %s", error->message);
+		g_error_free(error);
+		return -1;
+	}
+
+	BT_DBG("NEW CONNECTION ID %d", id);
+
+	return id;
+}
 
 int _bt_register_profile(bt_register_profile_info_t *info, gboolean use_default_rfcomm)
 {
@@ -562,10 +685,77 @@ int _bt_register_profile(bt_register_profile_info_t *info, gboolean use_default_
 						"Service",
 						g_variant_new_string(info->service));
 
-
 	ret = g_dbus_proxy_call_sync(proxy, "RegisterProfile",
 					g_variant_new("(osa{sv})", info->obj_path,
 								info->uuid,
+								option_builder),
+					G_DBUS_CALL_FLAGS_NONE, -1,
+					NULL, &err);
+	if (err) {
+		BT_ERR("RegisterProfile failed: %s", err->message);
+
+		if (g_strrstr(err->message, BT_ACCESS_DENIED_MSG))
+			result = BLUETOOTH_ERROR_ACCESS_DENIED;
+		else
+			result = BLUETOOTH_ERROR_INTERNAL;
+
+		g_clear_error(&err);
+	}
+
+	g_variant_builder_unref(option_builder);
+
+	if (ret)
+		g_variant_unref(ret);
+
+	return result;
+}
+
+int _bt_register_profile_ex(bt_register_profile_info_t *info, gboolean use_default_rfcomm, const char *name, const char *path)
+{
+	GVariantBuilder *option_builder;
+	GVariant *ret;
+	GDBusProxy *proxy;
+	GError *err = NULL;
+	int result = BLUETOOTH_ERROR_NONE;
+
+	proxy = __bt_gdbus_get_profile_proxy();
+	if (proxy == NULL) {
+		BT_ERR("Getting profile proxy failed");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	option_builder = g_variant_builder_new(G_VARIANT_TYPE("a{sv}"));
+	if (info->authentication)
+		g_variant_builder_add(option_builder, "{sv}",
+						"RequireAuthentication",
+						g_variant_new_boolean(TRUE));
+	if (info->authorization)
+		g_variant_builder_add(option_builder, "{sv}",
+						"RequireAuthorization",
+						g_variant_new_boolean(TRUE));
+	if (info->role)
+		g_variant_builder_add(option_builder, "{sv}",
+						"Role",
+						g_variant_new_string(info->role));
+
+	/* Setting RFCOMM channel to default value 0; would allow bluez to assign
+	 * RFCOMM channels based on the availability when two services want
+	 * to use the RFCOMM along with SPP. Hence bluez makes sure that no
+	 * two services use the same SPP RFCOMM channel. */
+	if (use_default_rfcomm)
+		g_variant_builder_add(option_builder, "{sv}",
+						"Channel",
+						g_variant_new_uint16(RFCOMM_DEFAULT_PROFILE_CHANNEL));
+	if (info->service)
+		g_variant_builder_add(option_builder, "{sv}",
+						"Service",
+						g_variant_new_string(info->service));
+
+	ret = g_dbus_proxy_call_sync(proxy, "RegisterProfile2",
+					g_variant_new("(osssa{sv})", info->obj_path,
+								info->uuid,
+								name,
+								path,
 								option_builder),
 					G_DBUS_CALL_FLAGS_NONE, -1,
 					NULL, &err);
@@ -629,13 +819,13 @@ int _bt_register_profile_platform(bt_register_profile_info_t *info, gboolean use
 						"Service",
 						g_variant_new_string(info->service));
 
-
 	ret = g_dbus_proxy_call_sync(proxy, "RegisterProfile1",
 					g_variant_new("(osa{sv})", info->obj_path,
 								info->uuid,
 								option_builder),
 					G_DBUS_CALL_FLAGS_NONE, -1,
 					NULL, &err);
+
 	if (err) {
 		BT_ERR("RegisterProfile failed: %s", err->message);
 
@@ -703,53 +893,74 @@ GDBusNodeInfo * _bt_get_gdbus_node(const gchar *xml_data)
 	return g_dbus_node_info_new_for_xml(xml_data, NULL);
 }
 
+GDBusNodeInfo * _bt_get_gdbus_node_ex(const gchar *xml_data, const char *bus_name)
+{
+	if (bus_id == 0) {
+		char *name = g_strdup(bus_name);
+		bus_id = g_bus_own_name(G_BUS_TYPE_SYSTEM,
+						name,
+						G_BUS_NAME_OWNER_FLAGS_NONE,
+						NULL,
+						NULL,
+						NULL,
+						NULL,
+						NULL);
+		BT_DBG("Got bus id %d", bus_id);
+		g_free(name);
+	}
+
+	return g_dbus_node_info_new_for_xml(xml_data, NULL);
+}
+
 int _bt_connect_profile(char *address, char *uuid, void *cb,
 							gpointer func_data)
 {
+	GDBusProxy *proxy;
+	GDBusProxy *adapter_proxy;
 	char *object_path;
-	DBusGProxy *proxy;
-	DBusGConnection *conn;
-	DBusGProxy *adapter_proxy;
-	GError *error = NULL;
-
-	conn = _bt_get_system_gconn();
-	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
+	GError *err = NULL;
 
 	object_path = _bt_get_device_object_path(address);
+
 	if (object_path == NULL) {
+		GVariant *ret = NULL;
 		BT_ERR("No searched device");
+		adapter_proxy = __bt_gdbus_get_adapter_proxy();
 
-		adapter_proxy = _bt_get_adapter_proxy(conn);
-		retv_if(adapter_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+		ret = g_dbus_proxy_call_sync(adapter_proxy, "CreateDevice",
+				g_variant_new("(s)", address),
+				G_DBUS_CALL_FLAGS_NONE,
+				DBUS_TIMEOUT, NULL,
+				&err);
 
-		dbus_g_proxy_call(adapter_proxy, "CreateDevice", &error,
-			G_TYPE_STRING, address,
-			G_TYPE_INVALID, G_TYPE_INVALID);
-
-		if (error != NULL) {
-			BT_ERR("CreateDevice Fail: %s", error->message);
-			g_error_free(error);
+		if (err != NULL) {
+			BT_ERR("CreateDevice Failed: %s", err->message);
+			g_clear_error(&err);
 		}
-
+		if (ret)
+			g_variant_unref(ret);
+		g_object_unref(adapter_proxy);
 		object_path = _bt_get_device_object_path(address);
+
+		if (object_path == NULL)
+			return BLUETOOTH_ERROR_INTERNAL;
 	}
-	retv_if(object_path == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-
-	proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
-				object_path, BT_DEVICE_INTERFACE);
+	proxy = __bt_gdbus_get_device_proxy(object_path);
 	g_free(object_path);
-	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	if (!dbus_g_proxy_begin_call(proxy, "ConnectProfile",
-			(DBusGProxyCallNotify)cb,
-			func_data, NULL,
-			G_TYPE_STRING, uuid,
-			G_TYPE_INVALID)) {
-		BT_ERR("Connect Dbus Call Error");
-		g_object_unref(proxy);
+	if (proxy == NULL) {
+		BT_ERR("Error while getting proxy");
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
+
+	g_dbus_proxy_call(proxy, "ConnectProfile",
+			g_variant_new("(s)", uuid),
+			G_DBUS_CALL_FLAGS_NONE,
+			DBUS_TIMEOUT, NULL,
+			(GAsyncReadyCallback)cb,
+			func_data);
+	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
 }
 
@@ -757,50 +968,43 @@ int _bt_discover_services(char *address, char *uuid, void *cb,
 		gpointer func_data)
 {
 	char *object_path;
-	DBusGProxy *proxy;
-	DBusGConnection *conn;
-	DBusGProxy *adapter_proxy;
-	GError *error = NULL;
-
-	int timeout = 10000;
-	BT_DBG("+");
-	conn = _bt_get_system_gconn();
-	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
-
+	GDBusProxy *proxy;
+	GDBusProxy *adapter_proxy;
+	GError *err = NULL;
 	object_path = _bt_get_device_object_path(address);
 	if (object_path == NULL) {
+		GVariant *ret = NULL;
 		BT_ERR("No searched device");
-
-		adapter_proxy = _bt_get_adapter_proxy(conn);
+		adapter_proxy = __bt_gdbus_get_adapter_proxy();
 		retv_if(adapter_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
-
-		dbus_g_proxy_call(adapter_proxy, "CreateDevice", &error,
-			G_TYPE_STRING, address,
-			G_TYPE_INVALID, G_TYPE_INVALID);
-
-		if (error != NULL) {
-			BT_ERR("CreateDevice Fail: %s", error->message);
-			g_error_free(error);
+		ret = g_dbus_proxy_call_sync(adapter_proxy, "CreateDevice",
+				g_variant_new("(s)", address),
+				G_DBUS_CALL_FLAGS_NONE,
+				DBUS_TIMEOUT, NULL,
+				&err);
+		if (err != NULL) {
+			BT_ERR("CreateDevice Failed: %s", err->message);
+			g_clear_error(&err);
 		}
-
+		if (ret)
+			g_variant_unref(ret);
+		g_object_unref(adapter_proxy);
 		object_path = _bt_get_device_object_path(address);
+		if (object_path == NULL)
+			return BLUETOOTH_ERROR_INTERNAL;
 	}
-	retv_if(object_path == NULL, BLUETOOTH_ERROR_INTERNAL);
-
-	proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
-				object_path, BT_DEVICE_INTERFACE);
+	proxy = __bt_gdbus_get_device_proxy(object_path);
 	g_free(object_path);
-	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
-
-	if (!dbus_g_proxy_begin_call_with_timeout(proxy, "DiscoverServices",
-			(DBusGProxyCallNotify)cb,
-			func_data, NULL, timeout,
-			G_TYPE_STRING, uuid,
-			G_TYPE_INVALID)) {
-		BT_ERR("Error: While calling DiscoverServices");
-		g_object_unref(proxy);
+	if (proxy == NULL) {
+		BT_ERR("Error while getting proxy");
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
+	g_dbus_proxy_call(proxy, "DiscoverServices",
+			g_variant_new("(s)", uuid),
+			G_DBUS_CALL_FLAGS_NONE,
+			DBUS_TIMEOUT, NULL,
+			(GAsyncReadyCallback)cb,
+			func_data);
 	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
 }
@@ -808,122 +1012,231 @@ int _bt_discover_services(char *address, char *uuid, void *cb,
 int _bt_cancel_discovers(char *address)
 {
 	char *object_path;
-	DBusGProxy *proxy;
-	DBusGConnection *conn;
-	BT_DBG("+");
-	conn = _bt_get_system_gconn();
-	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
-
+	GDBusProxy *proxy;
+	GDBusProxy *adapter_proxy;
+	GError *err = NULL;
 	object_path = _bt_get_device_object_path(address);
-	retv_if(object_path == NULL, BLUETOOTH_ERROR_INTERNAL);
-
-	proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
-				object_path, BT_DEVICE_INTERFACE);
+	if (object_path == NULL) {
+		GVariant *ret = NULL;
+		BT_ERR("No searched device");
+		adapter_proxy = __bt_gdbus_get_adapter_proxy();
+		retv_if(adapter_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+		ret = g_dbus_proxy_call_sync(adapter_proxy, "CreateDevice",
+				g_variant_new("(s)", address),
+				G_DBUS_CALL_FLAGS_NONE,
+				DBUS_TIMEOUT, NULL,
+				&err);
+		if (err != NULL) {
+			BT_ERR("CreateDevice Failed: %s", err->message);
+			g_clear_error(&err);
+		}
+		if (ret)
+			g_variant_unref(ret);
+		g_object_unref(adapter_proxy);
+		object_path = _bt_get_device_object_path(address);
+		if (object_path == NULL)
+			return BLUETOOTH_ERROR_INTERNAL;
+	}
+	proxy = __bt_gdbus_get_device_proxy(object_path);
 	g_free(object_path);
-	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
-	if (!dbus_g_proxy_call(proxy,
-			"CancelDiscovery",
-			NULL,
-			G_TYPE_INVALID, G_TYPE_INVALID)) {
-		BT_ERR("Error: while CancelDiscovery");
-		g_object_unref(proxy);
+	g_dbus_proxy_call_sync(proxy, "CancelDiscovery",
+		NULL,
+		G_DBUS_CALL_FLAGS_NONE,
+		DBUS_TIMEOUT, NULL,
+		&err);
+	if (err) {
+		BT_ERR("DBus Error message: [%s]", err->message);
+		g_clear_error(&err);
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
-	g_object_unref(proxy);
-	BT_DBG("-");
+	if (proxy)
+		g_object_unref(proxy);
 	return BLUETOOTH_ERROR_NONE;
 }
 
 int _bt_discover_service_uuids(char *address, char *remote_uuid)
 {
 	char *object_path;
-	DBusGProxy *proxy;
-	DBusGConnection *conn;
-	GHashTable *hash = NULL;
-	GValue *value;
-	char **uuid_value;
+	GDBusProxy *proxy;
+	GDBusConnection *gconn;
+	GError *err = NULL;
+	char **uuid_value = NULL;
+	gsize size;
 	int i =0;
+	GVariant *value = NULL;
+	GVariant *ret = NULL;
 	int result = BLUETOOTH_ERROR_INTERNAL;
+	BT_INFO("+");
 	retv_if(remote_uuid == NULL, BLUETOOTH_ERROR_INTERNAL);
-
-	conn = _bt_get_system_gconn();
-	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
-
+	gconn = __get_gdbus_connection();
+	retv_if(gconn == NULL, BLUETOOTH_ERROR_INTERNAL);
 	object_path = _bt_get_device_object_path(address);
 	retv_if(object_path == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
-				object_path, BT_PROPERTIES_INTERFACE);
-	g_free(object_path);
-
+	proxy = g_dbus_proxy_new_sync(gconn, G_DBUS_PROXY_FLAGS_NONE, NULL,
+				BT_BLUEZ_NAME, object_path, BT_PROPERTIES_INTERFACE, NULL,
+				&err);
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
-
-	if (!dbus_g_proxy_call(proxy, "GetAll", NULL,
-			G_TYPE_STRING, BT_DEVICE_INTERFACE,
-			G_TYPE_INVALID,
-			dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
-			G_TYPE_VALUE), &hash, G_TYPE_INVALID)) {
-			BT_ERR("Dbus error while GetAll");
-			g_object_unref(proxy);
-			return BLUETOOTH_ERROR_INTERNAL;
+	if (err) {
+		BT_ERR("DBus Error: [%s]", err->message);
+		g_clear_error(&err);
 	}
-	g_object_unref(proxy);
-	BT_DBG("Remote uuids %s", remote_uuid);
-	value = g_hash_table_lookup(hash, "UUIDs");
-	if (value == NULL) {
-		BT_ERR("No uuids found");
+	ret = g_dbus_proxy_call_sync(proxy, "GetAll",
+			g_variant_new("(s)", BT_DEVICE_INTERFACE),
+			G_DBUS_CALL_FLAGS_NONE,
+			DBUS_TIMEOUT, NULL,
+			&err);
+	if (err) {
+		result = BLUETOOTH_ERROR_INTERNAL;
+		BT_ERR("DBus Error : %s", err->message);
+		g_clear_error(&err);
+		goto done;
+	}
+	if (ret == NULL) {
+		BT_ERR("g_dbus_proxy_call_sync function return NULL");
+		result = BLUETOOTH_ERROR_INTERNAL;
 		goto done;
 	}
 
-	uuid_value = g_value_get_boxed(value);
-	if(uuid_value == NULL) {
-		BT_ERR("Error: while obtaining uuids");
-		goto done;
-	}
+	g_variant_get(ret, "(@a{sv})", &value);
+	g_variant_unref(ret);
+	if (value) {
+		GVariant *temp_value = g_variant_lookup_value(value, "UUIDs",
+			G_VARIANT_TYPE_STRING_ARRAY);
 
-	for (i = 0; uuid_value[i] != NULL; i++) {
-		BT_DBG("Remote uuids %s", uuid_value[i]);
-		if (strcasecmp(uuid_value[i], remote_uuid) == 0) {
-			result = BLUETOOTH_ERROR_NONE;
-			goto done;
+		size = g_variant_get_size(temp_value);
+		if (size > 0) {
+			uuid_value = (char **)g_variant_get_strv(temp_value, &size);
+			BT_DBG("Size items %d", size);
+		}
+		if (temp_value)
+			g_variant_unref(temp_value);
+		for (i = 0; uuid_value[i] != NULL; i++) {
+			BT_DBG("Remote uuids %s", uuid_value[i]);
+			if (strcasecmp(uuid_value[i], remote_uuid) == 0) {
+				result = BLUETOOTH_ERROR_NONE;
+				goto done;
+			}
 		}
 	}
-	BT_INFO("Specified uuid not found on remote device");
-done:
-	if (hash)
-		g_hash_table_destroy(hash);
 
+done:
+	if (proxy)
+		g_object_unref(proxy);
+	if (value)
+		g_variant_unref(value);
+	if (uuid_value)
+		g_free(uuid_value);
+
+	BT_DBG("-");
 	return result;
+}
+
+int _bt_get_cod_by_address(char *address, bluetooth_device_class_t *dev_class)
+{
+	char *object_path;
+	GDBusProxy *proxy;
+	GDBusConnection *gconn;
+	GError *err = NULL;
+	GVariant *value = NULL;
+	GVariant *result = NULL;
+	unsigned int  class = 0x00;
+	int ret = BLUETOOTH_ERROR_INTERNAL;
+
+	gconn = __get_gdbus_connection();
+	retv_if(gconn == NULL, BLUETOOTH_ERROR_INTERNAL);
+		object_path = _bt_get_device_object_path(address);
+
+	retv_if(object_path == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	proxy = g_dbus_proxy_new_sync(gconn, G_DBUS_PROXY_FLAGS_NONE, NULL,
+				BT_BLUEZ_NAME, object_path, BT_PROPERTIES_INTERFACE, NULL,
+				&err);
+	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+	if (err) {
+		BT_ERR("DBus Error: [%s]", err->message);
+		g_clear_error(&err);
+	}
+
+	result = g_dbus_proxy_call_sync(proxy, "GetAll",
+			g_variant_new("(s)", BT_DEVICE_INTERFACE),
+			G_DBUS_CALL_FLAGS_NONE,
+			DBUS_TIMEOUT, NULL,
+			&err);
+	if (err) {
+		ret = BLUETOOTH_ERROR_INTERNAL;
+		BT_ERR("DBus Error : %s", err->message);
+		g_clear_error(&err);
+		goto done;
+	}
+	if (result == NULL) {
+		BT_ERR("g_dbus_proxy_call_sync function return NULL");
+		ret = BLUETOOTH_ERROR_INTERNAL;
+		goto done;
+	}
+	g_variant_get(result, "(@a{sv})", &value);
+	g_variant_unref(result);
+	if (value) {
+		GVariant *temp_value = g_variant_lookup_value(value, "Class",
+			G_VARIANT_TYPE_UINT32);
+		class = g_variant_get_uint32(temp_value);
+		_bt_divide_device_class(dev_class, class);
+		if (temp_value)
+			g_variant_unref(temp_value);
+	}
+
+done:
+	if (proxy)
+		g_object_unref(proxy);
+	if (value)
+		g_variant_unref(value);
+
+	BT_DBG("-");
+	return ret;
 }
 
 int _bt_disconnect_profile(char *address, char *uuid, void *cb,
 							gpointer func_data)
 {
+	GDBusProxy *proxy;
 	char *object_path;
-	DBusGProxy *proxy;
-	DBusGConnection *conn;
-
-	conn = _bt_get_system_gconn();
-	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
-
+	GError *err = NULL;
+	GDBusProxy *adapter_proxy;
 	object_path = _bt_get_device_object_path(address);
-	retv_if(object_path == NULL, BLUETOOTH_ERROR_INTERNAL);
-
-
-	proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
-				object_path, BT_DEVICE_INTERFACE);
+	if (object_path == NULL) {
+		GVariant *ret = NULL;
+		BT_ERR("No searched device");
+		adapter_proxy = __bt_gdbus_get_adapter_proxy();
+		retv_if(adapter_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+		ret = g_dbus_proxy_call_sync(adapter_proxy, "CreateDevice",
+				g_variant_new("(s)", address),
+				G_DBUS_CALL_FLAGS_NONE,
+				DBUS_TIMEOUT, NULL,
+				&err);
+		if (err != NULL) {
+			BT_ERR("CreateDevice Failed: %s", err->message);
+			g_error_free(err);
+		}
+		if (ret)
+			g_variant_unref(ret);
+		g_object_unref(adapter_proxy);
+		object_path = _bt_get_device_object_path(address);
+		if (object_path == NULL)
+			return BLUETOOTH_ERROR_INTERNAL;
+	}
+	proxy = __bt_gdbus_get_device_proxy(object_path);
 	g_free(object_path);
-	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
-
-	if (!dbus_g_proxy_begin_call(proxy, "DisconnectProfile",
-			(DBusGProxyCallNotify)cb,
-			func_data, NULL,
-			G_TYPE_STRING, uuid,
-			G_TYPE_INVALID)) {
-		BT_ERR("Connect Dbus Call Error");
-		g_object_unref(proxy);
+	if (proxy == NULL) {
+		BT_ERR("Error while getting proxy");
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
+	g_dbus_proxy_call(proxy, "DisconnectProfile",
+			g_variant_new("(s)", uuid),
+			G_DBUS_CALL_FLAGS_NONE,
+			DBUS_TIMEOUT, NULL,
+			(GAsyncReadyCallback)cb,
+			func_data);
+	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
 }
 
@@ -1016,132 +1329,74 @@ void _bt_convert_device_path_to_address(const char *device_path,
 	}
 }
 
-static char *__bt_extract_adapter_path(DBusMessageIter *msg_iter)
-{
-	char *object_path = NULL;
-	DBusMessageIter value_iter;
-
-	/* Parse the signature:  oa{sa{sv}}} */
-	retv_if(dbus_message_iter_get_arg_type(msg_iter) !=
-				DBUS_TYPE_OBJECT_PATH, NULL);
-
-	dbus_message_iter_get_basic(msg_iter, &object_path);
-	retv_if(object_path == NULL, NULL);
-
-	/* object array (oa) */
-	retv_if(dbus_message_iter_next(msg_iter) == FALSE, NULL);
-	retv_if(dbus_message_iter_get_arg_type(msg_iter) !=
-				DBUS_TYPE_ARRAY, NULL);
-
-	dbus_message_iter_recurse(msg_iter, &value_iter);
-
-	/* string array (sa) */
-	while (dbus_message_iter_get_arg_type(&value_iter) ==
-					DBUS_TYPE_DICT_ENTRY) {
-		char *interface_name = NULL;
-		DBusMessageIter interface_iter;
-
-		dbus_message_iter_recurse(&value_iter, &interface_iter);
-
-		retv_if(dbus_message_iter_get_arg_type(&interface_iter) !=
-			DBUS_TYPE_STRING, NULL);
-
-		dbus_message_iter_get_basic(&interface_iter, &interface_name);
-
-		if (g_strcmp0(interface_name, "org.bluez.Adapter1") == 0) {
-			/* Tizen don't allow the multi-adapter */
-			BT_DBG("Found an adapter: %s", object_path);
-			return g_strdup(object_path);
-		}
-
-		dbus_message_iter_next(&value_iter);
-	}
-
-	return NULL;
-}
-
-static char *__bt_extract_device_path(DBusMessageIter *msg_iter, char *address)
+static char *__bt_extract_device_path(GVariantIter *iter, char *address)
 {
 	char *object_path = NULL;
 	char device_address[BT_ADDRESS_STRING_SIZE] = { 0 };
-
 	/* Parse the signature:  oa{sa{sv}}} */
-	retv_if(dbus_message_iter_get_arg_type(msg_iter) !=
-				DBUS_TYPE_OBJECT_PATH, NULL);
+	while (g_variant_iter_loop(iter, "{&oa{sa{sv}}}", &object_path,
+			NULL)) {
+		retv_if(object_path == NULL, NULL);
+		_bt_convert_device_path_to_address(object_path, device_address);
 
-	dbus_message_iter_get_basic(msg_iter, &object_path);
-	retv_if(object_path == NULL, NULL);
-
-	_bt_convert_device_path_to_address(object_path, device_address);
-
-	if (g_strcmp0(address, device_address) == 0) {
-		return g_strdup(object_path);
+		if (g_strcmp0(address, device_address) == 0) {
+			return g_strdup(object_path);
+		}
 	}
-
 	return NULL;
 }
 
 char *_bt_get_device_object_path(char *address)
 {
-	DBusMessage *msg;
-	DBusMessage *reply;
-	DBusMessageIter reply_iter;
-	DBusMessageIter value_iter;
-	DBusError err;
-	DBusConnection *conn;
+	GError *err = NULL;
+	GDBusProxy *proxy = NULL;
+	GVariant *result = NULL;
+	GVariantIter *iter = NULL;
+	GDBusConnection *conn = NULL;
 	char *object_path = NULL;
 
-	conn = _bt_get_system_conn();
+	conn = _bt_gdbus_get_system_gconn();
 	retv_if(conn == NULL, NULL);
 
-	msg = dbus_message_new_method_call(BT_BLUEZ_NAME, BT_MANAGER_PATH,
-						BT_MANAGER_INTERFACE,
-						"GetManagedObjects");
+	proxy =  g_dbus_proxy_new_sync(conn,
+			G_DBUS_PROXY_FLAGS_NONE, NULL,
+			BT_BLUEZ_NAME,
+			BT_MANAGER_PATH,
+			BT_MANAGER_INTERFACE,
+			NULL, &err);
 
-	retv_if(msg == NULL, NULL);
-
-	/* Synchronous call */
-	dbus_error_init(&err);
-	reply = dbus_connection_send_with_reply_and_block(
-					conn, msg,
-					-1, &err);
-	dbus_message_unref(msg);
-
-	if (!reply) {
-		BT_ERR("Can't get managed objects");
-
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("%s", err.message);
-			dbus_error_free(&err);
-		}
-		return NULL;
+	if (!proxy) {
+		BT_ERR("Unable to create proxy: %s", err->message);
+		goto fail;
 	}
 
-	if (dbus_message_iter_init(reply, &reply_iter) == FALSE) {
-	    BT_ERR("Fail to iterate the reply");
-	    dbus_message_unref(reply);
-	    return NULL;
+	result = g_dbus_proxy_call_sync(proxy, "GetManagedObjects", NULL,
+			G_DBUS_CALL_FLAGS_NONE, -1, NULL, &err);
+	if (!result) {
+		if (err != NULL)
+			BT_ERR("Fail to get GetManagedObjects (Error: %s)", err->message);
+		else
+			BT_ERR("Fail to get GetManagedObjects");
+
+		goto fail;
 	}
 
-	dbus_message_iter_recurse(&reply_iter, &value_iter);
+	g_variant_get(result, "(a{oa{sa{sv}}})", &iter);
+	object_path = __bt_extract_device_path(iter, address);
 
-	/* signature of GetManagedObjects:  a{oa{sa{sv}}} */
-	while (dbus_message_iter_get_arg_type(&value_iter) ==
-						DBUS_TYPE_DICT_ENTRY) {
-		DBusMessageIter msg_iter;
+	g_variant_unref(result);
+	g_object_unref(proxy);
+	g_variant_iter_free(iter);
+	return object_path;
 
-		dbus_message_iter_recurse(&value_iter, &msg_iter);
+fail:
+	g_clear_error(&err);
 
-		object_path = __bt_extract_device_path(&msg_iter, address);
-		if (object_path != NULL) {
-			BT_DBG("Found the device path %s", object_path);
-			break;
-		}
+	if (result)
+		g_variant_unref(result);
 
-		dbus_message_iter_next(&value_iter);
-	}
-
-	dbus_message_unref(reply);
+	if (proxy)
+		g_object_unref(proxy);
 
 	return object_path;
 }
@@ -1149,12 +1404,43 @@ char *_bt_get_device_object_path(char *address)
 
 DBusGProxy *_bt_get_adapter_proxy(DBusGConnection *conn)
 {
+	GError *err = NULL;
+	DBusGProxy *manager_proxy = NULL;
 	DBusGProxy *adapter_proxy = NULL;
+	char *adapter_path = NULL;
 
 	retv_if(conn == NULL, NULL);
 
-	adapter_proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
-			BT_BLUEZ_HCI_PATH, BT_PROPERTIES_INTERFACE);
+	manager_proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
+				BT_MANAGER_PATH, BT_MANAGER_INTERFACE);
+
+	retv_if(manager_proxy == NULL, NULL);
+
+	if (!dbus_g_proxy_call(manager_proxy, "DefaultAdapter", &err,
+				G_TYPE_INVALID, DBUS_TYPE_G_OBJECT_PATH,
+				&adapter_path,
+				G_TYPE_INVALID)) {
+		if (err != NULL) {
+			BT_ERR("Getting DefaultAdapter failed: [%s]\n", err->message);
+			g_error_free(err);
+		}
+		g_object_unref(manager_proxy);
+		return NULL;
+	}
+
+	if (adapter_path == NULL || strlen(adapter_path) >= BT_ADAPTER_OBJECT_PATH_MAX) {
+		BT_ERR("Adapter path is inproper\n");
+		g_free(adapter_path);
+		g_object_unref(manager_proxy);
+		return NULL;
+	}
+
+	adapter_proxy = dbus_g_proxy_new_for_name(conn,
+					BT_BLUEZ_NAME,
+					adapter_path,
+					BT_ADAPTER_INTERFACE);
+	g_free(adapter_path);
+	g_object_unref(manager_proxy);
 
 	return adapter_proxy;
 }
@@ -1228,6 +1514,39 @@ DBusConnection *_bt_get_system_conn(void)
 	return dbus_g_connection_get_connection(g_conn);
 }
 
+void _bt_generate_cookie(void)
+{
+	int retval;
+
+	ret_if(cookie != NULL);
+
+	cookie_size = security_server_get_cookie_size();
+
+	cookie = g_malloc0((cookie_size*sizeof(char))+1);
+
+	retval = security_server_request_cookie(cookie, cookie_size);
+	if(retval < 0) {
+		BT_ERR("Fail to get cookie: %d", retval);
+	}
+}
+
+void _bt_destroy_cookie(void)
+{
+	g_free(cookie);
+	cookie = NULL;
+	cookie_size = 0;
+}
+
+char *_bt_get_cookie(void)
+{
+	return cookie;
+}
+
+int _bt_get_cookie_size(void)
+{
+	return cookie_size;
+}
+
 int _bt_register_osp_server_in_agent(int type, char *uuid, char *path, int fd)
 {
 	int ret;
@@ -1257,7 +1576,6 @@ int _bt_unregister_osp_server_in_agent(int type, char *uuid)
 {
 	int ret;
 	char uuid_str[BLUETOOTH_UUID_STRING_MAX] = { 0, };
-	char path_str[BLUETOOTH_PATH_STRING] = { 0, };
 
 	BT_DBG("+");
 	BT_INIT_PARAMS();
@@ -1389,6 +1707,7 @@ BT_EXPORT_API int bluetooth_register_callback(bluetooth_cb_func_ptr callback_ptr
 		return ret;
 	}
 
+	_bt_generate_cookie();
 
 	_bt_set_user_data(BT_COMMON, (void *)callback_ptr, user_data);
 
@@ -1421,6 +1740,8 @@ fail:
 BT_EXPORT_API int bluetooth_unregister_callback(void)
 {
 	int ret;
+
+	_bt_destroy_cookie();
 
 	ret = _bt_deinit_event_handler();
 	if (ret != BLUETOOTH_ERROR_NONE) {

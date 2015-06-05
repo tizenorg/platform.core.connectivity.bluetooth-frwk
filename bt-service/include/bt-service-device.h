@@ -60,11 +60,16 @@ int _bt_is_gatt_connected(bluetooth_device_address_t *device_address,
 int _bt_is_device_connected(bluetooth_device_address_t *device_address,
 			int connection_type, gboolean *is_connected);
 
+int _bt_get_connected_link(bluetooth_device_address_t *device_address,
+			bluetooth_connected_link_t *connected);
+
 gboolean _bt_is_device_creating(void);
 
 void _bt_set_autopair_status_in_bonding_info(gboolean is_autopair);
 
 bt_remote_dev_info_t *_bt_get_remote_device_info(char *address);
+
+char *_bt_get_bonded_device_name(char *address);
 
 gboolean _bt_is_bonding_device_address(const char *address);
 

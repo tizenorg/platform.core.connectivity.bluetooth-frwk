@@ -22,13 +22,10 @@
  */
 
 #include <string.h>
-#include <dbus/dbus-glib.h>
-#include <dbus/dbus-glib-bindings.h>
-#include <dbus/dbus-glib-lowlevel.h>
 #include <glib.h>
 #include <dlog.h>
-#include <cynara-client.h>
-#include <cynara-creds-dbus.h>
+#include <security-server.h>
+#include <gio/gio.h>
 
 #include "bluetooth-api.h"
 #include "bt-service-common.h"
@@ -42,6 +39,7 @@
 #include "bt-service-audio.h"
 #include "bt-service-oob.h"
 #include "bt-service-avrcp.h"
+#include "bt-service-avrcp-controller.h"
 #include "bt-service-opp-client.h"
 #include "bt-service-obex-server.h"
 #include "bt-service-rfcomm-client.h"
@@ -49,39 +47,270 @@
 #include "bt-request-handler.h"
 #include "bt-service-pbap.h"
 
-/* auto generated header by bt-request-service.xml*/
-#include "bt-service-method.h"
+static GDBusConnection *bt_service_conn;
+static guint owner_id = 0;
 
-DBusGConnection *bt_service_conn;
-BtService *service_object;
+static const gchar bt_service_introspection_xml[] =
+"<node name='/org/projectx/bt_service'>"
+"	<interface name='org.projectx.bt'>"
+"		<method name='service_request'>"
+			/* Input Parameters */
+"			<arg type='i' name='service_type' direction='in' />"
+"			<arg type='i' name='service_function' direction='in' />"
+"			<arg type='i' name='request_type' direction='in' />"
+"			<arg type='ay' name='input_param1' direction='in' />"
+"			<arg type='ay' name='input_param2' direction='in' />"
+"			<arg type='ay' name='input_param3' direction='in' />"
+"			<arg type='ay' name='input_param4' direction='in' />"
+"			<arg type='ay' name='input_param5' direction='in' />"
+			/* Return Parameters */
+"			<arg type='i' name='output_param1' direction='out' />"
+"			<arg type='v' name='output_param2' direction='out' />"
+"		</method>"
+"	</interface>"
+"</node>";
 
-cynara *p_cynara;
-cynara_configuration *conf;
+GDBusNodeInfo *node_info = NULL;
 
-GType bt_service_get_type(void);
+static void __bt_service_method(GDBusConnection *connection,
+		const gchar *sender,
+		const gchar *object_path,
+		const gchar *interface_name,
+		const gchar *method_name,
+		GVariant *parameters,
+		GDBusMethodInvocation *invocation,
+		gpointer user_data);
 
-G_DEFINE_TYPE(BtService, bt_service, G_TYPE_OBJECT);
-
-/*This is part of platform provided code skeleton for client server model*/
-static void bt_service_class_init(BtServiceClass *service_class)
-{
-	dbus_g_object_type_install_info(G_TYPE_FROM_CLASS(service_class),
-					&dbus_glib_bt_object_info);
-}
-
-/*This is part of platform provided code skeleton for client server model*/
-static void bt_service_init(BtService *service)
-{
-}
-
-static int __bt_bluez_request(int function_name,
+int __bt_bluez_request(int function_name,
 		int request_type,
 		int request_id,
-		DBusGMethodInvocation *context,
-		GArray *in_param1,
-		GArray *in_param2,
-		GArray *in_param3,
-		GArray *in_param4,
+		GDBusMethodInvocation *context,
+		GVariant *in_param1,
+		GVariant *in_param2,
+		GVariant *in_param3,
+		GVariant *in_param4,
+		GArray **out_param1);
+int __bt_obexd_request(int function_name,
+		int request_type,
+		int request_id,
+		GDBusMethodInvocation *context,
+		GVariant *in_param1,
+		GVariant *in_param2,
+		GVariant *in_param3,
+		GVariant *in_param4,
+		GArray **out_param1);
+int __bt_agent_request(int function_name,
+		int request_type,
+		int request_id,
+		GDBusMethodInvocation *context,
+		GVariant *in_param1,
+		GVariant *in_param2,
+		GVariant *in_param3,
+		GVariant *in_param4,
+		GArray **out_param1);
+int __bt_core_request(int function_name,
+		int request_type,
+		int request_id,
+		GDBusMethodInvocation *context,
+		GVariant *in_param1);
+
+gboolean __bt_service_check_privilege(int function_name,
+					int service_type,
+					GVariant *param);
+
+/* Function definitions*/
+static void __bt_fill_garray_from_variant(GVariant *var, GArray *param)
+{
+	char *data;
+	int size;
+
+	size = g_variant_get_size(var);
+	if (size > 0) {
+		data = (char *)g_variant_get_data(var);
+		if (data)
+			param = g_array_append_vals(param, data, size);
+
+	}
+}
+
+static void __bt_service_get_parameters(GVariant *in_param,
+		void *value, int size)
+{
+	void *buf = NULL;
+	buf = (void *)g_variant_get_data(in_param);
+	memcpy(value, buf, size);
+}
+
+static void __bt_service_method(GDBusConnection *connection,
+		const gchar *sender,
+		const gchar *object_path,
+		const gchar *interface_name,
+		const gchar *method_name,
+		GVariant *parameters,
+		GDBusMethodInvocation *invocation,
+		gpointer user_data)
+{
+	FN_START;
+	BT_DBG("Method[%s] Object Path[%s] Interface Name[%s]",
+			method_name, object_path, interface_name);
+
+	if (g_strcmp0(method_name, "service_request") == 0) {
+		int service_type;
+		int service_function;
+		int request_type;
+		GVariant *param1 = NULL;
+		GVariant *param2 = NULL;
+		GVariant *param3 = NULL;
+		GVariant *param4 = NULL;
+		GVariant *param5 = NULL;
+		GArray *out_param1 = NULL;
+		GVariant *out_var = NULL;
+		int result = 0;
+		int request_id = -1;
+
+		g_variant_get(parameters, "(iii@ay@ay@ay@ay@ay)", &service_type,
+				&service_function, &request_type,
+				&param1, &param2, &param3, &param4, &param5);
+
+		out_param1 = g_array_new(FALSE, FALSE, sizeof(gchar));
+
+		if (service_type == BT_CORE_SERVICE) {
+			BT_DBG("No need to check privilege from bt-core");
+		} else if (__bt_service_check_privilege(service_function,
+					service_type, param5) == FALSE) {
+			result = BLUETOOTH_ERROR_PERMISSION_DEINED;
+			BT_ERR("Priviledge Check Failed");
+
+			goto fail;
+		}
+
+		if (request_type == BT_ASYNC_REQ
+				|| service_function == BT_OBEX_SERVER_ACCEPT_CONNECTION) {
+			/* Set the timer */
+			request_id = _bt_assign_request_id();
+			BT_DBG("Request ID: %d", request_id);
+
+			if (request_id < 0) {
+				BT_ERR("Fail to assign the request id");
+				result = BLUETOOTH_ERROR_INTERNAL;
+
+				goto fail;
+			}
+		}
+
+		BT_DBG("SERVICE TYPE [%d] SERVICE FUNC [%d]",
+				service_type, service_function);
+		switch (service_type) {
+		case BT_BLUEZ_SERVICE:
+			result = __bt_bluez_request(service_function,
+					request_type, request_id,
+					invocation, param1, param2,
+					param3, param4, &out_param1);
+			break;
+		case BT_OBEX_SERVICE:
+			result = __bt_obexd_request(service_function,
+					request_type, request_id,
+					invocation, param1,
+					param2, param3,
+					param4, &out_param1);
+			break;
+		case BT_AGENT_SERVICE:
+			result = __bt_agent_request(service_function,
+					request_type, request_id,
+					invocation, param1,
+					param2, param3,
+					param4, &out_param1);
+			break;
+		case BT_CORE_SERVICE:
+			result = __bt_core_request(service_function,
+					request_type, request_id,
+					invocation, param1);
+			break;
+		case BT_CHECK_PRIVILEGE:
+			result = BLUETOOTH_ERROR_NONE;
+			break;
+		default:
+			BT_ERR("Unknown service type");
+			result = BLUETOOTH_ERROR_INTERNAL;
+			goto fail;
+		}
+
+		if (result != BLUETOOTH_ERROR_NONE) {
+			goto fail;
+		}
+
+		if ((request_type == BT_ASYNC_REQ ||
+			service_function == BT_OBEX_SERVER_ACCEPT_CONNECTION) &&
+			service_function != BT_OPP_PUSH_FILES) {
+			BT_DBG("INSERT INTO REQ LIST");
+			_bt_insert_request_list(request_id, service_function,
+						NULL, invocation);
+		} else {
+			/* Return result */
+			if (service_type == BT_CHECK_PRIVILEGE ||
+					service_function != BT_OPP_PUSH_FILES) {
+				out_var = g_variant_new_from_data((const GVariantType *)"ay",
+						out_param1->data, out_param1->len,
+						TRUE, NULL, NULL);
+
+				GVariant *temp = g_variant_new("(iv)", result, out_var);
+				g_dbus_method_invocation_return_value(invocation, temp);
+
+				g_array_free(out_param1, TRUE);
+				out_param1 = NULL;
+			}
+		}
+
+		g_variant_unref(param1);
+		g_variant_unref(param2);
+		g_variant_unref(param3);
+		g_variant_unref(param4);
+		g_variant_unref(param5);
+		FN_END;
+		return;
+fail:
+		BT_ERR_C("Request is failed [%s] [%x]",
+				_bt_convert_error_to_string(result), result);
+
+		out_var = g_variant_new_from_data((const GVariantType *)"ay",
+				out_param1->data, out_param1->len,
+				TRUE, NULL, NULL);
+
+		GVariant *temp = g_variant_new("(iv)", result, out_var);
+		g_dbus_method_invocation_return_value(invocation, temp);
+
+		g_array_free(out_param1, TRUE);
+		out_param1 = NULL;
+
+		if (request_type == BT_ASYNC_REQ)
+			_bt_delete_request_id(request_id);
+
+		g_variant_unref(param1);
+		g_variant_unref(param2);
+		g_variant_unref(param3);
+		g_variant_unref(param4);
+		g_variant_unref(param5);
+	}
+
+	FN_END;
+	return;
+}
+
+
+static const GDBusInterfaceVTable method_table = {
+	__bt_service_method,
+	NULL,
+	NULL,
+};
+
+int __bt_bluez_request(int function_name,
+		int request_type,
+		int request_id,
+		GDBusMethodInvocation *context,
+		GVariant *in_param1,
+		GVariant *in_param2,
+		GVariant *in_param3,
+		GVariant *in_param4,
 		GArray **out_param1)
 {
 	int result = BLUETOOTH_ERROR_NONE;
@@ -107,8 +336,8 @@ static int __bt_bluez_request(int function_name,
 		break;
 	case BT_CHECK_ADAPTER: {
 		int enabled = BT_ADAPTER_DISABLED;
+
 		result = _bt_check_adapter(&enabled);
-		BT_DBG("_bt_check_adapter result is %d", result);
 
 		g_array_append_vals(*out_param1, &enabled,
 				sizeof(int));
@@ -141,9 +370,8 @@ static int __bt_bluez_request(int function_name,
 	}
 	case BT_SET_LOCAL_NAME: {
 		bluetooth_device_name_t local_name = { {0} };
-
-		local_name = g_array_index(in_param1,
-				bluetooth_device_name_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&local_name, sizeof(bluetooth_device_name_t));
 
 		result = _bt_set_local_name(local_name.name);
 
@@ -153,7 +381,7 @@ static int __bt_bluez_request(int function_name,
 		char *uuid;
 		gboolean used = FALSE;
 
-		uuid = &g_array_index(in_param1, char, 0);
+		uuid = (char *)g_variant_get_data(in_param1);
 
 		result = _bt_is_service_used(uuid, &used);
 
@@ -175,8 +403,8 @@ static int __bt_bluez_request(int function_name,
 		int mode = BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE;
 		int time = 0;
 
-		mode = g_array_index(in_param1, int, 0);
-		time = g_array_index(in_param2, int, 0);
+		__bt_service_get_parameters(in_param1, &mode, sizeof(int));
+		__bt_service_get_parameters(in_param2, &time, sizeof(int));
 
 		result = _bt_set_discoverable_mode(mode, time);
 		break;
@@ -190,36 +418,91 @@ static int __bt_bluez_request(int function_name,
 		break;
 	}
 	case BT_START_DISCOVERY:
-		BT_DBG("_bt_start_discovery ");
 		result = _bt_start_discovery();
 
 		break;
 	case BT_START_CUSTOM_DISCOVERY: {
 		bt_discovery_role_type_t role;
-		role = g_array_index(in_param1, bt_discovery_role_type_t, 0);
 
+		__bt_service_get_parameters(in_param1,
+				&role, sizeof(bt_discovery_role_type_t));
 		result = _bt_start_custom_discovery(role);
+
 		break;
 	}
 	case BT_CANCEL_DISCOVERY:
 		result = _bt_cancel_discovery();
 		break;
-	case BT_START_LE_DISCOVERY:
-		result = _bt_start_le_discovery();
-		break;
-	case BT_STOP_LE_DISCOVERY:
-		result = _bt_stop_le_discovery();
-		break;
 	case BT_IS_DISCOVERYING: {
 		gboolean discovering = FALSE;
 		discovering = _bt_is_discovering();
-		g_array_append_vals(*out_param1, &discovering, sizeof(gboolean));
+		g_array_append_vals(*out_param1,
+				&discovering, sizeof(gboolean));
+		break;
+	}
+	case BT_START_LE_DISCOVERY: {
+		char *sender = NULL;
+
+		sender = (char *)g_dbus_method_invocation_get_sender(context);
+		result = _bt_start_le_scan(sender);
+
+		break;
+	}
+	case BT_STOP_LE_DISCOVERY: {
+		char *sender = NULL;
+
+		sender = (char *)g_dbus_method_invocation_get_sender(context);
+		result = _bt_stop_le_scan(sender);
+
 		break;
 	}
 	case BT_IS_LE_DISCOVERYING: {
 		gboolean le_discovering = FALSE;
-		le_discovering = _bt_is_le_discovering();
-		g_array_append_vals(*out_param1, &le_discovering, sizeof(gboolean));
+
+		le_discovering = _bt_is_le_scanning();
+		g_array_append_vals(*out_param1,
+				&le_discovering, sizeof(gboolean));
+
+		break;
+	}
+	case BT_REGISTER_SCAN_FILTER: {
+		char *sender = NULL;
+		bluetooth_le_scan_filter_t scan_filter;
+		int slot_id;
+
+		sender = (char *)g_dbus_method_invocation_get_sender(context);
+		__bt_service_get_parameters(in_param1, &scan_filter,
+				sizeof(bluetooth_le_scan_filter_t));
+		BT_DBG("bluetooth_le_scan_filter_t [features : %.2x]",
+				scan_filter.added_features);
+
+		result = _bt_register_scan_filter(sender,
+				&scan_filter, &slot_id);
+
+		g_array_append_vals(*out_param1, &slot_id, sizeof(int));
+		break;
+	}
+	case BT_UNREGISTER_SCAN_FILTER:{
+		char *sender = NULL;
+		int slot_id;
+
+		sender = (char *)g_dbus_method_invocation_get_sender(context);
+		__bt_service_get_parameters(in_param1, &slot_id, sizeof(int));
+		BT_DBG("Remove scan filter [Slot ID : %d]", slot_id);
+
+		result = _bt_unregister_scan_filter(sender, slot_id);
+
+		break;
+	}
+	case BT_UNREGISTER_ALL_SCAN_FILTERS:{
+		char *sender = NULL;
+
+		sender = (char *)g_dbus_method_invocation_get_sender(context);
+
+		BT_DBG("Remove all scan filters [Sender : %s]", sender);
+
+		result = _bt_unregister_all_scan_filters(sender);
+
 		break;
 	}
 	case BT_ENABLE_RSSI: {
@@ -229,17 +512,22 @@ static int __bt_bluez_request(int function_name,
 		int low_threshold;
 		int in_range_threshold;
 		int high_threshold;
+
 		BT_DBG("Enable RSSI");
 
-		bd_addr = g_array_index(in_param1, bluetooth_device_address_t, 0);
-		link_type = g_array_index(in_param2, int, 0);
-		rssi_threshold = g_array_index(in_param3, bt_rssi_threshold_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&bd_addr, sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2,
+				&link_type, sizeof(int));
+		__bt_service_get_parameters(in_param3,
+				&rssi_threshold, sizeof(bt_rssi_threshold_t));
 
 		low_threshold = rssi_threshold.low_threshold;
 		in_range_threshold = rssi_threshold.in_range_threshold;
 		high_threshold = rssi_threshold.high_threshold;
 
-		result = _bt_enable_rssi(&bd_addr, link_type ,low_threshold,
+		result = _bt_enable_rssi(&bd_addr,
+				link_type, low_threshold,
 				in_range_threshold, high_threshold);
 		break;
 	}
@@ -249,8 +537,11 @@ static int __bt_bluez_request(int function_name,
 
 		BT_DBG("Get RSSI Strength");
 
-		bd_addr = g_array_index(in_param1, bluetooth_device_address_t, 0);
-		link_type = g_array_index(in_param2, int, 0);
+		__bt_service_get_parameters(in_param1,
+				&bd_addr, sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2,
+				&link_type, sizeof(int));
+
 		result = _bt_get_rssi_strength(&bd_addr, link_type);
 		break;
 	}
@@ -258,46 +549,60 @@ static int __bt_bluez_request(int function_name,
 		gboolean is_connectable;
 
 		is_connectable = _bt_is_connectable();
-		g_array_append_vals(*out_param1, &is_connectable, sizeof(gboolean));
+		g_array_append_vals(*out_param1,
+				&is_connectable, sizeof(gboolean));
 		break;
 	}
 	case BT_SET_CONNECTABLE: {
 		gboolean is_connectable;
 
-		is_connectable = g_array_index(in_param1, gboolean, 0);
-
+		__bt_service_get_parameters(in_param1,
+				&is_connectable, sizeof(gboolean));
 		result = _bt_set_connectable(is_connectable);
 		break;
 	}
 	case BT_SET_ADVERTISING: {
-		gboolean enable = FALSE;
 		char *sender = NULL;
+		int adv_handle;
+		gboolean enable = FALSE;
 		gboolean use_reserved_slot = FALSE;
 
-		enable = g_array_index(in_param1, gboolean, 0);
-		use_reserved_slot = g_array_index(in_param2, gboolean, 0);
-		sender = dbus_g_method_get_sender(context);
-		result = _bt_set_advertising(enable, sender, use_reserved_slot);
-		g_free(sender);
+		__bt_service_get_parameters(in_param1,
+				&adv_handle, sizeof(int));
+		__bt_service_get_parameters(in_param2,
+				&enable, sizeof(gboolean));
+		__bt_service_get_parameters(in_param3,
+				&use_reserved_slot, sizeof(gboolean));
+
+		sender = (char *)g_dbus_method_invocation_get_sender(context);
+
+		result = _bt_set_advertising(sender, adv_handle,
+				enable, use_reserved_slot);
 		break;
 	}
 	case BT_SET_CUSTOM_ADVERTISING: {
+		char *sender = NULL;
+		int adv_handle;
 		gboolean enable = FALSE;
 		bluetooth_advertising_params_t adv_params;
-		char *sender = NULL;
 		gboolean use_reserved_slot = FALSE;
 
-		enable = g_array_index(in_param1, gboolean, 0);
-		adv_params = g_array_index(in_param2,
-					bluetooth_advertising_params_t, 0);
-		use_reserved_slot = g_array_index(in_param3, gboolean, 0);
-		sender = dbus_g_method_get_sender(context);
+		sender = (char *)g_dbus_method_invocation_get_sender(context);
+
+		__bt_service_get_parameters(in_param1, &adv_handle,
+				sizeof(int));
+		__bt_service_get_parameters(in_param2, &enable,
+				sizeof(gboolean));
+		__bt_service_get_parameters(in_param3, &adv_params,
+				sizeof(bluetooth_advertising_params_t));
+		__bt_service_get_parameters(in_param4, &use_reserved_slot,
+				sizeof(gboolean));
 
 		BT_DBG("bluetooth_advertising_params_t [%f %f %d %d]",
 				adv_params.interval_min, adv_params.interval_max,
 				adv_params.filter_policy, adv_params.type);
-		result = _bt_set_custom_advertising(enable, &adv_params, sender, use_reserved_slot);
-		g_free(sender);
+		result = _bt_set_custom_advertising(sender, adv_handle,
+				enable, &adv_params, use_reserved_slot);
 		break;
 	}
 	case BT_GET_ADVERTISING_DATA: {
@@ -308,25 +613,28 @@ static int __bt_bluez_request(int function_name,
 		if (result == BLUETOOTH_ERROR_NONE) {
 			g_array_append_vals(*out_param1, adv.data, length);
 		}
-
 		break;
 	}
 	case BT_SET_ADVERTISING_DATA: {
+		char *sender = NULL;
+		int adv_handle;
 		bluetooth_advertising_data_t adv = { {0} };
 		int length;
-		char *sender = NULL;
 		gboolean use_reserved_slot = FALSE;
 
-		sender = dbus_g_method_get_sender(context);
+		sender = (char *)g_dbus_method_invocation_get_sender(context);
 
-		adv = g_array_index(in_param1,
-				bluetooth_advertising_data_t, 0);
-		length = g_array_index(in_param2, int, 0);
-		use_reserved_slot = g_array_index(in_param3, gboolean, 0);
+		__bt_service_get_parameters(in_param1,
+				&adv_handle, sizeof(int));
+		__bt_service_get_parameters(in_param2,
+				&adv, sizeof(bluetooth_advertising_data_t));
+		__bt_service_get_parameters(in_param3,
+				&length, sizeof(int));
+		__bt_service_get_parameters(in_param4,
+				&use_reserved_slot, sizeof(gboolean));
 
-		result = _bt_set_advertising_data(&adv, length, sender, use_reserved_slot);
-
-		g_free(sender);
+		result = _bt_set_advertising_data(sender, adv_handle,
+				&adv, length, use_reserved_slot);
 		break;
 	}
 	case BT_GET_SCAN_RESPONSE_DATA: {
@@ -341,37 +649,40 @@ static int __bt_bluez_request(int function_name,
 		break;
 	}
 	case BT_SET_SCAN_RESPONSE_DATA: {
+		char *sender = NULL;
+		int adv_handle;
 		bluetooth_scan_resp_data_t rsp = { {0} };
 		int length;
-		char *sender = NULL;
 		gboolean use_reserved_slot = FALSE;
 
-		sender = dbus_g_method_get_sender(context);
+		sender = (char *)g_dbus_method_invocation_get_sender(context);
 
-		rsp = g_array_index(in_param1,
-				bluetooth_scan_resp_data_t, 0);
-		length = g_array_index(in_param2, int, 0);
-		use_reserved_slot = g_array_index(in_param3, gboolean, 0);
+		__bt_service_get_parameters(in_param1,
+				&adv_handle, sizeof(int));
+		__bt_service_get_parameters(in_param2,
+				&rsp, sizeof(bluetooth_scan_resp_data_t));
+		__bt_service_get_parameters(in_param3,
+				&length, sizeof(int));
+		__bt_service_get_parameters(in_param4,
+				&use_reserved_slot, sizeof(gboolean));
 
-		result = _bt_set_scan_response_data(&rsp, length, sender, use_reserved_slot);
+		result = _bt_set_scan_response_data(sender, adv_handle,
+				&rsp, length, use_reserved_slot);
 
-		g_free(sender);
 		break;
 	}
 	case BT_SET_MANUFACTURER_DATA: {
 		bluetooth_manufacturer_data_t m_data = { 0 };
-
-		m_data = g_array_index(in_param1,
-				bluetooth_manufacturer_data_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&m_data, sizeof(bluetooth_manufacturer_data_t));
 
 		result = _bt_set_manufacturer_data(&m_data);
 		break;
 	}
 	case BT_SET_SCAN_PARAMETERS: {
 		bluetooth_le_scan_params_t scan_params;
-
-		scan_params = g_array_index(in_param1,
-					bluetooth_le_scan_params_t, 0);
+		__bt_service_get_parameters(in_param1, &scan_params,
+				sizeof(bluetooth_le_scan_params_t));
 
 		BT_DBG("bluetooth_le_scan_params_t [%f %f %d]",
 				scan_params.interval, scan_params.window,
@@ -384,10 +695,10 @@ static int __bt_bluez_request(int function_name,
 		bluetooth_device_address_t local_address = { {0} };
 		bluetooth_le_conn_update_t parameters = {0};
 
-		local_address = g_array_index(in_param1,
-					bluetooth_device_address_t, 0);
-		parameters = g_array_index(in_param2,
-					bluetooth_le_conn_update_t, 0);
+		__bt_service_get_parameters(in_param1, &local_address,
+				sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2, &parameters,
+				sizeof(bluetooth_le_conn_update_t));
 
 		result =  _bt_le_conn_update(local_address.addr,
 					parameters.interval_min,
@@ -400,16 +711,18 @@ static int __bt_bluez_request(int function_name,
 		gboolean advertising = FALSE;
 		advertising = _bt_is_advertising();
 
-		g_array_append_vals(*out_param1, &advertising, sizeof(gboolean));
+		g_array_append_vals(*out_param1, &advertising,
+				sizeof(gboolean));
 		break;
 	}
 	case BT_ADD_WHITE_LIST: {
 		bluetooth_device_address_t address = { {0} };
 		int addr_type = 0;
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
-		addr_type = g_array_index(in_param2, int, 0);
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2, &addr_type,
+				sizeof(int));
 
 		result = _bt_add_white_list(&address, addr_type);
 		break;
@@ -418,9 +731,10 @@ static int __bt_bluez_request(int function_name,
 		bluetooth_device_address_t address = { {0} };
 		int addr_type = 0;
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
-		addr_type = g_array_index(in_param2, int, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2,
+				&addr_type, sizeof(int));
 
 		result = _bt_remove_white_list(&address, addr_type);
 		break;
@@ -429,16 +743,16 @@ static int __bt_bluez_request(int function_name,
 		result = _bt_clear_white_list();
 		break;
 	}
-	case BT_GET_BONDED_DEVICES:
+	case BT_GET_BONDED_DEVICES: {
 		result = _bt_get_bonded_devices(out_param1);
 		break;
-
+	}
 	case BT_GET_BONDED_DEVICE: {
 		bluetooth_device_address_t address = { {0} };
 		bluetooth_device_info_t dev_info;
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		memset(&dev_info, 0x00, sizeof(bluetooth_device_info_t));
 		result = _bt_get_bonded_device_info(&address, &dev_info);
@@ -452,8 +766,8 @@ static int __bt_bluez_request(int function_name,
 	case BT_BOND_DEVICE: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_bond_device(request_id, &address,
 				BLUETOOTH_DEV_CONN_DEFAULT, out_param1);
@@ -463,11 +777,10 @@ static int __bt_bluez_request(int function_name,
 		bluetooth_device_address_t address = { {0} };
 		unsigned short conn_type = 0;
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
-
-		conn_type = g_array_index(in_param2,
-				unsigned short, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2,
+				&conn_type, sizeof(unsigned short));
 
 		result = _bt_bond_device(request_id, &address,
 				conn_type, out_param1);
@@ -480,8 +793,8 @@ static int __bt_bluez_request(int function_name,
 	case BT_UNBOND_DEVICE: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_unbond_device(request_id, &address, out_param1);
 
@@ -491,10 +804,9 @@ static int __bt_bluez_request(int function_name,
 		bluetooth_device_address_t address = { {0} };
 		const char *local_name;
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
-
-		local_name = &g_array_index(in_param2, char, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+		local_name = (const char *)g_variant_get_data(in_param2);
 
 		result = _bt_set_alias(&address, local_name);
 		break;
@@ -502,8 +814,8 @@ static int __bt_bluez_request(int function_name,
 	case BT_SEARCH_SERVICE: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_search_device(request_id, &address);
 		if (result != BLUETOOTH_ERROR_NONE) {
@@ -520,10 +832,10 @@ static int __bt_bluez_request(int function_name,
 		bluetooth_device_address_t address = { {0} };
 		gboolean authorize;
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
-
-		authorize = g_array_index(in_param2, gboolean, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2,
+				&authorize, sizeof(gboolean));
 
 		result = _bt_set_authorization(&address, authorize);
 		break;
@@ -533,13 +845,13 @@ static int __bt_bluez_request(int function_name,
 		int type;
 		gboolean connected = FALSE;
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
-
-		type = g_array_index(in_param2, int, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2,
+				&type, sizeof(int));
 
 		result = _bt_is_device_connected(&address, type, &connected);
-
+		BT_DBG("is_connected: %d", connected);
 		if (result == BLUETOOTH_ERROR_NONE) {
 			g_array_append_vals(*out_param1, &connected,
 						sizeof(gboolean));
@@ -547,11 +859,28 @@ static int __bt_bluez_request(int function_name,
 
 		break;
 	}
+	case BT_GET_CONNECTED_LINK_TYPE: {
+		bluetooth_device_address_t address = { {0} };
+		bluetooth_connected_link_t connected = BLUETOOTH_CONNECTED_LINK_NONE;
+
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+
+		result = _bt_get_connected_link(&address, &connected);
+
+		if (result == BLUETOOTH_ERROR_NONE) {
+			g_array_append_vals(*out_param1, &connected,
+					sizeof(guint));
+		}
+
+		break;
+	}
+
 	case BT_HID_CONNECT: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_hid_connect(request_id, &address);
 		if (result != BLUETOOTH_ERROR_NONE) {
@@ -563,8 +892,8 @@ static int __bt_bluez_request(int function_name,
 	case BT_HID_DISCONNECT: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_hid_disconnect(request_id, &address);
 		if (result != BLUETOOTH_ERROR_NONE) {
@@ -583,10 +912,10 @@ static int __bt_bluez_request(int function_name,
 		bluetooth_device_address_t address = { {0} };
 		int role;
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
-
-		role = g_array_index(in_param2, int, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2,
+				&role, sizeof(int));
 
 		result = _bt_network_connect(request_id, role, &address);
 		if (result != BLUETOOTH_ERROR_NONE) {
@@ -598,8 +927,8 @@ static int __bt_bluez_request(int function_name,
 	case BT_NETWORK_DISCONNECT: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_network_disconnect(request_id, &address);
 		if (result != BLUETOOTH_ERROR_NONE) {
@@ -611,8 +940,8 @@ static int __bt_bluez_request(int function_name,
 	case BT_NETWORK_SERVER_DISCONNECT: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_network_server_disconnect(request_id, &address);
 		if (result != BLUETOOTH_ERROR_NONE) {
@@ -625,8 +954,8 @@ static int __bt_bluez_request(int function_name,
 	case BT_AUDIO_CONNECT: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_audio_connect(request_id, BT_AUDIO_ALL,
 					&address, out_param1);
@@ -635,8 +964,8 @@ static int __bt_bluez_request(int function_name,
 	case BT_AUDIO_DISCONNECT: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_audio_disconnect(request_id, BT_AUDIO_ALL,
 					&address, out_param1);
@@ -645,8 +974,8 @@ static int __bt_bluez_request(int function_name,
 	case BT_AG_CONNECT: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_audio_connect(request_id, BT_AUDIO_HSP,
 					&address, out_param1);
@@ -655,8 +984,8 @@ static int __bt_bluez_request(int function_name,
 	case BT_AG_DISCONNECT: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_audio_disconnect(request_id, BT_AUDIO_HSP,
 					&address, out_param1);
@@ -665,8 +994,8 @@ static int __bt_bluez_request(int function_name,
 	case BT_AV_CONNECT: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_audio_connect(request_id, BT_AUDIO_A2DP,
 					&address, out_param1);
@@ -675,8 +1004,8 @@ static int __bt_bluez_request(int function_name,
 	case BT_AV_DISCONNECT: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_audio_disconnect(request_id, BT_AUDIO_A2DP,
 					&address, out_param1);
@@ -685,8 +1014,8 @@ static int __bt_bluez_request(int function_name,
 	case BT_AVRCP_CONTROL_CONNECT: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_audio_connect(request_id, BT_AVRCP,
 					&address, out_param1);
@@ -695,18 +1024,38 @@ static int __bt_bluez_request(int function_name,
 	case BT_AVRCP_CONTROL_DISCONNECT: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_audio_disconnect(request_id, BT_AVRCP,
+					&address, out_param1);
+		break;
+	}
+	case BT_AV_SOURCE_CONNECT: {
+		bluetooth_device_address_t address = { {0} };
+
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
+
+		result = _bt_audio_connect(request_id, BT_AUDIO_A2DP_SOURCE,
+					&address, out_param1);
+		break;
+	}
+	case BT_AV_SOURCE_DISCONNECT: {
+		bluetooth_device_address_t address = { {0} };
+
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
+
+		result = _bt_audio_disconnect(request_id, BT_AUDIO_A2DP_SOURCE,
 					&address, out_param1);
 		break;
 	}
 	case BT_HF_CONNECT: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_hf_connect(request_id, &address, out_param1);
 		break;
@@ -714,35 +1063,17 @@ static int __bt_bluez_request(int function_name,
 	case BT_HF_DISCONNECT: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_hf_disconnect(request_id, &address, out_param1);
-		break;
-	}
-	case BT_GET_SPEAKER_GAIN: {
-		unsigned int volume;
-
-		result = _bt_audio_get_speaker_gain(&volume);
-
-		g_array_append_vals(*out_param1, &volume,
-				sizeof(unsigned int));
-		break;
-	}
-	case BT_SET_SPEAKER_GAIN: {
-		unsigned int volume;
-
-		volume = g_array_index(in_param1,
-				unsigned int, 0);
-
-		result = _bt_audio_set_speaker_gain(volume);
-
 		break;
 	}
 	case BT_SET_CONTENT_PROTECT: {
 		gboolean status;
 
-		status = g_array_index(in_param1, gboolean, 0);
+		__bt_service_get_parameters(in_param1,
+				&status, sizeof(gboolean));
 
 		result = _bt_audio_set_content_protect(status);
 
@@ -763,11 +1094,10 @@ static int __bt_bluez_request(int function_name,
 		bluetooth_device_address_t address = { {0} };
 		bt_oob_data_t local_oob_data;
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
-
-		local_oob_data = g_array_index(in_param2,
-				bt_oob_data_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2,
+				&local_oob_data, sizeof(bt_oob_data_t));
 
 		result = _bt_oob_add_remote_data(&address, &local_oob_data);
 
@@ -776,8 +1106,8 @@ static int __bt_bluez_request(int function_name,
 	case BT_OOB_REMOVE_REMOTE_DATA: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		result = _bt_oob_remove_remote_data(&address);
 
@@ -790,8 +1120,8 @@ static int __bt_bluez_request(int function_name,
 		memset(&data, 0x00, sizeof(media_metadata_t));
 		memset(&meta_data, 0x00, sizeof(media_metadata_attributes_t));
 
-		data = g_array_index(in_param1,
-				media_metadata_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&data, sizeof(media_metadata_t));
 
 		meta_data.title = g_strdup(data.title);
 		meta_data.artist = g_strdup(data.artist);
@@ -814,8 +1144,10 @@ static int __bt_bluez_request(int function_name,
 		int type;
 		unsigned int value;
 
-		type = g_array_index(in_param1, int, 0);
-		value = g_array_index(in_param2, unsigned int, 0);
+		__bt_service_get_parameters(in_param1,
+				&type, sizeof(int));
+		__bt_service_get_parameters(in_param2,
+				&value, sizeof(unsigned int));
 
 		result = _bt_avrcp_set_property(type, value);
 
@@ -825,9 +1157,8 @@ static int __bt_bluez_request(int function_name,
 		media_player_settings_t properties;
 
 		memset(&properties, 0x00, sizeof(media_player_settings_t));
-
-		properties = g_array_index(in_param1,
-				media_player_settings_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&properties, sizeof(media_player_settings_t));
 
 		result = _bt_avrcp_set_properties(&properties);
 
@@ -836,8 +1167,7 @@ static int __bt_bluez_request(int function_name,
 	case BT_AVRCP_HANDLE_CONTROL: {
 		int type;
 
-		type = g_array_index(in_param1,
-				int, 0);
+		__bt_service_get_parameters(in_param1, &type, sizeof(int));
 
 		result = _bt_avrcp_control_cmd(type);
 
@@ -847,8 +1177,10 @@ static int __bt_bluez_request(int function_name,
 		int type;
 		unsigned int value;
 
-		type = g_array_index(in_param1, int, 0);
-		value = g_array_index(in_param2, unsigned int, 0);
+		__bt_service_get_parameters(in_param1,
+				&type, sizeof(int));
+		__bt_service_get_parameters(in_param2,
+				&value, sizeof(unsigned int));
 
 		result = _bt_avrcp_control_set_property(type, value);
 
@@ -858,8 +1190,7 @@ static int __bt_bluez_request(int function_name,
 		int type;
 		unsigned int value;
 
-		type = g_array_index(in_param1,
-				int, 0);
+		__bt_service_get_parameters(in_param1, &type, sizeof(int));
 
 		result = _bt_avrcp_control_get_property(type, &value);
 		g_array_append_vals(*out_param1, &value, sizeof(int));
@@ -924,8 +1255,8 @@ static int __bt_bluez_request(int function_name,
 		char *input_string;
 		int connect_type;
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
 
 		input_string = &g_array_index(in_param2, char, 0);
 
@@ -1025,9 +1356,12 @@ static int __bt_bluez_request(int function_name,
 		int pending;
 		gboolean is_native;
 
-		socket_fd = g_array_index(in_param1, int, 0);
-		pending = g_array_index(in_param2, int, 0);
-		is_native = g_array_index(in_param3, gboolean, 0);
+		__bt_service_get_parameters(in_param1, &socket_fd,
+				sizeof(int));
+		__bt_service_get_parameters(in_param2, &pending,
+				sizeof(int));
+		__bt_service_get_parameters(in_param3, &is_native,
+				sizeof(gboolean));
 
 		result = _bt_rfcomm_listen(socket_fd, pending, is_native);
 		break;
@@ -1036,7 +1370,7 @@ static int __bt_bluez_request(int function_name,
 		gboolean available = TRUE;
 		char *uuid;
 
-		uuid = &g_array_index(in_param1, char, 0);
+		uuid = (char *)g_variant_get_data(in_param1);
 
 		result = _bt_rfcomm_is_uuid_available(uuid, &available);
 
@@ -1046,7 +1380,7 @@ static int __bt_bluez_request(int function_name,
 	case BT_RFCOMM_ACCEPT_CONNECTION: {
 		int socket_fd;
 
-		socket_fd = g_array_index(in_param1, int, 0);
+		__bt_service_get_parameters(in_param1, &socket_fd, sizeof(int));
 		BT_DBG(" socket fd %d", socket_fd);
 		result = _bt_rfcomm_accept_connection();
 		break;
@@ -1054,20 +1388,27 @@ static int __bt_bluez_request(int function_name,
 	case BT_RFCOMM_REJECT_CONNECTION: {
 		int socket_fd;
 
-		socket_fd = g_array_index(in_param1, int, 0);
+		__bt_service_get_parameters(in_param1, &socket_fd, sizeof(int));
 		BT_DBG(" socket fd %d", socket_fd);
 		result = _bt_rfcomm_reject_connection();
+		break;
+	}
+	case BT_RFCOMM_CREATE_SOCKET_EX: {
+		result = BLUETOOTH_ERROR_NONE;
+		break;
+	}
+	case BT_RFCOMM_REMOVE_SOCKET_EX: {
+		result = BLUETOOTH_ERROR_NONE;
 		break;
 	}
 	case BT_CONNECT_LE: {
 		bluetooth_device_address_t address = { {0} };
 		gboolean auto_connect;
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
-
-		auto_connect = g_array_index(in_param2,
-				gboolean, 0);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2,
+				&auto_connect, sizeof(gboolean));
 
 		result = _bt_connect_le_device(&address, auto_connect);
 
@@ -1076,8 +1417,8 @@ static int __bt_bluez_request(int function_name,
 	case BT_DISCONNECT_LE: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
 
 		result = _bt_disconnect_le_device(&address);
 
@@ -1086,7 +1427,8 @@ static int __bt_bluez_request(int function_name,
 	case BT_SET_LE_PRIVACY: {
 		gboolean set_privacy;
 
-		set_privacy = g_array_index(in_param1, gboolean, 0);
+		__bt_service_get_parameters(in_param1, &set_privacy,
+				sizeof(gboolean));
 
 		result = _bt_set_le_privacy(set_privacy);
 
@@ -1111,14 +1453,14 @@ static int __bt_bluez_request(int function_name,
 	return result;
 }
 
-static int __bt_obexd_request(int function_name,
+int __bt_obexd_request(int function_name,
 		int request_type,
 		int request_id,
-		DBusGMethodInvocation *context,
-		GArray *in_param1,
-		GArray *in_param2,
-		GArray *in_param3,
-		GArray *in_param4,
+		GDBusMethodInvocation *context,
+		GVariant *in_param1,
+		GVariant *in_param2,
+		GVariant *in_param3,
+		GVariant *in_param4,
 		GArray **out_param1)
 {
 	BT_DBG("+");
@@ -1135,18 +1477,20 @@ static int __bt_obexd_request(int function_name,
 		bt_file_path_t path;
 		char **file_path;
 		int file_count;
+		GArray *param2;
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
-
-		file_count = g_array_index(in_param3, int, 0);
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param3, &file_count,
+				sizeof(int));
 
 		file_path = g_new0(char *, file_count + 1);
 
-		for (i = 0; i < file_count; i++) {
-			path = g_array_index(in_param2,
-					bt_file_path_t, i);
+		param2 = g_array_new(TRUE, TRUE, sizeof(gchar));
+		__bt_fill_garray_from_variant(in_param2, param2);
 
+		for (i = 0; i < file_count; i++) {
+			path = g_array_index(param2, bt_file_path_t, i);
 			file_path[i] = g_strdup(path.path);
 		}
 		BT_DBG("_bt_opp_client_push_files");
@@ -1157,8 +1501,8 @@ static int __bt_obexd_request(int function_name,
 		for (i = 0; i < file_count; i++) {
 			g_free(file_path[i]);
 		}
-
 		g_free(file_path);
+		g_array_free(param2, TRUE);
 
 		break;
 	}
@@ -1182,22 +1526,27 @@ static int __bt_obexd_request(int function_name,
 		char *path;
 		char *sender;
 
-		sender = dbus_g_method_get_sender(context);
-		path = &g_array_index(in_param1, char, 0);
-		is_native = g_array_index(in_param2, gboolean, 0);
-		app_pid = g_array_index(in_param3, int, 0);
+		sender = (char *)g_dbus_method_invocation_get_sender(context);
 
-		result = _bt_obex_server_allocate(sender, path, app_pid, is_native);
+		path = (char *)g_variant_get_data(in_param1);
+		__bt_service_get_parameters(in_param2, &is_native,
+				sizeof(gboolean));
+		__bt_service_get_parameters(in_param3, &app_pid,
+				sizeof(int));
 
-		g_free(sender);
+		result = _bt_obex_server_allocate(sender,
+				path, app_pid, is_native);
+
 		break;
 	}
 	case BT_OBEX_SERVER_DEALLOCATE: {
 		int app_pid;
 		gboolean is_native;
 
-		is_native = g_array_index(in_param1, gboolean, 0);
-		app_pid = g_array_index(in_param2, int, 0);
+		__bt_service_get_parameters(in_param1, &is_native,
+				sizeof(gboolean));
+		__bt_service_get_parameters(in_param2, &app_pid,
+				sizeof(int));
 
 		result = _bt_obex_server_deallocate(app_pid, is_native);
 		break;
@@ -1225,7 +1574,7 @@ static int __bt_obexd_request(int function_name,
 	case BT_OBEX_SERVER_ACCEPT_FILE: {
 		char *file_name;
 
-		file_name = &g_array_index(in_param1, char, 0);
+		file_name = (char *)g_variant_get_data(in_param1);
 
 		result = _bt_obex_server_accept_authorize(file_name, TRUE);
 
@@ -1240,8 +1589,9 @@ static int __bt_obexd_request(int function_name,
 		gboolean is_native;
 		char *destination_path;
 
-		destination_path = &g_array_index(in_param1, char, 0);
-		is_native = g_array_index(in_param2, gboolean, 0);
+		destination_path = (char *)g_variant_get_data(in_param1);
+		__bt_service_get_parameters(in_param2, &is_native,
+				sizeof(gboolean));
 
 		result = _bt_obex_server_set_destination_path(destination_path,
 							is_native);
@@ -1251,7 +1601,7 @@ static int __bt_obexd_request(int function_name,
 	case BT_OBEX_SERVER_SET_ROOT: {
 		char *root;
 
-		root = &g_array_index(in_param1, char, 0);
+		root = (char *)g_variant_get_data(in_param1);
 
 		result = _bt_obex_server_set_root(root);
 
@@ -1260,7 +1610,8 @@ static int __bt_obexd_request(int function_name,
 	case BT_OBEX_SERVER_CANCEL_TRANSFER: {
 		int transfer_id;
 
-		transfer_id = g_array_index(in_param1, int, 0);
+		__bt_service_get_parameters(in_param1, &transfer_id,
+				sizeof(int));
 
 		result = _bt_obex_server_cancel_transfer(transfer_id);
 
@@ -1283,8 +1634,8 @@ static int __bt_obexd_request(int function_name,
 	case BT_PBAP_CONNECT: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
 
 		result = _bt_pbap_connect(&address);
 		break;
@@ -1292,8 +1643,8 @@ static int __bt_obexd_request(int function_name,
 	case BT_PBAP_DISCONNECT: {
 		bluetooth_device_address_t address = { {0} };
 
-		address = g_array_index(in_param1,
-				bluetooth_device_address_t, 0);
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
 
 		result = _bt_pbap_disconnect(&address);
 		break;
@@ -1302,11 +1653,13 @@ static int __bt_obexd_request(int function_name,
 		bluetooth_device_address_t address = { {0} };
 		bt_pbap_folder_t folder = { 0, };
 
-		address = g_array_index(in_param1, bluetooth_device_address_t, 0);
-		folder = g_array_index(in_param2, bt_pbap_folder_t, 0);
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2, &folder,
+				sizeof(bt_pbap_folder_t));
 
-		result = _bt_pbap_get_phonebook_size(&address, folder.addressbook,
-					folder.folder_type);
+		result = _bt_pbap_get_phonebook_size(&address,
+				folder.addressbook, folder.folder_type);
 		break;
 	}
 	case BT_PBAP_GET_PHONEBOOK: {
@@ -1314,9 +1667,12 @@ static int __bt_obexd_request(int function_name,
 		bt_pbap_folder_t folder = { 0, };
 		bt_pbap_pull_parameters_t app_param = { 0, };
 
-		address = g_array_index(in_param1, bluetooth_device_address_t, 0);
-		folder = g_array_index(in_param2, bt_pbap_folder_t, 0);
-		app_param = g_array_index(in_param3, bt_pbap_pull_parameters_t, 0);
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2, &folder,
+				sizeof(bt_pbap_folder_t));
+		__bt_service_get_parameters(in_param3, &app_param,
+				sizeof(bt_pbap_pull_parameters_t));
 
 		result = _bt_pbap_get_phonebook(&address, folder.addressbook,
 				folder.folder_type, &app_param);
@@ -1327,9 +1683,12 @@ static int __bt_obexd_request(int function_name,
 		bt_pbap_folder_t folder = { 0, };
 		bt_pbap_list_parameters_t app_param = { 0, };
 
-		address = g_array_index(in_param1, bluetooth_device_address_t, 0);
-		folder = g_array_index(in_param2, bt_pbap_folder_t, 0);
-		app_param = g_array_index(in_param3, bt_pbap_list_parameters_t, 0);
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2, &folder,
+				sizeof(bt_pbap_folder_t));
+		__bt_service_get_parameters(in_param3, &app_param,
+				sizeof(bt_pbap_list_parameters_t));
 
 		result = _bt_pbap_get_list(&address, folder.addressbook,
 				folder.folder_type, &app_param);
@@ -1340,9 +1699,12 @@ static int __bt_obexd_request(int function_name,
 		bt_pbap_folder_t folder = { 0, };
 		bt_pbap_pull_vcard_parameters_t app_param = { 0, };
 
-		address = g_array_index(in_param1, bluetooth_device_address_t, 0);
-		folder = g_array_index(in_param2, bt_pbap_folder_t, 0);
-		app_param = g_array_index(in_param3, bt_pbap_pull_vcard_parameters_t, 0);
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2, &folder,
+				sizeof(bt_pbap_folder_t));
+		__bt_service_get_parameters(in_param3, &app_param,
+				sizeof(bt_pbap_pull_vcard_parameters_t));
 
 		result = _bt_pbap_pull_vcard(&address, folder.addressbook,
 				folder.folder_type, &app_param);
@@ -1353,9 +1715,12 @@ static int __bt_obexd_request(int function_name,
 		bt_pbap_folder_t folder = { 0, };
 		bt_pbap_search_parameters_t app_param = { 0, };
 
-		address = g_array_index(in_param1, bluetooth_device_address_t, 0);
-		folder = g_array_index(in_param2, bt_pbap_folder_t, 0);
-		app_param = g_array_index(in_param3, bt_pbap_search_parameters_t, 0);
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2, &folder,
+				sizeof(bt_pbap_folder_t));
+		__bt_service_get_parameters(in_param3, &app_param,
+				sizeof(bt_pbap_search_parameters_t));
 
 		result = _bt_pbap_phonebook_search(&address, folder.addressbook,
 				folder.folder_type, &app_param);
@@ -1368,41 +1733,44 @@ static int __bt_obexd_request(int function_name,
 		break;
 	}
 
-	BT_DBG("-");
+	FN_END;
 
 	return result;
 }
 
-static int __bt_agent_request(int function_name,
+int __bt_agent_request(int function_name,
 		int request_type,
 		int request_id,
-		DBusGMethodInvocation *context,
-		GArray *in_param1,
-		GArray *in_param2,
-		GArray *in_param3,
-		GArray *in_param4,
+		GDBusMethodInvocation *context,
+		GVariant *in_param1,
+		GVariant *in_param2,
+		GVariant *in_param3,
+		GVariant *in_param4,
 		GArray **out_param1)
 {
 	int result;
-	switch(function_name) {
+	switch (function_name) {
 	case BT_SET_AUTHORIZATION: {
 		int type;
 		char *uuid;
 		char *path;
 		int fd;
 
-		type = g_array_index(in_param1, int, 0);
-		uuid = &g_array_index(in_param2, char, 0);
-		path = &g_array_index(in_param3, char, 0);
-		fd = g_array_index(in_param4, int, 0);
+		__bt_service_get_parameters(in_param1, &type, sizeof(int));
+		uuid = (char *)g_variant_get_data(in_param2);
+		path = (char *)g_variant_get_data(in_param3);
+		__bt_service_get_parameters(in_param4, &fd, sizeof(int));
+
 		result = _bt_register_osp_server_in_agent(type, uuid, path, fd);
 		break;
 	}
 	case BT_UNSET_AUTHORIZATION: {
 		int type;
 		char *uuid;
-		type = g_array_index(in_param1, int, 0);
-		uuid = &g_array_index(in_param2, char, 0);
+
+		__bt_service_get_parameters(in_param1, &type, sizeof(int));
+		uuid = (char *)g_variant_get_data(in_param2);
+
 		result = _bt_unregister_osp_server_in_agent(type, uuid);
 		break;
 	}
@@ -1415,11 +1783,11 @@ static int __bt_agent_request(int function_name,
 	return result;
 }
 
-static int __bt_core_request(int function_name,
+int __bt_core_request(int function_name,
 		int request_type,
 		int request_id,
-		DBusGMethodInvocation *context,
-		GArray *in_param1)
+		GDBusMethodInvocation *context,
+		GVariant *in_param1)
 {
 	int result;
 
@@ -1452,13 +1820,10 @@ static int __bt_core_request(int function_name,
 		if (status == BT_DEACTIVATING) {
 				BT_DBG("Disabling in progress");
 				result = BLUETOOTH_ERROR_IN_PROGRESS;
-		}
-		else if (status == BT_DEACTIVATED) {
+		} else if (status == BT_DEACTIVATED) {
 				BT_DBG("Already disabled");
 				result = BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
-		}
-		else
-		{
+		} else {
 			_bt_adapter_set_status(BT_DEACTIVATING);
 			result = BLUETOOTH_ERROR_NONE;
 		}
@@ -1473,8 +1838,7 @@ static int __bt_core_request(int function_name,
 		if (le_status == BT_LE_ACTIVATING) {
 			BT_DBG("Enabling in progress");
 			result = BLUETOOTH_ERROR_IN_PROGRESS;
-		}
-		else if (le_status == BT_LE_ACTIVATED) {
+		} else if (le_status == BT_LE_ACTIVATED) {
 			BT_DBG("Already enabled");
 			result = BLUETOOTH_ERROR_DEVICE_ALREADY_ENABLED;
 		} else {
@@ -1493,13 +1857,10 @@ static int __bt_core_request(int function_name,
 		if (le_status == BT_LE_DEACTIVATING) {
 				BT_DBG("Disabling in progress");
 				result = BLUETOOTH_ERROR_IN_PROGRESS;
-		}
-		else if (le_status == BT_LE_DEACTIVATED) {
+		} else if (le_status == BT_LE_DEACTIVATED) {
 				BT_DBG("Already disabled");
 				result = BLUETOOTH_ERROR_DEVICE_NOT_ENABLED;
-		}
-		else
-		{
+		} else {
 			_bt_adapter_set_le_status(BT_LE_DEACTIVATING);
 			result = BLUETOOTH_ERROR_NONE;
 		}
@@ -1517,60 +1878,18 @@ static int __bt_core_request(int function_name,
 
 gboolean __bt_service_check_privilege(int function_name,
 					int service_type,
-					const char *unique_name)
+					GVariant *param)
 {
+	char *cookie = NULL;
 	int ret_val;
+	int len;
 	gboolean result = TRUE;
-	char *client_creds = NULL;
-	char *user_creds = NULL;
-	char *client_session = "";
-	DBusConnection *conn = NULL;
-	int client_creds_method = CLIENT_METHOD_SMACK;
-	int user_creds_method = USER_METHOD_UID;
-	char err_msg[256] = {0, };
 
-	retv_if(unique_name == NULL, FALSE);
+	len = g_variant_get_size(param);
+	if (len > 0)
+		cookie = (char *)g_variant_get_data(param);
 
-	BT_DBG("unique_name: %s", unique_name);
-
-	if (bt_service_conn)
-		conn = dbus_g_connection_get_connection(bt_service_conn);
-
-	retv_if(conn == NULL, FALSE);
-
-	ret_val = cynara_creds_get_default_client_method(&client_creds_method);
-	if (ret_val != CYNARA_API_SUCCESS) {
-		cynara_strerror(ret_val, err_msg, sizeof(err_msg));
-		BT_ERR("Fail to get default client method: %s", err_msg);
-		return FALSE;
-	}
-
-	ret_val = cynara_creds_get_default_user_method(&user_creds_method);
-	if (ret_val != CYNARA_API_SUCCESS) {
-		cynara_strerror(ret_val, err_msg, sizeof(err_msg));
-		BT_ERR("Fail to get default user method: %s", err_msg);
-		return FALSE;
-	}
-
-	ret_val = cynara_creds_dbus_get_client(conn, unique_name, client_creds_method, &client_creds);
-	if (ret_val != CYNARA_API_SUCCESS) {
-		cynara_strerror(ret_val, err_msg, sizeof(err_msg));
-		BT_ERR("Fail to get client credential: %s", err_msg);
-		return FALSE;
-	}
-
-	BT_DBG("client_creds: %s", client_creds);
-
-	ret_val = cynara_creds_dbus_get_user(conn, unique_name, user_creds_method, &user_creds);
-	if (ret_val != CYNARA_API_SUCCESS) {
-		cynara_strerror(ret_val, err_msg, sizeof(err_msg));
-		BT_ERR("Fail to get user credential: %s", err_msg);
-		if (client_creds)
-			free(client_creds);
-		return FALSE;
-	}
-
-	BT_DBG("user_creds: %s", user_creds);
+	retv_if(cookie == NULL, FALSE);
 
 	switch (function_name) {
 	case BT_SET_LOCAL_NAME:
@@ -1581,6 +1900,7 @@ gboolean __bt_service_check_privilege(int function_name,
 	case BT_OOB_REMOVE_REMOTE_DATA:
 	case BT_SET_ADVERTISING:
 	case BT_SET_CUSTOM_ADVERTISING:
+	case BT_SET_ADVERTISING_PARAMETERS:
 	case BT_START_LE_DISCOVERY:
 	case BT_STOP_LE_DISCOVERY:
 
@@ -1619,6 +1939,8 @@ gboolean __bt_service_check_privilege(int function_name,
 	case BT_AV_DISCONNECT:
 	case BT_AVRCP_CONTROL_CONNECT:
 	case BT_AVRCP_CONTROL_DISCONNECT:
+	case BT_AV_SOURCE_CONNECT:
+	case BT_AV_SOURCE_DISCONNECT:
 	case BT_HF_CONNECT:
 	case BT_HF_DISCONNECT:
 
@@ -1646,11 +1968,11 @@ gboolean __bt_service_check_privilege(int function_name,
 	case BT_GATT_SET_PROPERTY_REQUEST:
 	case BT_GATT_READ_CHARACTERISTIC:
 	case BT_GATT_DISCOVER_CHARACTERISTICS_DESCRIPTOR:
-		ret_val = cynara_check(p_cynara, client_creds, client_session, user_creds,
-										 BT_PRIVILEGE_PUBLIC);
 
-		if (ret_val != CYNARA_API_ACCESS_ALLOWED) {
-			BT_ERR("Fail to access: %s", BT_PRIVILEGE_PUBLIC);
+		ret_val = security_server_check_privilege_by_cookie(cookie,
+						BT_PRIVILEGE_PUBLIC, "w");
+		if (ret_val == SECURITY_SERVER_API_ERROR_ACCESS_DENIED) {
+			BT_ERR("[SMACK] Fail to access: %s", BT_PRIVILEGE_PUBLIC);
 			result = FALSE;
 		}
 	break;
@@ -1672,9 +1994,27 @@ gboolean __bt_service_check_privilege(int function_name,
 	case BT_CANCEL_SEARCH_SERVICE:
 	case BT_ENABLE_RSSI:
 
+	case BT_HID_DEVICE_ACTIVATE:
+	case BT_HID_DEVICE_DEACTIVATE:
+	case BT_HID_DEVICE_CONNECT:
+	case BT_HID_DEVICE_DISCONNECT:
+	case BT_HID_DEVICE_SEND_MOUSE_EVENT:
+	case BT_HID_DEVICE_SEND_KEY_EVENT:
+	case BT_HID_DEVICE_SEND_REPLY_TO_REPORT:
+
 	case BT_RFCOMM_ACCEPT_CONNECTION:
 	case BT_RFCOMM_REJECT_CONNECTION:
 	case BT_RFCOMM_LISTEN:
+	case BT_RFCOMM_CREATE_SOCKET_EX:
+	case BT_RFCOMM_REMOVE_SOCKET_EX:
+
+	case BT_PBAP_CONNECT:
+	case BT_PBAP_DISCONNECT:
+	case BT_PBAP_GET_PHONEBOOK_SIZE:
+	case BT_PBAP_GET_PHONEBOOK:
+	case BT_PBAP_GET_LIST:
+	case BT_PBAP_PULL_VCARD:
+	case BT_PBAP_PHONEBOOK_SEARCH:
 
 	case BT_AVRCP_SET_TRACK_INFO:
 	case BT_AVRCP_SET_PROPERTY:
@@ -1688,11 +2028,12 @@ gboolean __bt_service_check_privilege(int function_name,
 	case BT_BOND_DEVICE_BY_TYPE:
 	case BT_SET_LE_PRIVACY:
 	case BT_LE_CONN_UPDATE:
-		ret_val = cynara_check(p_cynara, client_creds, client_session, user_creds,
-										 BT_PRIVILEGE_PLATFORM);
 
-		if (ret_val != CYNARA_API_ACCESS_ALLOWED) {
-			BT_ERR("Fail to access: %s", BT_PRIVILEGE_PLATFORM);
+		ret_val = security_server_check_privilege_by_cookie(cookie,
+						BT_PRIVILEGE_PLATFORM, "w");
+
+		if (ret_val == SECURITY_SERVER_API_ERROR_ACCESS_DENIED) {
+			BT_ERR("[SMACK] Fail to access: %s", BT_PRIVILEGE_PLATFORM);
 			result = FALSE;
 		}
 	break;
@@ -1712,6 +2053,7 @@ gboolean __bt_service_check_privilege(int function_name,
 	case BT_GET_BONDED_DEVICES:
 	case BT_GET_BONDED_DEVICE:
 	case BT_IS_DEVICE_CONNECTED:
+	case BT_GET_CONNECTED_LINK_TYPE:
 	case BT_GET_SPEAKER_GAIN:
 	case BT_SET_SPEAKER_GAIN:
 	case BT_OOB_READ_LOCAL_DATA:
@@ -1720,9 +2062,13 @@ gboolean __bt_service_check_privilege(int function_name,
 	case BT_GET_ADVERTISING_DATA:
 	case BT_GET_SCAN_RESPONSE_DATA:
 	case BT_IS_ADVERTISING:
+	case BT_REGISTER_SCAN_FILTER:
+	case BT_UNREGISTER_SCAN_FILTER:
+	case BT_UNREGISTER_ALL_SCAN_FILTERS:
 
 	case BT_OBEX_SERVER_ALLOCATE:
 	case BT_OBEX_SERVER_DEALLOCATE:
+	case BT_OBEX_SERVER_IS_ACTIVATED:
 
 		/* Non-privilege control */
 		break;
@@ -1732,188 +2078,95 @@ gboolean __bt_service_check_privilege(int function_name,
 		break;
 	}
 
-	if (client_creds)
-		free(client_creds);
-
-	if (user_creds)
-		free(user_creds);
-
 	return result;
 }
 
-gboolean bt_service_request(
-		BtService *service,
-		int service_type,
-		int service_function,
-		int request_type,
-		GArray *in_param1,
-		GArray *in_param2,
-		GArray *in_param3,
-		GArray *in_param4,
-		GArray *in_param5,
-		DBusGMethodInvocation *context)
+GDBusNodeInfo *__bt_service_create_method_node_info
+					(const gchar *introspection_data)
 {
-	BT_DBG("+");
+	GError *err = NULL;
+	GDBusNodeInfo *node_info = NULL;
 
-	int result;
-	int request_id = -1;
-	GArray *out_param1 = NULL;
-	GArray *out_param2 = NULL;
-	char *sender = NULL;
-
-	out_param1 = g_array_new(FALSE, FALSE, sizeof(gchar));
-	out_param2 = g_array_new(FALSE, FALSE, sizeof(gchar));
-
-	sender = dbus_g_method_get_sender(context);
-
-	if (service_type == BT_CORE_SERVICE) {
-		BT_DBG("No need to check privilege from bt-core");
-	} else if (__bt_service_check_privilege(service_function,
-				service_type, (const char *)sender) == FALSE) {
-		BT_ERR("Client don't have the privilege to excute this function");
-
-		result = BLUETOOTH_ERROR_PERMISSION_DEINED;
-		goto fail;
+	if (introspection_data == NULL) {
+		ERR("Introspection XML not present: %s", err->message);
+		return NULL;
 	}
 
-	if (request_type == BT_ASYNC_REQ
-	     || service_function == BT_OBEX_SERVER_ACCEPT_CONNECTION
-	      || service_function == BT_RFCOMM_ACCEPT_CONNECTION) {
-		/* Set the timer */
-		request_id = _bt_assign_request_id();
-		BT_DBG("Request ID: %d", request_id);
+	node_info = g_dbus_node_info_new_for_xml(introspection_data, &err);
 
-		if (request_id < 0) {
-			BT_ERR("Fail to assign the request id");
-			result = BLUETOOTH_ERROR_INTERNAL;
-			goto fail;
+	if (err) {
+		ERR("Unable to create node: %s", err->message);
+		g_clear_error(&err);
+	}
+	return node_info;
+}
+
+int __bt_service_register_object(GDBusConnection *conn,
+		GDBusNodeInfo *node_info, gboolean reg)
+{
+	static guint service_id = 0;
+	GError *error = NULL;
+
+	if (reg) {
+		if (node_info == NULL)
+			return -1;
+
+		service_id = g_dbus_connection_register_object(conn,
+				BT_SERVICE_PATH,
+				node_info->interfaces[0],
+				&method_table,
+				NULL, NULL, &error);
+		if (service_id == 0)
+			return -1;
+	} else {
+		if (service_id > 0) {
+			g_dbus_connection_unregister_object(conn,
+					service_id);
+			service_id = 0;
 		}
 	}
 
-	BT_DBG("SERVICE TYPE %d", service_type);
-
-	switch (service_type) {
-	case BT_BLUEZ_SERVICE:
-		result = __bt_bluez_request(service_function, request_type,
-					request_id, context, in_param1, in_param2,
-					in_param3, in_param4, &out_param1);
-		break;
-	case BT_OBEX_SERVICE:
-		result = __bt_obexd_request(service_function, request_type,
-					request_id, context, in_param1,
-					in_param2, in_param3,
-					in_param4, &out_param1);
-		break;
-	case BT_AGENT_SERVICE:
-		result = __bt_agent_request(service_function, request_type,
-					request_id, context, in_param1,
-					in_param2, in_param3,
-					in_param4, &out_param1);
-		break;
-	case BT_CORE_SERVICE:
-		result = __bt_core_request(service_function, request_type,
-					request_id, context, in_param1);
-		break;
-	case BT_CHECK_PRIVILEGE:
-		result = BLUETOOTH_ERROR_NONE;
-		break;
-	default:
-		BT_ERR("Unknown service type");
-		result = BLUETOOTH_ERROR_INTERNAL;
-		goto fail;
-	}
-
-	if (result != BLUETOOTH_ERROR_NONE) {
-		goto fail;
-	}
-
-	g_array_append_vals(out_param2, &result, sizeof(int));
-
-	if ((request_type == BT_ASYNC_REQ ||
-		service_function == BT_OBEX_SERVER_ACCEPT_CONNECTION) &&
-		service_function != BT_OPP_PUSH_FILES) {
-		_bt_insert_request_list(request_id, service_function,
-					NULL, context);
-	} else {
-		/* Return result */
-		if (service_type == BT_CHECK_PRIVILEGE ||
-			service_function != BT_OPP_PUSH_FILES)
-			dbus_g_method_return(context, out_param1, out_param2);
-	}
-
-	g_array_free(out_param1, TRUE);
-	g_array_free(out_param2, TRUE);
-	g_free(sender);
-
-	return TRUE;
-fail:
-	BT_ERR_C("Request is failed [%s] [%x]", _bt_convert_error_to_string(result), result);
-	g_array_append_vals(out_param2, &result, sizeof(int));
-	dbus_g_method_return(context, out_param1, out_param2);
-
-	g_array_free(out_param1, TRUE);
-	g_array_free(out_param2, TRUE);
-	g_free(sender);
-
-	if (request_type == BT_ASYNC_REQ)
-		_bt_delete_request_id(request_id);
-
-	BT_DBG("-");
-
-	return FALSE;
+	return 0;
 }
 
 int _bt_service_register(void)
 {
-	BtService *bt_service;
-	DBusGConnection *conn;
-	DBusGProxy *proxy;
+	GDBusConnection *conn;
 	GError *err = NULL;
-	guint result = 0;
+	int result;
 
-	conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
+	conn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &err);
 	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	proxy = dbus_g_proxy_new_for_name(conn, DBUS_SERVICE_DBUS,
-				DBUS_PATH_DBUS, DBUS_INTERFACE_DBUS);
-
-	if (proxy == NULL) {
-		BT_ERR("proxy is NULL");
+	owner_id = g_bus_own_name(G_BUS_TYPE_SYSTEM,
+				BT_SERVICE_NAME,
+				G_BUS_NAME_OWNER_FLAGS_NONE,
+				NULL, NULL, NULL,
+				NULL, NULL);
+	BT_DBG("owner_id is [%d]", owner_id);
+	if (owner_id == 0)
 		goto fail;
-	}
 
-	if (!dbus_g_proxy_call(proxy, "RequestName", &err, G_TYPE_STRING,
-			BT_SERVICE_NAME, G_TYPE_UINT, 0, G_TYPE_INVALID,
-			G_TYPE_UINT, &result, G_TYPE_INVALID)) {
-		if (err != NULL) {
-			BT_ERR("RequestName RPC failed[%s]\n", err->message);
-			g_error_free(err);
-		}
-		g_object_unref(proxy);
+	node_info = __bt_service_create_method_node_info(
+			bt_service_introspection_xml);
 
+	if (node_info == NULL)
 		goto fail;
-	}
 
-	g_object_unref(proxy);
+	result = __bt_service_register_object(conn, node_info, TRUE);
+	g_dbus_node_info_unref(node_info);
+	node_info = NULL;
 
-	if (result != DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER) {
-		BT_ERR("Failed to get the primary well-known name.\n");
+	if (result != BLUETOOTH_ERROR_NONE)
 		goto fail;
-	}
 
-	bt_service = g_object_new(BT_SERVICE_TYPE, NULL);
-
-	dbus_g_connection_register_g_object(conn, BT_SERVICE_PATH,
-					G_OBJECT(bt_service));
-
-	service_object = bt_service;
 	bt_service_conn = conn;
 
 	return BLUETOOTH_ERROR_NONE;
 
 fail:
 	if (bt_service_conn) {
-		dbus_g_connection_unref(bt_service_conn);
+		g_object_unref(bt_service_conn);
 		bt_service_conn = NULL;
 	}
 
@@ -1923,52 +2176,19 @@ fail:
 void _bt_service_unregister(void)
 {
 	if (bt_service_conn) {
-		if (service_object) {
-			dbus_g_connection_unregister_g_object(bt_service_conn,
-						G_OBJECT(service_object));
-			g_object_unref(service_object);
-			service_object = NULL;
+		__bt_service_register_object(bt_service_conn, NULL, FALSE);
+		if (bt_service_conn) {
+			g_object_unref(bt_service_conn);
+			bt_service_conn = NULL;
 		}
-
-		dbus_g_connection_unref(bt_service_conn);
-		bt_service_conn = NULL;
+		if (node_info) {
+			g_dbus_node_info_unref(node_info);
+			node_info = NULL;
+		}
+		if (owner_id > 0) {
+			g_bus_unown_name(owner_id);
+			owner_id = 0;
+		}
 	}
-}
-
-int _bt_service_cynara_init(void)
-{
-	int result;
-	char err_msg[256] = {0, };
-
-	retv_if(p_cynara != NULL, BLUETOOTH_ERROR_ALREADY_INITIALIZED);
-
-	result = cynara_initialize(&p_cynara, conf);
-
-	if (result != CYNARA_API_SUCCESS) {
-		cynara_strerror(result, err_msg, sizeof(err_msg));
-		BT_ERR("Fail to initialize cynara: [%s]", err_msg);
-		return BLUETOOTH_ERROR_INTERNAL;
-	}
-
-	return BLUETOOTH_ERROR_NONE;
-}
-
-void _bt_service_cynara_deinit(void)
-{
-	int result;
-	char err_msg[256] = {0, };
-
-	ret_if(p_cynara == NULL);
-
-	result = cynara_finish(p_cynara);
-
-	if (result != CYNARA_API_SUCCESS) {
-		cynara_strerror(result, err_msg, sizeof(err_msg));
-		BT_ERR("Fail to finish cynara: [%s]", err_msg);
-		return;
-	}
-
-	p_cynara = NULL;
-	conf = NULL;
 }
 

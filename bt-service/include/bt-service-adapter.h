@@ -33,11 +33,6 @@
 extern "C" {
 #endif
 
-#define BT_LE_SCAN_INTERVAL_MIN 2.5
-#define BT_LE_SCAN_INTERVAL_MAX 10240
-#define BT_LE_SCAN_WINDOW_MIN 2.5
-#define BT_LE_SCAN_WINDOW_MAX 10240
-
 typedef enum {
 	BT_DEACTIVATED,
 	BT_ACTIVATED,
@@ -51,11 +46,6 @@ typedef enum {
 	BT_LE_ACTIVATING,
 	BT_LE_DEACTIVATING,
 } bt_le_status_t;
-
-typedef enum {
-	BT_LE_PASSIVE_SCAN = 0x00,
-	BT_LE_ACTIVE_SCAN
-} bt_le_discovery_type_t;
 
 int _bt_enable_adapter(void);
 
@@ -85,12 +75,6 @@ void _bt_service_unregister_vconf_handler(void);
 
 void _bt_set_discovery_status(gboolean mode);
 
-void _bt_set_le_discovery_status(gboolean mode);
-
-void _bt_set_le_discovery_type(bt_le_discovery_type_t type);
-
-bt_le_discovery_type_t _bt_get_le_discovery_type(void);
-
 int _bt_get_local_address(bluetooth_device_address_t *local_address);
 
 int _bt_get_local_version(bluetooth_version_t *local_version);
@@ -115,10 +99,6 @@ int _bt_start_custom_discovery(bt_discovery_role_type_t role);
 
 int _bt_cancel_discovery(void);
 
-int _bt_start_le_discovery(void);
-
-int _bt_stop_le_discovery(void);
-
 int _bt_get_bonded_devices(GArray **dev_list);
 
 int _bt_get_bonded_device_info(bluetooth_device_address_t *device_address,
@@ -127,8 +107,6 @@ int _bt_get_bonded_device_info(bluetooth_device_address_t *device_address,
 int _bt_get_timeout_value(int *timeout);
 
 gboolean _bt_is_discovering(void);
-
-gboolean _bt_is_le_discovering(void);
 
 int _bt_enable_rssi(bluetooth_device_address_t *bd_addr, int link_type,
 		int low_threshold, int in_range_threshold, int high_threshold);
@@ -150,10 +128,6 @@ void _bt_adapter_set_status(bt_status_t status);
 
 bt_status_t _bt_adapter_get_status(void);
 
-void _bt_handle_flight_mode_noti(void);
-
-int _bt_get_remote_found_devices(GArray **dev_list);
-
 void _bt_adapter_set_le_status(bt_le_status_t status);
 
 bt_le_status_t _bt_adapter_get_le_status(void);
@@ -169,6 +143,8 @@ void _bt_set_le_disabled(int result);
 int _bt_set_le_privacy(gboolean set_privacy);
 
 int _bt_set_manufacturer_data(bluetooth_manufacturer_data_t *m_data);
+
+int __bt_disable_cb(void);
 
 #ifdef __cplusplus
 }

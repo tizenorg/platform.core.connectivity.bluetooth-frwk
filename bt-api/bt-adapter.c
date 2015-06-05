@@ -22,9 +22,6 @@
  */
 
 #include <vconf.h>
-#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
-#include <syspopup_caller.h>
-#endif
 
 #include "bluetooth-api.h"
 #include "bt-internal-types.h"
@@ -75,17 +72,14 @@ BT_EXPORT_API int bluetooth_check_adapter(void)
 	ret = _bt_get_adapter_path(_bt_gdbus_get_system_gconn(), NULL);
 
 	if (ret != BLUETOOTH_ERROR_NONE) {
-		BT_ERR("error in get adapter ");
 		return BLUETOOTH_ADAPTER_DISABLED;
 	}
 
 	/* check VCONFKEY_BT_STATUS */
 	if (vconf_get_int(VCONFKEY_BT_STATUS, &value) != 0) {
-		BT_ERR("fail to get vconf key! return disabled");
+		BT_ERR("fail to get vconf key!");
 		return BLUETOOTH_ADAPTER_DISABLED;
 	}
-
-	BT_ERR("get status from vconf key \n");
 
 	return value == VCONFKEY_BT_STATUS_OFF ? BLUETOOTH_ADAPTER_DISABLED :
 						BLUETOOTH_ADAPTER_ENABLED;
@@ -94,16 +88,21 @@ BT_EXPORT_API int bluetooth_check_adapter(void)
 BT_EXPORT_API int bluetooth_enable_adapter(void)
 {
 	int result;
+	bt_user_info_t *user_info;
 
 	BT_INFO("");
 	retv_if(bluetooth_check_adapter() == BLUETOOTH_ADAPTER_ENABLED,
 				BLUETOOTH_ERROR_DEVICE_ALREADY_ENABLED);
 
+	user_info = _bt_get_user_data(BT_COMMON);
+	retv_if(user_info->cb == NULL, BLUETOOTH_ERROR_INTERNAL);
+
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
-	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_ENABLE_ADAPTER,
-		in_param1, in_param2, in_param3, in_param4, &out_param);
+	result = _bt_send_request_async(BT_BLUEZ_SERVICE, BT_ENABLE_ADAPTER,
+		in_param1, in_param2, in_param3, in_param4,
+		user_info->cb, user_info->user_data);
 
 	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
@@ -113,16 +112,20 @@ BT_EXPORT_API int bluetooth_enable_adapter(void)
 BT_EXPORT_API int bluetooth_disable_adapter(void)
 {
 	int result;
+	bt_user_info_t *user_info;
 
 	BT_INFO("");
-
 	BT_CHECK_ENABLED(return);
+
+	user_info = _bt_get_user_data(BT_COMMON);
+	retv_if(user_info->cb == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
-	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_DISABLE_ADAPTER,
-		in_param1, in_param2, in_param3, in_param4, &out_param);
+	result = _bt_send_request_async(BT_BLUEZ_SERVICE, BT_DISABLE_ADAPTER,
+		in_param1, in_param2, in_param3, in_param4,
+		user_info->cb, user_info->user_data);
 
 	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
@@ -168,6 +171,7 @@ BT_EXPORT_API int bluetooth_get_local_address(bluetooth_device_address_t *local_
 	int result;
 
 	BT_CHECK_PARAMETER(local_address, return);
+	BT_CHECK_ENABLED_ANY(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -212,6 +216,7 @@ BT_EXPORT_API int bluetooth_get_local_name(bluetooth_device_name_t *local_name)
 	int result;
 
 	BT_CHECK_PARAMETER(local_name, return);
+	BT_CHECK_ENABLED_ANY(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -284,6 +289,25 @@ BT_EXPORT_API int bluetooth_get_discoverable_mode(bluetooth_discoverable_mode_t 
 
 	BT_CHECK_PARAMETER(discoverable_mode_ptr, return);
 
+#ifndef TIZEN_WEARABLE
+	int timeout = 0;
+	/* Requirement in OSP */
+	if (bluetooth_check_adapter() == BLUETOOTH_ADAPTER_DISABLED) {
+		if (vconf_get_int(BT_FILE_VISIBLE_TIME, &timeout) != 0) {
+			BT_ERR("Fail to get the timeout value");
+			return BLUETOOTH_ERROR_INTERNAL;
+		}
+
+		if (timeout == -1) {
+			*discoverable_mode_ptr = BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE;
+		} else {
+			*discoverable_mode_ptr = BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE;
+		}
+
+		return BLUETOOTH_ERROR_NONE;
+	}
+#endif
+
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
@@ -291,8 +315,7 @@ BT_EXPORT_API int bluetooth_get_discoverable_mode(bluetooth_discoverable_mode_t 
 		in_param1, in_param2, in_param3, in_param4, &out_param);
 
 	if (result == BLUETOOTH_ERROR_NONE) {
-		*discoverable_mode_ptr = g_array_index(out_param,
-					int, 0);
+		*discoverable_mode_ptr = g_array_index(out_param, int, 0);
 	}
 
 	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);

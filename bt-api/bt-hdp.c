@@ -380,11 +380,9 @@ static void __bt_hdp_internal_handle_connect(DBusMessage *msg)
 				BLUETOOTH_ERROR_CONNECTION_ERROR, NULL,
 				user_info->cb, user_info->user_data);
 	} else {
-		if (user_info->cb) {
-			_bt_common_event_cb(BLUETOOTH_EVENT_HDP_CONNECTED,
-					BLUETOOTH_ERROR_NONE, NULL,
-					user_info->cb, user_info->user_data);
-		}
+		_bt_common_event_cb(BLUETOOTH_EVENT_HDP_CONNECTED,
+				BLUETOOTH_ERROR_NONE, NULL,
+				user_info->cb, user_info->user_data);
 	}
 
 	BT_DBG("-");
@@ -1170,11 +1168,9 @@ static void __bt_hdp_disconnect_request_cb(DBusGProxy *hdp_proxy, DBusGProxyCall
 				BLUETOOTH_ERROR_CONNECTION_ERROR, disconn_ind,
 				user_info->cb, user_info->user_data);
 	} else {
-		if (user_info->cb) {
-			_bt_common_event_cb(BLUETOOTH_EVENT_HDP_DISCONNECTED,
-					BLUETOOTH_ERROR_NONE, disconn_ind,
-					user_info->cb, user_info->user_data);
-		}
+		_bt_common_event_cb(BLUETOOTH_EVENT_HDP_DISCONNECTED,
+				BLUETOOTH_ERROR_NONE, disconn_ind,
+				user_info->cb, user_info->user_data);
 		BT_INFO("HDP disconnection Dbus Call is done\n");
 	}
 

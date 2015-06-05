@@ -28,12 +28,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <dlog.h>
-#include <dbus/dbus.h>
-#include <dbus/dbus-glib.h>
-#include <dbus/dbus-glib-lowlevel.h>
 #include <glib.h>
 #include <gio/gio.h>
-#include <glib-object.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,20 +48,6 @@ extern "C" {
 #define BT_CORE_NAME "org.projectx.bt_core"
 #define BT_CORE_PATH "/org/projectx/bt_core"
 
-typedef struct _BtCore
-{
-    GObject object;
-} BtCore;
-
-typedef struct _BtCoreClass
-{
-    GObjectClass object_class;
-} BtCoreClass;
-
-
-DBusGProxy *_bt_core_register_event_filter(DBusGConnection *g_conn, BtCore *bt_core);
-void _bt_unregister_event_filter(DBusGConnection *g_conn, BtCore *bt_core, DBusGProxy *dbus_proxy);
-
 int _bt_core_service_request(int service_type, int service_function,
 			GArray *in_param1, GArray *in_param2,
 			GArray *in_param3, GArray *in_param4,
@@ -73,6 +55,9 @@ int _bt_core_service_request(int service_type, int service_function,
 void _bt_core_fill_garray_from_variant(GVariant *var, GArray *param);
 GDBusProxy *_bt_core_gdbus_get_service_proxy(void);
 void _bt_core_gdbus_deinit_proxys(void);
+
+gboolean _bt_core_register_dbus(void);
+void  _bt_core_unregister_dbus(void);
 
 #ifdef __cplusplus
 }

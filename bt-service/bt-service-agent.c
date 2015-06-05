@@ -26,8 +26,9 @@
 #include <string.h>
 #include <malloc.h>
 #include <stacktrim.h>
+#include <syspopup_caller.h>
 #include <vconf.h>
-#include <package-manager.h>
+#include <bundle_internal.h>
 
 #ifdef TIZEN_NETWORK_TETHERING_ENABLE
 #include <tethering.h>
@@ -42,14 +43,6 @@
 #include "bt-service-rfcomm-server.h"
 #include "bt-service-device.h"
 #include "bt-service-audio.h"
-
-#if defined(LIBNOTIFY_SUPPORT)
-#include "bt-popup.h"
-#elif defined(LIBNOTIFICATION_SUPPORT)
-#include "bt-service-agent-notification.h"
-#else
-#include <syspopup_caller.h>
-#endif
 
 #define BT_APP_AUTHENTICATION_TIMEOUT		35
 #define BT_APP_AUTHORIZATION_TIMEOUT		15
@@ -85,6 +78,10 @@
 #define BT_PAN_MAX_CONNECTION 4
 extern guint nap_connected_device_count;
 
+#define G_VARIANT_UNREF(variant) \
+	g_variant_unref(variant); \
+	variant = NULL
+
 static int __bt_agent_is_auto_response(uint32_t dev_class, const gchar *address,
 							const gchar *name);
 static gboolean __bt_agent_is_hid_keyboard(uint32_t dev_class);
@@ -108,13 +105,7 @@ static gboolean __bt_agent_system_popup_timer_cb(gpointer user_data)
 
 	++retry_count;
 
-#if defined(LIBNOTIFY_SUPPORT)
-	ret = notify_launch(b);
-#elif defined(LIBNOTIFICATION_SUPPORT)
-	ret = notification_launch(b);
-#else
 	ret = syspopup_launch("bt-syspopup", b);
-#endif
 	if (ret < 0) {
 		BT_ERR("Sorry! Can't launch popup, ret=%d, Re-try[%d] time..",
 							ret, retry_count);
@@ -134,18 +125,22 @@ static gboolean __bt_agent_system_popup_timer_cb(gpointer user_data)
 }
 
 #ifdef TIZEN_WEARABLE
-static void __bt_unbond_cb(DBusGProxy *proxy, DBusGProxyCall *call,
-				gpointer user_data)
+static void __bt_unbond_cb(GDBusProxy *proxy,
+		GAsyncResult *res, gpointer user_data)
 {
 	GError *err = NULL;
+	GVariant *value;
 
-	dbus_g_proxy_end_call(proxy, call, &err, G_TYPE_INVALID);
-	if (err != NULL) {
-		BT_ERR("Error occured in RemoveBonding [%s]\n", err->message);
-		g_error_free(err);
+	value = g_dbus_proxy_call_finish(proxy, res, &err);
+	if (value == NULL) {
+		BT_ERR("Error: Unbond Failed");
+		if (err) {
+			BT_ERR("errCode[%x], message[%s]\n", err->code, err->message);
+			g_clear_error(&err);
+		}
 		return;
 	}
-
+	g_variant_unref(value);
 	BT_INFO("Unbonding is done");
 	return;
 }
@@ -170,7 +165,7 @@ static gboolean __bt_unpair_device(void)
 
 	no_of_device = device_list->len / sizeof(bluetooth_device_info_t);
 	for (i = 0; i < no_of_device; i++) {
-		DBusGProxy *adapter_proxy;
+		GDBusProxy *adapter_proxy;
 		bluetooth_device_info_t info;
 		char addr[BT_ADDRESS_STRING_SIZE] = { 0 };
 		char *device_path = NULL;
@@ -195,15 +190,11 @@ static gboolean __bt_unpair_device(void)
 			return FALSE;
 		}
 
-		if (!dbus_g_proxy_begin_call(adapter_proxy, "UnpairDevice",
-					(DBusGProxyCallNotify)__bt_unbond_cb,
-					NULL, NULL,
-					DBUS_TYPE_G_OBJECT_PATH, device_path,
-					G_TYPE_INVALID)) {
-			BT_ERR("RemoveBonding begin failed\n");
-			g_array_free(device_list, TRUE);
-			return FALSE;
-		}
+		g_dbus_proxy_call(adapter_proxy,
+				"UnpairDevice", g_variant_new("o", device_path),
+				G_DBUS_CALL_FLAGS_NONE, -1, NULL,
+				(GAsyncReadyCallback)__bt_unbond_cb, NULL);
+
 		BT_INFO("unbonding %s is requested", addr);
 
 		g_array_free(device_list, TRUE);
@@ -214,58 +205,61 @@ static gboolean __bt_unpair_device(void)
 	return FALSE;
 }
 
-static DBusHandlerResult __bt_popup_event_filter(DBusConnection *conn,
-		DBusMessage *msg, void *data)
+static void __bt_popup_event_filter(GDBusConnection *connection,
+		const gchar *sender_name,
+		const gchar *object_path,
+		const gchar *interface_name,
+		const gchar *signal_name,
+		GVariant *parameters,
+		gpointer user_data)
 {
-	int response;
+	BT_DBG("Sender Name[%s] Object Path[%s] Interface[%s] Signal[%s]",
+			sender_name, object_path, interface_name, signal_name);
 
-	BT_DBG("+");
+	if (g_strcmp0(interface_name, "User.Bluetooth.syspopup") == 0 &&
+			g_strcmp0(signal_name, "ResetResponse") == 0) {
+		int response;
 
-	if (msg == NULL)
-		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
-
-	if (!dbus_message_is_signal(msg, "User.Bluetooth.syspopup", "ResetResponse"))
-		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
-
-	if (!dbus_message_get_args(msg, NULL,
-				DBUS_TYPE_INT32, &response,
-				DBUS_TYPE_INVALID)) {
-		return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+		g_variant_get(parameters, "(i)", &response);
+		BT_DBG("response = %d", response);
 	}
+}
 
-	BT_DBG("response = %d", response);
+int __bt_service_subscribe_popup(GDBusConnection *conn,
+		gboolean subscribe)
+{
+	static guint subs_interface_added_id = 0;
 
-	BT_DBG("-");
-	return DBUS_HANDLER_RESULT_HANDLED;
+	if (conn == NULL)
+		return BLUETOOTH_ERROR_INVALID_PARAM;
+
+	if (subscribe) {
+		if (subs_interface_added_id == 0) {
+			subs_interface_added_id = g_dbus_connection_signal_subscribe(conn,
+					NULL, "User.Bluetooth.syspopup", "ResetResponse", NULL, NULL, 0,
+					__bt_popup_event_filter, NULL, NULL);
+		}
+	} else {
+		if (subs_interface_added_id > 0) {
+			g_dbus_connection_signal_unsubscribe(conn,
+					subs_interface_added_id);
+			subs_interface_added_id = 0;
+		}
+	}
+	return BLUETOOTH_ERROR_NONE;
 }
 
 static void  __bt_register_popup_event_signal(void)
 {
-	DBusError dbus_error;
-	DBusGConnection *gconn;
-	DBusConnection *conn;
+	GDBusConnection *conn;
 
 	BT_DBG("+\n");
 
-	gconn = _bt_get_system_gconn();
-	if (gconn == NULL)
-		return;
-
-	conn = dbus_g_connection_get_connection(gconn);
+	conn = _bt_get_system_gconn();
 	if (conn == NULL)
 		return;
 
-	dbus_connection_add_filter(conn, __bt_popup_event_filter, NULL, NULL);
-
-	dbus_error_init(&dbus_error);
-	dbus_bus_add_match(conn,
-			"type='signal',interface='User.Bluetooth.syspopup'"
-			",member='ResetResponse'", &dbus_error);
-	if (dbus_error_is_set(&dbus_error)) {
-		BT_ERR("Error: %s\n", dbus_error.message);
-		dbus_error_free(&dbus_error);
-		return;
-	}
+	__bt_service_subscribe_popup(conn, TRUE);
 
 	BT_DBG("-\n");
 	return;
@@ -346,6 +340,11 @@ int _bt_launch_system_popup(bt_agent_event_type_t event_type,
 						sizeof(event_str));
 		break;
 
+	case BT_AGENT_EVENT_PASSKEY_AUTO_ACCEPTED:
+		g_strlcpy(event_str, "passkey-auto-accepted",
+						sizeof(event_str));
+		break;
+
 	case BT_AGENT_EVENT_PASSKEY_REQUEST:
 		g_strlcpy(event_str, "passkey-request", sizeof(event_str));
 		break;
@@ -410,9 +409,7 @@ int _bt_launch_system_popup(bt_agent_event_type_t event_type,
 
 	bundle_add(b, "event-type", event_str);
 
-#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	ret = syspopup_launch("bt-syspopup", b);
-#endif
 	if (0 > ret) {
 		BT_ERR("Popup launch failed...retry %d", ret);
 
@@ -426,53 +423,77 @@ int _bt_launch_system_popup(bt_agent_event_type_t event_type,
 	return 0;
 }
 
-static gboolean __pincode_request(GapAgent *agent, DBusGProxy *device)
+static GVariant *__bt_service_getall(GDBusProxy *device, const char *interface)
+{
+	GError *error = NULL;
+	GVariant *reply;
+
+	reply = g_dbus_proxy_call_sync(device,
+			"GetAll", g_variant_new("(s)", interface),
+			G_DBUS_CALL_FLAGS_NONE, -1,
+			NULL, &error);
+	if (reply == NULL) {
+		ERR("GetAll dBUS-RPC failed");
+		if (error) {
+			ERR("D-Bus API failure: errCode[%x], message[%s]",
+				error->code, error->message);
+			g_clear_error(&error);
+		}
+		return NULL;
+	}
+
+	return reply;
+}
+
+static gboolean __pincode_request(GapAgentPrivate *agent, GDBusProxy *device)
 {
 	uint32_t device_class;
-	GHashTable *hash = NULL;
-	GValue *value;
 	const gchar *address;
 	const gchar *name;
-	GError *error = NULL;
+	GVariant *reply = NULL;
+	GVariant *reply_temp = NULL;
+	GVariant *tmp_value;
 
-	BT_INFO("+");
+	BT_DBG("+");
 
-	dbus_g_proxy_call(device, "GetAll", &error,
-				G_TYPE_STRING, BT_DEVICE_INTERFACE,
-				G_TYPE_INVALID,
-				dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
-				G_TYPE_VALUE), &hash, G_TYPE_INVALID);
-	if (error) {
-		BT_ERR("error in GetBasicProperties [%s]\n", error->message);
-		g_error_free(error);
+	reply_temp = __bt_service_getall(device, BT_DEVICE_INTERFACE);
+
+	if (reply_temp == NULL) {
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "",
-					     NULL);
+				NULL);
 		goto done;
 	}
 
-	value = g_hash_table_lookup(hash, "Class");
-	device_class = value ? g_value_get_uint(value) : 0;
+	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
 
-	value = g_hash_table_lookup(hash, "Address");
-	address = value ? g_value_get_string(value) : NULL;
+	tmp_value = g_variant_lookup_value(reply, "Class", G_VARIANT_TYPE_UINT32);
+	g_variant_get(tmp_value, "u", &device_class);
+	G_VARIANT_UNREF(tmp_value);
+
+	tmp_value = g_variant_lookup_value(reply, "Address", G_VARIANT_TYPE_STRING);
+	g_variant_get(tmp_value, "s", &address);
+	G_VARIANT_UNREF(tmp_value);
 	if (!address) {
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "", NULL);
 		goto done;
 	}
 
-	value = g_hash_table_lookup(hash, "Name");
-	name = value ? g_value_get_string(value) : NULL;
+	tmp_value = g_variant_lookup_value(reply, "Name", G_VARIANT_TYPE_STRING);
+	g_variant_get(tmp_value, "s", &name);
+	G_VARIANT_UNREF(tmp_value);
 	if (!name)
 		name = address;
 
 	if (_bt_is_device_creating() == TRUE &&
 		_bt_is_bonding_device_address(address) == TRUE &&
 		__bt_agent_is_auto_response(device_class, address, name)) {
-		/* Use Fixed PIN "0000" for basic pairing*/
+		BT_DBG("0000 Auto Pair");
+		/* Use Fixed PIN "0000" for basic pairing */
 		_bt_set_autopair_status_in_bonding_info(TRUE);
 		gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, "0000",
 									NULL);
 	} else if (__bt_agent_is_hid_keyboard(device_class)) {
+		BT_DBG("HID Keyboard");
 		char str_passkey[BT_PASSKEY_MAX_LENGTH + 1] = { 0 };
 
 		if (__bt_agent_generate_passkey(str_passkey,
@@ -489,51 +510,50 @@ static gboolean __pincode_request(GapAgent *agent, DBusGProxy *device)
 						name, str_passkey, NULL,
 						_gap_agent_get_path(agent));
 	} else {
+		BT_DBG("Show Pin entry");
 		_bt_launch_system_popup(BT_AGENT_EVENT_PIN_REQUEST, name, NULL,
 					NULL, _gap_agent_get_path(agent));
 	}
 
 done:
-	g_hash_table_destroy(hash);
+	g_variant_unref(reply);
+	g_variant_unref(reply_temp);
 	__bt_agent_release_memory();
-
 	BT_DBG("-");
 
 	return TRUE;
 }
 
-static gboolean __passkey_request(GapAgent *agent, DBusGProxy *device)
+static gboolean __passkey_request(GapAgentPrivate *agent, GDBusProxy *device)
 {
-	GHashTable *hash = NULL;
-	GValue *value;
 	const gchar *address;
 	const gchar *name;
-	GError *error = NULL;
-
+	GVariant *reply = NULL;
+	GVariant *reply_temp = NULL;
+	GVariant *tmp_value;
 	BT_DBG("+");
 
-	dbus_g_proxy_call(device, "GetAll", &error,
-				G_TYPE_STRING, BT_DEVICE_INTERFACE,
-				G_TYPE_INVALID,
-				dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
-				G_TYPE_VALUE), &hash, G_TYPE_INVALID);
-	if (error) {
-		BT_ERR("error in GetBasicProperties [%s]\n", error->message);
-		g_error_free(error);
+	reply_temp = __bt_service_getall(device, BT_DEVICE_INTERFACE);
+
+	if (reply_temp == NULL) {
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "",
 					     NULL);
 		goto done;
 	}
 
-	value = g_hash_table_lookup(hash, "Address");
-	address = value ? g_value_get_string(value) : NULL;
+	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
+
+	tmp_value = g_variant_lookup_value (reply, "Address", G_VARIANT_TYPE_STRING);
+	g_variant_get(tmp_value, "s", &address);
+	G_VARIANT_UNREF(tmp_value);
 	if (!address) {
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "", NULL);
 		goto done;
 	}
 
-	value = g_hash_table_lookup(hash, "Name");
-	name = value ? g_value_get_string(value) : NULL;
+	tmp_value = g_variant_lookup_value(reply, "Name", G_VARIANT_TYPE_STRING);
+	g_variant_get(tmp_value, "s", &name);
+	G_VARIANT_UNREF(tmp_value);
 	if (!name)
 		name = address;
 
@@ -541,47 +561,46 @@ static gboolean __passkey_request(GapAgent *agent, DBusGProxy *device)
 						_gap_agent_get_path(agent));
 
 done:
+	g_variant_unref(reply);
+	g_variant_unref(reply_temp);
 	__bt_agent_release_memory();
-	g_hash_table_destroy(hash);
-	BT_DBG("-");
 
+	BT_DBG("-");
 	return TRUE;
 }
 
-static gboolean __display_request(GapAgent *agent, DBusGProxy *device,
+static gboolean __display_request(GapAgentPrivate *agent, GDBusProxy *device,
 								guint passkey)
 {
-	GHashTable *hash = NULL;
-	GValue *value;
 	const gchar *address;
 	const gchar *name;
-	GError *error = NULL;
 	char *str_passkey;
+	GVariant *reply = NULL;
+	GVariant *reply_temp = NULL;
+	GVariant *tmp_value = NULL;
 
 	BT_DBG("+");
 
-	dbus_g_proxy_call(device, "GetAll", &error,
-				G_TYPE_STRING, BT_DEVICE_INTERFACE,
-				G_TYPE_INVALID,
-				dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
-				G_TYPE_VALUE), &hash, G_TYPE_INVALID);
-	if (error) {
-		BT_ERR("error in GetAll [%s]\n", error->message);
-		g_error_free(error);
+	reply_temp = __bt_service_getall(device, BT_DEVICE_INTERFACE);
+	if (reply_temp == NULL) {
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "",
 					     NULL);
 		goto done;
 	}
 
-	value = g_hash_table_lookup(hash, "Address");
-	address = value ? g_value_get_string(value) : NULL;
+	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
+
+	tmp_value = g_variant_lookup_value (reply, "Address", G_VARIANT_TYPE_STRING);
+	g_variant_get(tmp_value, "s", &address);
+	G_VARIANT_UNREF(tmp_value);
 	if (!address) {
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "", NULL);
 		goto done;
 	}
 
-	value = g_hash_table_lookup(hash, "Name");
-	name = value ? g_value_get_string(value) : NULL;
+	tmp_value = g_variant_lookup_value(reply, "Name", G_VARIANT_TYPE_STRING);
+	g_variant_get(tmp_value, "s", &name);
+	G_VARIANT_UNREF(tmp_value);
 	if (!name)
 		name = address;
 
@@ -594,50 +613,49 @@ static gboolean __display_request(GapAgent *agent, DBusGProxy *device,
 	g_free(str_passkey);
 
 done:
+	g_variant_unref(reply);
+	g_variant_unref(reply_temp);
 	__bt_agent_release_memory();
-	g_hash_table_destroy(hash);
-	BT_DBG("-");
 
+	BT_DBG("-");
 	return TRUE;
 }
 
-static gboolean __confirm_request(GapAgent *agent, DBusGProxy *device,
+static gboolean __confirm_request(GapAgentPrivate *agent, GDBusProxy *device,
 								guint passkey)
 {
-	GHashTable *hash = NULL;
-	GValue *value;
 	const gchar *address;
 	const gchar *name;
-	GError *error = NULL;
 	char str_passkey[7];
-
+	GVariant *reply_temp = NULL;
+	GVariant *reply = NULL;
+	GVariant *tmp_value;
 	BT_DBG("+ passkey[%.6d]", passkey);
 
 	snprintf(str_passkey, sizeof(str_passkey), "%.6d", passkey);
 
-	dbus_g_proxy_call(device, "GetAll", &error,
-				G_TYPE_STRING, BT_DEVICE_INTERFACE,
-				G_TYPE_INVALID,
-				dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
-				G_TYPE_VALUE), &hash, G_TYPE_INVALID);
+	reply_temp = __bt_service_getall(device, BT_DEVICE_INTERFACE);
 
-	if (error) {
-		BT_ERR("error in GetAll [%s]", error->message);
-		g_error_free(error);
+	if (reply_temp == NULL) {
+		BT_ERR("Device doesn't exist");
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "",
 					     NULL);
 		goto done;
 	}
 
-	value = g_hash_table_lookup(hash, "Address");
-	address = value ? g_value_get_string(value) : NULL;
+	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
+
+	tmp_value = g_variant_lookup_value (reply, "Address", G_VARIANT_TYPE_STRING);
+	g_variant_get(tmp_value, "s", &address);
+	G_VARIANT_UNREF(tmp_value);
 	if (!address) {
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "", NULL);
 		goto done;
 	}
 
-	value = g_hash_table_lookup(hash, "Name");
-	name = value ? g_value_get_string(value) : NULL;
+	tmp_value = g_variant_lookup_value (reply, "Name", G_VARIANT_TYPE_STRING);
+	g_variant_get(tmp_value, "s", &name);
+	G_VARIANT_UNREF(tmp_value);
 	if (!name)
 		name = address;
 
@@ -645,10 +663,9 @@ static gboolean __confirm_request(GapAgent *agent, DBusGProxy *device,
 	uint32_t device_class = 0x00;
 	uint32_t major_class;
 
-	value = g_hash_table_lookup(hash, "Class");
-	device_class = value ? g_value_get_uint(value) : 0;
-
-	BT_INFO("COD : 0x%X", device_class);
+	tmp_value = g_variant_lookup_value(reply, "Class", G_VARIANT_TYPE_UINT32);
+	g_variant_get(tmp_value, "u", &device_class);
+	G_VARIANT_UNREF(tmp_value);
 
 	major_class = (device_class & 0x1f00) >> 8;
 
@@ -665,31 +682,32 @@ static gboolean __confirm_request(GapAgent *agent, DBusGProxy *device,
 				NULL, NULL, _gap_agent_get_path(agent));
 	} else {
 		BT_INFO("Launch passkey pop-up");
-		_bt_launch_system_popup(BT_AGENT_EVENT_PASSKEY_CONFIRM_REQUEST, name,
+		_bt_launch_system_popup(BT_AGENT_EVENT_PASSKEY_AUTO_ACCEPTED, name,
 				str_passkey, NULL, _gap_agent_get_path(agent));
+
+		gap_agent_reply_confirmation(agent, GAP_AGENT_ACCEPT, NULL);
 	}
 #else
+	BT_DBG("LAUNCH SYSPOPUP");
 	_bt_launch_system_popup(BT_AGENT_EVENT_PASSKEY_CONFIRM_REQUEST, name,
 						str_passkey, NULL,
 						_gap_agent_get_path(agent));
 #endif
 
 done:
+	g_variant_unref(reply);
+	g_variant_unref(reply_temp);
 	__bt_agent_release_memory();
-	g_hash_table_destroy(hash);
-
 	BT_DBG("-");
 
 	return TRUE;
 }
 
-static gboolean __pairing_cancel_request(GapAgent *agent, const char *address)
+static gboolean __pairing_cancel_request(GapAgentPrivate *agent, const char *address)
 {
 	BT_DBG("On Going Pairing is cancelled by remote\n");
 
-#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	syspopup_destroy_all();
-#endif
 
 	__bt_agent_release_memory();
 
@@ -702,21 +720,20 @@ static gboolean __a2dp_authorize_request_check(void)
 	return _bt_is_headset_type_connected(BT_AUDIO_A2DP, NULL);
 }
 
-static gboolean __authorize_request(GapAgent *agent, DBusGProxy *device,
+static gboolean __authorize_request(GapAgentPrivate *agent, GDBusProxy *device,
 							const char *uuid)
 {
-	GHashTable *hash = NULL;
-	GValue *value;
 	const gchar *address;
 	const gchar *name;
 	gboolean trust;
 	gboolean paired;
+	GVariant *reply = NULL;
+	GVariant *reply_temp = NULL;
+	GVariant *tmp_value;
 #ifdef TIZEN_NETWORK_TETHERING_ENABLE
 	bool enabled;
 	tethering_h tethering = NULL;
-	int ret = TETHERING_ERROR_NONE;
 #endif
-	GError *error = NULL;
 	int result = BLUETOOTH_ERROR_NONE;
 	int request_type = BT_AGENT_EVENT_AUTHORIZE_REQUEST;
 
@@ -798,55 +815,51 @@ fail:
 #endif
 	}
 
-	dbus_g_proxy_call(device, "GetAll", &error,
-				G_TYPE_STRING, BT_DEVICE_INTERFACE,
-				G_TYPE_INVALID,
-				dbus_g_type_get_map("GHashTable", G_TYPE_STRING,
-				G_TYPE_VALUE), &hash, G_TYPE_INVALID);
-	if (error) {
-		BT_ERR("error in GetAll [%s]\n", error->message);
-		g_error_free(error);
+	reply_temp = __bt_service_getall(device, BT_DEVICE_INTERFACE);
+	if (reply_temp == NULL) {
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "",
 					     NULL);
 		goto done;
 	}
 
-	value = g_hash_table_lookup(hash, "Address");
-	address = value ? g_value_get_string(value) : NULL;
+	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
+
+	tmp_value = g_variant_lookup_value (reply, "Address", G_VARIANT_TYPE_STRING);
+	g_variant_get(tmp_value, "s", &address);
+	G_VARIANT_UNREF(tmp_value);
 	if (!address) {
 		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, "", NULL);
 		goto done;
 	}
 
-	value = g_hash_table_lookup(hash, "Alias");
-	name = value ? g_value_get_string(value) : NULL;
+	tmp_value = g_variant_lookup_value(reply, "Alias", G_VARIANT_TYPE_STRING);
+	g_variant_get(tmp_value, "s", &name);
+	G_VARIANT_UNREF(tmp_value);
 	if (!name)
 		name = address;
 
-	value = g_hash_table_lookup(hash, "Trusted");
-	trust = value ? g_value_get_boolean(value) : 0;
+	tmp_value = g_variant_lookup_value(reply, "Trusted", G_VARIANT_TYPE_BOOLEAN);
+	g_variant_get(tmp_value, "b", &trust);
+	G_VARIANT_UNREF(tmp_value);
 
-	value = g_hash_table_lookup(hash, "Paired");
-	paired = value ? g_value_get_boolean(value) : 0;
+	tmp_value = g_variant_lookup_value(reply, "Paired", G_VARIANT_TYPE_BOOLEAN);
+	g_variant_get(tmp_value, "b", &paired);
+	G_VARIANT_UNREF(tmp_value);
 	if ((paired == FALSE) && (trust == FALSE)) {
 		BT_ERR("No paired & No trusted device");
 		gap_agent_reply_authorize(agent,
-					      GAP_AGENT_REJECT, NULL);
+				GAP_AGENT_REJECT, NULL);
 		goto done;
 	}
 
-	BT_INFO("Authorization request for device [%s] Service:[%s]\n", address,
-									uuid);
+	BT_INFO("Authorization request for device [%s] Service:[%s]\n", address, uuid);
 
 	if (strcasecmp(uuid, OPP_UUID) == 0 &&
 	     _gap_agent_exist_osp_server(agent, BT_OBEX_SERVER,
 					NULL) == TRUE) {
 		_bt_send_event(BT_OPP_SERVER_EVENT,
-			BLUETOOTH_EVENT_OBEX_SERVER_CONNECTION_AUTHORIZE,
-			DBUS_TYPE_INT32, &result,
-			DBUS_TYPE_STRING, &address,
-			DBUS_TYPE_STRING, &name,
-			DBUS_TYPE_INVALID);
+				BLUETOOTH_EVENT_OBEX_SERVER_CONNECTION_AUTHORIZE,
+				g_variant_new("iss", result, address, name));
 
 		goto done;
 	}
@@ -859,13 +872,8 @@ fail:
 
 		_bt_send_event(BT_RFCOMM_SERVER_EVENT,
 			BLUETOOTH_EVENT_RFCOMM_AUTHORIZE,
-			DBUS_TYPE_INT32, &result,
-			DBUS_TYPE_STRING, &address,
-			DBUS_TYPE_STRING, &uuid,
-			DBUS_TYPE_STRING, &name,
-			DBUS_TYPE_STRING, &osp_serv->path,
-			DBUS_TYPE_INT16, &osp_serv->fd,
-			DBUS_TYPE_INVALID);
+			g_variant_new("issssn", result, address, uuid,
+					name, osp_serv->path, osp_serv->fd));
 
 		goto done;
 	}
@@ -887,24 +895,22 @@ fail:
 	}
 
 done:
+	g_variant_unref(reply);
+	g_variant_unref(reply_temp);
 	__bt_agent_release_memory();
-	g_hash_table_destroy(hash);
-
 	BT_DBG("-");
 
 	return TRUE;
 }
 
-static gboolean __authorization_cancel_request(GapAgent *agent,
+static gboolean __authorization_cancel_request(GapAgentPrivate *agent,
 							const char *address)
 {
 	BT_DBG("On Going Authorization is cancelled by remote\n");
 
 	gap_agent_reply_authorize(agent, GAP_AGENT_CANCEL, NULL);
 
-#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	syspopup_destroy_all();
-#endif
 
 	__bt_agent_release_memory();
 
@@ -916,16 +922,16 @@ void _bt_destroy_agent(void *agent)
 	if (!agent)
 		return;
 
-	_gap_agent_reset_dbus(agent);
+	_gap_agent_reset_dbus((GapAgentPrivate *)agent);
 
-	g_object_unref(agent);
+	g_free(agent);
 }
 
 void* _bt_create_agent(const char *path, gboolean adapter)
 {
 	GAP_AGENT_FUNC_CB func_cb;
-	DBusGProxy *adapter_proxy;
-	GapAgent* agent;
+	GDBusProxy *adapter_proxy;
+	GapAgentPrivate *agent;
 
 	adapter_proxy = _bt_get_adapter_proxy();
 	if (!adapter_proxy)
@@ -939,14 +945,15 @@ void* _bt_create_agent(const char *path, gboolean adapter)
 	func_cb.pairing_cancel_func = __pairing_cancel_request;
 	func_cb.authorization_cancel_func = __authorization_cancel_request;
 
-	agent = _gap_agent_new();
+	/* Allocate memory*/
+	agent = g_new0(GapAgentPrivate, 1);
 
-	_gap_agent_setup_dbus(agent, &func_cb, path);
+	_gap_agent_setup_dbus(agent, &func_cb, path, adapter_proxy);
 
 	if (adapter) {
 		if (!_gap_agent_register(agent)) {
 			_bt_destroy_agent(agent);
-			return NULL;
+			agent = NULL;
 		}
 	}
 
@@ -967,6 +974,7 @@ gboolean _bt_agent_register_osp_server(const gint type,
 gboolean _bt_agent_unregister_osp_server(const gint type, const char *uuid)
 {
 	void *agent = _bt_get_adapter_agent();
+
 	if (!agent)
 		return FALSE;
 
@@ -1038,7 +1046,7 @@ static gboolean __bt_agent_find_device_by_address_exactname(char *buffer,
 							const char *address)
 {
 	char *pch;
-	char *last = NULL;
+	char *last;
 
 	pch = strtok_r(buffer, "= ,", &last);
 
@@ -1058,7 +1066,7 @@ static gboolean __bt_agent_find_device_by_partial_name(char *buffer,
 						const char *partial_name)
 {
 	char *pch;
-	char *last = NULL;
+	char *last;
 
 	pch = strtok_r(buffer, "= ,", &last);
 
@@ -1104,6 +1112,12 @@ static gboolean __bt_agent_is_device_blacklist(const char *address,
 	rewind(fp);
 
 	buffer = g_malloc0(sizeof(char) * size);
+	/* Fix : NULL_RETURNS */
+	if (buffer == NULL) {
+		BT_ERR("Fail to allocate memory");
+		fclose(fp);
+		return FALSE;
+	}
 	result = fread((char *)buffer, 1, size, fp);
 	fclose(fp);
 	if (result != size) {

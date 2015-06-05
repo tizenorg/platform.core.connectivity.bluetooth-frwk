@@ -27,8 +27,6 @@
 
 #include <glib.h>
 #include <sys/types.h>
-#include <dbus/dbus-glib.h>
-#include <dbus/dbus-glib-lowlevel.h>
 
 #include "bluetooth-api.h"
 #include "bluetooth-media-control.h"
@@ -37,10 +35,21 @@
 extern "C" {
 #endif
 
-#define BLUEZ_MEDIA_PLAYER_INTERFACE	"org.bluez.MediaPlayer"
 #define BT_MEDIA_OBJECT_PATH "/Musicplayer"
 
-#define BT_MEDIA_CONTROL_PATH "%s/player0"
+#define BT_AVRCP_ERROR (__bt_avrcp_error_quark())
+
+#define BT_ERROR_INTERNAL "InternalError"
+#define BT_ERROR_INVALID_PARAM "InvalidParameters"
+#define BT_ERROR_INVALID_INTERFACE "InvalidInterface"
+
+typedef enum {
+	BT_AVRCP_ERROR_NONE,
+	BT_AVRCP_ERROR_INTERNAL,
+	BT_AVRCP_ERROR_INVALID_PARAM,
+	BT_AVRCP_ERROR_NOT_SUPPORTED,
+	BT_AVRCP_ERROR_INVALID_INTERFACE
+} bt_avrcp_error_t;
 
 int _bt_register_media_player(void);
 
@@ -51,16 +60,6 @@ int _bt_avrcp_set_track_info(media_metadata_attributes_t *meta_data);
 int _bt_avrcp_set_properties(media_player_settings_t *properties);
 
 int _bt_avrcp_set_property(int type, unsigned int value);
-
-int _bt_avrcp_control_cmd(int type);
-
-int _bt_avrcp_control_set_property(int type, unsigned int value);
-
-int _bt_avrcp_control_get_property(int type, unsigned int *value);
-
-int _bt_avrcp_control_get_track_info(media_metadata_attributes_t *metadata);
-
-void _bt_handle_avrcp_control_event(DBusMessageIter *msg_iter, const char *path);
 
 #ifdef __cplusplus
 }

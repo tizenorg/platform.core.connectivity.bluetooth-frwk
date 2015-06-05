@@ -54,7 +54,7 @@ BT_EXPORT_API int bluetooth_gatt_free_service_property(bt_gatt_service_property_
 
 	g_free(svc_pty->uuid);
 	g_free(svc_pty->handle);
-	g_strfreev(svc_pty->handle_info.handle);
+	g_strfreev(svc_pty->include_handles.handle);
 	g_strfreev(svc_pty->char_handle.handle);
 
 	memset(svc_pty, 0, sizeof(bt_gatt_service_property_t));
@@ -109,6 +109,10 @@ static char **__get_string_array_from_gptr_array(GPtrArray *gp)
 
 	path = g_malloc0((gp->len + 1) * sizeof(char *));
 
+	/* Fix : NULL_RETURNS */
+	if (path == NULL)
+		return NULL;
+
 	for (i = 0; i < gp->len; i++) {
 		gp_path = g_ptr_array_index(gp, i);
 		path[i] = g_strdup(gp_path);
@@ -125,7 +129,7 @@ BT_EXPORT_API int bluetooth_gatt_get_service_property(const char *service_handle
 	GError *error = NULL;
 	GVariant *result = NULL;
 	GDBusConnection *g_conn;
-	int len;
+	gsize len;
 	char *char_handle = NULL;
 	GPtrArray *gp_array  = NULL ;
 	GVariantIter *property_iter, *char_iter;
@@ -184,8 +188,8 @@ BT_EXPORT_API int bluetooth_gatt_get_service_property(const char *service_handle
 				g_ptr_array_add(gp_array, (gpointer)char_handle);
 			}
 			if (gp_array->len != 0) {
-				service->handle_info.count = gp_array->len;
-				service->handle_info.handle =
+				service->include_handles.count = gp_array->len;
+				service->include_handles.handle =
 						__get_string_array_from_gptr_array(gp_array);
 			}
 			g_ptr_array_free(gp_array, TRUE);
@@ -294,7 +298,6 @@ BT_EXPORT_API int bluetooth_gatt_get_service_from_uuid(bluetooth_device_address_
 	GVariantIter *iter;
 	GVariantIter *svc_iter;
 	GVariantIter *interface_iter;
-	GError *error = NULL;
 	char *object_path = NULL;
 	char *interface_str = NULL;
 	char device_address[BT_ADDRESS_STRING_SIZE] = { 0 };
@@ -397,7 +400,7 @@ static void __bluetooth_internal_get_char_cb(GDBusProxy *proxy,
 	g_variant_get(value, "(v)", &char_value);
 	g_variant_get(char_value, "ao", &char_iter);
 
-	int len = g_variant_get_size(char_iter);
+	int len = g_variant_get_size((GVariant *)char_iter);
 	if (len > 0) {
 		gp_array = g_ptr_array_new();
 		for (i = 0; i < len; i++) {
@@ -510,7 +513,7 @@ BT_EXPORT_API int bluetooth_gatt_get_characteristics_property(
 	const gchar *key;
 	gchar* permission;
 	char *char_desc_handle = NULL;
-	int len;
+	gsize len;
 	GVariantIter *property_iter;
 	GVariantIter *char_value_iter;
 	GVariantIter *char_perm_iter;
@@ -644,7 +647,7 @@ void bluetooth_gatt_get_char_from_uuid_cb(GDBusProxy *proxy,
 
 	g_variant_get(value, "(ao)", &char_iter);
 
-	len = g_variant_get_size(char_iter);
+	len = g_variant_get_size((GVariant *)char_iter);
 
 	for (i = 0; i < len; i++) {
 		g_variant_iter_loop(char_iter, "o",  &char_handle);
@@ -722,7 +725,7 @@ BT_EXPORT_API int bluetooth_gatt_get_char_descriptor_property(
 	GVariantIter *property_iter;
 	const gchar *key;
 	guint8 char_value;
-	int len;
+	gsize len;
 	GVariant *value = NULL;
 	GByteArray *gb_array = NULL;
 	GVariantIter *desc_value_iter;
@@ -968,6 +971,65 @@ static void __bluetooth_internal_write_cb(GObject *source_object,
 	return;
 }
 
+BT_EXPORT_API int bluetooth_gatt_set_characteristics_value_by_type(
+		const char *char_handle, const guint8 *value, int length, guint8 write_type)
+{
+	GVariant *val;
+	GVariantBuilder *builder;
+	GDBusConnection *conn;
+	int i = 0;
+	int ret = BLUETOOTH_ERROR_NONE;
+
+	BT_CHECK_PARAMETER(char_handle, return);
+	BT_CHECK_PARAMETER(value, return);
+	retv_if(length == 0, BLUETOOTH_ERROR_INVALID_PARAM);
+	BT_CHECK_ENABLED(return);
+
+	conn = _bt_gdbus_get_system_gconn();
+	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	builder = g_variant_builder_new(G_VARIANT_TYPE("ay"));
+
+	for (i = 0; i < length; i++) {
+		g_variant_builder_add(builder, "y", value[i]);
+	}
+
+	val = g_variant_new("ay", builder);
+
+	if (write_type ==
+		BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE_NO_RESPONSE) {
+		g_dbus_connection_call(conn,
+				BT_BLUEZ_NAME,
+				char_handle,
+				GATT_CHAR_INTERFACE,
+				"WriteValuebyType",
+				g_variant_new("(y@ay)", write_type, val),
+				NULL,
+				G_DBUS_CALL_FLAGS_NONE,
+				-1, NULL,
+				(GAsyncReadyCallback)__bluetooth_internal_write_cb,
+				NULL);
+	} else if (write_type ==
+			BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE) {
+		g_dbus_connection_call(conn,
+				BT_BLUEZ_NAME,
+				char_handle,
+				GATT_CHAR_INTERFACE,
+				"WriteValuebyType",
+				g_variant_new("(y@ay)", write_type, val),
+				NULL,
+				G_DBUS_CALL_FLAGS_NONE,
+				-1, NULL,
+				(GAsyncReadyCallback)__bluetooth_internal_write_cb,
+				NULL);
+	} else
+		ret = BLUETOOTH_ERROR_INVALID_PARAM;
+
+
+	g_variant_builder_unref(builder);
+	return ret;
+}
+
 BT_EXPORT_API int bluetooth_gatt_set_characteristics_value_request(
 			const char *char_handle, const guint8 *value, int length)
 {
@@ -1022,8 +1084,8 @@ static int __bluetooth_gatt_descriptor_iter(const char *char_handle,
 	GVariant *result = NULL;
 	GDBusConnection *g_conn;
 	int i, ret = BLUETOOTH_ERROR_NONE;
-	char *uuid = NULL;
-	int len = 0;
+	const char *uuid = NULL;
+	gsize len = 0;
 	GVariantIter *desc_value_iter, *property_iter;
 	const gchar *key;
 	char_descriptor_type_t desc_type = TYPE_NONE;
@@ -1090,10 +1152,10 @@ static int __bluetooth_gatt_descriptor_iter(const char *char_handle,
 				case USER_DESC:
 					BT_DBG("User descriptor");
 					g_variant_get(value, "ay", &desc_value_iter);
-					len = g_variant_get_size(desc_value_iter);
+					len = g_variant_get_size((GVariant *)desc_value_iter);
 
 					if (len > 0) {
-						characteristic->description = (guint8 *)g_malloc0(len + 1);
+						characteristic->description = (char *)g_malloc0(len + 1);
 						if (!characteristic->description) {
 							ret = BLUETOOTH_ERROR_OUT_OF_MEMORY;
 							goto done;
@@ -1111,6 +1173,7 @@ static int __bluetooth_gatt_descriptor_iter(const char *char_handle,
 				case SERVER_CONF :
 					BT_DBG(" SERVER_CONF");
 					break;
+				default:break;
 			}
 		}
 	}
@@ -1164,7 +1227,7 @@ static void bluetooth_gatt_get_char_desc_cb(GDBusProxy *proxy,
 	g_variant_get(value, "(v)", &char_value);
 	g_variant_get(char_value, "ao", &char_iter);
 
-	int len = g_variant_get_size(char_iter);
+	int len = g_variant_get_size((GVariant *)char_iter);
 	if (len > 0) {
 		for (i = 0; i < len; i++) {
 			g_variant_iter_loop(char_iter, "o",  &char_handle);
@@ -1264,8 +1327,8 @@ static void __bluetooth_internal_read_desc_cb(GObject *source_object,
 	}
 
 	if (gp_byte_array->len != 0) {
-		char_value.val_len = gp_byte_array->len;
-		char_value.description= gp_byte_array->data;
+		char_value.val_len = (unsigned int )gp_byte_array->len;
+		char_value.description= (char *)gp_byte_array->data;
 	}
 
 	if (user_info) {
@@ -1396,8 +1459,6 @@ BT_EXPORT_API int bluetooth_gatt_watch_characteristics(const char *char_handle)
 	GError *error = NULL;
 	int ret = BLUETOOTH_ERROR_NONE;
 	BT_DBG("+");
-/* Implementation in Bluez is not complete */
-#if 0
 	BT_CHECK_PARAMETER(char_handle, return);
 
 	BT_CHECK_ENABLED(return);
@@ -1419,23 +1480,36 @@ BT_EXPORT_API int bluetooth_gatt_watch_characteristics(const char *char_handle)
 
 	if (error) {
 		BT_ERR("Watch Failed: %s", error->message);
+		if (g_strrstr(error->message, "Already notifying"))
+			ret = BLUETOOTH_ERROR_NONE;
+		else if (g_strrstr(error->message, "In Progress"))
+			ret = BLUETOOTH_ERROR_IN_PROGRESS;
+		else if (g_strrstr(error->message, "Operation is not supported"))
+			ret = BLUETOOTH_ERROR_NOT_SUPPORT;
+/*failed because of either Insufficient Authorization or Write Not Permitted */
+		else if (g_strrstr(error->message, "Write not permitted") ||
+				g_strrstr(error->message, "Operation Not Authorized"))
+			ret = BLUETOOTH_ERROR_PERMISSION_DEINED;
+/* failed because of either Insufficient Authentication,
+	Insufficient Encryption Key Size, or Insufficient Encryption. */
+		else if (g_strrstr(error->message, "Not paired"))
+			ret = BLUETOOTH_ERROR_NOT_PAIRED;
+		else
+			ret = BLUETOOTH_ERROR_INTERNAL;
+
 		g_clear_error(&error);
-		ret = BLUETOOTH_ERROR_INTERNAL;
 	}
-#endif
 	BT_DBG("-");
 	return ret;
 }
 
-BT_EXPORT_API int bluetooth_gatt_unwatch_characteristics(const char *service_handle)
+BT_EXPORT_API int bluetooth_gatt_unwatch_characteristics(const char *char_handle)
 {
 
 	GDBusConnection *conn;
 	GError *error = NULL;
 	int ret = BLUETOOTH_ERROR_NONE;
 	BT_DBG("+");
-/* Implementation in Bluez is not complete */
-#if 0
 	BT_CHECK_PARAMETER(char_handle, return);
 
 	BT_CHECK_ENABLED(return);
@@ -1460,7 +1534,6 @@ BT_EXPORT_API int bluetooth_gatt_unwatch_characteristics(const char *service_han
 		g_clear_error(&error);
 		ret =  BLUETOOTH_ERROR_INTERNAL;
 	}
-#endif
 	BT_DBG("-");
 	return ret;
 }

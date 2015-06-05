@@ -120,6 +120,11 @@ char * get_bd_from_file(char *filename)
 	}
 
 	buf = g_malloc0(20);
+	/* Fix : NULL_RETURNS */
+	if (buf == NULL) {
+		close(fd);
+		return NULL;
+	}
 
 	if (read(fd, buf, 17) < 17) {
 		perror("Can't load firmware");
@@ -146,7 +151,10 @@ static void __accept_bdaddress(bluetooth_device_address_t *device_address)
 	}
 
 	TC_PRT("Enter bd address: ");
-	scanf("%s", str_address);
+	int ret = 0;
+	ret = scanf("%s", str_address);
+	if (ret < 0)
+		TC_PRT("Some read error");
 	TC_PRT("You have entered bd address %s\n", str_address);
 	convert_addr_string_to_addr_type(device_address, str_address);
 }
@@ -154,8 +162,11 @@ static void __accept_bdaddress(bluetooth_device_address_t *device_address)
 static void __accept_alert_level()
 {
 	TC_PRT("Enter alert level \n 0 - no alert 1 - mild alert 2 - High alert : ");
-	scanf("%u", &g_alert_level);
-	TC_PRT("You have selected alert level %u ", g_alert_level);
+	int ret = 0;
+	ret = scanf("%c", &g_alert_level);
+	if (ret < 0)
+		TC_PRT("Some read error");
+	TC_PRT("You have selected alert level %hu ", g_alert_level);
 }
 
 int test_input_callback(void *data)
@@ -297,8 +308,8 @@ static gboolean key_event_cb(GIOChannel *chan, GIOCondition cond, gpointer data)
 	unsigned int len = 0;
 	int test_id;
 
-	if (g_io_channel_read(chan, buf, sizeof(buf), &len) !=
-							G_IO_ERROR_NONE) {
+	if (g_io_channel_read_chars(chan, buf, sizeof(buf), 
+			&len, NULL) ==  G_IO_STATUS_ERROR) {
 		printf("IO Channel read error");
 		return FALSE;
 	}

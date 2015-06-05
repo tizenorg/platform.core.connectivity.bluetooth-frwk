@@ -458,7 +458,7 @@ int test_input_callback(void *data)
 		case 24:
 		{
 			gboolean hf_connected;
-			bluetooth_hf_is_hf_connected(&hf_connected);
+			bluetooth_hf_is_connected(&hf_connected);
 			if (hf_connected == BLUETOOTH_HF_AUDIO_CONNECTED)
 				TC_PRT("HF is connected");
 			else

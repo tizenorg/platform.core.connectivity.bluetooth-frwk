@@ -268,6 +268,7 @@ typedef enum {
 	BLUETOOTH_HFG_SERVICE = 0x20,
 	BLUETOOTH_GATT_SERVICE = 0x40,
 	BLUETOOTH_NAP_SERVER_SERVICE = 0x80,
+	BLUETOOTH_A2DP_SINK_SERVICE = 0x100,
 } bluetooth_service_type_t;
 
 /**
@@ -401,7 +402,7 @@ typedef struct {
 
 #define BLUETOOTH_EVENT_AUDIO_BASE ((int)(BLUETOOTH_EVENT_GATT_BASE + 0x0020))
 								/**< Base ID for Audio events */
-#define BLUETOOTH_EVENT_HID_BASE ((int)(BLUETOOTH_EVENT_AUDIO_BASE + 0x0020))
+#define BLUETOOTH_EVENT_HID_BASE ((int)(BLUETOOTH_EVENT_AUDIO_BASE + 0x0030))
 								/**< Base ID for HID events */
 #define BLUETOOTH_EVENT_ADVERTISING_BASE ((int)(BLUETOOTH_EVENT_HID_BASE + 0x0020))
 								/**< Base ID for Advertising events */
@@ -439,7 +440,6 @@ typedef enum {
 	BLUETOOTH_EVENT_DEVICE_AUTHORIZED,	    /**< Bluetooth event authorize device */
 	BLUETOOTH_EVENT_DEVICE_UNAUTHORIZED,	    /**< Bluetooth event unauthorize device */
 	BLUETOOTH_EVENT_DISCOVERABLE_TIMEOUT_CHANGED,  /**< Bluetooth event mode changed */
-		BLUETOOTH_EVENT_REMOTE_DEVICE_DISAPPEARED, /**< Bluetooth event remote device disappeared*/
 	BLUETOOTH_EVENT_CONNECTABLE_CHANGED,	    /**< Bluetooth event connectable changed */
 
 	BLUETOOTH_EVENT_RSSI_ENABLED,		/**< Bluetooth event RSSI monitoring enabled */
@@ -505,6 +505,7 @@ typedef enum {
 	BLUETOOTH_EVENT_GATT_CONNECTED,/**<Gatt connected event */
 	BLUETOOTH_EVENT_GATT_DISCONNECTED, /**<Gatt Disconnected event */
 	BLUETOOTH_EVENT_GATT_SERVER_CHARACTERISTIC_VALUE_CHANGED, /**<Gatt Char write callback event */
+	BLUETOOTH_EVENT_GATT_SERVER_READ_REQUESTED, /** <GATT Characteristic/Descriptor Read Request event */
 
 	BLUETOOTH_EVENT_AG_CONNECTED = BLUETOOTH_EVENT_AUDIO_BASE, /**<AG service connected event*/
 	BLUETOOTH_EVENT_AG_DISCONNECTED, /**<AG service disconnected event*/
@@ -514,6 +515,8 @@ typedef enum {
 	BLUETOOTH_EVENT_AG_AUDIO_DISCONNECTED,  /**<AV & AG service disconnected event*/
 	BLUETOOTH_EVENT_AV_CONNECTED, /**<AV service connected event*/
 	BLUETOOTH_EVENT_AV_DISCONNECTED, /**<AV service disconnected event*/
+	BLUETOOTH_EVENT_AV_SOURCE_CONNECTED, /**<AV Source device connected event */
+	BLUETOOTH_EVENT_AV_SOURCE_DISCONNECTED, /**<AV Source device disconnected event */
 	BLUETOOTH_EVENT_AVRCP_CONNECTED, /**<AVRCP service connected event*/
 	BLUETOOTH_EVENT_AVRCP_DISCONNECTED, /**<AVRCP service disconnected event*/
 	BLUETOOTH_EVENT_AVRCP_SETTING_SHUFFLE_STATUS, /**<AVRCP service player suffle  status event*/
@@ -540,6 +543,9 @@ typedef enum {
 
 	BLUETOOTH_HID_CONNECTED = BLUETOOTH_EVENT_HID_BASE, /**< Input connectd event*/
 	BLUETOOTH_HID_DISCONNECTED, /**< Input disconnectd event*/
+	BLUETOOTH_HID_DEVICE_CONNECTED, /**< HID Device connected event*/
+	BLUETOOTH_HID_DEVICE_DISCONNECTED, /**< HID Device disconnected event*/
+	BLUETOOTH_HID_DEVICE_DATA_RECEIVED, /**< HID Device data received event*/
 
 	BLUETOOTH_EVENT_ADVERTISING_STARTED = BLUETOOTH_EVENT_ADVERTISING_BASE, /**< Advertising started event */
 	BLUETOOTH_EVENT_ADVERTISING_STOPPED, /**< Advertising stopped event */
@@ -550,7 +556,8 @@ typedef enum {
 	BLUETOOTH_EVENT_TX_TIMEOUT_ERROR, /** TX Timeout Error*/
 	BLUETOOTH_EVENT_MAX, /**< Bluetooth event Max value */
 
-	BLUETOOTH_PBAP_CONNECTED = BLUETOOTH_EVENT_PBAP_CLIENT_BASE, /**< PBAP connected/disconnectd event*/
+	BLUETOOTH_PBAP_CONNECTED = BLUETOOTH_EVENT_PBAP_CLIENT_BASE, /**< PBAP connected event*/
+	BLUETOOTH_PBAP_DISCONNECTED, /**< PBAP disconnectd event*/
 	BLUETOOTH_PBAP_PHONEBOOK_SIZE, /**< PBAP Phonebook Size event*/
 	BLUETOOTH_PBAP_PHONEBOOK_PULL, /**< PBAP Phonebook Pull event*/
 	BLUETOOTH_PBAP_VCARD_LIST, /**< PBAP vCard List event*/
@@ -815,6 +822,28 @@ typedef enum {
 } bt_discovery_role_type_t;
 
 /**
+ * Connected state types
+ */
+typedef enum {
+	BLUETOOTH_CONNECTED_LINK_NONE = 0x00,
+	BLUETOOTH_CONNECTED_LINK_BREDR = 0x01,
+	BLUETOOTH_CONNECTED_LINK_LE = 0x02,
+	BLUETOOTH_CONNECTED_LINK_BREDR_LE = 0x03,
+} bluetooth_connected_link_t;
+
+/**
+* Scan filter entry
+*/
+typedef enum {
+	BLUETOOTH_LE_SCAN_FILTER_FEATURE_DEVICE_ADDRESS = 0x01,			/**< device address */
+	BLUETOOTH_LE_SCAN_FILTER_FEATURE_SERVICE_UUID = 0x04,			/**< service uuid */
+	BLUETOOTH_LE_SCAN_FILTER_FEATURE_SERVICE_SOLICITATION_UUID = 0x08,	/**< service solicitation uuid */
+	BLUETOOTH_LE_SCAN_FILTER_FEATURE_DEVICE_NAME = 0x10,			/**< device name */
+	BLUETOOTH_LE_SCAN_FILTER_FEATURE_MANUFACTURER_DATA = 0x20,		/**< manufacturer data */
+	BLUETOOTH_LE_SCAN_FILTER_FEATURE_SERVICE_DATA = 0x40,			/**< service data */
+} bluetooth_le_scan_filter_feature_t;
+
+/**
 * structure to hold the device information
 */
 typedef struct {
@@ -824,10 +853,10 @@ typedef struct {
 	char uuids[BLUETOOTH_MAX_SERVICES_FOR_DEVICE][BLUETOOTH_UUID_STRING_MAX];
 	unsigned int service_list_array[BLUETOOTH_MAX_SERVICES_FOR_DEVICE]; /**< Use enum values in bt_service_uuid_list_t */
 	int service_index;
-	int rssi;			/**< received strength signal*/
-	gboolean paired;		/**< paired flag */
-	gboolean connected;	/**< connected flag */
-	gboolean trust;		/**< connected flag */
+	int rssi;				/**< received strength signal*/
+	gboolean paired;			/**< paired flag */
+	bluetooth_connected_link_t connected;	/**< connected link type */
+	gboolean trust;				/**< trust flag */
 	bluetooth_manufacturer_data_t manufacturer_data;	/**< manafacturer specific class */
 } bluetooth_device_info_t;
 
@@ -846,6 +875,22 @@ typedef struct {
 	bluetooth_le_advertising_data_t adv_ind_data;
 	bluetooth_le_advertising_data_t scan_resp_data;
 } bluetooth_le_device_info_t;
+
+typedef struct {
+	int slot_id;
+	bluetooth_le_scan_filter_feature_t added_features;		/**< added features */
+	bluetooth_device_address_t device_address;			/**< device address */
+	char device_name[BLUETOOTH_ADVERTISING_DATA_LENGTH_MAX];	/**< device name */
+	bluetooth_le_advertising_data_t service_uuid;			/**< service uuid */
+	bluetooth_le_advertising_data_t service_uuid_mask;		/**< service uuid mask */
+	bluetooth_le_advertising_data_t service_solicitation_uuid;	/**< service solicitation uuid */
+	bluetooth_le_advertising_data_t service_solicitation_uuid_mask;	/**< service solicitation uuid mask */
+	bluetooth_le_advertising_data_t service_data;			/**< service data */
+	bluetooth_le_advertising_data_t service_data_mask;		/**< service data mask */
+	int manufacturer_id;						/**< manufacturer ID */
+	bluetooth_le_advertising_data_t manufacturer_data;		/**< manufacturer data */
+	bluetooth_le_advertising_data_t manufacturer_data_mask;		/**< manufacturer data mask */
+} bluetooth_le_scan_filter_t;
 
 /**
  * structure to hold the paired device information
@@ -915,13 +960,49 @@ typedef struct {
 } bluetooth_rfcomm_received_data_t;
 
 /**
+ * HID Header type
+ */
+typedef enum {
+	HTYPE_TRANS_HANDSHAKE,
+	HTYPE_TRANS_HID_CONTROL,
+	HTYPE_TRANS_GET_REPORT,
+	HTYPE_TRANS_SET_REPORT,
+	HTYPE_TRANS_GET_PROTOCOL,
+	HTYPE_TRANS_SET_PROTOCOL,
+	HTYPE_TRANS_DATA,
+	HTYPE_TRANS_UNKNOWN
+}bt_hid_header_type_t;
+
+/**
+ * HID Param type
+ */
+typedef enum {
+	PTYPE_DATA_RTYPE_INPUT,
+	PTYPE_DATA_RTYPE_OUTPUT
+}bt_hid_param_type_t;
+
+/**
+ * Stucture to hid receive data
+ */
+typedef struct {
+	const char *address;
+	bt_hid_header_type_t type;
+		/**< Header type containing */
+	bt_hid_param_type_t param;
+		/**< Param type in header like INPUT Report or OutPut Report */
+	int buffer_size;/**< the length of the receive buffer */
+	char *buffer;
+		/**< the receive data buffer */
+} bluetooth_hid_received_data_t;
+
+/**
 * Stucture to rfcomm connection
 */
 
 typedef struct {
-	int socket_fd;
-		/**< the socket fd */
-	int device_role;/** < Device role - RFCOMM_ROLE_SERVER or RFCOMM_ROLE_CLIENT */
+	int socket_fd; /**< the socket fd */
+	int server_id; /* Server id */
+	int device_role; /** < Device role - RFCOMM_ROLE_SERVER or RFCOMM_ROLE_CLIENT */
 	bluetooth_device_address_t device_addr;
 					      /**< device address */
 	char uuid[BLUETOOTH_UUID_STRING_MAX];
@@ -945,6 +1026,13 @@ typedef struct {
 	bluetooth_device_address_t device_addr;
 					      /**< device address */
 } bluetooth_rfcomm_connection_request_t;
+
+typedef struct {
+	int socket_fd;
+		/**< the socket fd */
+	bluetooth_device_address_t device_addr;
+					      /**< device address */
+} bluetooth_hid_request_t;
 
 /**
  * HDP QOS types
@@ -1061,7 +1149,7 @@ typedef struct {
 	char *uuid;
 	char *handle;
 	gboolean primary;
-	bt_gatt_handle_info_t handle_info;
+	bt_gatt_handle_info_t include_handles;
 	bt_gatt_handle_info_t char_handle;
 } bt_gatt_service_property_t;
 
@@ -1124,6 +1212,16 @@ typedef struct {
 	guint32 val_len;
 } bt_gatt_char_value_t;
 
+/**
+ * Structure to GATT Read Request
+ */
+typedef struct {
+	char *char_handle;
+	char *service_handle;
+	char *address;
+	guint16 offset;
+	guint8 req_id;
+} bt_gatt_read_req_t;
 
 /**
  * Structure to RSSI Signal Strength Alert
@@ -1794,6 +1892,33 @@ int bluetooth_is_device_connected(const bluetooth_device_address_t *device_addre
 				gboolean *is_connected);
 
 /**
+ * @fn int bluetooth_get_connected_link_type(const bluetooth_device_address_t *device_address, bluetooth_connected_link_t *connected_link)
+ * @brief Gets device's connected link type
+ *
+ * This function is used to get device's connected link type
+ *
+ * This function is a synchronous call.
+ *
+ * @param[in]	device_address	a device address of remote bluetooth device
+ * @param[out]	connected_link	a device's connected link type
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is not enabled \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM - Bluetooth name parameter is incorrect \n
+ *		BLUETOOTH_ERROR_INTERNAL - The dbus method call is fail \n
+ *
+ * @remark      None
+ *
+@code
+bluetooth_connected_link_t *connected_link = BLUETOOTH_CONNECTED_LINK_NONE;
+bluetooth_device_address_t device_address={{0x00,0x0D,0xFD,0x24,0x5E,0xFF}};
+ret = bluetooth_get_connected_link(&device_address, &connected_link);
+@endcode
+ */
+int bluetooth_get_connected_link_type(const bluetooth_device_address_t *device_address,
+				bluetooth_connected_link_t *connected_link);
+
+/**
  * @fn int bluetooth_get_discoverable_mode(bluetooth_discoverable_mode_t *discoverable_mode_ptr)
  * @brief Get the visibility mode
  *
@@ -2301,6 +2426,76 @@ ret = bluetooth_is_le_discovering ();
 @endcode
  */
 int bluetooth_is_le_discovering(void);
+
+/**
+ * @fn int bluetooth_is_le_scanning(void)
+ * @brief Check for the device LE scan is in-progress or not.
+ *
+ * This API is used to check the current status of the LE Scan operation.If discovery is in\
+ * progress normally other operations are not allowed.
+ *
+ * This function checks whether the device  LE Scan is started or not.
+ *
+ * This function is a synchronous call.
+ *
+ * @return   TRUE  - LE Scan in progress \n
+ *              FALSE - LE Scan is not in progress \n
+ *
+ * @remark      None
+
+@code
+gboolean is_le_scanning = 0;
+is_le_scanning = bluetooth_is_le_scanning ();
+@endcode
+ */
+gboolean bluetooth_is_le_scanning(void);
+
+/**
+ * @fn int bluetooth_register_scan_filter(bluetooth_le_scan_filter_t *filter, int *slot_id)
+ * @brief Register scan filter.
+ *
+ * This function registers the scan filter.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *
+ * @param[in]   filter   scan filter to register
+ * @param[out]  slot_id  the slot ID of scan filter
+ *
+ * @remark      None
+ */
+int bluetooth_register_scan_filter(bluetooth_le_scan_filter_t *filter, int *slot_id);
+
+/**
+ * @fn int bluetooth_unregister_scan_filter(int slot_id)
+ * @brief Register scan filter.
+ *
+ * This function unregisters the scan filter.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *
+ * @param[in]   slot_id  the slot ID of scan filter
+ *
+ * @remark      None
+ */
+int bluetooth_unregister_scan_filter(int slot_id);
+
+/**
+ * @fn int bluetooth_unregister_all_scan_filters(void)
+ * @brief Register scan filter.
+ *
+ * This function usregisters all scan filters.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *
+ * @remark      None
+ */
+int bluetooth_unregister_all_scan_filters(void);
 
 /**
  * @fn int bluetooth_enable_rssi(const bluetooth_device_address_t *remote_address,
@@ -2876,6 +3071,39 @@ int bluetooth_cancel_service_search(void);
 int bluetooth_rfcomm_create_socket(const char *uuid);
 
 /**
+ * @fn int bluetooth_rfcomm_create_socket_ex(const char *uuid, const char *bus_name, const char *path)
+ * @brief Register rfcomm socket with a specific uuid
+ *
+ *
+ * This API register rfcomm socket with the given UUID. The return value of this API is the socket
+ * descriptor of the server.
+ * This is the first API which is called to create the server. Once we created the server socket,
+ * we will listen on that return socket.
+ * So a bluetooth_rfcomm_listen_and_accept_ex should follow this API call. This is a synchronous call.
+ *
+ *
+ * @return  socket FD on Success \n
+ *              BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Device is not enabled \n
+ *              BLUETOOTH_ERROR_INTERNAL - Internal error\n
+ *              BLUETOOTH_ERROR_MAX_CONNECTION - Maximum connection reached\n
+ *              BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter \n
+ * @param[in]   UUID (128 bits)
+ * @param[in]   bus_name (const char)
+ * @param[in]   path (const char)
+ *
+ * @remark      None
+ * @see       bluetooth_rfcomm_listen_and_accept_ex, bluetooth_rfcomm_remove_socket
+ *
+ @code
+
+  const char *rfcomm_test_uuid="00001101-0000-1000-8000-00805F9B34FB";
+  fd  = bluetooth_rfcomm_create_socket_ex(rfcomm_test_uuid, bus_name, path);
+
+ @endcode
+ */
+int bluetooth_rfcomm_create_socket_ex(const char *uuid, const char *bus_name, const char *path);
+
+/**
  * @fn int bluetooth_rfcomm_remove_socket(int socket_fd, const char *uuid)
  * @brief De-register the rfcomm socket
  *
@@ -2920,6 +3148,52 @@ int bluetooth_rfcomm_create_socket(const char *uuid);
  @endcode
  */
 int bluetooth_rfcomm_remove_socket(int socket_fd);
+
+/**
+ * @fn int bluetooth_rfcomm_remove_socket(const char *uuid)
+ * @brief De-register the rfcomm socket
+ *
+ *
+ * This API deregister rfcomm socket with the given socket UUID. If the remote device is
+ * already connected then we will receive the BLUETOOTH_EVENT_RFCOMM_DISCONNECTED with socket
+ * descriptor else no event will come. We will call this API only after the
+ * bluetooth_rfcomm_listen_and_accept_ex.
+ * This is a synchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE - Success \n
+ *               BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Device is not enabled \n
+ *               BLUETOOTH_ERROR_NOT_FOUND - Cannot find the proxy\n
+ *               BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter \n
+ * @param[in]   UUID (128 bits)
+ *
+ * @remark      None
+ * @see       bluetooth_rfcomm_create_socket_ex, bluetooth_rfcomm_listen_and_accept_ex
+ *
+ @code
+ void bt_event_callback(int event, bluetooth_event_param_t *param)
+ {
+	switch(event)
+	{
+		case BLUETOOTH_EVENT_RFCOMM_DISCONNECTED:
+		{
+			bluetooth_rfcomm_connection_t *discon_ind =
+					(bluetooth_rfcomm_connection_t *)param->param_data;
+
+			printf("\nDisconnected from FD %d",  discon_ind->socket_fd);
+		}
+	}
+ }
+
+ ...
+
+ int ret = 0;
+ fd  = bluetooth_rfcomm_create_socket_ex(rfcomm_test_uuid, path, bus_name);
+ ret = bluetooth_rfcomm_listen_and_accept_ex(rfcomm_test_uuid, 1, bus_name, path);
+ ....
+ ret = bluetooth_rfcomm_remove_socket_ex(rfcomm_test_uuid);
+ @endcode
+ */
+int bluetooth_rfcomm_remove_socket_ex(const char *uuid);
 
 /**
  * @fn int bluetooth_rfcomm_server_disconnect(int socket_fd)
@@ -2997,6 +3271,56 @@ int bluetooth_rfcomm_server_disconnect(int socket_fd);
 int bluetooth_rfcomm_listen_and_accept(int socket_fd, int max_pending_connection);
 
 /**
+ * @fn int bluetooth_rfcomm_listen_and_accept_ex(const char *uuid, int max_pending_connection, const char *bus_name, const char *path)
+ * @brief Rfcomm socket listen
+ *
+ *
+ * This API make rfcomm socket listen and accept with socket. We will call this API immediatly
+ * after the bluetooth_rfcomm_create_socket API.
+ * This API listen for the incomming connection and once it receives a connection, it will give
+ * BLUETOOTH_EVENT_RFCOMM_CONNECTED
+ * event to the application. This is an Asynchronous API call.
+ *
+ *
+ * @return  BLUETOOTH_ERROR_NONE - Success \n
+ *              BLUETOOTH_ERROR_INVALID_PARAM - Invalid parameter \n
+ *              BLUETOOTH_ERROR_CONNECTION_ERROR - Listen failed \n
+
+ * @param[in]  int socket_fd
+ * @param[in]  max pending connection.
+ * @param[in]  name
+ * @param[in]  path
+ *
+ * @remark      None
+ * @see       bluetooth_rfcomm_create_socket_ex
+ *
+  @code
+  void bt_event_callback(int event, bluetooth_event_param_t* param)
+ {
+	switch(event)
+	{
+		case BLUETOOTH_EVENT_RFCOMM_CONNECTED:
+		{
+			bluetooth_rfcomm_connection_t *conn_ind =
+						(bluetooth_rfcomm_connection_t *)param->param_data;
+
+			printf("\nConnected from FD %d",  conn_ind->socket_fd);
+		}
+	}
+ }
+
+ ...
+
+ int ret = 0;
+ fd  = bluetooth_rfcomm_create_socket_ex(rfcomm_test_uuid);
+ ret = bluetooth_rfcomm_listen_and_accept_ex(rfcomm_test_uuid, 1, bus_name, path);
+
+ @endcode
+ */
+
+int bluetooth_rfcomm_listen_and_accept_ex(const char *uuid, int max_pending_connection, const char *bus_name, const char *path);
+
+/**
  * @fn int bluetooth_rfcomm_listen(int socket_fd,int max_pending_connection)
  * @brief Rfcomm socket listen
  *
@@ -3061,7 +3385,7 @@ int bluetooth_rfcomm_listen(int socket_fd, int max_pending_connection);
  * @remark       None
  * @see    	  bluetooth_rfcomm_reject_connection
  */
-int bluetooth_rfcomm_accept_connection(int server_fd, int *client_fd);
+int bluetooth_rfcomm_accept_connection(int server_fd);
 
 /**
  * @fn int bluetooth_rfcomm_reject_connection()
@@ -3256,8 +3580,8 @@ int bluetooth_rfcomm_write(int fd, const char *buf, int length);
  * @remark       None
  */
 gboolean bluetooth_rfcomm_is_client_connected(void);
-int bluetooth_rfcomm_client_is_connected(bluetooth_device_address_t *device_address, gboolean *connected);
-int bluetooth_rfcomm_server_is_connected(bluetooth_device_address_t *device_address, gboolean *connected);
+int bluetooth_rfcomm_client_is_connected(const bluetooth_device_address_t *device_address, gboolean *connected);
+int bluetooth_rfcomm_server_is_connected(const bluetooth_device_address_t *device_address, gboolean *connected);
 
 /**
  * @fn int bluetooth_network_activate_server(void)
@@ -4147,6 +4471,33 @@ int bluetooth_gatt_set_characteristics_value(const char *char_handle,
 						const guint8 *value, int length);
 
 /**
+ * @fn int bluetooth_gatt_set_characteristics_value_by_type(const char *char_handle,
+ *				const guint8 *value, int length, guint8 write_type)
+ *
+ * @brief Set characteristic value by write type.
+ *
+ * This function is a synchronous call if write type is "write without resonse"
+ * and it is an asynchronous call if write type is "write with response"
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *		BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *		BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+ *		BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+ *
+ * @exception	None
+ * @param[in]	char_handle - Handle for Characteristic property.
+ * @param[in]	value - New value to set for characteristic property.
+ * @param[in]	length - Length of the value to be set.
+ * @param[in]	write_type - Type of write.
+ *
+ * @remark	None
+ * @see		None
+ */
+int bluetooth_gatt_set_characteristics_value_by_type(const char *char_handle,
+				const guint8 *value, int length, guint8 write_type);
+
+
+/**
  * @fn int bluetooth_gatt_set_characteristics_value_request(const char *char_handle,
  *						const guint8 *value, int length)
  *
@@ -4601,6 +4952,35 @@ int bluetooth_gatt_register_service(const char *svc_path);
 */
 int bluetooth_gatt_unregister_service(const char *svc_path);
 
+/* @fn int bluetooth_gatt_send_response(int request_id,
+*				int offset, char *value, int value_length)
+*
+* @brief Updates the attribute value in local attribute list.
+*
+* This function is a synchronous call.
+*
+* @return	BLUETOOTH_ERROR_NONE	- Success \n
+*	 BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+*	 BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+*	 BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+*
+* @exception	 None
+* @param[in] request_id The identification of a read request
+* @param[in] offset The offset from where a value is read
+* @param[in] value The value to be sent. It will be sent from @a offset.
+*		If it is NULL, a requested GATT handle's value will be sent from @a offset.
+* @param[in] value_length Value Length.
+*
+* @remark  Adapter should be enabled
+* @see	bluetooth_gatt_add_service()
+* @see	bluetooth_gatt_add_characteristics()
+* @see	bluetooth_gatt_add_descriptor()
+* @see bluetooth_gatt_register_service()
+*/
+int bluetooth_gatt_send_response(int request_id,
+				int offset, char *value, int value_length);
+
+
 /* @fn int bluetooth_gatt_delete_services(void)
 *
 * @brief deletes (unregisters) all services from the gatt server database..
@@ -4647,7 +5027,7 @@ int bluetooth_gatt_update_characteristic(const char *char_path,
 		const char* char_value, int value_length);
 
 /**
- * @fn int bluetooth_set_advertising(gboolean enable);
+ * @fn int bluetooth_set_advertising(int handle, gboolean enable);
  *
  * @brief Set advertising status.
  *
@@ -4666,11 +5046,10 @@ int bluetooth_gatt_update_characteristic(const char *char_path,
  * @remark	None
  * @see		bluetooth_set_advertising_data
  */
-int bluetooth_set_advertising(gboolean enable);
+int bluetooth_set_advertising(int handle, gboolean enable);
 
 /**
- * @fn int bluetooth_set_custom_advertising(gboolean enable, float interval_min, float interval_max,
- * 					guint8 filter_policy);
+ * @fn int bluetooth_set_custom_advertising(int handle, gboolean enable, bluetooth_advertising_params_t *params);
  *
  * @brief Set advertising status along with interval value.
  *
@@ -4693,7 +5072,7 @@ int bluetooth_set_advertising(gboolean enable);
  * @remark	None
  * @see		bluetooth_set_advertising_data
  */
-int bluetooth_set_custom_advertising(gboolean enable,
+int bluetooth_set_custom_advertising(int handle, gboolean enable,
 					bluetooth_advertising_params_t *params);
 
 /**
@@ -4724,7 +5103,7 @@ ret = bluetooth_get_advertising_data(&value, &length);
 int bluetooth_get_advertising_data(bluetooth_advertising_data_t *value, int *length);
 
 /**
- * @fn int bluetooth_set_advertising_data(const bluetooth_advertising_data_t *value, int length);
+ * @fn int bluetooth_set_advertising_data(int handle, const bluetooth_advertising_data_t *value, int length);
  *
  * @brief Set advertising data with value
  *
@@ -4742,7 +5121,23 @@ int bluetooth_get_advertising_data(bluetooth_advertising_data_t *value, int *len
  *
  * @remark	None
  */
-int bluetooth_set_advertising_data(const bluetooth_advertising_data_t *value, int length);
+int bluetooth_set_advertising_data(int handle, const bluetooth_advertising_data_t *value, int length);
+
+/**
+ * @fn int bluetooth_check_privilege_advertising_parameter(void);
+ *
+ * @brief Check the privilege for advertising parameter setting
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_ERROR_NONE - Success \n
+ *		BLUETOOTH_ERROR_PERMISSION_DEINED - Permission deined \n
+ *
+ * @exception	None
+ *
+ * @remark	None
+ */
+int bluetooth_check_privilege_advertising_parameter(void);
 
 /**
  * @fn int bluetooth_get_scan_response_data(bluetooth_scan_resp_data_t *value, int *length);
@@ -4772,7 +5167,7 @@ ret = bluetooth_get_scan_response_data(&value, &length);
 int bluetooth_get_scan_response_data(bluetooth_scan_resp_data_t *value, int *length);
 
 /**
- * @fn int bluetooth_set_scan_response_data(const bluetooth_scan_resp_data_t *value, int length);
+ * @fn int bluetooth_set_scan_response_data(int handle, const bluetooth_scan_resp_data_t *value, int length);
  *
  * @brief Set scan response data with value
  *
@@ -4789,7 +5184,7 @@ int bluetooth_get_scan_response_data(bluetooth_scan_resp_data_t *value, int *len
  *
  * @remark	None
  */
-int bluetooth_set_scan_response_data(const bluetooth_scan_resp_data_t *value, int length);
+int bluetooth_set_scan_response_data(int handle, const bluetooth_scan_resp_data_t *value, int length);
 
 /**
  * @fn int bluetooth_set_scan_parameters(bluetooth_le_scan_params_t *params);

@@ -37,6 +37,7 @@ BT_EXPORT_API int bluetooth_obex_server_init(const char *dst_path)
 	bt_user_info_t *user_info;
 	gboolean native_service = TRUE;
 	char path[BT_FILE_PATH_MAX];
+	int res;
 
 	BT_CHECK_ENABLED(return);
 
@@ -61,8 +62,10 @@ BT_EXPORT_API int bluetooth_obex_server_init(const char *dst_path)
 
 	if (result == BLUETOOTH_ERROR_NONE) {
 		_bt_set_obex_server_id(BT_NATIVE_SERVER);
-		 _bt_register_event(BT_OPP_SERVER_EVENT, user_info->cb,
+		res = _bt_register_event(BT_OPP_SERVER_EVENT, user_info->cb,
 		 			user_info->user_data);
+		if (res != BLUETOOTH_ERROR_NONE)
+			BT_ERR("Fail to _bt_register_event(%d)", res);
 	} else {
 		BT_ERR("Fail to send request");
 	}
@@ -109,6 +112,7 @@ BT_EXPORT_API int bluetooth_obex_server_init_without_agent(const char *dst_path)
 	bt_user_info_t *user_info;
 	gboolean native_service = FALSE;
 	char path[BT_FILE_PATH_MAX];
+	int res;
 
 	BT_CHECK_ENABLED(return);
 
@@ -133,8 +137,11 @@ BT_EXPORT_API int bluetooth_obex_server_init_without_agent(const char *dst_path)
 
 	if (result == BLUETOOTH_ERROR_NONE) {
 		_bt_set_obex_server_id(BT_CUSTOM_SERVER);
-		_bt_register_event(BT_OPP_SERVER_EVENT, user_info->cb,
+		res = _bt_register_event(BT_OPP_SERVER_EVENT, user_info->cb,
 		 			user_info->user_data);
+		if (res != BLUETOOTH_ERROR_NONE)
+			BT_ERR("Fail to _bt_register_event(%d)", res);
+
 	} else {
 		BT_ERR("Fail to send request");
 	}
