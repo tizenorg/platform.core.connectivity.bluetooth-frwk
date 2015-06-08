@@ -144,6 +144,7 @@ int _bt_enable_adapter(void)
 
 	BT_INFO("");
 
+#ifdef __TIZEN_MOBILE__
 	status = _bt_core_get_status();
 	if (status != BT_DEACTIVATED) {
 		BT_ERR("Invalid state %d", status);
@@ -168,6 +169,9 @@ int _bt_enable_adapter(void)
 		__bt_core_set_status(BT_DEACTIVATED);
 		return -1;
 	}
+#else
+	_bt_power_adapter(TRUE);
+#endif
 
 	return 0;
 }
@@ -179,6 +183,7 @@ int _bt_disable_adapter(void)
 
 	BT_INFO_C("Disable adapter");
 
+#ifdef __TIZEN_MOBILE__
 	le_status = _bt_core_get_le_status();
 	BT_DBG("le_status : %d", le_status);
 	if (le_status == BT_LE_ACTIVATED) {
@@ -208,14 +213,16 @@ int _bt_disable_adapter(void)
 		__bt_core_set_status( BT_ACTIVATED);
 		return -1;
 	}
-
+#else
+	_bt_power_adapter(FALSE);
+#endif
 	return 0;
 }
 
 int _bt_enable_adapter_le(void)
 {
 	BT_DBG("");
-
+#ifdef __TIZEN_MOBILE__
 	int ret;
 	bt_status_t status;
 	bt_le_status_t le_status;
@@ -237,6 +244,9 @@ int _bt_enable_adapter_le(void)
 	} else {
 		__bt_core_set_le_status(BT_LE_ACTIVATED);
 	}
+#else
+	_bt_power_adapter(TRUE);
+#endif
 	return 0;
 }
 
@@ -244,6 +254,7 @@ int _bt_disable_adapter_le(void)
 {
 	BT_DBG("+");
 
+#ifdef __TIZEN_MOBILE__
 	bt_status_t status;
 	bt_le_status_t le_status;
 
@@ -265,6 +276,9 @@ int _bt_disable_adapter_le(void)
 	}
 
 	__bt_core_set_le_status(BT_LE_DEACTIVATED);
+#else
+	_bt_power_adapter(FALSE);
+#endif
 
 	BT_DBG("-");
 	return 0;
