@@ -33,6 +33,15 @@
 extern "C" {
 #endif
 
+#define CONNMAN_DBUS_NAME "net.connman"
+#define CONNMAN_BLUETOOTH_TECHNOLOGY_PATH "/net/connman/technology/bluetooth"
+#define CONNMAN_BLUETOTOH_TECHNOLOGY_INTERFACE "net.connman.Technology"
+
+#define BT_CORE_NAME "org.projectx.bt_core"
+#define BT_CORE_PATH "/org/projectx/bt_core"
+
+#define BT_CORE_TYPE (bt_core_get_type())
+
 typedef enum {
 	BT_DEACTIVATED,
 	BT_ACTIVATED,

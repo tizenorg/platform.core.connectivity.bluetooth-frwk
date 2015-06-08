@@ -41,6 +41,8 @@ static gboolean is_recovery_mode = FALSE;
 static int bt_status_before[BT_MODE_MAX] = { VCONFKEY_BT_STATUS_OFF, };
 static int bt_le_status_before[BT_MODE_MAX] = { 0, };
 
+static DBusGConnection *conn = NULL;
+
 static void __bt_core_set_status(bt_status_t status)
 {
 	adapter_status = status;
@@ -135,6 +137,53 @@ static int __execute_command(const char *cmd, char *const arg_list[])
 	BT_DBG("-");
 	return 0;
 }
+
+static DBusGProxy *_bt_get_connman_proxy(void)
+{
+	DBusGProxy *proxy;
+
+	if (conn == NULL) {
+		conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
+		retv_if(conn == NULL, NULL);
+	}
+
+	proxy = dbus_g_proxy_new_for_name(conn,
+			CONNMAN_DBUS_NAME,
+			CONNMAN_BLUETOOTH_TECHNOLOGY_PATH,
+			CONNMAN_BLUETOTOH_TECHNOLOGY_INTERFACE);
+	retv_if(proxy == NULL, NULL);
+
+	return proxy;
+}
+
+static int _bt_power_adapter(gboolean powered)
+{
+	GValue state = { 0 };
+	GError *error = NULL;
+	DBusGProxy *proxy;
+
+	proxy = _bt_get_connman_proxy();
+	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	g_value_init(&state, G_TYPE_BOOLEAN);
+	g_value_set_boolean(&state, powered);
+
+	BT_DBG("set power property state: %d to connman", powered);
+
+	dbus_g_proxy_call(proxy, "SetProperty", &error,
+				G_TYPE_STRING, "Powered",
+				G_TYPE_VALUE, &state,
+				G_TYPE_INVALID, G_TYPE_INVALID);
+
+	if (error != NULL) {
+		BT_ERR("Powered set err: \n [%s]", error->message);
+		g_error_free(error);
+		g_value_unset(&state);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+	return BLUETOOTH_ERROR_NONE;
+}
+
 
 int _bt_enable_adapter(void)
 {

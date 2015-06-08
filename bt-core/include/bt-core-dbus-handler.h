@@ -28,6 +28,9 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <dlog.h>
+#include <dbus/dbus.h>
+#include <dbus/dbus-glib.h>
+#include <dbus/dbus-glib-lowlevel.h>
 #include <glib.h>
 #include <gio/gio.h>
 

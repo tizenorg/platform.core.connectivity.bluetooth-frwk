@@ -1673,8 +1673,6 @@ BT_EXPORT_API int bluetooth_register_callback(bluetooth_cb_func_ptr callback_ptr
 		return ret;
 	}
 
-	_bt_generate_cookie();
-
 	_bt_set_user_data(BT_COMMON, (void *)callback_ptr, user_data);
 
 	/* Register All events */
