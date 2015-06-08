@@ -44,6 +44,7 @@ BT_EXPORT_API int bluetooth_check_adapter_le(void)
 		return BLUETOOTH_ADAPTER_LE_DISABLED;
 	}
 
+#ifdef ENABLE_TIZEN_2_4
 	ret = vconf_get_int(VCONFKEY_BT_LE_STATUS, &value);
 	if (ret != 0) {
 		BT_ERR("fail to get vconf key!");
@@ -53,6 +54,9 @@ BT_EXPORT_API int bluetooth_check_adapter_le(void)
 	BT_DBG("value : %d", value);
 	return value == VCONFKEY_BT_LE_STATUS_ON ? BLUETOOTH_ADAPTER_LE_ENABLED :
 						BLUETOOTH_ADAPTER_LE_DISABLED;
+#else
+	return value = BLUETOOTH_ADAPTER_LE_DISABLED;
+#endif
 }
 
 BT_EXPORT_API int bluetooth_enable_adapter_le(void)

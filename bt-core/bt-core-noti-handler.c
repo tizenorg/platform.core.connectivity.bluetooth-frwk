@@ -97,8 +97,10 @@ static void __bt_core_handle_adapter_with_flight_mode(gboolean flight_mode)
 		if (adapter_status_le == BT_LE_ACTIVATED) {
 			int bt_le_status_before_mode = 0;
 
+#ifdef ENABLE_TIZEN_2_4
 			if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_le_status_before_mode) == 0)
 				_bt_core_set_bt_le_status(BT_FLIGHT_MODE, bt_le_status_before_mode);
+#endif
 
 			_bt_core_service_request_adapter(BT_DISABLE_ADAPTER_LE);
 			_bt_disable_adapter_le();
@@ -168,8 +170,10 @@ static void __bt_core_handle_adapter_with_power_saving_mode(int power_saving_mod
 		}
 		if (adapter_status_le == BT_LE_ACTIVATED) {
 			int bt_le_status_before_mode = 0;
+#ifdef ENABLE_TIZEN_2_4
 			if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_le_status_before_mode) == 0)
 				_bt_core_set_bt_le_status(BT_POWER_SAVING_MODE, bt_le_status_before_mode);
+#endif
 
 			/* Disable the BT LE */
 			_bt_core_service_request_adapter(BT_DISABLE_ADAPTER_LE);
@@ -258,8 +262,10 @@ void _bt_core_init_vconf_value(void)
 	flight_mode = _bt_core_is_flight_mode_enabled();
 
 #ifndef TIZEN_WEARABLE
+#ifdef ENABLE_TIZEN_2_4
 	if (vconf_get_int(VCONFKEY_SETAPPL_PSMODE, &power_saving_mode) != 0)
 		BT_ERR("Fail to get the power_saving_mode status value");
+#endif
 #endif
 	BT_DBG("flight_mode = %d, power_saving_mode = %d", flight_mode, power_saving_mode);
 
@@ -293,9 +299,10 @@ void _bt_core_handle_power_saving_mode_noti(void)
 	int ret;
 
 	BT_DBG("+");
+#ifdef ENABLE_TIZEN_2_4
 	ret = vconf_notify_key_changed(VCONFKEY_SETAPPL_PSMODE,
 			(vconf_callback_fn)__bt_core_power_saving_mode_cb, NULL);
-
+#endif
 	if (ret < 0)
 		BT_ERR("Unable to register key handler");
 #endif
@@ -309,8 +316,10 @@ void _bt_core_unregister_vconf_handler(void)
 #endif
 
 #ifndef TIZEN_WEARABLE
+#ifdef ENABLE_TIZEN_2_4
 	vconf_ignore_key_changed(VCONFKEY_SETAPPL_PSMODE,
 			(vconf_callback_fn)__bt_core_power_saving_mode_cb);
+#endif
 #endif
 
 	return;

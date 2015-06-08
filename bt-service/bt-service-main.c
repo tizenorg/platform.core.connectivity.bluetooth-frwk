@@ -31,7 +31,9 @@
 #include <privilege-control.h>
 #endif
 #include <bundle.h>
+#if 0
 #include <eventsystem.h>
+#endif
 
 #include "bt-internal-types.h"
 #include "bt-service-common.h"
@@ -87,13 +89,15 @@ gboolean _bt_terminate_service(gpointer user_data)
 			if(vconf_set_int(VCONFKEY_BT_STATUS,
 					VCONFKEY_BT_STATUS_OFF) != 0)
 				BT_ERR("Set vconf failed\n");
-
+#if 0
 			if (_bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_STATE,
 							EVT_VAL_BT_OFF) != ES_R_OK)
 				BT_ERR("Fail to set value");
+#endif
 		}
 	}
 
+#ifdef ENABLE_TIZEN_2_4
 	if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_status) < 0) {
 		BT_ERR("no bluetooth device info, so BT was disabled at previous session");
 	} else {
@@ -101,11 +105,14 @@ gboolean _bt_terminate_service(gpointer user_data)
 			if(vconf_set_int(VCONFKEY_BT_LE_STATUS,
 					VCONFKEY_BT_LE_STATUS_OFF) != 0)
 				BT_ERR("Set vconf failed\n");
+#if 0
 			if (_bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_LE_STATE,
 							EVT_VAL_BT_LE_OFF) != ES_R_OK)
 				BT_ERR("Fail to set value");
+#endif
 		}
 	}
+#endif
 
 	if (main_loop != NULL) {
 		g_main_loop_quit(main_loop);
@@ -151,7 +158,7 @@ gboolean _bt_reliable_terminate_service(gpointer user_data)
 static gboolean __bt_check_bt_service(void *data)
 {
 	int bt_status = VCONFKEY_BT_STATUS_OFF;
-	int bt_le_status = VCONFKEY_BT_LE_STATUS_OFF;
+	int bt_le_status = 0;
 	bt_status_t status = BT_DEACTIVATED;
 	bt_le_status_t le_status = BT_LE_DEACTIVATED;
 	int flight_mode_deactivation = 0;
@@ -168,9 +175,11 @@ static gboolean __bt_check_bt_service(void *data)
 		BT_DBG("no bluetooth device info, so BT was disabled at previous session");
 	}
 
+#ifdef ENABLE_TIZEN_2_4
 	if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_le_status) < 0) {
 		BT_ERR("no bluetooth le info, so BT LE was disabled at previous session");
 	}
+#endif
 
 	if (vconf_get_int(BT_OFF_DUE_TO_FLIGHT_MODE, &flight_mode_deactivation) != 0)
 		BT_ERR("Fail to get the flight_mode_deactivation value");
@@ -193,7 +202,7 @@ static gboolean __bt_check_bt_service(void *data)
 		_bt_enable_core();
 	}
 
-	if ((bt_le_status == VCONFKEY_BT_LE_STATUS_ON) && (le_status == BT_LE_DEACTIVATED)) {
+	if ((bt_le_status == 1) && (le_status == BT_LE_DEACTIVATED)) {
 		BT_DBG("Previous session was le enabled. Turn BT LE on automatically.");
 
 		/* Enable the BT LE */

@@ -80,7 +80,7 @@ static void __bt_core_sigterm_handler(int signo)
 static gboolean __bt_check_bt_core(void *data)
 {
 	int bt_status = VCONFKEY_BT_STATUS_OFF;
-	int bt_le_status = VCONFKEY_BT_LE_STATUS_OFF;
+	int bt_le_status = 0;
 	bt_status_t status = BT_DEACTIVATED;
 	bt_le_status_t le_status = BT_LE_DEACTIVATED;
 	int flight_mode_deactivation = 0;
@@ -95,9 +95,11 @@ static gboolean __bt_check_bt_core(void *data)
 		BT_DBG("no bluetooth device info, so BT was disabled at previous session");
 	}
 
+#ifdef ENABLE_TIZEN_2_4
 	if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_le_status) < 0) {
 		BT_ERR("no bluetooth le info, so BT LE was disabled at previous session");
 	}
+#endif
 
 	if (vconf_get_int(BT_OFF_DUE_TO_FLIGHT_MODE, &flight_mode_deactivation) != 0)
 		BT_ERR("Fail to get the flight_mode_deactivation value");
@@ -124,7 +126,7 @@ static gboolean __bt_check_bt_core(void *data)
 		_bt_core_set_bt_status(BT_POWER_SAVING_MODE, ps_mode_deactivation);
 	}
 
-	if ((bt_le_status == VCONFKEY_BT_LE_STATUS_ON) && (le_status == BT_LE_DEACTIVATED)) {
+	if ((bt_le_status == 1) && (le_status == BT_LE_DEACTIVATED)) {
 		BT_DBG("Previous session was le enabled. Turn BT LE on automatically.");
 
 		/* Enable the BT LE */

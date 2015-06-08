@@ -27,11 +27,17 @@
 #include <dlog.h>
 #include <string.h>
 #include <vconf.h>
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
+#endif
 #include <aul.h>
+#ifdef ENABLE_TIZEN_2_4
 #include <journal/device.h>
+#endif
 #include <bundle.h>
+#if 0
 #include <eventsystem.h>
+#endif
 #include <bundle_internal.h>
 
 #include "alarm.h"
@@ -108,10 +114,12 @@ static gboolean __bt_is_factory_test_mode(void)
 {
 	int mode = 0;
 
+#ifdef ENABLE_TIZEN_2_4
 	if (vconf_get_bool(VCONFKEY_BT_DUT_MODE, &mode)) {
 		BT_ERR("Get the DUT Mode fail");
 		return TRUE;
 	}
+#endif
 
 	if (mode != FALSE) {
 		BT_INFO("DUT Test Mode !!");
@@ -519,10 +527,11 @@ static int __bt_set_enabled(void)
 
 	if (vconf_set_int(VCONFKEY_BT_DEVICE, VCONFKEY_BT_DEVICE_NONE) != 0)
 		BT_ERR("Set vconf failed\n");
-
+#if 0
 	if (_bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_STATE,
 						EVT_VAL_BT_ON) != ES_R_OK)
 		BT_ERR("Fail to set value");
+#endif
 
 	/* Send enabled event to API */
 	_bt_send_event(BT_ADAPTER_EVENT, BLUETOOTH_EVENT_ENABLED,
@@ -556,10 +565,11 @@ void _bt_set_disabled(int result)
 		/* Update Bluetooth Status to notify other modules */
 		if (vconf_set_int(VCONFKEY_BT_STATUS, VCONFKEY_BT_STATUS_OFF) != 0)
 			BT_ERR("Set vconf failed");
-
+#if 0
 		if (_bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_STATE,
 							EVT_VAL_BT_OFF) != ES_R_OK)
 			BT_ERR("Fail to set value");
+#endif
 	}
 
 	if (vconf_set_int(VCONFKEY_BT_DEVICE, VCONFKEY_BT_DEVICE_NONE) != 0)
@@ -584,13 +594,16 @@ static int __bt_set_le_enabled(void)
 
 	__bt_set_local_name();
 
+#ifdef ENABLE_TIZEN_2_4
 	/* Update Bluetooth Status to notify other modules */
 	if (vconf_set_int(VCONFKEY_BT_LE_STATUS, VCONFKEY_BT_LE_STATUS_ON) != 0)
 		BT_ERR("Set vconf failed\n");
-
+#endif
+#if 0
 	if (_bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_LE_STATE,
 						EVT_VAL_BT_LE_ON) != ES_R_OK)
 		BT_ERR("Fail to set value");
+#endif
 
 	/* Send enabled event to API */
 	/*
@@ -626,13 +639,16 @@ void _bt_set_le_disabled(int result)
 
 	/* Update Bluetooth Status to notify other modules */
 	BT_DBG("Update vconf for BT LE normal Deactivation");
+#ifdef ENABLE_TIZEN_2_4
 	if (vconf_set_int(VCONFKEY_BT_LE_STATUS, VCONFKEY_BT_LE_STATUS_OFF) != 0)
 		BT_ERR("Set vconf failed\n");
 	_bt_adapter_set_le_status(BT_LE_DEACTIVATED);
-
+#endif
+#if 0
 	if (_bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_LE_STATE,
 						EVT_VAL_BT_LE_OFF) != ES_R_OK)
 		BT_ERR("Fail to set value");
+#endif
 
 	if (_bt_adapter_get_status() != BT_DEACTIVATED) {
 		/* Send disabled event */
@@ -720,9 +736,11 @@ void _bt_service_register_vconf_handler(void)
 #endif
 
 #ifndef TIZEN_WEARABLE
+#ifdef ENABLE_TIZEN_2_4
 	if (vconf_notify_key_changed(VCONFKEY_SETAPPL_PSMODE,
 			(vconf_callback_fn)__bt_service_flight_ps_mode_cb, NULL) < 0)
 		BT_ERR("Unable to register key handler");
+#endif
 #endif
 }
 
@@ -735,9 +753,11 @@ void _bt_service_unregister_vconf_handler(void)
 			(vconf_callback_fn)__bt_service_flight_ps_mode_cb);
 #endif
 
-#ifndef TIZEN_WEARABLE
+#ifndef TIZEN_WEARABLEi
+#ifdef ENABLE_TIZEN_2_4
 	vconf_ignore_key_changed(VCONFKEY_SETAPPL_PSMODE,
 			(vconf_callback_fn)__bt_service_flight_ps_mode_cb);
+#endif
 #endif
 }
 
@@ -747,12 +767,13 @@ static void __bt_state_event_handler(const char *event_name, bundle *data, void 
 	const char *bt_le_status = NULL;
 	const char *bt_transfering_status = NULL;
 	BT_DBG("bt state set event(%s) received", event_name);
-
+#ifdef ENABLE_TIZEN_2_4
 	bt_status = bundle_get_val(data, EVT_KEY_BT_STATE);
 	BT_DBG("bt_state: (%s)", bt_status);
 
 	bt_le_status = bundle_get_val(data, EVT_KEY_BT_LE_STATE);
 	BT_DBG("bt_state: (%s)", bt_le_status);
+#endif
 }
 
 void _bt_handle_adapter_added(void)
@@ -804,15 +825,18 @@ void _bt_handle_adapter_added(void)
 		__bt_set_enabled();
 		_bt_adapter_set_status(BT_ACTIVATED);
 	}
+#ifdef ENABLE_TIZEN_2_4
 	journal_bt_on();
+#endif
 
 	_bt_service_register_vconf_handler();
-
+#if 0
 	/* eventsystem */
 	if (eventsystem_register_event(SYS_EVENT_BT_STATE, &status_reg_id,
 			(eventsystem_handler)__bt_state_event_handler, NULL) != ES_R_OK) {
 		BT_ERR("Fail to register system event");
 	}
+#endif
 }
 
 void _bt_handle_adapter_removed(void)
@@ -820,7 +844,9 @@ void _bt_handle_adapter_removed(void)
 	int ret;
 
 	_bt_adapter_set_status(BT_DEACTIVATED);
+#ifdef ENABLE_TIZEN_2_4
 	journal_bt_off();
+#endif
 
 	__bt_visibility_alarm_remove();
 
@@ -839,10 +865,11 @@ void _bt_handle_adapter_removed(void)
 	adapter_agent = NULL;
 
 	_bt_reliable_terminate_service(NULL);
-
+#if 0 
 	if (eventsystem_unregister_event(status_reg_id) != ES_R_OK) {
 		BT_ERR("Fail to unregister system event");
 	}
+#endif
 
 }
 

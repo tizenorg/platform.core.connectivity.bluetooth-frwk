@@ -22,7 +22,7 @@ INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 INCLUDE(FindPkgConfig)
-pkg_check_modules(pkgs REQUIRED dbus-glib-1 dlog vconf gio-2.0 gio-unix-2.0 eventsystem)
+pkg_check_modules(pkgs REQUIRED dbus-glib-1 dlog vconf gio-2.0 gio-unix-2.0)
 
 FOREACH(flag ${pkgs_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")

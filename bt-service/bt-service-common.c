@@ -39,11 +39,9 @@
 #include <termios.h>
 #include <net_connection.h>
 #include <bundle.h>
+#if 0
 #include <eventsystem.h>
-
-#include <bundle.h>
-#include <eventsystem.h>
-
+#endif
 
 #include "bluetooth-api.h"
 #include "bt-service-common.h"
@@ -804,7 +802,7 @@ void _bt_logging_connection(gboolean connect, int addr_type)
 	BT_INFO("[PM] Number of LE conn: %d disc: %d, Number of BR/EDR conn: %d disc: %d",
 			le_conn, le_disc, edr_conn, edr_disc);
 }
-
+#if 0
 int _bt_eventsystem_set_value(const char *event, const char *key, const char *value)
 {
 	int ret;
@@ -822,7 +820,7 @@ int _bt_eventsystem_set_value(const char *event, const char *key, const char *va
 
 	return ret;
 }
-
+#endif
 void _bt_swap_byte_ordering(char *data, int data_len)
 {
 	char temp;

@@ -24,7 +24,9 @@
 #include <vconf.h>
 #include <vconf-keys.h>
 #include <bundle.h>
+#if 0
 #include <eventsystem.h>
+#endif
 
 #include "bt-core-main.h"
 #include "bt-core-adapter.h"
@@ -37,7 +39,7 @@ static bt_le_status_t adapter_le_status = BT_LE_DEACTIVATED;
 static gboolean is_recovery_mode = FALSE;
 
 static int bt_status_before[BT_MODE_MAX] = { VCONFKEY_BT_STATUS_OFF, };
-static int bt_le_status_before[BT_MODE_MAX] = { VCONFKEY_BT_LE_STATUS_OFF, };
+static int bt_le_status_before[BT_MODE_MAX] = { 0, };
 
 static void __bt_core_set_status(bt_status_t status)
 {
@@ -293,12 +295,14 @@ int _bt_core_service_request_adapter(int service_function)
 static void __bt_core_update_status(void)
 {
 	int bt_status = VCONFKEY_BT_STATUS_OFF;
-	int bt_le_status = VCONFKEY_BT_LE_STATUS_OFF;
+	int bt_le_status = 0;
 
 	if (vconf_get_int(VCONFKEY_BT_STATUS, &bt_status) < 0)
 		BT_ERR("no bluetooth device info, so BT was disabled at previous session");
+#ifdef ENABLE_TIZEN_2_4
 	if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_le_status) < 0)
 		BT_ERR("no bluetooth le info, so BT LE was disabled at previous session");
+#endif
 
 	BT_INFO("bt_status = %d, bt_le_status = %d", bt_status, bt_le_status);
 
@@ -307,7 +311,7 @@ static void __bt_core_update_status(void)
 	else
 		__bt_core_set_status(BT_ACTIVATED);
 
-	if (bt_le_status == VCONFKEY_BT_LE_STATUS_OFF)
+	if (bt_le_status == 0)
 		__bt_core_set_le_status(BT_LE_DEACTIVATED);
 	else
 		__bt_core_set_le_status(BT_LE_ACTIVATED);
@@ -584,8 +588,10 @@ static gboolean __bt_core_disable_timeout_cb(gpointer data)
 	if (adapter_status_le == BT_LE_ACTIVATED) {
 		int bt_le_status_before_mode = 0;
 
+#ifdef ENABLE_TIZEN_2_4
 		if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_le_status_before_mode) == 0)
 			_bt_core_set_bt_le_status(BT_FLIGHT_MODE, bt_le_status_before_mode);
+#endif
 
 		_bt_core_service_request_adapter(BT_DISABLE_ADAPTER_LE);
 		_bt_disable_adapter_le();
@@ -593,7 +599,7 @@ static gboolean __bt_core_disable_timeout_cb(gpointer data)
 
 	return FALSE;
 }
-
+#if 0
 static int __bt_eventsystem_set_value(const char *event, const char *key, const char *value)
 {
 	int ret;
@@ -611,7 +617,7 @@ static int __bt_eventsystem_set_value(const char *event, const char *key, const 
 
 	return ret;
 }
-
+#endif
 void _bt_core_adapter_added_cb(void)
 {
 	bt_status_t status;
@@ -654,9 +660,12 @@ void _bt_core_adapter_removed_cb(void)
 	__bt_core_set_le_status(BT_LE_DEACTIVATED);
 	if (vconf_set_int(VCONFKEY_BT_STATUS, VCONFKEY_BT_STATUS_OFF) != 0)
 		BT_ERR("Set vconf failed");
+#ifdef ENABLE_TIZEN_2_4
 	if (vconf_set_int(VCONFKEY_BT_LE_STATUS, VCONFKEY_BT_LE_STATUS_OFF) != 0)
 		BT_ERR("Set vconf failed");
+#endif
 
+#if 0
 	if (__bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_STATE,
 						EVT_VAL_BT_OFF) != ES_R_OK)
 		BT_ERR("Fail to set value");
@@ -664,7 +673,7 @@ void _bt_core_adapter_removed_cb(void)
 	if (__bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_LE_STATE,
 						EVT_VAL_BT_LE_OFF) != ES_R_OK)
 		BT_ERR("Fail to set value");
-
+#endif
 	if (is_recovery_mode == TRUE)
 	{
 		if (timer_id < 0)

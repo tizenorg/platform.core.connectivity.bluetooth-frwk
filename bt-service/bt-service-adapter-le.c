@@ -29,9 +29,13 @@
 #include <dlog.h>
 #include <string.h>
 #include <vconf.h>
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
+#endif
 #include <aul.h>
+#ifdef ENABLE_TIZEN_2_4
 #include <journal/device.h>
+#endif
 
 #include "bt-internal-types.h"
 #include "bt-service-common.h"
@@ -139,12 +143,12 @@ gboolean _bt_update_le_feature_support(const char *item, const char *value)
 static gboolean __bt_is_factory_test_mode(void)
 {
 	int mode = 0;
-
+#ifdef ENABLE_TIZEN_2_4
 	if (vconf_get_bool(VCONFKEY_BT_DUT_MODE, &mode)) {
 		BT_ERR("Get the DUT Mode fail");
 		return TRUE;
 	}
-
+#endif
 	if (mode != FALSE) {
 		BT_INFO("DUT Test Mode !!");
 		return TRUE;

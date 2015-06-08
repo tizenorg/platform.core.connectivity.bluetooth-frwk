@@ -25,7 +25,9 @@
 #include <gio/gio.h>
 #include <dlog.h>
 #include <string.h>
+#if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 #include <syspopup_caller.h>
+#endif
 #include "bluetooth-api.h"
 
 #include "bt-service-common.h"

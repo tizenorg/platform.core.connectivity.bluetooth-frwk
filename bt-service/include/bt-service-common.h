@@ -377,9 +377,9 @@ int _bt_set_socket_non_blocking(int socket_fd);
 int _bt_set_non_blocking_tty(int sk);
 
 void _bt_deinit_bluez_proxy(void);
-
+#if 0
 int _bt_eventsystem_set_value(const char *event, const char *key, const char *value);
-
+#endif
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

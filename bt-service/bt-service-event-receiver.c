@@ -26,7 +26,9 @@
 #include <dlog.h>
 #include <vconf.h>
 #include <vconf-internal-bt-keys.h>
+#if ENABLE_TIZEN_2_4
 #include <journal/device.h>
+#endif
 
 #include "bluetooth-api.h"
 #include "bt-internal-types.h"
@@ -722,10 +724,12 @@ static void __bt_adapter_property_changed_event(GVariant *msg, const char *path)
 				bt_state != VCONFKEY_BT_STATUS_OFF) {
 					_bt_disable_adapter();
 				}
+#ifdef ENABLE_TIZEN_2_4
 				if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_state) == 0 &&
 					bt_state != VCONFKEY_BT_LE_STATUS_OFF) {
 					_bt_set_le_disabled(BLUETOOTH_ERROR_NONE);
 				}
+#endif
 			}
 		} else if (strcasecmp(property, "Connectable") == 0) {
 			gboolean connectable = FALSE;
@@ -1246,15 +1250,19 @@ void _bt_handle_input_event(GVariant *msg, const char *path)
 				BT_DBG("HID device class [%x]", remote_dev_info->class);
 				if (remote_dev_info->class &
 					BLUETOOTH_DEVICE_MINOR_CLASS_KEY_BOARD) {
+#ifdef ENABLE_TIZEN_2_4
 					__bt_set_device_values(property_flag,
 						VCONFKEY_BT_DEVICE_HID_KEYBOARD_CONNECTED);
+#endif
 
 				}
 
 				if (remote_dev_info->class &
 						BLUETOOTH_DEVICE_MINOR_CLASS_POINTING_DEVICE) {
+#ifdef ENABLE_TIZEN_2_4
 					__bt_set_device_values(property_flag,
 							VCONFKEY_BT_DEVICE_HID_MOUSE_CONNECTED);
+#endif
 				}
 				_bt_free_device_info(remote_dev_info);
 			}
@@ -1556,7 +1564,9 @@ void _bt_handle_device_event(GVariant *msg, const char *member,const char *path)
 		g_free(dev_name);
 
 		_bt_logging_connection(TRUE, addr_type);
+#ifdef ENABLE_TIZEN_2_4
 		journal_bt_connected();
+#endif
 		param = g_variant_new("(isy)", result, address, addr_type);
 		/*Send event to application*/
 		_bt_send_event(BT_DEVICE_EVENT,
@@ -1576,7 +1586,9 @@ void _bt_handle_device_event(GVariant *msg, const char *member,const char *path)
 
 		_bt_convert_device_path_to_address(path, address);
 		dev_name = _bt_get_bonded_device_name(address);
+#ifdef ENABLE_TIZEN_2_4
 		journal_bt_disconnected();
+#endif
 
 		/* 0x00 BDADDR_BRDER
 		      0x01 BDADDR_LE_PUBLIC
