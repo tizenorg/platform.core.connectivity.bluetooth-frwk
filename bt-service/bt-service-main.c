@@ -62,6 +62,8 @@ static void __bt_release_service(void)
 
 	_bt_clear_request_list();
 
+	_bt_service_cynara_deinit();
+
 	BT_DBG("Terminating the bt-service daemon");
 }
 
@@ -233,6 +235,13 @@ int main(void)
 	sigaction(SIGTERM, &sa, NULL);
 
 	g_type_init();
+
+	/* Security Initialization */
+	if (_bt_service_cynara_init() != BLUETOOTH_ERROR_NONE) {
+		BT_ERR("Fail to init cynara");
+		return EXIT_FAILURE;
+	}
+
 #ifndef TIZEN_WEARABLE
 	if (perm_app_set_privilege("bluetooth-frwk-service", NULL, NULL) !=
 		PC_OPERATION_SUCCESS)

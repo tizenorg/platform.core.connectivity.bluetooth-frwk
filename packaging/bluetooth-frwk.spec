@@ -44,7 +44,6 @@ BuildRequires:  pkgconfig(utilX)
 %endif
 BuildRequires:  pkgconfig(capi-network-connection)
 BuildRequires:  pkgconfig(alarm-service)
-BuildRequires:  pkgconfig(security-server)
 BuildRequires:  pkgconfig(capi-content-mime-type)
 BuildRequires:  pkgconfig(appcore-efl)
 BuildRequires:  pkgconfig(pkgmgr)
@@ -53,8 +52,9 @@ BuildRequires:  pkgconfig(pkgmgr)
 %if "%{?tizen_profile_name}" == "mobile"
 BuildRequires:  pkgconfig(capi-network-tethering)
 %endif
-#BuildRequires:  pkgconfig(cynara-client)
-#BuildRequires:  pkgconfig(cynara-creds-dbus)
+BuildRequires:  pkgconfig(libprivilege-control)
+BuildRequires:  pkgconfig(cynara-client)
+BuildRequires:  pkgconfig(cynara-creds-dbus)
 
 BuildRequires:  cmake
 

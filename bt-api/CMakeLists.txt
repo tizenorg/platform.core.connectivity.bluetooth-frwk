@@ -57,7 +57,6 @@ SET(PKG_MODULES
 	gmodule-2.0
 	vconf
 	libxml-2.0
-	security-server
 	glib-2.0
 	gio-2.0
 	gio-unix-2.0

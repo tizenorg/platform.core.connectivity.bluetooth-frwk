@@ -21,7 +21,6 @@
 			<smack request="sys-assert::core" type="rwxat"/>
 			<smack request="alarm-server::alarm" type="w"/>
 			<smack request="aul::launch" type="x"/>
-			<smack request="security-server::api-cookie-check" type="w"/>
 			<smack request="connman::get" type="rwx"/>
 			<smack request="connman::set" type="rwx"/>
 			<smack request="connman::profile" type="rwx"/>

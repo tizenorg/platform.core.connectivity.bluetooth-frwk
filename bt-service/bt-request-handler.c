@@ -24,8 +24,9 @@
 #include <string.h>
 #include <glib.h>
 #include <dlog.h>
-#include <security-server.h>
 #include <gio/gio.h>
+#include <cynara-client.h>
+#include <cynara-creds-dbus.h>
 
 #include "bluetooth-api.h"
 #include "bt-service-common.h"
@@ -49,6 +50,8 @@
 
 static GDBusConnection *bt_service_conn;
 static guint owner_id = 0;
+cynara *p_cynara;
+cynara_configuration *conf;
 
 static const gchar bt_service_introspection_xml[] =
 "<node name='/org/projectx/bt_service'>"
@@ -116,7 +119,7 @@ int __bt_core_request(int function_name,
 
 gboolean __bt_service_check_privilege(int function_name,
 					int service_type,
-					GVariant *param);
+					const char *unique_name);
 
 /* Function definitions*/
 static void __bt_fill_garray_from_variant(GVariant *var, GArray *param)
@@ -167,6 +170,7 @@ static void __bt_service_method(GDBusConnection *connection,
 		GVariant *out_var = NULL;
 		int result = 0;
 		int request_id = -1;
+		char *sender = NULL;
 
 		g_variant_get(parameters, "(iii@ay@ay@ay@ay@ay)", &service_type,
 				&service_function, &request_type,
@@ -174,12 +178,14 @@ static void __bt_service_method(GDBusConnection *connection,
 
 		out_param1 = g_array_new(FALSE, FALSE, sizeof(gchar));
 
+		sender = dbus_g_method_get_sender(invocation);
+
 		if (service_type == BT_CORE_SERVICE) {
 			BT_DBG("No need to check privilege from bt-core");
 		} else if (__bt_service_check_privilege(service_function,
-					service_type, param5) == FALSE) {
+					service_type, (const char *)sender) == FALSE) {
 			result = BLUETOOTH_ERROR_PERMISSION_DEINED;
-			BT_ERR("Priviledge Check Failed");
+			BT_ERR("Client don't have the privilege to excute this function");
 
 			goto fail;
 		}
@@ -266,6 +272,7 @@ static void __bt_service_method(GDBusConnection *connection,
 		g_variant_unref(param3);
 		g_variant_unref(param4);
 		g_variant_unref(param5);
+		g_free(sender);
 		FN_END;
 		return;
 fail:
@@ -290,6 +297,7 @@ fail:
 		g_variant_unref(param3);
 		g_variant_unref(param4);
 		g_variant_unref(param5);
+		g_free(sender);
 	}
 
 	FN_END;
@@ -1878,207 +1886,228 @@ int __bt_core_request(int function_name,
 
 gboolean __bt_service_check_privilege(int function_name,
 					int service_type,
-					GVariant *param)
+					const char *unique_name)
 {
-	char *cookie = NULL;
-	int ret_val;
-	int len;
-	gboolean result = TRUE;
+        int ret_val;
+        gboolean result = TRUE;
+        char *client_creds = NULL;
+        char *user_creds = NULL;
+        char *client_session = "";
+        DBusConnection *conn = NULL;
+        int client_creds_method = CLIENT_METHOD_SMACK;
+        int user_creds_method = USER_METHOD_UID;
+        char err_msg[256] = {0, };
 
-	len = g_variant_get_size(param);
-	if (len > 0)
-		cookie = (char *)g_variant_get_data(param);
+        retv_if(unique_name == NULL, FALSE);
 
-	retv_if(cookie == NULL, FALSE);
+        BT_DBG("unique_name: %s", unique_name);
 
-	switch (function_name) {
-	case BT_SET_LOCAL_NAME:
-	case BT_START_DISCOVERY:
-	case BT_START_CUSTOM_DISCOVERY:
-	case BT_CANCEL_DISCOVERY:
-	case BT_OOB_ADD_REMOTE_DATA:
-	case BT_OOB_REMOVE_REMOTE_DATA:
-	case BT_SET_ADVERTISING:
-	case BT_SET_CUSTOM_ADVERTISING:
-	case BT_SET_ADVERTISING_PARAMETERS:
-	case BT_START_LE_DISCOVERY:
-	case BT_STOP_LE_DISCOVERY:
+        if (bt_service_conn)
+                conn = dbus_g_connection_get_connection(bt_service_conn);
 
-	case BT_BOND_DEVICE:
-	case BT_CANCEL_BONDING:
-	case BT_UNBOND_DEVICE:
-	case BT_SET_ALIAS:
-	case BT_SET_AUTHORIZATION:
-	case BT_UNSET_AUTHORIZATION:
-	case BT_SEARCH_SERVICE:
+        retv_if(conn == NULL, FALSE);
 
-	case BT_RFCOMM_CLIENT_CONNECT:
-	case BT_RFCOMM_CLIENT_CANCEL_CONNECT:
-	case BT_RFCOMM_SOCKET_DISCONNECT:
-	case BT_RFCOMM_SOCKET_WRITE:
-	case BT_RFCOMM_CREATE_SOCKET:
-	case BT_RFCOMM_REMOVE_SOCKET:
+        ret_val = cynara_creds_get_default_client_method(&client_creds_method);
+        if (ret_val != CYNARA_API_SUCCESS) {
+                cynara_strerror(ret_val, err_msg, sizeof(err_msg));
+                BT_ERR("Fail to get default client method: %s", err_msg);
+                return FALSE;
+        }
 
-	case BT_OPP_PUSH_FILES:
-	case BT_OPP_CANCEL_PUSH:
+        ret_val = cynara_creds_get_default_user_method(&user_creds_method);
+        if (ret_val != CYNARA_API_SUCCESS) {
+                cynara_strerror(ret_val, err_msg, sizeof(err_msg));
+                BT_ERR("Fail to get default user method: %s", err_msg);
+                return FALSE;
+        }
 
-	case BT_OBEX_SERVER_ACCEPT_CONNECTION:
-	case BT_OBEX_SERVER_REJECT_CONNECTION:
-	case BT_OBEX_SERVER_ACCEPT_FILE:
-	case BT_OBEX_SERVER_REJECT_FILE:
-	case BT_OBEX_SERVER_SET_PATH:
-	case BT_OBEX_SERVER_SET_ROOT:
-	case BT_OBEX_SERVER_CANCEL_TRANSFER:
-	case BT_OBEX_SERVER_CANCEL_ALL_TRANSFERS:
+        ret_val = cynara_creds_dbus_get_client(conn, unique_name, client_creds_method, &client_creds);
+        if (ret_val != CYNARA_API_SUCCESS) {
+                cynara_strerror(ret_val, err_msg, sizeof(err_msg));
+                BT_ERR("Fail to get client credential: %s", err_msg);
+                return FALSE;
+        }
 
-	case BT_AUDIO_CONNECT:
-	case BT_AUDIO_DISCONNECT:
-	case BT_AG_CONNECT:
-	case BT_AG_DISCONNECT:
-	case BT_AV_CONNECT:
-	case BT_AV_DISCONNECT:
-	case BT_AVRCP_CONTROL_CONNECT:
-	case BT_AVRCP_CONTROL_DISCONNECT:
-	case BT_AV_SOURCE_CONNECT:
-	case BT_AV_SOURCE_DISCONNECT:
-	case BT_HF_CONNECT:
-	case BT_HF_DISCONNECT:
+        BT_DBG("client_creds: %s", client_creds);
 
-	case BT_HID_CONNECT:
-	case BT_HID_DISCONNECT:
+        ret_val = cynara_creds_dbus_get_user(conn, unique_name, user_creds_method, &user_creds);
+        if (ret_val != CYNARA_API_SUCCESS) {
+                cynara_strerror(ret_val, err_msg, sizeof(err_msg));
+                BT_ERR("Fail to get user credential: %s", err_msg);
+                if (client_creds)
+                        free(client_creds);
+                return FALSE;
+        }
 
-	case BT_CONNECT_LE:
-	case BT_DISCONNECT_LE:
+        BT_DBG("user_creds: %s", user_creds);
 
-	case BT_SET_ADVERTISING_DATA:
-	case BT_SET_SCAN_RESPONSE_DATA:
+        switch (function_name) {
+        case BT_SET_LOCAL_NAME:
+        case BT_START_DISCOVERY:
+        case BT_START_CUSTOM_DISCOVERY:
+        case BT_CANCEL_DISCOVERY:
+        case BT_OOB_ADD_REMOTE_DATA:
+        case BT_OOB_REMOVE_REMOTE_DATA:
+        case BT_SET_ADVERTISING:
+        case BT_SET_CUSTOM_ADVERTISING:
+        case BT_START_LE_DISCOVERY:
+        case BT_STOP_LE_DISCOVERY:
 
-	case BT_HDP_CONNECT:
-	case BT_HDP_DISCONNECT:
-	case BT_HDP_SEND_DATA:
+        case BT_BOND_DEVICE:
+        case BT_CANCEL_BONDING:
+        case BT_UNBOND_DEVICE:
+        case BT_SET_ALIAS:
+        case BT_SET_AUTHORIZATION:
+        case BT_UNSET_AUTHORIZATION:
+        case BT_SEARCH_SERVICE:
 
-	case BT_NETWORK_ACTIVATE:
-	case BT_NETWORK_DEACTIVATE:
-	case BT_NETWORK_CONNECT:
-	case BT_NETWORK_DISCONNECT:
-	case BT_NETWORK_SERVER_DISCONNECT:
+        case BT_RFCOMM_CLIENT_CONNECT:
+        case BT_RFCOMM_CLIENT_CANCEL_CONNECT:
+        case BT_RFCOMM_SOCKET_DISCONNECT:
+        case BT_RFCOMM_SOCKET_WRITE:
+        case BT_RFCOMM_CREATE_SOCKET:
+        case BT_RFCOMM_REMOVE_SOCKET:
 
-	case BT_GATT_GET_PRIMARY_SERVICES:
-	case BT_GATT_DISCOVER_CHARACTERISTICS:
-	case BT_GATT_SET_PROPERTY_REQUEST:
-	case BT_GATT_READ_CHARACTERISTIC:
-	case BT_GATT_DISCOVER_CHARACTERISTICS_DESCRIPTOR:
+        case BT_OPP_PUSH_FILES:
+        case BT_OPP_CANCEL_PUSH:
 
-		ret_val = security_server_check_privilege_by_cookie(cookie,
-						BT_PRIVILEGE_PUBLIC, "w");
-		if (ret_val == SECURITY_SERVER_API_ERROR_ACCESS_DENIED) {
-			BT_ERR("[SMACK] Fail to access: %s", BT_PRIVILEGE_PUBLIC);
-			result = FALSE;
-		}
-	break;
+        case BT_OBEX_SERVER_ACCEPT_CONNECTION:
+        case BT_OBEX_SERVER_REJECT_CONNECTION:
+        case BT_OBEX_SERVER_ACCEPT_FILE:
+        case BT_OBEX_SERVER_REJECT_FILE:
+        case BT_OBEX_SERVER_SET_PATH:
+        case BT_OBEX_SERVER_SET_ROOT:
+        case BT_OBEX_SERVER_CANCEL_TRANSFER:
+        case BT_OBEX_SERVER_CANCEL_ALL_TRANSFERS:
 
-	case BT_ENABLE_ADAPTER:
-	case BT_DISABLE_ADAPTER:
-	case BT_RESET_ADAPTER:
-	case BT_RECOVER_ADAPTER:
-	case BT_ENABLE_ADAPTER_LE:
-	case BT_DISABLE_ADAPTER_LE:
-	case BT_SET_CONNECTABLE:
-	case BT_SET_DISCOVERABLE_MODE:
-	case BT_ADD_WHITE_LIST:
-	case BT_REMOVE_WHITE_LIST:
-	case BT_CLEAR_WHITE_LIST:
-	case BT_SET_MANUFACTURER_DATA:
-	case BT_SET_SCAN_PARAMETERS:
+        case BT_AUDIO_CONNECT:
+        case BT_AUDIO_DISCONNECT:
+        case BT_AG_CONNECT:
+        case BT_AG_DISCONNECT:
+        case BT_AV_CONNECT:
+        case BT_AV_DISCONNECT:
+        case BT_AVRCP_CONTROL_CONNECT:
+        case BT_AVRCP_CONTROL_DISCONNECT:
+        case BT_HF_CONNECT:
+        case BT_HF_DISCONNECT:
 
-	case BT_CANCEL_SEARCH_SERVICE:
-	case BT_ENABLE_RSSI:
+        case BT_HID_CONNECT:
+        case BT_HID_DISCONNECT:
 
-	case BT_HID_DEVICE_ACTIVATE:
-	case BT_HID_DEVICE_DEACTIVATE:
-	case BT_HID_DEVICE_CONNECT:
-	case BT_HID_DEVICE_DISCONNECT:
-	case BT_HID_DEVICE_SEND_MOUSE_EVENT:
-	case BT_HID_DEVICE_SEND_KEY_EVENT:
-	case BT_HID_DEVICE_SEND_REPLY_TO_REPORT:
+        case BT_CONNECT_LE:
+        case BT_DISCONNECT_LE:
 
-	case BT_RFCOMM_ACCEPT_CONNECTION:
-	case BT_RFCOMM_REJECT_CONNECTION:
-	case BT_RFCOMM_LISTEN:
-	case BT_RFCOMM_CREATE_SOCKET_EX:
-	case BT_RFCOMM_REMOVE_SOCKET_EX:
+        case BT_SET_ADVERTISING_DATA:
+        case BT_SET_SCAN_RESPONSE_DATA:
 
-	case BT_PBAP_CONNECT:
-	case BT_PBAP_DISCONNECT:
-	case BT_PBAP_GET_PHONEBOOK_SIZE:
-	case BT_PBAP_GET_PHONEBOOK:
-	case BT_PBAP_GET_LIST:
-	case BT_PBAP_PULL_VCARD:
-	case BT_PBAP_PHONEBOOK_SEARCH:
+        case BT_HDP_CONNECT:
+        case BT_HDP_DISCONNECT:
+        case BT_HDP_SEND_DATA:
 
-	case BT_AVRCP_SET_TRACK_INFO:
-	case BT_AVRCP_SET_PROPERTY:
-	case BT_AVRCP_SET_PROPERTIES:
-	case BT_AVRCP_HANDLE_CONTROL:
-	case BT_AVRCP_CONTROL_SET_PROPERTY:
-	case BT_AVRCP_CONTROL_GET_PROPERTY:
-	case BT_AVRCP_GET_TRACK_INFO:
+        case BT_NETWORK_ACTIVATE:
+        case BT_NETWORK_DEACTIVATE:
+        case BT_NETWORK_CONNECT:
+        case BT_NETWORK_DISCONNECT:
+        case BT_NETWORK_SERVER_DISCONNECT:
 
-	case BT_SET_CONTENT_PROTECT:
-	case BT_BOND_DEVICE_BY_TYPE:
-	case BT_SET_LE_PRIVACY:
-	case BT_LE_CONN_UPDATE:
+        case BT_GATT_GET_PRIMARY_SERVICES:
+        case BT_GATT_DISCOVER_CHARACTERISTICS:
+        case BT_GATT_SET_PROPERTY_REQUEST:
+        case BT_GATT_READ_CHARACTERISTIC:
+        case BT_GATT_DISCOVER_CHARACTERISTICS_DESCRIPTOR:
+                ret_val = cynara_check(p_cynara, client_creds, client_session, user_creds,
+                                                                                 BT_PRIVILEGE_PUBLIC);
 
-		ret_val = security_server_check_privilege_by_cookie(cookie,
-						BT_PRIVILEGE_PLATFORM, "w");
+                if (ret_val != CYNARA_API_ACCESS_ALLOWED) {
+                        BT_ERR("Fail to access: %s", BT_PRIVILEGE_PUBLIC);
+                        result = FALSE;
+                }
+        break;
 
-		if (ret_val == SECURITY_SERVER_API_ERROR_ACCESS_DENIED) {
-			BT_ERR("[SMACK] Fail to access: %s", BT_PRIVILEGE_PLATFORM);
-			result = FALSE;
-		}
-	break;
+        case BT_ENABLE_ADAPTER:
+        case BT_DISABLE_ADAPTER:
+        case BT_RESET_ADAPTER:
+        case BT_RECOVER_ADAPTER:
+        case BT_ENABLE_ADAPTER_LE:
+        case BT_DISABLE_ADAPTER_LE:
+        case BT_SET_CONNECTABLE:
+        case BT_SET_DISCOVERABLE_MODE:
+        case BT_ADD_WHITE_LIST:
+        case BT_REMOVE_WHITE_LIST:
+        case BT_CLEAR_WHITE_LIST:
+        case BT_SET_MANUFACTURER_DATA:
+        case BT_SET_SCAN_PARAMETERS:
 
-	case BT_CHECK_ADAPTER:
-	case BT_GET_RSSI:
+        case BT_CANCEL_SEARCH_SERVICE:
+        case BT_ENABLE_RSSI:
 
-	case BT_GET_LOCAL_NAME:
-	case BT_GET_LOCAL_ADDRESS:
-	case BT_GET_LOCAL_VERSION:
-	case BT_IS_SERVICE_USED:
-	case BT_GET_DISCOVERABLE_MODE:
-	case BT_GET_DISCOVERABLE_TIME:
-	case BT_IS_DISCOVERYING:
-	case BT_IS_LE_DISCOVERYING:
-	case BT_IS_CONNECTABLE:
-	case BT_GET_BONDED_DEVICES:
-	case BT_GET_BONDED_DEVICE:
-	case BT_IS_DEVICE_CONNECTED:
-	case BT_GET_CONNECTED_LINK_TYPE:
-	case BT_GET_SPEAKER_GAIN:
-	case BT_SET_SPEAKER_GAIN:
-	case BT_OOB_READ_LOCAL_DATA:
-	case BT_RFCOMM_CLIENT_IS_CONNECTED:
-	case BT_RFCOMM_IS_UUID_AVAILABLE:
-	case BT_GET_ADVERTISING_DATA:
-	case BT_GET_SCAN_RESPONSE_DATA:
-	case BT_IS_ADVERTISING:
-	case BT_REGISTER_SCAN_FILTER:
-	case BT_UNREGISTER_SCAN_FILTER:
-	case BT_UNREGISTER_ALL_SCAN_FILTERS:
+        case BT_RFCOMM_ACCEPT_CONNECTION:
+        case BT_RFCOMM_REJECT_CONNECTION:
+        case BT_RFCOMM_LISTEN:
 
-	case BT_OBEX_SERVER_ALLOCATE:
-	case BT_OBEX_SERVER_DEALLOCATE:
-	case BT_OBEX_SERVER_IS_ACTIVATED:
+        case BT_AVRCP_SET_TRACK_INFO:
+        case BT_AVRCP_SET_PROPERTY:
+        case BT_AVRCP_SET_PROPERTIES:
+        case BT_AVRCP_HANDLE_CONTROL:
+        case BT_AVRCP_CONTROL_SET_PROPERTY:
+        case BT_AVRCP_CONTROL_GET_PROPERTY:
+        case BT_AVRCP_GET_TRACK_INFO:
 
-		/* Non-privilege control */
-		break;
-	default:
-		BT_ERR("Unknown function!");
-		result = FALSE;
-		break;
-	}
+        case BT_SET_CONTENT_PROTECT:
+        case BT_BOND_DEVICE_BY_TYPE:
+        case BT_SET_LE_PRIVACY:
+        case BT_LE_CONN_UPDATE:
+                ret_val = cynara_check(p_cynara, client_creds, client_session, user_creds,
+                                                                                 BT_PRIVILEGE_PLATFORM);
 
-	return result;
+                if (ret_val != CYNARA_API_ACCESS_ALLOWED) {
+                        BT_ERR("Fail to access: %s", BT_PRIVILEGE_PLATFORM);
+                        result = FALSE;
+                }
+        break;
+
+        case BT_CHECK_ADAPTER:
+        case BT_GET_RSSI:
+
+        case BT_GET_LOCAL_NAME:
+        case BT_GET_LOCAL_ADDRESS:
+        case BT_GET_LOCAL_VERSION:
+        case BT_IS_SERVICE_USED:
+        case BT_GET_DISCOVERABLE_MODE:
+        case BT_GET_DISCOVERABLE_TIME:
+        case BT_IS_DISCOVERYING:
+        case BT_IS_LE_DISCOVERYING:
+        case BT_IS_CONNECTABLE:
+        case BT_GET_BONDED_DEVICES:
+        case BT_GET_BONDED_DEVICE:
+        case BT_IS_DEVICE_CONNECTED:
+        case BT_GET_SPEAKER_GAIN:
+        case BT_SET_SPEAKER_GAIN:
+        case BT_OOB_READ_LOCAL_DATA:
+        case BT_RFCOMM_CLIENT_IS_CONNECTED:
+        case BT_RFCOMM_IS_UUID_AVAILABLE:
+        case BT_GET_ADVERTISING_DATA:
+        case BT_GET_SCAN_RESPONSE_DATA:
+        case BT_IS_ADVERTISING:
+
+        case BT_OBEX_SERVER_ALLOCATE:
+        case BT_OBEX_SERVER_DEALLOCATE:
+
+                /* Non-privilege control */
+                break;
+        default:
+                BT_ERR("Unknown function!");
+                result = FALSE;
+                break;
+        }
+
+        if (client_creds)
+                free(client_creds);
+
+        if (user_creds)
+                free(user_creds);
+
+        return result;
 }
 
 GDBusNodeInfo *__bt_service_create_method_node_info
@@ -2190,5 +2219,42 @@ void _bt_service_unregister(void)
 			owner_id = 0;
 		}
 	}
+}
+
+int _bt_service_cynara_init(void)
+{
+        int result;
+        char err_msg[256] = {0, };
+
+        retv_if(p_cynara != NULL, BLUETOOTH_ERROR_ALREADY_INITIALIZED);
+
+        result = cynara_initialize(&p_cynara, conf);
+
+        if (result != CYNARA_API_SUCCESS) {
+                cynara_strerror(result, err_msg, sizeof(err_msg));
+                BT_ERR("Fail to initialize cynara: [%s]", err_msg);
+                return BLUETOOTH_ERROR_INTERNAL;
+        }
+
+        return BLUETOOTH_ERROR_NONE;
+}
+
+void _bt_service_cynara_deinit(void)
+{
+        int result;
+        char err_msg[256] = {0, };
+
+        ret_if(p_cynara == NULL);
+
+        result = cynara_finish(p_cynara);
+
+        if (result != CYNARA_API_SUCCESS) {
+                cynara_strerror(result, err_msg, sizeof(err_msg));
+                BT_ERR("Fail to finish cynara: [%s]", err_msg);
+                return;
+        }
+
+        p_cynara = NULL;
+        conf = NULL;
 }
 

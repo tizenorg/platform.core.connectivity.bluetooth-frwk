@@ -57,10 +57,11 @@ SET(PKG_MODULES
 	dbus-glib-1
 	gio-2.0
 	alarm-service
-	security-server
 	capi-content-mime-type
 	capi-network-connection
 	pkgmgr
+	cynara-client
+	cynara-creds-dbus
 )
 
 IF("$ENV{CFLAGS}" MATCHES "-DTIZEN_NETWORK_TETHERING_ENABLE")
