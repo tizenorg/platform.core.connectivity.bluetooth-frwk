@@ -46,9 +46,6 @@ static bt_user_info_t user_info[BT_MAX_USER_INFO];
 static DBusGConnection *system_conn = NULL;
 static GDBusConnection *system_gdbus_conn = NULL;
 
-static char *cookie;
-static size_t cookie_size;
-
 static guint bus_id;
 
 static GDBusConnection *system_gconn = NULL;
@@ -1704,8 +1701,6 @@ fail:
 BT_EXPORT_API int bluetooth_unregister_callback(void)
 {
 	int ret;
-
-	_bt_destroy_cookie();
 
 	ret = _bt_deinit_event_handler();
 	if (ret != BLUETOOTH_ERROR_NONE) {

@@ -720,15 +720,25 @@ static void __bt_adapter_property_changed_event(GVariant *msg, const char *path)
 			g_variant_get(val, "b" ,&powered);
 			BT_DBG("Powered = %d", powered);
 			if (powered == FALSE) {
+#ifdef TIZEN_TV
+				_bt_handle_adapter_removed();
+#else
 				if (vconf_get_int(VCONFKEY_BT_STATUS, &bt_state) == 0 &&
 				bt_state != VCONFKEY_BT_STATUS_OFF) {
 					_bt_disable_adapter();
 				}
+#endif
+
 #ifdef ENABLE_TIZEN_2_4
 				if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_state) == 0 &&
 					bt_state != VCONFKEY_BT_LE_STATUS_OFF) {
 					_bt_set_le_disabled(BLUETOOTH_ERROR_NONE);
 				}
+#endif
+			}
+			else {
+#ifdef TIZEN_TV
+				_bt_handle_adapter_added();
 #endif
 			}
 		} else if (strcasecmp(property, "Connectable") == 0) {
@@ -3081,6 +3091,7 @@ fail:
 static int __bt_init_obexd_receiver(void)
 {
 	BT_DBG("+");
+#if 0
 	GError *error = NULL;
 
 	if (obexd_conn == NULL) {
@@ -3099,7 +3110,7 @@ static int __bt_init_obexd_receiver(void)
 		obexd_conn = NULL;
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
-
+#endif
 	BT_DBG("-");
 
 	return BLUETOOTH_ERROR_NONE;

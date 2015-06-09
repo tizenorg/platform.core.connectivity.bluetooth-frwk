@@ -379,7 +379,6 @@ int _bt_sync_send_request(int service_type, int service_function,
 			GArray **out_param1)
 {
 	int result = BLUETOOTH_ERROR_NONE;
-	char *cookie;
 	GError *error = NULL;
 	GArray *in_param5 = NULL;
 //	GArray *out_param2 = NULL;
@@ -402,13 +401,6 @@ int _bt_sync_send_request(int service_type, int service_function,
 			return BLUETOOTH_ERROR_INTERNAL;
 
 		in_param5 = g_array_new(TRUE, TRUE, sizeof(gchar));
-
-		cookie = _bt_get_cookie();
-
-		if (cookie) {
-			g_array_append_vals(in_param5, cookie,
-					_bt_get_cookie_size());
-		}
 
 		param1 = g_variant_new_from_data((const GVariantType *)"ay",
 					in_param1->data, in_param1->len,
@@ -493,7 +485,6 @@ int _bt_async_send_request(int service_type, int service_function,
 {
 	GArray* in_param5 = NULL;
 	bt_req_info_t *cb_data;
-	char *cookie;
 
 	GDBusProxy *proxy;
 	int timeout;
@@ -531,12 +522,6 @@ int _bt_async_send_request(int service_type, int service_function,
 
 		in_param5 = g_array_new(TRUE, TRUE, sizeof(gchar));
 
-		cookie = _bt_get_cookie();
-
-		if (cookie) {
-			g_array_append_vals(in_param5, cookie,
-					_bt_get_cookie_size());
-		}
 		param1 = g_variant_new_from_data((const GVariantType *)"ay",
 					in_param1->data, in_param1->len,
 					TRUE, NULL, NULL);

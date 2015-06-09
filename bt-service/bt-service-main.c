@@ -241,11 +241,12 @@ int main(void)
 		BT_ERR("Fail to init cynara");
 		return EXIT_FAILURE;
 	}
-
+#if 0
 #ifndef TIZEN_WEARABLE
 	if (perm_app_set_privilege("bluetooth-frwk-service", NULL, NULL) !=
 		PC_OPERATION_SUCCESS)
 		BT_ERR("Failed to set app privilege");
+#endif
 #endif
 	/* Event reciever Init */
 	if (_bt_init_service_event_receiver() != BLUETOOTH_ERROR_NONE) {

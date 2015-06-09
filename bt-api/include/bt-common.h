@@ -345,16 +345,8 @@ DBusConnection *_bt_get_system_conn(void);
 
 GDBusConnection *_bt_init_system_gdbus_conn(void);
 
-char *_bt_get_cookie(void);
-
-int _bt_get_cookie_size(void);
-
 int _bt_register_osp_server_in_agent(int type, char *uuid, char *path, int fd);
 int _bt_unregister_osp_server_in_agent(int type, char *uuid);
-
-void _bt_generate_cookie(void);
-
-void _bt_destroy_cookie(void);
 
 int _bt_check_privilege(int service_type, int service_function);
 

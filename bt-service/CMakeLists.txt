@@ -50,6 +50,7 @@ INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 SET(PKG_MODULES
+	vconf
 	aul
 	vconf
 	libprivilege-control
@@ -109,8 +110,8 @@ ADD_DEFINITIONS("-DAPP_LOCALEDIR=\"${APP_LOCALEDIR}\"")
 ADD_DEFINITIONS("-DAPP_SYSCONFDIR=\"${APP_SYSCONFDIR}\"")
 
 IF(LIBNOTIFY_SUPPORT OR LIBNOTIFICATION_SUPPORT)
-        ADD_DEFINITIONS("-DDATA_DIR_ICON=\"${SHARE_INSTALL_PREFIX}\"")
-        MESSAGE("Icon used for notification is : ${SHARE_INSTALL_PREFIX}/icons/default/bt-icon.png")
+	ADD_DEFINITIONS("-DDATA_DIR_ICON=\"${SHARE_INSTALL_PREFIX}\"")
+	MESSAGE("Icon used for notification is : ${SHARE_INSTALL_PREFIX}/icons/default/bt-icon.png")
 ENDIF(LIBNOTIFY_SUPPORT OR LIBNOTIFICATION_SUPPORT)
 
 SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed -pie")
@@ -119,15 +120,13 @@ ADD_EXECUTABLE(${PROJECT_NAME} ${SRCS})
 
 # to permit usage of bluetooth_cancel_bonding in bt-popup.c. This build bluetooth-api first.
 IF(LIBNOTIFY_SUPPORT)
-        ADD_DEPENDENCIES(${PROJECT_NAME} bluetooth-api)
-        TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS} bluetooth-api)
+	ADD_DEPENDENCIES(${PROJECT_NAME} bluetooth-api)
+	TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS} bluetooth-api)
 ELSE(LIBNOTIFY_SUPPORT)
-        TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS})
+	TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS})
 ENDIF(LIBNOTIFY_SUPPORT)
 
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS})
-
-#INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service DESTINATION /etc/rc.d/init.d)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service.in ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service DESTINATION share/dbus-1/system-services)
 INSTALL(TARGETS ${PROJECT_NAME} DESTINATION bin)
 
