@@ -178,7 +178,7 @@ static void __bt_service_method(GDBusConnection *connection,
 
 		out_param1 = g_array_new(FALSE, FALSE, sizeof(gchar));
 
-		sender = dbus_g_method_get_sender(invocation);
+		sender = g_dbus_method_invocation_get_sender(invocation);
 
 		if (service_type == BT_CORE_SERVICE) {
 			BT_DBG("No need to check privilege from bt-core");
@@ -1901,6 +1901,11 @@ gboolean __bt_service_check_privilege(int function_name,
         retv_if(unique_name == NULL, FALSE);
 
         BT_DBG("unique_name: %s", unique_name);
+	/* TODO: check privilege is temporally disabled.
+	 * After solving dbus_g_connection_get_connection crash problem,
+	 * it should be eliminated.
+	 */
+        return TRUE;
 
         if (bt_service_conn)
                 conn = dbus_g_connection_get_connection(bt_service_conn);

@@ -122,7 +122,7 @@ export CFLAGS="$CFLAGS -DTIZEN_WEARABLE"
 
 %if "%{?profile}" == "tv"
 echo tv
-export CFLAGS="$CFLAGS -DUSB_BLUETOOTH"
+export CFLAGS="$CFLAGS -DUSB_BLUETOOTH -DTIZEN_TV"
 %endif
 
 %ifarch x86_64
