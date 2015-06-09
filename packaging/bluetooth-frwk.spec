@@ -49,7 +49,7 @@ BuildRequires:  pkgconfig(appcore-efl)
 BuildRequires:  pkgconfig(pkgmgr)
 #BuildRequires:  pkgconfig(journal)
 #BuildRequires:  pkgconfig(eventsystem)
-%if "%{?tizen_profile_name}" == "mobile"
+%if "%{?profile}" == "mobile"
 BuildRequires:  pkgconfig(capi-network-tethering)
 %endif
 BuildRequires:  pkgconfig(libprivilege-control)
@@ -112,17 +112,25 @@ export FFLAGS="$FFLAGS -DTIZEN_DEBUG_ENABLE"
 export CFLAGS="$CFLAGS -fpie -DRFCOMM_DIRECT "
 export LDFLAGS="$CFLAGS -Wl,--rpath=/usr/lib -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs -pie"
 
-%if "%{?tizen_profile_name}" == "mobile"
+%if "%{?profile}" == "mobile"
+echo mobile
 export CFLAGS="$CFLAGS -DTIZEN_NETWORK_TETHERING_ENABLE -DTIZEN_BT_FLIGHTMODE_ENABLED"
+%define _servicefile packaging/bluetooth-frwk-mobile.service
+%define _servicedir graphical.target.wants
 %endif
 
-%if "%{?tizen_profile_name}" == "wearable"
+%if "%{?profile}" == "wearable"
+echo wearable
 export CFLAGS="$CFLAGS -DTIZEN_WEARABLE"
 %define _servicefile packaging/bluetooth-frwk-wearable.service
 %define _servicedir multi-user.target.wants
-%else
-%define _servicefile packaging/bluetooth-frwk-mobile.service
-%define _servicedir graphical.target.wants
+%endif
+
+%if "%{?profile}" == "tv"
+echo tv
+export CFLAGS="$CFLAGS -DUSB_BLUETOOTH"
+%define _servicefile packaging/bluetooth-frwk-common.service
+%define _servicedir starter.target.wants
 %endif
 %define _servicedir multi-user.target.wants
 
@@ -152,12 +160,12 @@ cmake . -DCMAKE_INSTALL_PREFIX=/usr \
 make
 
 %cmake \
-%if "%{?tizen_profile_name}" == "wearable"
+%if "%{?profile}" == "wearable"
 	-DTIZEN_WEARABLE=YES \
 %else
 	-DTIZEN_WEARABLE=NO \
 %endif
-%if "%{?tizen_profile_name}" == "common"
+%if "%{?profile}" == "common"
         -DTIZEN_WEARABLE=NO \
 %endif
 
@@ -171,7 +179,7 @@ install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk-servic
 install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk-devel
 
 mkdir -p %{buildroot}%{_unitdir_user}
-install -m 0644 bt-service/bluetooth-frwk-service.service %{buildroot}%{_unitdir_user}
+install -m 0644 %{_servicefile} %{buildroot}%{_unitdir_user}/bluetooth-frwk.service
 
 mkdir -p %{buildroot}%{_dumpdir}
 install -m 0755 bluetooth_log_dump.sh %{buildroot}%{_dumpdir}
@@ -189,13 +197,13 @@ sed -i 's/%TZ_SYS_DEFAULT_USER/app/' %{buildroot}%{_datadir}/dbus-1/system-servi
 
 %post
 /sbin/ldconfig
-%if "%{?tizen_profile_name}" == "wearable"
+%if "%{?profile}" == "wearable"
 vconftool set -f -t int db/bluetooth/status "1" -g 6520
 %endif
-%if "%{?tizen_profile_name}" == "mobile"
+%if "%{?profile}" == "mobile"
 vconftool set -f -t int db/bluetooth/status "0" -g 6520
 %endif
-%if "%{?tizen_profile_name}" == "common"
+%if "%{?profile}" == "common"
 vconftool set -f -t int db/bluetooth/status "0" -g 6520
 %endif
 
@@ -212,7 +220,7 @@ vconftool set -f -t bool memory/bluetooth/dutmode "0" -g 6520 -i
 
 #%post service
 #mkdir -p %{_sysconfdir}/systemd/default-extra-dependencies/ignore-units.d/
-#ln -sf %{_libdir}/systemd/system/bluetooth-frwk.service %{_sysconfdir}/systemd/default-extra-dependencies/ignore-units.d/
+#ln -sf %{_unitdir_user}/bluetooth-frwk.service %{_sysconfdir}/systemd/default-extra-dependencies/ignore-units.d/
 
 %postun -p /sbin/ldconfig
 
@@ -238,9 +246,9 @@ vconftool set -f -t bool memory/bluetooth/dutmode "0" -g 6520 -i
 %files service
 %manifest bluetooth-frwk.manifest
 %defattr(-, root, root)
-%{_datadir}/dbus-1/system-services/org.projectx.bt.service
+%{_datadir}/dbus-1/services/org.projectx.bt.service
 %{_bindir}/bt-service
-%{_unitdir_user}/bluetooth-frwk-service.service
+%{_unitdir_user}/bluetooth-frwk.service
 %{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-service.conf
 %{_bindir}/bluetooth-frwk-test
 #%{_bindir}/bluetooth-gatt-test
