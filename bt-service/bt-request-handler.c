@@ -26,7 +26,7 @@
 #include <dlog.h>
 #include <gio/gio.h>
 #include <cynara-client.h>
-#include <cynara-creds-dbus.h>
+#include <cynara-creds-gdbus.h>
 
 #include "bluetooth-api.h"
 #include "bt-service-common.h"
@@ -178,7 +178,7 @@ static void __bt_service_method(GDBusConnection *connection,
 
 		out_param1 = g_array_new(FALSE, FALSE, sizeof(gchar));
 
-		sender = dbus_g_method_get_sender(invocation);
+		sender = g_dbus_method_invocation_get_sender(invocation);
 
 		if (service_type == BT_CORE_SERVICE) {
 			BT_DBG("No need to check privilege from bt-core");
@@ -1893,7 +1893,6 @@ gboolean __bt_service_check_privilege(int function_name,
         char *client_creds = NULL;
         char *user_creds = NULL;
         char *client_session = "";
-        DBusConnection *conn = NULL;
         int client_creds_method = CLIENT_METHOD_SMACK;
         int user_creds_method = USER_METHOD_UID;
         char err_msg[256] = {0, };
@@ -1902,10 +1901,7 @@ gboolean __bt_service_check_privilege(int function_name,
 
         BT_DBG("unique_name: %s", unique_name);
 
-        if (bt_service_conn)
-                conn = dbus_g_connection_get_connection(bt_service_conn);
-
-        retv_if(conn == NULL, FALSE);
+        retv_if(bt_service_conn == NULL, FALSE);
 
         ret_val = cynara_creds_get_default_client_method(&client_creds_method);
         if (ret_val != CYNARA_API_SUCCESS) {
@@ -1921,7 +1917,7 @@ gboolean __bt_service_check_privilege(int function_name,
                 return FALSE;
         }
 
-        ret_val = cynara_creds_dbus_get_client(conn, unique_name, client_creds_method, &client_creds);
+        ret_val = cynara_creds_gdbus_get_client(bt_service_conn, unique_name, client_creds_method, &client_creds);
         if (ret_val != CYNARA_API_SUCCESS) {
                 cynara_strerror(ret_val, err_msg, sizeof(err_msg));
                 BT_ERR("Fail to get client credential: %s", err_msg);
@@ -1930,7 +1926,7 @@ gboolean __bt_service_check_privilege(int function_name,
 
         BT_DBG("client_creds: %s", client_creds);
 
-        ret_val = cynara_creds_dbus_get_user(conn, unique_name, user_creds_method, &user_creds);
+        ret_val = cynara_creds_gdbus_get_user(bt_service_conn, unique_name, user_creds_method, &user_creds);
         if (ret_val != CYNARA_API_SUCCESS) {
                 cynara_strerror(ret_val, err_msg, sizeof(err_msg));
                 BT_ERR("Fail to get user credential: %s", err_msg);

@@ -62,7 +62,7 @@ SET(PKG_MODULES
 	capi-network-connection
 	pkgmgr
 	cynara-client
-	cynara-creds-dbus
+	cynara-creds-gdbus
 )
 
 IF("$ENV{CFLAGS}" MATCHES "-DTIZEN_NETWORK_TETHERING_ENABLE")

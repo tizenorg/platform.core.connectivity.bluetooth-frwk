@@ -55,7 +55,7 @@ BuildRequires:  pkgconfig(capi-network-tethering)
 BuildRequires:  cmake
 BuildRequires:  pkgconfig(libprivilege-control)
 BuildRequires:  pkgconfig(cynara-client)
-BuildRequires:  pkgconfig(cynara-creds-dbus)
+BuildRequires:  pkgconfig(cynara-creds-gdbus)
 
 Requires(post): /usr/bin/vconftool
 Requires(post): /sbin/ldconfig
@@ -122,7 +122,7 @@ export CFLAGS="$CFLAGS -DTIZEN_WEARABLE"
 
 %if "%{?profile}" == "tv"
 echo tv
-export CFLAGS="$CFLAGS -DUSB_BLUETOOTH"
+export CFLAGS="$CFLAGS -DUSB_BLUETOOTH -DTIZEN_TV"
 %endif
 
 %ifarch x86_64
