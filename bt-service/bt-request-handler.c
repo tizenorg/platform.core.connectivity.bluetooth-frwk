@@ -272,7 +272,7 @@ static void __bt_service_method(GDBusConnection *connection,
 		g_variant_unref(param3);
 		g_variant_unref(param4);
 		g_variant_unref(param5);
-		g_free(sender);
+//		g_free(sender);
 		FN_END;
 		return;
 fail:
@@ -297,7 +297,7 @@ fail:
 		g_variant_unref(param3);
 		g_variant_unref(param4);
 		g_variant_unref(param5);
-		g_free(sender);
+//		g_free(sender);
 	}
 
 	FN_END;

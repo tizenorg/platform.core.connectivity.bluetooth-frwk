@@ -116,7 +116,9 @@ static gboolean __bt_check_bt_core(void *data)
 
 		/* Enable the BT */
 		_bt_core_service_request_adapter(BT_ENABLE_ADAPTER);
+#ifndef USB_BLUETOOTH
 		_bt_enable_adapter();
+#endif
 	} else if (bt_status == VCONFKEY_BT_STATUS_OFF &&
 			(flight_mode_deactivation == 1 || ps_mode_deactivation > 0)) {
 		_bt_core_handle_flight_mode_noti();
@@ -131,7 +133,9 @@ static gboolean __bt_check_bt_core(void *data)
 
 		/* Enable the BT LE */
 		_bt_core_service_request_adapter(BT_ENABLE_ADAPTER_LE);
+#ifndef USB_BLUETOOTH
 		_bt_enable_adapter_le();
+#endif
 	} else {
 		status = _bt_core_get_status();
 		le_status = _bt_core_get_le_status();

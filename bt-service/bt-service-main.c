@@ -99,7 +99,6 @@ gboolean _bt_terminate_service(gpointer user_data)
 		}
 	}
 
-#ifdef ENABLE_TIZEN_2_4
 	if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_status) < 0) {
 		BT_ERR("no bluetooth device info, so BT was disabled at previous session");
 	} else {
@@ -114,7 +113,6 @@ gboolean _bt_terminate_service(gpointer user_data)
 #endif
 		}
 	}
-#endif
 
 	if (main_loop != NULL) {
 		g_main_loop_quit(main_loop);
@@ -177,11 +175,9 @@ static gboolean __bt_check_bt_service(void *data)
 		BT_DBG("no bluetooth device info, so BT was disabled at previous session");
 	}
 
-#ifdef ENABLE_TIZEN_2_4
 	if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_le_status) < 0) {
 		BT_ERR("no bluetooth le info, so BT LE was disabled at previous session");
 	}
-#endif
 
 	if (vconf_get_int(BT_OFF_DUE_TO_FLIGHT_MODE, &flight_mode_deactivation) != 0)
 		BT_ERR("Fail to get the flight_mode_deactivation value");
@@ -216,7 +212,10 @@ static gboolean __bt_check_bt_service(void *data)
 
 		if ((status != BT_ACTIVATING && status != BT_ACTIVATED) &&
 				(le_status != BT_LE_ACTIVATING && le_status != BT_LE_ACTIVATED)){
+//#ifndef USB_BLUETOOTH
+#if 0
 			_bt_terminate_service(NULL);
+#endif
 		}
 	}
 

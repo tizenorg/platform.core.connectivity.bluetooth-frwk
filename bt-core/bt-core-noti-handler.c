@@ -91,19 +91,21 @@ static void __bt_core_handle_adapter_with_flight_mode(gboolean flight_mode)
 				_bt_core_set_bt_status(BT_FLIGHT_MODE, bt_status_before_mode);
 
 			_bt_core_service_request_adapter(BT_DISABLE_ADAPTER);
+#ifndef USB_BLUETOOTH
 			_bt_disable_adapter();
+#endif
 		}
 
 		if (adapter_status_le == BT_LE_ACTIVATED) {
 			int bt_le_status_before_mode = 0;
 
-#ifdef ENABLE_TIZEN_2_4
 			if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_le_status_before_mode) == 0)
 				_bt_core_set_bt_le_status(BT_FLIGHT_MODE, bt_le_status_before_mode);
-#endif
 
 			_bt_core_service_request_adapter(BT_DISABLE_ADAPTER_LE);
+#ifndef USB_BLUETOOTH
 			_bt_disable_adapter_le();
+#endif
 		}
 	} else {
 		int flight_mode_value = 0;
@@ -135,14 +137,18 @@ static void __bt_core_handle_adapter_with_flight_mode(gboolean flight_mode)
 		    _bt_core_get_bt_status(BT_FLIGHT_MODE) != 0) {
 			_bt_core_set_bt_status(BT_FLIGHT_MODE, 0);
 			_bt_core_service_request_adapter(BT_ENABLE_ADAPTER);
+#ifndef USB_BLUETOOTH
 			_bt_enable_adapter();
+#endif
 		}
 
 		if (adapter_status_le == BT_LE_DEACTIVATED &&
 		    _bt_core_get_bt_le_status(BT_FLIGHT_MODE) != 0) {
 			_bt_core_set_bt_le_status(BT_FLIGHT_MODE, 0);
 			_bt_core_service_request_adapter(BT_ENABLE_ADAPTER_LE);
+#ifndef USB_BLUETOOTH
 			_bt_enable_adapter_le();
+#endif
 		}
 	}
 }
@@ -166,18 +172,21 @@ static void __bt_core_handle_adapter_with_power_saving_mode(int power_saving_mod
 				_bt_core_set_bt_status(BT_POWER_SAVING_MODE, bt_status_before_mode);
 
 			_bt_core_service_request_adapter(BT_DISABLE_ADAPTER);
+#ifndef USB_BLUETOOTH
 			_bt_disable_adapter();
+#endif
 		}
 		if (adapter_status_le == BT_LE_ACTIVATED) {
 			int bt_le_status_before_mode = 0;
-#ifdef ENABLE_TIZEN_2_4
+
 			if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_le_status_before_mode) == 0)
 				_bt_core_set_bt_le_status(BT_POWER_SAVING_MODE, bt_le_status_before_mode);
-#endif
 
 			/* Disable the BT LE */
 			_bt_core_service_request_adapter(BT_DISABLE_ADAPTER_LE);
+#ifndef USB_BLUETOOTH
 			_bt_disable_adapter_le();
+#endif
 		}
 	} else {
 		int ps_mode_value = 0;
@@ -200,14 +209,18 @@ static void __bt_core_handle_adapter_with_power_saving_mode(int power_saving_mod
 		if (adapter_status == BT_DEACTIVATED && (_bt_core_get_bt_status(BT_POWER_SAVING_MODE) != 0)) {
 			_bt_core_set_bt_status(BT_POWER_SAVING_MODE, 0);
 			_bt_core_service_request_adapter(BT_ENABLE_ADAPTER);
+#ifndef USB_BLUETOOTH
 			_bt_enable_adapter();
+#endif
 		}
 		BT_DBG("BT LE status before Emergency mode() :%d", _bt_core_get_bt_le_status(BT_POWER_SAVING_MODE));
 		if (adapter_status_le == BT_LE_DEACTIVATED &&  _bt_core_get_bt_le_status(BT_POWER_SAVING_MODE) != 0) {
 			_bt_core_set_bt_le_status(BT_POWER_SAVING_MODE, 0);
 			/* Enable the BT LE */
 			_bt_core_service_request_adapter(BT_ENABLE_ADAPTER_LE);
+#ifndef USB_BLUETOOTH
 			_bt_enable_adapter_le();
+#endif
 		}
 	}
 }

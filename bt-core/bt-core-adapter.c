@@ -138,53 +138,6 @@ static int __execute_command(const char *cmd, char *const arg_list[])
 	return 0;
 }
 
-static DBusGProxy *_bt_get_connman_proxy(void)
-{
-	DBusGProxy *proxy;
-
-	if (conn == NULL) {
-		conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
-		retv_if(conn == NULL, NULL);
-	}
-
-	proxy = dbus_g_proxy_new_for_name(conn,
-			CONNMAN_DBUS_NAME,
-			CONNMAN_BLUETOOTH_TECHNOLOGY_PATH,
-			CONNMAN_BLUETOTOH_TECHNOLOGY_INTERFACE);
-	retv_if(proxy == NULL, NULL);
-
-	return proxy;
-}
-
-static int _bt_power_adapter(gboolean powered)
-{
-	GValue state = { 0 };
-	GError *error = NULL;
-	DBusGProxy *proxy;
-
-	proxy = _bt_get_connman_proxy();
-	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
-
-	g_value_init(&state, G_TYPE_BOOLEAN);
-	g_value_set_boolean(&state, powered);
-
-	BT_DBG("set power property state: %d to connman", powered);
-
-	dbus_g_proxy_call(proxy, "SetProperty", &error,
-				G_TYPE_STRING, "Powered",
-				G_TYPE_VALUE, &state,
-				G_TYPE_INVALID, G_TYPE_INVALID);
-
-	if (error != NULL) {
-		BT_ERR("Powered set err: \n [%s]", error->message);
-		g_error_free(error);
-		g_value_unset(&state);
-		return BLUETOOTH_ERROR_INTERNAL;
-	}
-	return BLUETOOTH_ERROR_NONE;
-}
-
-
 int _bt_enable_adapter(void)
 {
 	int ret;
@@ -193,7 +146,6 @@ int _bt_enable_adapter(void)
 
 	BT_INFO("");
 
-#ifdef __TIZEN_MOBILE__
 	status = _bt_core_get_status();
 	if (status != BT_DEACTIVATED) {
 		BT_ERR("Invalid state %d", status);
@@ -210,17 +162,18 @@ int _bt_enable_adapter(void)
 	}
 
 	__bt_core_set_status(BT_ACTIVATING);
-
+#ifdef USB_BLUETOOTH
+	char *argv_up[] = {"/usr/bin/hciconfig", "/usr/bin/hciconfig", "hci0", "up", "pscan", NULL};
+	ret = __execute_command("/usr/bin/hciconfig", argv_up);
+#else
 	ret = __execute_command("/usr/etc/bluetooth/bt-stack-up.sh", NULL);
+#endif
 	if (ret < 0) {
 		BT_ERR("running script failed");
 		ret = __execute_command("/usr/etc/bluetooth/bt-dev-end.sh", NULL);
 		__bt_core_set_status(BT_DEACTIVATED);
 		return -1;
 	}
-#else
-	_bt_power_adapter(TRUE);
-#endif
 
 	return 0;
 }
@@ -232,7 +185,6 @@ int _bt_disable_adapter(void)
 
 	BT_INFO_C("Disable adapter");
 
-#ifdef __TIZEN_MOBILE__
 	le_status = _bt_core_get_le_status();
 	BT_DBG("le_status : %d", le_status);
 	if (le_status == BT_LE_ACTIVATED) {
@@ -246,7 +198,12 @@ int _bt_disable_adapter(void)
 	status = _bt_core_get_status();
 	if (status == BT_ACTIVATING) {
 		/* Forcely terminate */
+#ifdef USB_BLUETOOTH
+		char *argv_down[] = {"/usr/bin/hciconfig", "/usr/bin/hciconfig", "hci0", "down", NULL};
+		if (__execute_command("/usr/bin/hciconfig", argv_down) < 0) {
+#else
 		if (__execute_command("/usr/etc/bluetooth/bt-stack-down.sh", NULL) < 0) {
+#endif
 			BT_ERR("running script failed");
 		}
 		_bt_core_terminate();
@@ -256,22 +213,24 @@ int _bt_disable_adapter(void)
 	}
 
 	__bt_core_set_status(BT_DEACTIVATING);
-
+#ifdef USB_BLUETOOTH
+	char *argv_down[] = {"/usr/bin/hciconfig", "/usr/bin/hciconfig", "hci0", "down", NULL};
+	if (__execute_command("/usr/bin/hciconfig", argv_down) < 0) {
+#else
 	if (__execute_command("/usr/etc/bluetooth/bt-stack-down.sh", NULL) < 0) {
+#endif
 		BT_ERR("running script failed");
 		__bt_core_set_status( BT_ACTIVATED);
 		return -1;
 	}
-#else
-	_bt_power_adapter(FALSE);
-#endif
+
 	return 0;
 }
 
 int _bt_enable_adapter_le(void)
 {
 	BT_DBG("");
-#ifdef __TIZEN_MOBILE__
+
 	int ret;
 	bt_status_t status;
 	bt_le_status_t le_status;
@@ -282,7 +241,12 @@ int _bt_enable_adapter_le(void)
 	if (status == BT_DEACTIVATED) {
 		__bt_core_set_le_status(BT_LE_ACTIVATING);
 		BT_DBG("Activate BT");
+#ifdef USB_BLUETOOTH
+		char *argv_up[] = {"/usr/bin/hciconfig", "/usr/bin/hciconfig", "hci0", "up", "pscan", NULL};
+		ret = __execute_command("/usr/bin/hciconfig", argv_up);
+#else
 		ret = __execute_command("/usr/etc/bluetooth/bt-stack-up.sh", NULL);
+#endif
 		if (ret < 0) {
 			BT_ERR("running script failed");
 			ret = __execute_command("/usr/etc/bluetooth/bt-dev-end.sh &", NULL);
@@ -293,9 +257,7 @@ int _bt_enable_adapter_le(void)
 	} else {
 		__bt_core_set_le_status(BT_LE_ACTIVATED);
 	}
-#else
-	_bt_power_adapter(TRUE);
-#endif
+
 	return 0;
 }
 
@@ -303,7 +265,6 @@ int _bt_disable_adapter_le(void)
 {
 	BT_DBG("+");
 
-#ifdef __TIZEN_MOBILE__
 	bt_status_t status;
 	bt_le_status_t le_status;
 
@@ -316,8 +277,12 @@ int _bt_disable_adapter_le(void)
 
 	if (status == BT_DEACTIVATED) {
 		__bt_core_set_le_status(BT_LE_DEACTIVATING);
-
+#ifdef USB_BLUETOOTH
+		char *argv_down[] = {"/usr/bin/hciconfig", "/usr/bin/hciconfig", "hci0", "down", NULL};
+		if (__execute_command("/usr/bin/hciconfig", argv_down) < 0) {
+#else
 		if (__execute_command("/usr/etc/bluetooth/bt-stack-down.sh", NULL) < 0) {
+#endif
 			BT_ERR("running script failed");
 			__bt_core_set_le_status(BT_LE_ACTIVATED);
 			return -1;
@@ -325,9 +290,6 @@ int _bt_disable_adapter_le(void)
 	}
 
 	__bt_core_set_le_status(BT_LE_DEACTIVATED);
-#else
-	_bt_power_adapter(FALSE);
-#endif
 
 	BT_DBG("-");
 	return 0;
@@ -362,10 +324,9 @@ static void __bt_core_update_status(void)
 
 	if (vconf_get_int(VCONFKEY_BT_STATUS, &bt_status) < 0)
 		BT_ERR("no bluetooth device info, so BT was disabled at previous session");
-#ifdef ENABLE_TIZEN_2_4
+
 	if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_le_status) < 0)
 		BT_ERR("no bluetooth le info, so BT LE was disabled at previous session");
-#endif
 
 	BT_INFO("bt_status = %d, bt_le_status = %d", bt_status, bt_le_status);
 
@@ -651,10 +612,8 @@ static gboolean __bt_core_disable_timeout_cb(gpointer data)
 	if (adapter_status_le == BT_LE_ACTIVATED) {
 		int bt_le_status_before_mode = 0;
 
-#ifdef ENABLE_TIZEN_2_4
 		if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_le_status_before_mode) == 0)
 			_bt_core_set_bt_le_status(BT_FLIGHT_MODE, bt_le_status_before_mode);
-#endif
 
 		_bt_core_service_request_adapter(BT_DISABLE_ADAPTER_LE);
 		_bt_disable_adapter_le();
@@ -723,10 +682,9 @@ void _bt_core_adapter_removed_cb(void)
 	__bt_core_set_le_status(BT_LE_DEACTIVATED);
 	if (vconf_set_int(VCONFKEY_BT_STATUS, VCONFKEY_BT_STATUS_OFF) != 0)
 		BT_ERR("Set vconf failed");
-#ifdef ENABLE_TIZEN_2_4
+
 	if (vconf_set_int(VCONFKEY_BT_LE_STATUS, VCONFKEY_BT_LE_STATUS_OFF) != 0)
 		BT_ERR("Set vconf failed");
-#endif
 
 #if 0
 	if (__bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_STATE,
