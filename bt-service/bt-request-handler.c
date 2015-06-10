@@ -184,10 +184,11 @@ static void __bt_service_method(GDBusConnection *connection,
 			BT_DBG("No need to check privilege from bt-core");
 		} else if (__bt_service_check_privilege(service_function,
 					service_type, (const char *)sender) == FALSE) {
-			result = BLUETOOTH_ERROR_PERMISSION_DEINED;
 			BT_ERR("Client don't have the privilege to excute this function");
-
+#if 0 /* temporally removed for demo */
+			result = BLUETOOTH_ERROR_PERMISSION_DEINED;
 			goto fail;
+#endif
 		}
 
 		if (request_type == BT_ASYNC_REQ

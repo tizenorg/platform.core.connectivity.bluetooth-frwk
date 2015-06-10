@@ -619,7 +619,9 @@ static int __bt_set_le_enabled(void)
 	status = _bt_adapter_get_status();
 	if (status == BT_DEACTIVATED) {
 		BT_INFO("BREDR is off, turn off PSCAN");
+#if 0 /* temporally removed for demo */
 		_bt_set_connectable(FALSE);
+#endif
 	}
 	if (le_timer_id > 0) {
 		g_source_remove(le_timer_id);
