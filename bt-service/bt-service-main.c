@@ -212,10 +212,6 @@ static gboolean __bt_check_bt_service(void *data)
 
 		if ((status != BT_ACTIVATING && status != BT_ACTIVATED) &&
 				(le_status != BT_LE_ACTIVATING && le_status != BT_LE_ACTIVATED)){
-//#ifndef USB_BLUETOOTH
-#if 0
-			_bt_terminate_service(NULL);
-#endif
 		}
 	}
 
@@ -240,12 +236,11 @@ int main(void)
 		BT_ERR("Fail to init cynara");
 		return EXIT_FAILURE;
 	}
-#if 0
+/* TODO: The below privilege check doesn't work properly. It should be resolved later. */
 #ifndef TIZEN_WEARABLE
 	if (perm_app_set_privilege("bluetooth-frwk-service", NULL, NULL) !=
 		PC_OPERATION_SUCCESS)
 		BT_ERR("Failed to set app privilege");
-#endif
 #endif
 	/* Event reciever Init */
 	if (_bt_init_service_event_receiver() != BLUETOOTH_ERROR_NONE) {

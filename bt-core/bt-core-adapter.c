@@ -163,7 +163,7 @@ int _bt_enable_adapter(void)
 
 	__bt_core_set_status(BT_ACTIVATING);
 #ifdef USB_BLUETOOTH
-	char *argv_up[] = {"/usr/bin/hciconfig", "/usr/bin/hciconfig", "hci0", "up", "pscan", NULL};
+	char *argv_up[] = {"/usr/bin/hciconfig", "/usr/bin/hciconfig", "hci0", "up", NULL};
 	ret = __execute_command("/usr/bin/hciconfig", argv_up);
 #else
 	ret = __execute_command("/usr/etc/bluetooth/bt-stack-up.sh", NULL);
@@ -242,7 +242,7 @@ int _bt_enable_adapter_le(void)
 		__bt_core_set_le_status(BT_LE_ACTIVATING);
 		BT_DBG("Activate BT");
 #ifdef USB_BLUETOOTH
-		char *argv_up[] = {"/usr/bin/hciconfig", "/usr/bin/hciconfig", "hci0", "up", "pscan", NULL};
+		char *argv_up[] = {"/usr/bin/hciconfig", "/usr/bin/hciconfig", "hci0", "up", NULL};
 		ret = __execute_command("/usr/bin/hciconfig", argv_up);
 #else
 		ret = __execute_command("/usr/etc/bluetooth/bt-stack-up.sh", NULL);

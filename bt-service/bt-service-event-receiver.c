@@ -3100,7 +3100,7 @@ fail:
 static int __bt_init_obexd_receiver(void)
 {
 	BT_DBG("+");
-#if 0
+#ifndef TIZEN_TV /* TODO: obexd doesn't work in TV profile. It should be resolved later. */
 	GError *error = NULL;
 
 	if (obexd_conn == NULL) {
