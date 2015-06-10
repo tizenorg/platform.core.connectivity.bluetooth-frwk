@@ -216,7 +216,9 @@ static gboolean __bt_check_bt_service(void *data)
 
 		if ((status != BT_ACTIVATING && status != BT_ACTIVATED) &&
 				(le_status != BT_LE_ACTIVATING && le_status != BT_LE_ACTIVATED)){
+#ifndef USB_BLUETOOTH
 			_bt_terminate_service(NULL);
+#endif
 		}
 	}
 

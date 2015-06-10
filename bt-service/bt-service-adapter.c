@@ -34,6 +34,9 @@
 #ifdef ENABLE_TIZEN_2_4
 #include <journal/device.h>
 #endif
+#include <dbus/dbus-glib.h>
+#include <dbus/dbus.h>
+
 #include <bundle.h>
 #if 0
 #include <eventsystem.h>
@@ -505,6 +508,7 @@ static void __bt_set_local_name(void)
 
 static int __bt_set_enabled(void)
 {
+	BT_DBG("+");
 	int adapter_status = BT_ADAPTER_DISABLED;
 	int result = BLUETOOTH_ERROR_NONE;
 
@@ -536,6 +540,7 @@ static int __bt_set_enabled(void)
 	/* Send enabled event to API */
 	_bt_send_event(BT_ADAPTER_EVENT, BLUETOOTH_EVENT_ENABLED,
 				g_variant_new("(i)", result));
+	BT_DBG("-");
 
 	return BLUETOOTH_ERROR_NONE;
 }
@@ -776,6 +781,44 @@ static void __bt_state_event_handler(const char *event_name, bundle *data, void 
 #endif
 }
 
+#ifdef USB_BLUETOOTH
+static int _bt_set_powered(gboolean is_powered)
+{
+	DBusGProxy *proxy;
+	GValue powered = { 0 };
+	GError *error = NULL;
+
+	if (__bt_is_factory_test_mode()) {
+		BT_ERR("Unable to set power in factory binary !!");
+		return BLUETOOTH_ERROR_NOT_SUPPORT;
+	}
+
+	proxy = _bt_get_adapter_properties_proxy();
+
+	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	g_value_init(&powered, G_TYPE_BOOLEAN);
+	g_value_set_boolean(&powered, is_powered);
+
+	dbus_g_proxy_call(proxy, "Set", &error,
+			G_TYPE_STRING, BT_ADAPTER_INTERFACE,
+			G_TYPE_STRING, "Powered",
+			G_TYPE_VALUE, &powered,
+			G_TYPE_INVALID, G_TYPE_INVALID);
+
+	g_value_unset(&powered);
+	if (error != NULL) {
+		BT_ERR("Powered set err:[%s]", error->message);
+		g_error_free(error);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	BT_INFO("Set powered [%d]", is_powered);
+
+	return BLUETOOTH_ERROR_NONE;
+}
+#endif
+
 void _bt_handle_adapter_added(void)
 {
 	BT_DBG("+");
@@ -889,6 +932,17 @@ static gboolean __bt_enable_timeout_cb(gpointer user_data)
 	if (!proxy)
 		return FALSE;
 
+#ifdef USB_BLUETOOTH
+	if (_bt_set_powered(FALSE)) {
+		BT_ERR("BT adapter power down failed");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	if (vconf_set_int(VCONFKEY_BT_STATUS, VCONFKEY_BT_STATUS_OFF) != 0)
+		BT_ERR("Set vconf failed");
+
+	_bt_adapter_set_status(BT_DEACTIVATED);
+#else
 	/* Clean up the process */
 	result = g_dbus_proxy_call_sync(proxy,
 				"DisableAdapter",
@@ -909,6 +963,8 @@ static gboolean __bt_enable_timeout_cb(gpointer user_data)
 	}
 
 	g_variant_unref(result);
+#endif
+
 	_bt_set_disabled(BLUETOOTH_ERROR_TIMEOUT);
 
 	_bt_terminate_service(NULL);
@@ -932,6 +988,18 @@ static gboolean __bt_enable_le_timeout_cb(gpointer user_data)
 	if (!proxy)
 		return FALSE;
 
+#ifdef USB_BLUETOOTH
+	if (_bt_set_powered(FALSE)) {
+		BT_ERR("BT LE adapter power down failed");
+
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	if (vconf_set_int(VCONFKEY_BT_STATUS, VCONFKEY_BT_STATUS_OFF) != 0)
+		BT_ERR("Set vconf failed");
+
+	_bt_adapter_set_status(BT_DEACTIVATED);
+#else
 	/* Clean up the process */
 	result = g_dbus_proxy_call_sync(proxy,
 				"DisableAdapterLe",
@@ -951,6 +1019,8 @@ static gboolean __bt_enable_le_timeout_cb(gpointer user_data)
 	}
 
 	g_variant_unref(result);
+#endif
+
 	_bt_adapter_set_le_status(BT_LE_DEACTIVATED);
 
 	_bt_set_le_disabled(BLUETOOTH_ERROR_TIMEOUT);
@@ -1029,6 +1099,24 @@ int _bt_enable_adapter(void)
 		}
 	}
 
+#ifdef USB_BLUETOOTH
+	if (_bt_set_powered(TRUE)) {
+		BT_ERR("BT adapter power up failed");
+		_bt_adapter_set_status(BT_DEACTIVATED);
+#if 0
+		/* Display notification */
+		notification_status_message_post(BT_STR_NOT_SUPPORT);
+#endif
+		/* Terminate myself */
+		g_idle_add((GSourceFunc)_bt_terminate_service, NULL);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	if (vconf_set_int(VCONFKEY_BT_STATUS, VCONFKEY_BT_STATUS_ON) != 0)
+		BT_ERR("Set vconf failed");
+
+	_bt_adapter_set_status(BT_ACTIVATED);
+#else
 	result = g_dbus_proxy_call_sync(proxy, "EnableAdapter",
 					 NULL,
 					 G_DBUS_CALL_FLAGS_NONE, BT_ENABLE_TIMEOUT,
@@ -1056,6 +1144,8 @@ int _bt_enable_adapter(void)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 	g_variant_unref(result);
+#endif
+
 	if (le_status == BT_LE_ACTIVATED) {
 		__bt_set_enabled();
 	} else {
@@ -1184,6 +1274,17 @@ int __bt_disable_cb(void)
 		}
 	}
 
+#ifdef USB_BLUETOOTH
+	if (_bt_set_powered(FALSE)) {
+		BT_ERR("BT adapter power down failed");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	if (vconf_set_int(VCONFKEY_BT_STATUS, VCONFKEY_BT_STATUS_OFF) != 0)
+		BT_ERR("Set vconf failed");
+
+	_bt_adapter_set_status(BT_DEACTIVATED);
+#else
 	proxy = __bt_get_core_proxy();
 	retv_if(!proxy, BLUETOOTH_ERROR_INTERNAL);
 
@@ -1206,6 +1307,8 @@ int __bt_disable_cb(void)
 	}
 
 	g_variant_unref(result);
+#endif
+
 	return BLUETOOTH_ERROR_NONE;
 }
 
@@ -1368,6 +1471,24 @@ int _bt_enable_adapter_le(void)
 	proxy = __bt_get_core_proxy();
 	retv_if(!proxy, BLUETOOTH_ERROR_INTERNAL);
 
+#ifdef USB_BLUETOOTH
+	if (_bt_set_powered(TRUE)) {
+		BT_ERR("BT LE adapter power up failed");
+		_bt_adapter_set_status(BT_DEACTIVATED);
+#if 0
+		/* Display notification */
+		notification_status_message_post(BT_STR_NOT_SUPPORT);
+#endif
+		/* Terminate myself */
+		g_idle_add((GSourceFunc)_bt_terminate_service, NULL);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+#if 0
+	if (vconf_set_int(VCONFKEY_BT_LE_STATUS, VCONFKEY_BT_LE_STATUS_ON) != 0)
+		BT_ERR("Set vconf failed");
+#endif
+	_bt_adapter_set_le_status(BT_LE_ACTIVATED);
+#else
 	result = g_dbus_proxy_call_sync(proxy, "EnableAdapterLe",
 					NULL,
 					G_DBUS_CALL_FLAGS_NONE, BT_ENABLE_TIMEOUT,
@@ -1402,6 +1523,7 @@ int _bt_enable_adapter_le(void)
 
 	if (result)
 		g_variant_unref(result);
+#endif
 
 	_bt_adapter_start_le_enable_timer();
 
@@ -1439,6 +1561,17 @@ int _bt_disable_adapter_le(void)
 	if (!proxy)
 		return BLUETOOTH_ERROR_INTERNAL;
 
+#ifdef USB_BLUETOOTH
+	if (_bt_set_powered(FALSE)) {
+		BT_ERR("BT LE adapter power down failed");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+/*
+	if (vconf_set_int(VCONFKEY_BT_LE_STATUS, VCONFKEY_BT_LE_STATUS_OFF) != 0)
+		BT_ERR("Set vconf failed");
+*/
+	_bt_adapter_set_le_status(BT_LE_DEACTIVATED);
+#else
 	result = g_dbus_proxy_call_sync(proxy,
 				"DisableAdapterLe",
 				NULL,
@@ -1458,6 +1591,8 @@ int _bt_disable_adapter_le(void)
 	}
 
 	g_variant_unref(result);
+#endif
+
 	_bt_set_le_disabled(BLUETOOTH_ERROR_NONE);
 	BT_DBG("le status : %d", _bt_adapter_get_le_status());
 	BT_DBG("-");

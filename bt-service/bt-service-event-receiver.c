@@ -720,7 +720,7 @@ static void __bt_adapter_property_changed_event(GVariant *msg, const char *path)
 			g_variant_get(val, "b" ,&powered);
 			BT_DBG("Powered = %d", powered);
 			if (powered == FALSE) {
-#ifdef TIZEN_TV
+#ifdef USB_BLUETOOTH
 				_bt_handle_adapter_removed();
 #else
 				if (vconf_get_int(VCONFKEY_BT_STATUS, &bt_state) == 0 &&
@@ -737,7 +737,7 @@ static void __bt_adapter_property_changed_event(GVariant *msg, const char *path)
 #endif
 			}
 			else {
-#ifdef TIZEN_TV
+#ifdef USB_BLUETOOTH
 				_bt_handle_adapter_added();
 #endif
 			}
@@ -2253,8 +2253,14 @@ static  void __bt_manager_event_filter(GDBusConnection *connection,
 	if (strcasecmp(signal_name, "InterfacesAdded") == 0) {
 		g_variant_get(parameters, "(&o@a{sa{sv}})", &obj_path, &value);
 
-		if (strcasecmp(obj_path, BT_BLUEZ_HCI_PATH) == 0)
+		if (strcasecmp(obj_path, BT_BLUEZ_HCI_PATH) == 0){
+#ifdef USB_BLUETOOTH
+			BT_DBG("Enable Adapter");
+			_bt_enable_adapter();
+#else
 			_bt_handle_adapter_added();
+#endif
+		}
 		else {
 			bt_event = __bt_parse_event(value);
 			if (bt_event == BT_DEVICE_EVENT) {
@@ -2328,6 +2334,11 @@ static  void __bt_manager_event_filter(GDBusConnection *connection,
 		}
 		g_variant_unref(value);
 	} else if (strcasecmp(signal_name, "InterfacesRemoved") == 0) {
+#ifdef USB_BLUETOOTH
+		BT_DBG("InterfacesRemoved");
+		_bt_handle_adapter_removed();
+#endif
+
 		if (g_strcmp0(interface_name, BT_MEDIATRANSPORT_INTERFACE) == 0) {
 			bt_event = BT_MEDIA_TRANSFER_EVENT;
 		} else if (g_strcmp0(interface_name, BT_DEVICE_INTERFACE) == 0) {
