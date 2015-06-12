@@ -112,7 +112,7 @@ export FFLAGS="$FFLAGS -DTIZEN_DEBUG_ENABLE"
 
 %if "%{?profile}" == "mobile"
 echo mobile
-export CFLAGS="$CFLAGS -DTIZEN_NETWORK_TETHERING_ENABLE -DTIZEN_BT_FLIGHTMODE_ENABLED"
+export CFLAGS="$CFLAGS -DTIZEN_NETWORK_TETHERING_ENABLE -DTIZEN_BT_FLIGHTMODE_ENABLED -D__TIZEN_MOBILE__ -DTIZEN_TELEPHONY_ENABLED"
 %endif
 
 %if "%{?profile}" == "wearable"
@@ -130,14 +130,11 @@ export CFLAGS="$CFLAGS -Wall -g -fvisibility=hidden -fPIC"
 export LDFLAGS="$CFLAGS -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs"
 %else
 export CFLAGS="$CFLAGS -fpie -DRFCOMM_DIRECT "
-export LDFLAGS="$CFLAGS -Wl,--rpath=/usr/lib -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs -pie"
-%endif
-
-%ifarch aarch64
-export CFLAGS="$CFLAGS -D__TIZEN_MOBILE__ -DTIZEN_TELEPHONY_ENABLED"
+export LDFLAGS="$CFLAGS -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs -pie"
 %endif
 
 cmake . -DCMAKE_INSTALL_PREFIX=/usr \
+-DCMAKE_LIB_DIR=%{_libdir} \
 -DTZ_SYS_USER_GROUP=%TZ_SYS_USER_GROUP \
 -DTZ_SYS_DEFAULT_USER=%TZ_SYS_DEFAULT_USER \
 %if %{with bluetooth_frwk_libnotify}
@@ -171,8 +168,8 @@ install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk
 install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk-service
 install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk-devel
 
-mkdir -p %{buildroot}%{_unitdir_user}
-install -m 0644 bt-service/bluetooth-frwk-service.service %{buildroot}%{_unitdir_user}
+mkdir -p %{buildroot}%{_libdir}/systemd/user
+install -m 0644 bt-service/bluetooth-frwk-service.service %{buildroot}%{_libdir}/systemd/user
 
 %if %{with bluetooth_frwk_libnotify} || %{with bluetooth_frwk_libnotification}
 mkdir -p %{buildroot}%{_datadir}/icons/default
@@ -210,7 +207,7 @@ vconftool set -f -t bool memory/bluetooth/dutmode "0" -g 6520 -i
 
 #%post service
 #mkdir -p %{_sysconfdir}/systemd/default-extra-dependencies/ignore-units.d/
-#ln -sf %{_unitdir_user}/bluetooth-frwk.service %{_sysconfdir}/systemd/default-extra-dependencies/ignore-units.d/
+#ln -sf %{_libdir}/systemd/user/bluetooth-frwk.service %{_sysconfdir}/systemd/default-extra-dependencies/ignore-units.d/
 
 %postun -p /sbin/ldconfig
 
@@ -240,7 +237,7 @@ vconftool set -f -t bool memory/bluetooth/dutmode "0" -g 6520 -i
 %{_datadir}/dbus-1/system-services/org.projectx.bt.service
 
 %{_bindir}/bt-service
-%{_unitdir_user}/bluetooth-frwk-service.service
+%{_libdir}/systemd/user/bluetooth-frwk-service.service
 %{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-service.conf
 %{_bindir}/bluetooth-frwk-test
 #%{_bindir}/bluetooth-gatt-test
