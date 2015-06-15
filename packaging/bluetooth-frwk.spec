@@ -127,11 +127,13 @@ export CFLAGS="$CFLAGS -DUSB_BLUETOOTH -DTIZEN_TV"
 
 %ifarch x86_64
 export CFLAGS="$CFLAGS -Wall -g -fvisibility=hidden -fPIC"
-export LDFLAGS="$CFLAGS -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs"
 %else
-export CFLAGS="$CFLAGS -fpie -DRFCOMM_DIRECT "
-export LDFLAGS="$CFLAGS -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs -pie"
+export CFLAGS="$CFLAGS -fpie"
+export LDFLAGS="$CFLAGS -pie"
 %endif
+
+export CFLAGS="$CFLAGS -DRFCOMM_DIRECT"
+export LDFLAGS="$CFLAGS -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs"
 
 cmake . -DCMAKE_INSTALL_PREFIX=/usr \
 -DCMAKE_LIB_DIR=%{_libdir} \
