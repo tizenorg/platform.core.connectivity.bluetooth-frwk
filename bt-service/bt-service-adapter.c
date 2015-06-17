@@ -1744,7 +1744,7 @@ static gboolean __bt_get_discoverable_property(void)
 			g_clear_error(&error);
 		} else
 			BT_ERR("Failed to get Discoverable property");
-		return BLUETOOTH_ERROR_INTERNAL;
+		return FALSE;
 	}
 
 	g_variant_get(result, "(v)", &temp);
