@@ -2113,7 +2113,7 @@ GDBusNodeInfo *__bt_service_create_method_node_info
 	GDBusNodeInfo *node_info = NULL;
 
 	if (introspection_data == NULL) {
-		ERR("Introspection XML not present: %s", err->message);
+		ERR("Introspection XML not present");
 		return NULL;
 	}
 
