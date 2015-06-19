@@ -309,7 +309,7 @@ void _bt_core_handle_flight_mode_noti(void)
 void _bt_core_handle_power_saving_mode_noti(void)
 {
 #ifndef TIZEN_WEARABLE
-	int ret;
+	int ret = 0;
 
 	BT_DBG("+");
 #ifdef ENABLE_TIZEN_2_4
