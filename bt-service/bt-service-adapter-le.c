@@ -1155,7 +1155,6 @@ int _bt_start_le_scan(const char *sender)
 		BT_ERR("BT is already in LE scanning");
 		return BLUETOOTH_ERROR_IN_PROGRESS;
 	}
-	scanner->is_scanning = TRUE;
 
 	proxy = _bt_get_adapter_proxy();
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -1182,6 +1181,8 @@ int _bt_start_le_scan(const char *sender)
 		} else {
 			BT_INFO("LE Full Scan is already on progress");
 		}
+
+		scanner->is_scanning = TRUE;
 		return BLUETOOTH_ERROR_NONE;
 	} else {
 		if (is_le_set_scan_parameter == FALSE) {
@@ -1225,6 +1226,8 @@ int _bt_start_le_scan(const char *sender)
 
 	if (ret)
 		g_variant_unref(ret);
+
+	scanner->is_scanning = TRUE;
 	return BLUETOOTH_ERROR_NONE;
 }
 
