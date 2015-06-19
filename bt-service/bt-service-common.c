@@ -139,9 +139,6 @@ static GDBusProxy *__bt_init_adapter_proxy(void)
 		retv_if(system_conn == NULL, NULL);
 	}
 
-	manager_proxy = _bt_get_manager_proxy();
-	retv_if(manager_proxy == NULL, NULL);
-
 	adapter_path = _bt_get_adapter_path();
 	retv_if(adapter_path == NULL, NULL);
 
@@ -170,9 +167,6 @@ static GDBusProxy *__bt_init_adapter_properties_proxy(void)
 		system_conn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, NULL);
 		retv_if(system_conn == NULL, NULL);
 	}
-
-	manager_proxy = _bt_get_manager_proxy();
-	retv_if(manager_proxy == NULL, NULL);
 
 	adapter_path = _bt_get_adapter_path();
 	retv_if(adapter_path == NULL, NULL);
