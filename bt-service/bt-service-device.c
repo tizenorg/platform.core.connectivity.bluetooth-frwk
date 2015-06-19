@@ -633,7 +633,7 @@ static void __bt_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
 	GVariant *out_param1;
 	request_info_t *req_info;
 	bluetooth_device_info_t dev_info;
-	bt_remote_dev_info_t *remote_dev_info;
+	bt_remote_dev_info_t *remote_dev_info = NULL;
 	GVariant *manufacture_data;
 	GVariant *param;
 
@@ -733,6 +733,10 @@ static void __bt_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
 		goto dbus_return;
 
 	remote_dev_info = _bt_get_remote_device_info(bonding_info->addr);
+	if (NULL == remote_dev_info) {
+		BT_ERR("Failed to get remote device info");
+		goto dbus_return;
+	}
 
 	GVariant *uuids = NULL;
 	GVariantBuilder *builder = NULL;
@@ -763,14 +767,11 @@ static void __bt_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
 
 
 	/* Send the event to application */
-	if (remote_dev_info != NULL) {
+	_bt_send_event(BT_ADAPTER_EVENT,
+		BLUETOOTH_EVENT_BONDING_FINISHED,
+		param);
 
-		_bt_send_event(BT_ADAPTER_EVENT,
-			BLUETOOTH_EVENT_BONDING_FINISHED,
-			param);
-
-		_bt_free_device_info(remote_dev_info);
-	}
+	_bt_free_device_info(remote_dev_info);
 
 dbus_return:
 	if (req_info->context == NULL)
@@ -1100,7 +1101,7 @@ static void __bt_discover_cb(GDBusProxy *proxy, GAsyncResult *res,
 	GVariant *out_param1;
 	int result = BLUETOOTH_ERROR_NONE;
 	bluetooth_device_info_t dev_info;
-	bt_remote_dev_info_t *remote_dev_info;
+	bt_remote_dev_info_t *remote_dev_info = NULL;
 	request_info_t *req_info;
 	GVariant *uuid_list, *manufacture_data;
 	GVariant *param;
@@ -1150,6 +1151,10 @@ static void __bt_discover_cb(GDBusProxy *proxy, GAsyncResult *res,
 	}
 
 	remote_dev_info = _bt_get_remote_device_info(searching_info->addr);
+	if (NULL == remote_dev_info) {
+		BT_ERR("Failed to get remote device info");
+		goto dbus_return;
+	}
 
 event:
 	builder = g_variant_builder_new(G_VARIANT_TYPE("as"));
@@ -1178,14 +1183,11 @@ event:
 
 
 	/* Send the event to application */
-	if (remote_dev_info != NULL) {
+	_bt_send_event(BT_ADAPTER_EVENT,
+		BLUETOOTH_EVENT_SERVICE_SEARCHED,
+		param);
 
-		_bt_send_event(BT_ADAPTER_EVENT,
-			BLUETOOTH_EVENT_SERVICE_SEARCHED,
-			param);
-
-		_bt_free_device_info(remote_dev_info);
-	}
+	_bt_free_device_info(remote_dev_info);
 
 dbus_return:
 	if (req_info->context == NULL)
