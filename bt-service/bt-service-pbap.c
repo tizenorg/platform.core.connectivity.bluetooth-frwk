@@ -774,8 +774,8 @@ int __bt_pbap_call_get_phonebook_size(GDBusProxy *proxy, bt_pbap_data_t *pbap_da
 			(GAsyncReadyCallback)__bt_pbap_get_phonebook_size_cb,
 			pbap_data);
 
-	return BLUETOOTH_ERROR_NONE;
 	BT_DBG("-");
+	return BLUETOOTH_ERROR_NONE;
 }
 
 int __bt_pbap_call_get_phonebook(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
