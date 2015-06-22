@@ -245,14 +245,26 @@ static gboolean __received_cb(GIOChannel *chan, GIOCondition cond,
 				data.type = HTYPE_TRANS_HANDSHAKE;
 				data.buffer_size = len;
 				data.buffer = (char *) malloc(sizeof(char) * len);
-				memcpy(data.buffer, buffer, len);
+				/* Fix : NULL_RETURNS */
+				if (NULL == data.buffer) {
+					BT_ERR("Failed to allocate memory");
+					data.buffer_size = 0;
+				} else {
+					memcpy(data.buffer, buffer, len);
+				}
 			break;
 			case HIDP_TRANS_HID_CONTROL:
 				BT_INFO("HID CONTROL");
 				data.type = HTYPE_TRANS_HID_CONTROL;
 				data.buffer_size = len;
 				data.buffer = (char *) malloc(sizeof(char) * len);
-				memcpy(data.buffer, buffer, len);
+				/* Fix : NULL_RETURNS */
+				if (NULL == data.buffer) {
+					BT_ERR("Failed to allocate memory");
+					data.buffer_size = 0;
+				} else {
+					memcpy(data.buffer, buffer, len);
+				}
 			break;
 			case HIDP_TRANS_DATA:
 				BT_INFO("TRANS DATA");
@@ -262,14 +274,26 @@ static gboolean __received_cb(GIOChannel *chan, GIOCondition cond,
 					data.param = PTYPE_DATA_RTYPE_INPUT;
 					data.buffer_size = len;
 					data.buffer = (char *) malloc(sizeof(char) * len);
-					memcpy(data.buffer, buffer, len);
+					/* Fix : NULL_RETURNS */
+					if (NULL == data.buffer) {
+						BT_ERR("Failed to allocate memory");
+						data.buffer_size = 0;
+					} else {
+						memcpy(data.buffer, buffer, len);
+					}
 				}
 				else {
 					BT_INFO("Out Report");
 					data.param = PTYPE_DATA_RTYPE_OUTPUT;
 					data.buffer_size = len;
 					data.buffer = (char *) malloc(sizeof(char) * len);
-					memcpy(data.buffer, buffer, len);
+					/* Fix : NULL_RETURNS */
+					if (NULL == data.buffer) {
+						BT_ERR("Failed to allocate memory");
+						data.buffer_size = 0;
+					} else {
+						memcpy(data.buffer, buffer, len);
+					}
 				}
 			break;
 			case HIDP_TRANS_GET_REPORT: {
@@ -284,7 +308,13 @@ static gboolean __received_cb(GIOChannel *chan, GIOCondition cond,
 				}
 				data.buffer_size = len;
 				data.buffer = (char *) malloc(sizeof(char) * len);
-				memcpy(data.buffer, buffer, len);
+				/* Fix : NULL_RETURNS */
+				if (NULL == data.buffer) {
+					BT_ERR("Failed to allocate memory");
+					data.buffer_size = 0;
+				} else {
+					memcpy(data.buffer, buffer, len);
+				}
 				break;
 			}
 			case HIDP_TRANS_SET_REPORT: {
@@ -299,7 +329,13 @@ static gboolean __received_cb(GIOChannel *chan, GIOCondition cond,
 				}
 				data.buffer_size = len;
 				data.buffer = (char *) malloc(sizeof(char) * len);
-				memcpy(data.buffer, buffer, len);
+				/* Fix : NULL_RETURNS */
+				if (NULL == data.buffer) {
+					BT_ERR("Failed to allocate memory");
+					data.buffer_size = 0;
+				} else {
+					memcpy(data.buffer, buffer, len);
+				}
 				break;
 			}
 			case HIDP_TRANS_GET_PROTOCOL:{
@@ -308,7 +344,13 @@ static gboolean __received_cb(GIOChannel *chan, GIOCondition cond,
 				data.param = PTYPE_DATA_RTYPE_INPUT;
 				data.buffer_size = len;
 				data.buffer = (char *) malloc(sizeof(char) * len);
-				memcpy(data.buffer, buffer, len);
+				/* Fix : NULL_RETURNS */
+				if (NULL == data.buffer) {
+					BT_ERR("Failed to allocate memory");
+					data.buffer_size = 0;
+				} else {
+					memcpy(data.buffer, buffer, len);
+				}
 				break;
 			}
 			case HIDP_TRANS_SET_PROTOCOL:{
@@ -317,7 +359,13 @@ static gboolean __received_cb(GIOChannel *chan, GIOCondition cond,
 				data.param = PTYPE_DATA_RTYPE_INPUT;
 				data.buffer_size = len;
 				data.buffer = (char *) malloc(sizeof(char) * len);
-				memcpy(data.buffer, buffer, len);
+				/* Fix : NULL_RETURNS */
+				if (NULL == data.buffer) {
+					BT_ERR("Failed to allocate memory");
+					data.buffer_size = 0;
+				} else {
+					memcpy(data.buffer, buffer, len);
+				}
 				break;
 			}
 			default: {
