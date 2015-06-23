@@ -67,7 +67,14 @@ BT_EXPORT_API int bluetooth_bond_device_by_type(
 	bt_user_info_t *user_info;
 
 	BT_CHECK_PARAMETER(device_address, return);
-	BT_CHECK_ENABLED(return);
+	if(conn_type == BLUETOOTH_DEV_CONN_BREDR)
+		BT_CHECK_ENABLED(return);
+	else if(conn_type == BLUETOOTH_DEV_CONN_LE)
+		BT_CHECK_ENABLED_LE(return);
+	else if(conn_type == BLUETOOTH_DEV_CONN_DEFAULT) {
+		BT_CHECK_ENABLED(return);
+		BT_CHECK_ENABLED_LE(return);
+	}
 
 	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_BOND_DEVICE_BY_TYPE)
 	     == BLUETOOTH_ERROR_PERMISSION_DEINED) {
@@ -97,7 +104,7 @@ BT_EXPORT_API int bluetooth_cancel_bonding(void)
 {
 	int result;
 
-	BT_CHECK_ENABLED(return);
+	BT_CHECK_ENABLED_ANY(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -116,7 +123,7 @@ BT_EXPORT_API int bluetooth_unbond_device(const bluetooth_device_address_t *devi
 	bt_user_info_t *user_info;
 
 	BT_CHECK_PARAMETER(device_address, return);
-	BT_CHECK_ENABLED(return);
+	BT_CHECK_ENABLED_ANY(return);
 
 	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_UNBOND_DEVICE)
 	     == BLUETOOTH_ERROR_PERMISSION_DEINED) {
@@ -148,7 +155,7 @@ BT_EXPORT_API int bluetooth_get_bonded_device(const bluetooth_device_address_t *
 
 	BT_CHECK_PARAMETER(device_address, return);
 	BT_CHECK_PARAMETER(dev_info, return);
-	BT_CHECK_ENABLED(return);
+	BT_CHECK_ENABLED_ANY(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -183,7 +190,7 @@ BT_EXPORT_API int bluetooth_search_service(const bluetooth_device_address_t *dev
 	bt_user_info_t *user_info;
 
 	BT_CHECK_PARAMETER(device_address, return);
-	BT_CHECK_ENABLED(return);
+	BT_CHECK_ENABLED_ANY(return);
 
 	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_SEARCH_SERVICE)
 	     == BLUETOOTH_ERROR_PERMISSION_DEINED) {
@@ -212,7 +219,7 @@ BT_EXPORT_API int bluetooth_cancel_service_search(void)
 {
 	int result;
 
-	BT_CHECK_ENABLED(return);
+	BT_CHECK_ENABLED_ANY(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -233,7 +240,7 @@ BT_EXPORT_API int bluetooth_set_alias(const bluetooth_device_address_t *device_a
 
 	BT_CHECK_PARAMETER(device_address, return);
 	BT_CHECK_PARAMETER(alias, return);
-	BT_CHECK_ENABLED(return);
+	BT_CHECK_ENABLED_ANY(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -256,7 +263,7 @@ BT_EXPORT_API int bluetooth_authorize_device(const bluetooth_device_address_t *d
 	int result;
 
 	BT_CHECK_PARAMETER(device_address, return);
-	BT_CHECK_ENABLED(return);
+	BT_CHECK_ENABLED_ANY(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -280,7 +287,7 @@ BT_EXPORT_API int bluetooth_is_device_connected(const bluetooth_device_address_t
 
 	BT_CHECK_PARAMETER(device_address, return);
 	BT_CHECK_PARAMETER(is_connected, return);
-	BT_CHECK_ENABLED(return);
+	BT_CHECK_ENABLED_ANY(return);
 
 #ifdef RFCOMM_DIRECT
 	if (type & BLUETOOTH_RFCOMM_SERVICE) {
@@ -356,7 +363,7 @@ BT_EXPORT_API int bluetooth_enable_rssi(const bluetooth_device_address_t *remote
 {
 	int result;
 
-	BT_CHECK_ENABLED(return);
+	BT_CHECK_ENABLED_ANY(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -376,7 +383,7 @@ BT_EXPORT_API int bluetooth_get_rssi_strength(const bluetooth_device_address_t *
 {
 	int result;
 
-	BT_CHECK_ENABLED(return);
+	BT_CHECK_ENABLED_ANY(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -396,7 +403,7 @@ BT_EXPORT_API int bluetooth_le_conn_update(const bluetooth_device_address_t *add
 {
 	int result;
 
-	BT_CHECK_ENABLED(return);
+	BT_CHECK_ENABLED_ANY(return);
 	BT_CHECK_PARAMETER(address, return);
 	BT_CHECK_PARAMETER(parameters, return);
 
@@ -423,7 +430,7 @@ BT_EXPORT_API int bluetooth_get_connected_link_type(
 	int result;
 
 	BT_CHECK_PARAMETER(device_address, return);
-	BT_CHECK_ENABLED(return);
+	BT_CHECK_ENABLED_ANY(return);
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
