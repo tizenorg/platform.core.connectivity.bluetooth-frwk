@@ -389,6 +389,10 @@ void _bt_obex_agent_new(char *path)
 		}
 	}
 	info = (bt_obex_agent_info *)malloc (sizeof(bt_obex_agent_info));
+	if (info == NULL) {
+		BT_ERR("Failed to allocate memory");
+		return;
+	}
 	memset(info, 0, sizeof(bt_obex_agent_info));
 	info->path = g_strdup(path);
 	obex_agent_list = g_slist_append(obex_agent_list, info);
