@@ -102,6 +102,8 @@ int _bt_start_le_scan(const char *sender);
 
 int _bt_stop_le_scan(const char *sender);
 
+void _bt_disable_all_scanner_status(void);
+
 void _bt_set_le_scan_status(gboolean mode);
 
 gboolean _bt_is_le_scanning(void);

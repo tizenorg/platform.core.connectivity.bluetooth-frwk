@@ -302,6 +302,7 @@ gboolean _bt_discovery_finished_cb(gpointer user_data)
 		}
 
 		_bt_set_cancel_by_user(FALSE);
+		_bt_disable_all_scanner_status();
 		_bt_set_discovery_status(FALSE);
 		param = g_variant_new("(i)", result);
 		_bt_send_event(BT_ADAPTER_EVENT,

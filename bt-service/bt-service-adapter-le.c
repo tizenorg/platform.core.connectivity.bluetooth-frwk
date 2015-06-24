@@ -1311,6 +1311,17 @@ int _bt_stop_le_scan(const char *sender)
 	return BLUETOOTH_ERROR_NONE;
 }
 
+void _bt_disable_all_scanner_status(void)
+{
+	GSList *l;
+	bt_adapter_le_scanner_t *scanner;
+
+	for (l = scanner_list; l != NULL; l = g_slist_next(l)) {
+		scanner = l->data;
+		scanner->is_scanning = FALSE;
+	}
+}
+
 void _bt_set_le_scan_status(gboolean mode)
 {
 	is_le_scanning = mode;
