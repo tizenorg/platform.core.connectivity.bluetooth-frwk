@@ -186,8 +186,10 @@ static void __bt_service_method(GDBusConnection *connection,
 					service_type, (const char *)sender) == FALSE) {
 			BT_ERR("Client don't have the privilege to excute this function");
 			/* TODO: privilege check doesn't work properly. It sometimes reutrns fail. */
+#if 0
 			result = BLUETOOTH_ERROR_PERMISSION_DEINED;
 			goto fail;
+#endif
 		}
 
 		if (request_type == BT_ASYNC_REQ
