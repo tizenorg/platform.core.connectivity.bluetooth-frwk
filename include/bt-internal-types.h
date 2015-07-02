@@ -415,14 +415,6 @@ typedef struct {
 #define BT_HID_DEVICE_CONNECTED "HIDConnected"
 #define BT_HID_DEVICE_DISCONNECTED "HIDDisconnected"
 
-/* These vconfkey value should be removed after vconf internal package provides them */
-#define VCONFKEY_BT_LE_STATUS  "db/bluetooth/lestatus"
-enum {
-	VCONFKEY_BT_LE_STATUS_OFF = 0x0000,
-	VCONFKEY_BT_LE_STATUS_ON = 0x0001
-};
-
-
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
