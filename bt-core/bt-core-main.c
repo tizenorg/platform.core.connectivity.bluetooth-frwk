@@ -157,6 +157,8 @@ int main(void)
 	g_type_init();
 	BT_INFO_C("Starting bt-core daemeon");
 
+	_bt_core_update_status();
+
 	ret = _bt_core_register_dbus();
 	if (!ret) {
 		BT_ERR("_bt_core_register_dbus failed");

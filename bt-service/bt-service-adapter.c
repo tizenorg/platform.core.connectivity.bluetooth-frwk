@@ -758,7 +758,7 @@ void _bt_service_unregister_vconf_handler(void)
 			(vconf_callback_fn)__bt_service_flight_ps_mode_cb);
 #endif
 
-#ifndef TIZEN_WEARABLEi
+#ifndef TIZEN_WEARABLE
 #ifdef ENABLE_TIZEN_2_4
 	vconf_ignore_key_changed(VCONFKEY_SETAPPL_PSMODE,
 			(vconf_callback_fn)__bt_service_flight_ps_mode_cb);

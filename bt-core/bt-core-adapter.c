@@ -34,6 +34,8 @@
 #include "bt-core-dbus-handler.h"
 #include "bt-core-noti-handler.h"
 
+#define BT_CORE_IDLE_TERM_TIME 200 /* 200ms */
+
 static bt_status_t adapter_status = BT_DEACTIVATED;
 static bt_le_status_t adapter_le_status = BT_LE_DEACTIVATED;
 static gboolean is_recovery_mode = FALSE;
@@ -86,6 +88,13 @@ void _bt_core_set_bt_le_status(bt_mode_e mode, int status)
 gboolean _bt_core_is_recovery_mode(void)
 {
 	return is_recovery_mode;
+}
+
+static gboolean __bt_core_idle_terminate(gpointer data)
+{
+	BT_DBG("+");
+	_bt_core_terminate();
+	return FALSE;
 }
 
 gboolean _bt_core_is_flight_mode_enabled(void)
@@ -192,6 +201,7 @@ int _bt_disable_adapter(void)
 		/* Return with 0 for the Disabled response. */
 		__bt_core_set_status(BT_DEACTIVATED);
 		BT_INFO("BR/EDR is disabled. now LE only mode");
+		g_timeout_add(BT_CORE_IDLE_TERM_TIME, __bt_core_idle_terminate, NULL);
 		return 0;
 	}
 
@@ -256,6 +266,7 @@ int _bt_enable_adapter_le(void)
 		}
 	} else {
 		__bt_core_set_le_status(BT_LE_ACTIVATED);
+		g_timeout_add(BT_CORE_IDLE_TERM_TIME, __bt_core_idle_terminate, NULL);
 	}
 
 	return 0;
@@ -287,6 +298,8 @@ int _bt_disable_adapter_le(void)
 			__bt_core_set_le_status(BT_LE_ACTIVATED);
 			return -1;
 		}
+	} else {
+		g_timeout_add(BT_CORE_IDLE_TERM_TIME, __bt_core_idle_terminate, NULL);
 	}
 
 	__bt_core_set_le_status(BT_LE_DEACTIVATED);
@@ -317,7 +330,7 @@ int _bt_core_service_request_adapter(int service_function)
 	return ret;
 }
 
-static void __bt_core_update_status(void)
+void _bt_core_update_status(void)
 {
 	int bt_status = VCONFKEY_BT_STATUS_OFF;
 	int bt_le_status = 0;
@@ -384,7 +397,7 @@ gboolean _bt_core_recover_adapter(void)
 
 	is_recovery_mode = TRUE;
 
-	__bt_core_update_status();
+	_bt_core_update_status();
 
 	if (_bt_core_get_status() == BT_ACTIVATED) {
 		_bt_core_set_bt_status(BT_RECOVERY_MODE, 1);
@@ -453,7 +466,7 @@ gboolean _bt_core_enable_core(void)
 {
 	BT_DBG("+");
 
-	__bt_core_update_status();
+	_bt_core_update_status();
 
 	g_timeout_add(200, (GSourceFunc)__bt_core_enable_core_timeout_cb, NULL);
 

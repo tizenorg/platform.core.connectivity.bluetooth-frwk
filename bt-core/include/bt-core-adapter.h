@@ -91,6 +91,8 @@ gboolean __bt_core_reset_adapter(void);
 gboolean _bt_core_enable_core(void);
 gboolean _bt_core_factory_test_mode(const char *type, const char *arg);
 
+void _bt_core_update_status(void);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
