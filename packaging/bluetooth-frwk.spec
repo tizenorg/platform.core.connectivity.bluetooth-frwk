@@ -110,19 +110,25 @@ export CFLAGS="$CFLAGS -DTIZEN_DEBUG_ENABLE"
 export CXXFLAGS="$CXXFLAGS -DTIZEN_DEBUG_ENABLE"
 export FFLAGS="$FFLAGS -DTIZEN_DEBUG_ENABLE"
 
+%define _servicefile packaging/bluetooth-frwk-common.service
+%define _servicedir starter.target.wants
+
 %if "%{?profile}" == "mobile"
-echo mobile
 export CFLAGS="$CFLAGS -DTIZEN_NETWORK_TETHERING_ENABLE -DTIZEN_BT_FLIGHTMODE_ENABLED -D__TIZEN_MOBILE__ -DTIZEN_TELEPHONY_ENABLED"
+%define _servicefile packaging/bluetooth-frwk-mobile.service
+%define _servicedir multi-user.target.wants
 %endif
 
 %if "%{?profile}" == "wearable"
-echo wearable
 export CFLAGS="$CFLAGS -DTIZEN_WEARABLE"
+%define _servicefile packaging/bluetooth-frwk-wearable.service
+%define _servicedir multi-user.target.wants
 %endif
 
 %if "%{?profile}" == "tv"
-echo tv
 export CFLAGS="$CFLAGS -DUSB_BLUETOOTH -DTIZEN_TV"
+#%define _servicefile packaging/bluetooth-frwk-tv.service
+#%define _servicedir starter.target.wants
 %endif
 
 %ifarch x86_64
@@ -170,8 +176,11 @@ install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk
 install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk-service
 install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk-devel
 
-mkdir -p %{buildroot}%{_libdir}/systemd/user
-install -m 0644 bt-service/bluetooth-frwk-service.service %{buildroot}%{_libdir}/systemd/user
+#mkdir -p %{buildroot}%{_libdir}/systemd/user
+#install -m 0644 packaging/bluetooth-frwk-tv.service %{buildroot}%{_libdir}/systemd/user
+mkdir -p %{buildroot}%{_libdir}/systemd/system/%{_servicedir}
+install -m 0644 %{_servicefile} %{buildroot}%{_libdir}/systemd/system/bluetooth-frwk.service
+ln -s ../bluetooth-frwk.service %{buildroot}%{_libdir}/systemd/system/%{_servicedir}/bluetooth-frwk.service
 
 %if %{with bluetooth_frwk_libnotify} || %{with bluetooth_frwk_libnotification}
 mkdir -p %{buildroot}%{_datadir}/icons/default
@@ -218,8 +227,8 @@ vconftool set -f -t bool memory/bluetooth/dutmode "0" -g 6520 -i
 %defattr(-, root, root)
 %{_libdir}/libbluetooth-api.so.*
 %{_datadir}/license/bluetooth-frwk
-#%{_libdir}/systemd/system/%{_servicedir}/bluetooth-frwk.service
-#%{_libdir}/systemd/system/bluetooth-frwk.service
+%{_libdir}/systemd/system/%{_servicedir}/bluetooth-frwk.service
+%{_libdir}/systemd/system/bluetooth-frwk.service
 
 %files devel
 %defattr(-, root, root)
@@ -239,7 +248,8 @@ vconftool set -f -t bool memory/bluetooth/dutmode "0" -g 6520 -i
 %{_datadir}/dbus-1/system-services/org.projectx.bt.service
 
 %{_bindir}/bt-service
-%{_libdir}/systemd/user/bluetooth-frwk-service.service
+#%{_libdir}/systemd/user/bluetooth-frwk-tv.service
+%{_libdir}/systemd/system/%{_servicedir}/bluetooth-frwk.service
 %{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-service.conf
 %{_bindir}/bluetooth-frwk-test
 #%{_bindir}/bluetooth-gatt-test
