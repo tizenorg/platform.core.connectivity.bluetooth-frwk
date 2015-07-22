@@ -166,11 +166,14 @@ static gboolean __bt_check_bt_service(void *data)
 #if 0
 	int ps_mode_deactivation = 0;
 #endif
-
 	status = _bt_adapter_get_status();
 	le_status = _bt_adapter_get_le_status();
 	BT_DBG("State: %d, LE State: %d", status, le_status);
 
+#ifdef TIZEN_TV
+	if (_bt_get_enable_timer_id() == 0)
+		_bt_enable_adapter();
+#else
 	if (vconf_get_int(VCONFKEY_BT_STATUS, &bt_status) < 0) {
 		BT_DBG("no bluetooth device info, so BT was disabled at previous session");
 	}
@@ -214,7 +217,7 @@ static gboolean __bt_check_bt_service(void *data)
 				(le_status != BT_LE_ACTIVATING && le_status != BT_LE_ACTIVATED)){
 		}
 	}
-
+#endif
 	return FALSE;
 }
 

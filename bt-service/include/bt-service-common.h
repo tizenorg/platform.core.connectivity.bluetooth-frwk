@@ -104,7 +104,11 @@ extern "C" {
 #define BT_AGENT_NEW_LINE "\r\n"
 
 #define BT_MAX_DBUS_TIMEOUT 45000
+#ifndef TIZEN_TV
 #define BT_ENABLE_TIMEOUT 20000 /* 20 seconds */
+#else
+#define BT_ENABLE_TIMEOUT 5000 /* 5 seconds */
+#endif
 #define BT_DISCOVERY_FINISHED_DELAY 200
 
 #define MANAGER_EVENT_MATCH_RULE \

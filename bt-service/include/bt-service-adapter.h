@@ -146,6 +146,8 @@ int _bt_set_manufacturer_data(bluetooth_manufacturer_data_t *m_data);
 
 int __bt_disable_cb(void);
 
+int _bt_get_enable_timer_id(void);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

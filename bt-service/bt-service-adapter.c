@@ -994,6 +994,17 @@ void _bt_adapter_start_enable_timer(void)
 	return;
 }
 
+static gboolean __bt_adapter_enabled_cb(gpointer user_data)
+{
+	BT_DBG("+");
+
+	__bt_set_enabled();
+	_bt_adapter_set_status(BT_ACTIVATED);
+
+	return FALSE;
+}
+
+
 int _bt_enable_adapter(void)
 {
 	GDBusProxy *proxy;
@@ -1021,6 +1032,22 @@ int _bt_enable_adapter(void)
 	}
 
 	_bt_adapter_set_status(BT_ACTIVATING);
+
+#ifdef TIZEN_TV
+{
+	int adapter_status = BT_ADAPTER_DISABLED;
+
+	if (vconf_set_int(VCONFKEY_BT_STATUS, VCONFKEY_BT_STATUS_OFF) != 0)
+		BT_ERR("Set vconf failed");
+
+	_bt_check_adapter(&adapter_status);
+	if (adapter_status == BT_ADAPTER_ENABLED) {
+		g_idle_add(__bt_adapter_enabled_cb, NULL);
+		_bt_adapter_start_enable_timer();
+		return BLUETOOTH_ERROR_NONE;
+	}
+}
+#endif
 
 	proxy = __bt_get_core_proxy();
 	if (!proxy)
@@ -1329,6 +1356,7 @@ int _bt_reset_adapter(void)
 	return BLUETOOTH_ERROR_NONE;
 }
 
+#ifndef TIZEN_TV
 int _bt_check_adapter(int *status)
 {
 
@@ -1347,6 +1375,52 @@ int _bt_check_adapter(int *status)
 	g_free(adapter_path);
 	return BLUETOOTH_ERROR_NONE;
 }
+#else
+int _bt_check_adapter(int *status)
+{
+	GDBusProxy *proxy;
+	GError *error = NULL;
+	GVariant *result;
+	GVariant *temp;
+	gboolean powered = FALSE;
+
+	BT_CHECK_PARAMETER(status, return);
+
+	*status = BT_ADAPTER_DISABLED;
+
+	proxy = _bt_get_adapter_properties_proxy();
+	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	result = g_dbus_proxy_call_sync(proxy,
+				"Get",
+				g_variant_new("(ss)", BT_ADAPTER_INTERFACE,
+					"Powered"),
+				G_DBUS_CALL_FLAGS_NONE,
+				-1,
+				NULL,
+				&error);
+
+	if (!result) {
+		BT_ERR("Failed to get local address");
+		if (error != NULL) {
+			BT_ERR("Failed to get local address (Error: %s)", error->message);
+			g_clear_error(&error);
+		}
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	g_variant_get(result, "(v)", &temp);
+	powered = g_variant_get_boolean(temp);
+	BT_DBG("powered: %d", powered);
+
+	if (powered)
+		*status = BT_ADAPTER_ENABLED;
+
+	g_variant_unref(result);
+	g_variant_unref(temp);
+	return BLUETOOTH_ERROR_NONE;
+}
+#endif
 
 int _bt_enable_adapter_le(void)
 {
@@ -2493,3 +2567,7 @@ int _bt_set_manufacturer_data(bluetooth_manufacturer_data_t *m_data)
 	return BLUETOOTH_ERROR_NONE;
 }
 
+int _bt_get_enable_timer_id(void)
+{
+	return timer_id;
+}
