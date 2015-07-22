@@ -4,7 +4,7 @@
 
 Name:       bluetooth-frwk
 Summary:    Bluetooth framework for BlueZ and Obexd. This package is Bluetooth framework based on BlueZ and Obexd stack.
-Version:    0.2.148
+Version:    0.2.149
 Release:    1
 Group:      Network & Connectivity/Bluetooth
 License:    Apache-2.0
@@ -127,8 +127,8 @@ export CFLAGS="$CFLAGS -DTIZEN_WEARABLE"
 
 %if "%{?profile}" == "tv"
 export CFLAGS="$CFLAGS -DUSB_BLUETOOTH -DTIZEN_TV"
-#%define _servicefile packaging/bluetooth-frwk-tv.service
-#%define _servicedir starter.target.wants
+%define _servicefile packaging/bluetooth-frwk-mobile.service
+%define _servicedir multi-user.target.wants
 %endif
 
 %ifarch x86_64
