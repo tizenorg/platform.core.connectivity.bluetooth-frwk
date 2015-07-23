@@ -73,10 +73,11 @@ static void __bt_sigterm_handler(int signo, siginfo_t *info, void *data)
 
 	BT_INFO("signal [%d] is sent by [%d]", signo, info->si_pid);
 
+#ifndef TIZEN_TV
 	ret = _bt_recover_adapter();
 	if (ret != BLUETOOTH_ERROR_NONE)
 		BT_ERR("_bt_recover_adapter is failed : %d", ret);
-
+#endif
 	return;
 }
 

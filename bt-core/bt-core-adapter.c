@@ -35,6 +35,8 @@
 #include "bt-core-noti-handler.h"
 
 #define BT_CORE_IDLE_TERM_TIME 200 /* 200ms */
+#define BT_CORE_CHECK_ADAPTER_OBJECT_PATH_MAX 50
+
 
 static bt_status_t adapter_status = BT_DEACTIVATED;
 static bt_le_status_t adapter_le_status = BT_LE_DEACTIVATED;
@@ -167,6 +169,7 @@ int _bt_enable_adapter(void)
 		/* Return with 0 for the Enabled response. */
 		__bt_core_set_status(BT_ACTIVATED);
 		BT_INFO("BR/EDR is enabled.");
+		g_timeout_add(BT_CORE_IDLE_TERM_TIME, __bt_core_idle_terminate, NULL);
 		return 0;
 	}
 
@@ -330,28 +333,98 @@ int _bt_core_service_request_adapter(int service_function)
 	return ret;
 }
 
+static gboolean __bt_core_check_the_adapter_path(GDBusConnection *conn)
+{
+	GError *err = NULL;
+	GDBusProxy *manager_proxy = NULL;
+	GVariant *result = NULL;
+	char *adapter_path = NULL;
+
+	if(conn == NULL)
+		return FALSE;
+
+	manager_proxy =  g_dbus_proxy_new_sync(conn,
+			G_DBUS_PROXY_FLAGS_NONE, NULL,
+			"org.bluez",
+			"/",
+			"org.freedesktop.DBus.ObjectManager",
+			NULL, &err);
+
+	if (!manager_proxy) {
+		if (err != NULL) {
+			BT_ERR("Unable to create proxy: %s", err->message);
+			g_clear_error(&err);
+		} else {
+			BT_ERR("Fail to create proxy");
+		}
+		goto fail;
+	}
+
+	result = g_dbus_proxy_call_sync(manager_proxy, "DefaultAdapter", NULL,
+			G_DBUS_CALL_FLAGS_NONE, -1, NULL, &err);
+	if (!result) {
+		if (err != NULL) {
+			BT_ERR("Fail to get DefaultAdapter (Error: %s)", err->message);
+			g_clear_error(&err);
+		} else{
+			BT_ERR("Fail to get DefaultAdapter");
+		}
+		goto fail;
+	}
+
+	if (g_strcmp0(g_variant_get_type_string(result), "(o)")) {
+		BT_ERR("Incorrect result\n");
+		goto fail;
+	}
+
+	g_variant_get(result, "(&o)", &adapter_path);
+
+	if (adapter_path == NULL ||
+		strlen(adapter_path) >= BT_CORE_CHECK_ADAPTER_OBJECT_PATH_MAX) {
+		BT_ERR("Adapter path is inproper\n");
+		goto fail;
+	}
+
+	g_variant_unref(result);
+	g_object_unref(manager_proxy);
+
+	return TRUE;
+
+fail:
+	if (result)
+		g_variant_unref(result);
+
+	if (manager_proxy)
+		g_object_unref(manager_proxy);
+
+	return FALSE;
+}
+
 void _bt_core_update_status(void)
 {
 	int bt_status = VCONFKEY_BT_STATUS_OFF;
-	int bt_le_status = 0;
+	int bt_le_status = VCONFKEY_BT_LE_STATUS_OFF;
+	gboolean ret = FALSE;
 
-	if (vconf_get_int(VCONFKEY_BT_STATUS, &bt_status) < 0)
-		BT_ERR("no bluetooth device info, so BT was disabled at previous session");
+	ret = __bt_core_check_the_adapter_path(_bt_core_get_gdbus_connection());
+	BT_INFO("check the real status of bt_adapter");
 
-	if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_le_status) < 0)
-		BT_ERR("no bluetooth le info, so BT LE was disabled at previous session");
-
-	BT_INFO("bt_status = %d, bt_le_status = %d", bt_status, bt_le_status);
-
-	if (bt_status == VCONFKEY_BT_STATUS_OFF)
+	if (ret != TRUE) {
 		__bt_core_set_status(BT_DEACTIVATED);
-	else
-		__bt_core_set_status(BT_ACTIVATED);
+		__bt_core_set_le_status(BT_DEACTIVATED);
+	} else {
+		if (vconf_get_int(VCONFKEY_BT_STATUS, &bt_status) < 0)
+			BT_ERR("no bluetooth device info, so BT was disabled at previous session");
+		if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_le_status) < 0)
+			BT_ERR("no bluetooth le info, so BT LE was disabled at previous session");
 
-	if (bt_le_status == 0)
-		__bt_core_set_le_status(BT_LE_DEACTIVATED);
-	else
-		__bt_core_set_le_status(BT_LE_ACTIVATED);
+		BT_INFO("bt_status = %d, bt_le_status = %d", bt_status, bt_le_status);
+
+		if(bt_status == VCONFKEY_BT_STATUS_ON)
+			__bt_core_set_status(BT_ACTIVATED);
+		if(bt_le_status == VCONFKEY_BT_LE_STATUS_ON)
+			__bt_core_set_le_status(BT_ACTIVATED);
+	}
 }
 
 gboolean _bt_core_enable_adapter(void)

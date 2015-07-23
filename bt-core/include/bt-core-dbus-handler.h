@@ -59,6 +59,8 @@ void _bt_core_fill_garray_from_variant(GVariant *var, GArray *param);
 GDBusProxy *_bt_core_gdbus_get_service_proxy(void);
 void _bt_core_gdbus_deinit_proxys(void);
 
+GDBusConnection * _bt_core_get_gdbus_connection(void);
+
 gboolean _bt_core_register_dbus(void);
 void  _bt_core_unregister_dbus(void);
 

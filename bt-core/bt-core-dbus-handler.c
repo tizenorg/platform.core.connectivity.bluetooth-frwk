@@ -52,7 +52,7 @@ void _bt_core_fill_garray_from_variant(GVariant *var, GArray *param)
 	}
 }
 
-static GDBusConnection * _bt_core_get_gdbus_connection(void)
+GDBusConnection * _bt_core_get_gdbus_connection(void)
 {
 	GError *err = NULL;
 
