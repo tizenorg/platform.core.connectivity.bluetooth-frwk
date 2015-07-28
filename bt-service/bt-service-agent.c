@@ -479,6 +479,12 @@ static gboolean __pincode_request(GapAgentPrivate *agent, GDBusProxy *device)
 		goto done;
 	}
 
+#ifdef AUTO_ACCEPT
+	gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, "0000",
+										NULL);
+	goto done;
+#endif
+
 	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
 
 	tmp_value = g_variant_lookup_value(reply, "Class", G_VARIANT_TYPE_UINT32);
@@ -556,6 +562,12 @@ static gboolean __passkey_request(GapAgentPrivate *agent, GDBusProxy *device)
 		goto done;
 	}
 
+#ifdef AUTO_ACCEPT
+	gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, "0000",
+										NULL);
+	goto done;
+#endif
+
 	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
 
 	tmp_value = g_variant_lookup_value (reply, "Address", G_VARIANT_TYPE_STRING);
@@ -602,6 +614,12 @@ static gboolean __display_request(GapAgentPrivate *agent, GDBusProxy *device,
 					     NULL);
 		goto done;
 	}
+
+#ifdef AUTO_ACCEPT
+	gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, "0000",
+										NULL);
+	goto done;
+#endif
 
 	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
 
@@ -657,6 +675,12 @@ static gboolean __confirm_request(GapAgentPrivate *agent, GDBusProxy *device,
 					     NULL);
 		goto done;
 	}
+
+#ifdef AUTO_ACCEPT
+	gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, str_passkey,
+										NULL);
+	goto done;
+#endif
 
 	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
 
@@ -754,6 +778,12 @@ static gboolean __authorize_request(GapAgentPrivate *agent, GDBusProxy *device,
 	int request_type = BT_AGENT_EVENT_AUTHORIZE_REQUEST;
 
 	BT_DBG("+");
+
+#ifdef AUTO_ACCEPT
+	gap_agent_reply_authorize(agent, GAP_AGENT_ACCEPT,
+					  NULL);
+	goto done;
+#endif
 
 	/* Check if already Media connection exsist */
 	if (!strcasecmp(uuid, A2DP_UUID)) {

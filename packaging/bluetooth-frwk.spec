@@ -126,7 +126,7 @@ export CFLAGS="$CFLAGS -DTIZEN_WEARABLE"
 %endif
 
 %if "%{?profile}" == "tv"
-export CFLAGS="$CFLAGS -DUSB_BLUETOOTH -DTIZEN_TV"
+export CFLAGS="$CFLAGS -DUSB_BLUETOOTH -DTIZEN_TV -DAUTO_ACCEPT"
 %define _servicefile packaging/bluetooth-frwk-mobile.service
 %define _servicedir multi-user.target.wants
 %endif
