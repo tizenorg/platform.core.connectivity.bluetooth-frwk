@@ -468,7 +468,7 @@ static void __bt_phone_name_changed_cb(keynode_t *node, void *data)
 	}
 }
 
-#ifndef TIZEN_WEARABLE
+#ifdef TIZEN_MOBILE
 static void __bt_set_visible_mode(void)
 {
 	int timeout = 0;
@@ -519,10 +519,15 @@ static int __bt_set_enabled(void)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-#ifndef TIZEN_WEARABLE
+#ifdef TIZEN_MOBILE
 	__bt_set_visible_mode();
+#else
+#ifdef TIZEN_TV
+	if (_bt_set_discoverable_mode(
+		BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE, 0)!= BLUETOOTH_ERROR_NONE)
+			BT_ERR("Fail to set discoverable mode");
 #endif
-
+#endif
 	__bt_set_local_name();
 
 	/* Update Bluetooth Status to notify other modules */
