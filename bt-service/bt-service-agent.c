@@ -479,12 +479,6 @@ static gboolean __pincode_request(GapAgentPrivate *agent, GDBusProxy *device)
 		goto done;
 	}
 
-#ifdef AUTO_ACCEPT
-	gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, "0000",
-										NULL);
-	goto done;
-#endif
-
 	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
 
 	tmp_value = g_variant_lookup_value(reply, "Class", G_VARIANT_TYPE_UINT32);
@@ -527,9 +521,14 @@ static gboolean __pincode_request(GapAgentPrivate *agent, GDBusProxy *device)
 		gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT,
 							str_passkey, NULL);
 
+#ifdef AUTO_ACCEPT
+		gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, "0000",
+											NULL);
+#else
 		_bt_launch_system_popup(BT_AGENT_EVENT_KEYBOARD_PASSKEY_REQUEST,
 						name, str_passkey, NULL,
 						_gap_agent_get_path(agent));
+#endif
 	} else {
 		BT_DBG("Show Pin entry");
 		_bt_launch_system_popup(BT_AGENT_EVENT_PIN_REQUEST, name, NULL,
@@ -562,12 +561,6 @@ static gboolean __passkey_request(GapAgentPrivate *agent, GDBusProxy *device)
 		goto done;
 	}
 
-#ifdef AUTO_ACCEPT
-	gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, "0000",
-										NULL);
-	goto done;
-#endif
-
 	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
 
 	tmp_value = g_variant_lookup_value (reply, "Address", G_VARIANT_TYPE_STRING);
@@ -584,8 +577,13 @@ static gboolean __passkey_request(GapAgentPrivate *agent, GDBusProxy *device)
 	if (!name)
 		name = address;
 
+#ifdef AUTO_ACCEPT
+	gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, "0000",
+										NULL);
+#else
 	_bt_launch_system_popup(BT_AGENT_EVENT_PASSKEY_REQUEST, name, NULL, NULL,
 						_gap_agent_get_path(agent));
+#endif
 
 done:
 	g_variant_unref(reply);
@@ -615,12 +613,6 @@ static gboolean __display_request(GapAgentPrivate *agent, GDBusProxy *device,
 		goto done;
 	}
 
-#ifdef AUTO_ACCEPT
-	gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, "0000",
-										NULL);
-	goto done;
-#endif
-
 	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
 
 	tmp_value = g_variant_lookup_value (reply, "Address", G_VARIANT_TYPE_STRING);
@@ -639,10 +631,14 @@ static gboolean __display_request(GapAgentPrivate *agent, GDBusProxy *device,
 
 	str_passkey = g_strdup_printf("%d", passkey);
 
+#ifdef AUTO_ACCEPT
+	gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, str_passkey,
+										NULL);
+#else
 	_bt_launch_system_popup(BT_AGENT_EVENT_KEYBOARD_PASSKEY_REQUEST, name,
 						str_passkey, NULL,
 						_gap_agent_get_path(agent));
-
+#endif
 	g_free(str_passkey);
 
 done:
@@ -675,12 +671,6 @@ static gboolean __confirm_request(GapAgentPrivate *agent, GDBusProxy *device,
 					     NULL);
 		goto done;
 	}
-
-#ifdef AUTO_ACCEPT
-	gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, str_passkey,
-										NULL);
-	goto done;
-#endif
 
 	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
 
@@ -727,10 +717,15 @@ static gboolean __confirm_request(GapAgentPrivate *agent, GDBusProxy *device,
 		gap_agent_reply_confirmation(agent, GAP_AGENT_ACCEPT, NULL);
 	}
 #else
+#ifdef AUTO_ACCEPT
+	BT_DBG("Confirm reply");
+	gap_agent_reply_confirmation(agent, GAP_AGENT_ACCEPT, NULL);
+#else
 	BT_DBG("LAUNCH SYSPOPUP");
 	_bt_launch_system_popup(BT_AGENT_EVENT_PASSKEY_CONFIRM_REQUEST, name,
 						str_passkey, NULL,
 						_gap_agent_get_path(agent));
+#endif
 #endif
 
 done:
@@ -936,8 +931,12 @@ fail:
 		gap_agent_reply_authorize(agent,
 					      GAP_AGENT_ACCEPT, NULL);
 	} else {
+#ifdef AUTO_ACCEPT
+		gap_agent_reply_authorize(agent, GAP_AGENT_ACCEPT, NULL);
+#else
 		_bt_launch_system_popup(request_type, name, NULL, NULL,
 						_gap_agent_get_path(agent));
+#endif
 	}
 
 done:
