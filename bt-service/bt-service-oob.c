@@ -82,7 +82,7 @@ int _bt_oob_read_local_data(bt_oob_data_t *local_oob_data)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	g_variant_get(reply ,"@ay@ay", &hash, &randomizer);
+	g_variant_get(reply ,"(@ay@ay)", &hash, &randomizer);
 	g_variant_unref(reply);
 
 	if(hash != NULL){
