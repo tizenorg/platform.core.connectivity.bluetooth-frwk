@@ -1,6 +1,7 @@
 %bcond_with x
 %define _dumpdir /opt/etc/dump.d/module.d
 %define _varlibdir /opt/var/lib
+%define _libpath /usr/lib
 
 Name:       bluetooth-frwk
 Summary:    Bluetooth framework for BlueZ and Obexd. This package is Bluetooth framework based on BlueZ and Obexd stack.
@@ -178,9 +179,9 @@ install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk-devel
 
 #mkdir -p %{buildroot}%{_libdir}/systemd/user
 #install -m 0644 packaging/bluetooth-frwk-tv.service %{buildroot}%{_libdir}/systemd/user
-mkdir -p %{buildroot}%{_libdir}/systemd/system/%{_servicedir}
-install -m 0644 %{_servicefile} %{buildroot}%{_libdir}/systemd/system/bluetooth-frwk.service
-ln -s ../bluetooth-frwk.service %{buildroot}%{_libdir}/systemd/system/%{_servicedir}/bluetooth-frwk.service
+mkdir -p %{buildroot}%{_libpath}/systemd/system/%{_servicedir}
+install -m 0644 %{_servicefile} %{buildroot}%{_libpath}/systemd/system/bluetooth-frwk.service
+ln -s ../bluetooth-frwk.service %{buildroot}%{_libpath}/systemd/system/%{_servicedir}/bluetooth-frwk.service
 
 %if %{with bluetooth_frwk_libnotify} || %{with bluetooth_frwk_libnotification}
 mkdir -p %{buildroot}%{_datadir}/icons/default
@@ -227,8 +228,8 @@ vconftool set -f -t bool memory/bluetooth/dutmode "0" -g 6520 -i
 %defattr(-, root, root)
 %{_libdir}/libbluetooth-api.so.*
 %{_datadir}/license/bluetooth-frwk
-%{_libdir}/systemd/system/%{_servicedir}/bluetooth-frwk.service
-%{_libdir}/systemd/system/bluetooth-frwk.service
+%{_libpath}/systemd/system/%{_servicedir}/bluetooth-frwk.service
+%{_libpath}/systemd/system/bluetooth-frwk.service
 
 %files devel
 %defattr(-, root, root)
@@ -249,7 +250,7 @@ vconftool set -f -t bool memory/bluetooth/dutmode "0" -g 6520 -i
 
 %{_bindir}/bt-service
 #%{_libdir}/systemd/user/bluetooth-frwk-tv.service
-%{_libdir}/systemd/system/%{_servicedir}/bluetooth-frwk.service
+%{_libpath}/systemd/system/%{_servicedir}/bluetooth-frwk.service
 %{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-service.conf
 %{_bindir}/bluetooth-frwk-test
 #%{_bindir}/bluetooth-gatt-test
