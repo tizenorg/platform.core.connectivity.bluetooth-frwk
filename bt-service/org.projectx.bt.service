@@ -1,5 +1,6 @@
 [D-BUS Service]
 Name=org.projectx.bt
 Exec=/bin/false
-User=guest
+User=system
+Group=system
 SystemdService=bluetooth-frwk.service

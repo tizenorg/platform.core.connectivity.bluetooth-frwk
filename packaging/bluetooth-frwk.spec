@@ -4,7 +4,7 @@
 
 Name:       bluetooth-frwk
 Summary:    Bluetooth framework for BlueZ and Obexd. This package is Bluetooth framework based on BlueZ and Obexd stack.
-Version:    0.2.150
+Version:    0.2.151
 Release:    1
 Group:      Network & Connectivity/Bluetooth
 License:    Apache-2.0
@@ -56,6 +56,7 @@ BuildRequires:  cmake
 BuildRequires:  pkgconfig(libprivilege-control)
 BuildRequires:  pkgconfig(cynara-client)
 BuildRequires:  pkgconfig(cynara-creds-gdbus)
+BuildRequires:  pkgconfig(libtzplatform-config)
 
 Requires(post): /usr/bin/vconftool
 Requires(post): /sbin/ldconfig
