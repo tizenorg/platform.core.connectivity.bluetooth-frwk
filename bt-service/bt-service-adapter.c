@@ -31,9 +31,6 @@
 #include <syspopup_caller.h>
 #endif
 #include <aul.h>
-#ifdef ENABLE_TIZEN_2_4
-#include <journal/device.h>
-#endif
 #include <dbus/dbus-glib.h>
 #include <dbus/dbus.h>
 

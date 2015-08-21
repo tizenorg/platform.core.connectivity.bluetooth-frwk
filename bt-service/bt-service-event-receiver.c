@@ -26,9 +26,6 @@
 #include <dlog.h>
 #include <vconf.h>
 #include <vconf-internal-bt-keys.h>
-#if ENABLE_TIZEN_2_4
-#include <journal/device.h>
-#endif
 
 #include "bluetooth-api.h"
 #include "bt-internal-types.h"
