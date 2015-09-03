@@ -1748,6 +1748,7 @@ int _bt_is_service_used(char *service_uuid, gboolean *used)
 	GError *error = NULL;
 	int ret = BLUETOOTH_ERROR_NONE;
 	GVariant *result;
+	GVariant *value;
 	GVariantIter *iter;
 	gchar *uuid;
 
@@ -1776,7 +1777,17 @@ int _bt_is_service_used(char *service_uuid, gboolean *used)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	g_variant_get(result, "as", &iter);
+	g_variant_get(result, "(v)", &value);
+	g_variant_get(value, "as", &iter);
+
+	if (iter == NULL) {
+		BT_ERR("Failed to get UUIDs(%s)",service_uuid);
+		*used = FALSE;
+		g_variant_unref(result);
+		g_variant_unref(value);
+		return ret;
+	}
+
 	while (g_variant_iter_loop(iter, "s", &uuid)) {
 		if (strcasecmp(uuid, service_uuid) == 0) {
 			*used = TRUE;
@@ -1789,6 +1800,7 @@ int _bt_is_service_used(char *service_uuid, gboolean *used)
 
 done:
 	g_variant_iter_free(iter);
+	g_variant_unref(value);
 	g_variant_unref(result);
 	BT_DBG("Service Used? %d", *used);
 	return ret;
