@@ -6,6 +6,11 @@
         <allow own="org.projectx.bt_event"/>
 	<allow send_type="method_call"/>
     </policy>
+    <policy group="root">
+        <allow own="org.projectx.bt"/>
+        <allow own="org.projectx.bt_event"/>
+    <allow send_type="method_call"/>
+    </policy>
     <policy at_console="true">
         <allow send_destination="org.projectx.bt"/>
     </policy>
