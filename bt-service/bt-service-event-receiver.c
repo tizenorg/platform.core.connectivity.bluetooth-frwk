@@ -726,7 +726,6 @@ static void __bt_adapter_property_changed_event(GVariant *msg, const char *path)
 					_bt_disable_adapter();
 				}
 #endif
-
 				if (vconf_get_int(VCONFKEY_BT_LE_STATUS, &bt_state) == 0 &&
 					bt_state != VCONFKEY_BT_LE_STATUS_OFF) {
 					_bt_set_le_disabled(BLUETOOTH_ERROR_NONE);
@@ -1838,6 +1837,24 @@ void _bt_handle_device_event(GVariant *msg, const char *member,const char *path)
 		}
 		_bt_free_le_device_info(le_dev_info);
 		g_variant_unref(value);
+	} else if  (strcasecmp(member, "LEDataLengthChanged") == 0) {
+		int tx_octets = 0;
+		int tx_time = 0;
+		int rx_octets = 0;
+		int rx_time = 0;
+
+		g_variant_get(msg, "(qqqq)",
+				tx_octets, tx_time, rx_octets, rx_time);
+
+		address = g_malloc0(BT_ADDRESS_STRING_SIZE);
+		_bt_convert_device_path_to_address(path, address);
+
+		param = g_variant_new("(isqqqq)", result, address, tx_octets, tx_time,
+				rx_octets, rx_time);
+		/* Send event to application */
+		_bt_send_event(BT_DEVICE_EVENT,
+					event, param);
+		g_free(address);
 	}
 
 }

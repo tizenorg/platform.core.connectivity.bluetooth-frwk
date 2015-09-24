@@ -360,6 +360,10 @@ static void __send_request_cb(GDBusProxy *proxy,
 		((bt_audio_func_ptr)cb_data->cb)(bt_event.event,
 				(bt_audio_event_param_t *)&bt_event,
 				cb_data->user_data);
+	} else if (event_type == BT_DEVICE_EVENT) {
+		((bluetooth_cb_func_ptr)cb_data->cb)(bt_event.event,
+				&bt_event,
+				cb_data->user_data);
 	} else {
 		BT_INFO("Not handled event type : %d", event_type);
 	}

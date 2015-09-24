@@ -1452,6 +1452,53 @@ int __bt_bluez_request(int function_name,
 	case BT_GATT_DISCOVER_CHARACTERISTICS_DESCRIPTOR:
 		/* Just call to check the privilege */
 		break;
+	case BT_LE_READ_MAXIMUM_DATA_LENGTH: {
+		bluetooth_le_read_maximum_data_length_t max_le_datalength = {0};
+
+		result = _bt_le_read_maximum_data_length(&max_le_datalength);
+
+		g_array_append_vals(*out_param1, &max_le_datalength,
+			sizeof(bluetooth_le_read_maximum_data_length_t));
+		break;
+	}
+	case BT_LE_WRITE_HOST_SUGGESTED_DATA_LENGTH: {
+		unsigned int def_tx_Octects = 0;
+		unsigned int def_tx_Time = 0;
+
+		__bt_service_get_parameters(in_param1,
+				&def_tx_Octects, sizeof(int));
+		__bt_service_get_parameters(in_param2,
+				&def_tx_Time, sizeof(int));
+
+		result = _bt_le_write_host_suggested_default_data_length(
+						def_tx_Octects, def_tx_Time);
+		break;
+	}
+	case BT_LE_READ_HOST_SUGGESTED_DATA_LENGTH: {
+		bluetooth_le_read_host_suggested_data_length_t def_data_length = {0};
+
+		result = _bt_le_read_host_suggested_default_data_length(&def_data_length);
+
+		g_array_append_vals(*out_param1, &def_data_length,
+				sizeof(bluetooth_le_read_host_suggested_data_length_t));
+
+		break;
+	}
+	case BT_LE_SET_DATA_LENGTH: {
+		int max_tx_Octets = 0;
+		int max_tx_Time = 0;
+		bluetooth_device_address_t address = { {0} };
+
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2,
+				&max_tx_Octets, sizeof(int));
+		__bt_service_get_parameters(in_param3,
+				&max_tx_Time, sizeof(int));
+
+		result = _bt_le_set_data_length(&address, max_tx_Octets, max_tx_Time);
+		break;
+	}
 	default:
 		result = BLUETOOTH_ERROR_INTERNAL;
 		break;
@@ -2053,6 +2100,10 @@ gboolean __bt_service_check_privilege(int function_name,
         case BT_BOND_DEVICE_BY_TYPE:
         case BT_SET_LE_PRIVACY:
         case BT_LE_CONN_UPDATE:
+	case BT_LE_READ_MAXIMUM_DATA_LENGTH:
+	case BT_LE_WRITE_HOST_SUGGESTED_DATA_LENGTH:
+	case BT_LE_READ_HOST_SUGGESTED_DATA_LENGTH:
+	case BT_LE_SET_DATA_LENGTH:
                 ret_val = cynara_check(p_cynara, client_creds, client_session, user_creds,
                                                                                  BT_PRIVILEGE_PLATFORM);
 
