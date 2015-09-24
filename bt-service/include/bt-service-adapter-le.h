@@ -120,6 +120,13 @@ int _bt_remove_white_list(bluetooth_device_address_t *device_address, bluetooth_
 
 int _bt_clear_white_list(void);
 
+int _bt_le_read_maximum_data_length(bluetooth_le_read_maximum_data_length_t *max_le_datalength);
+
+int _bt_le_write_host_suggested_default_data_length(const unsigned int def_tx_Octets, const unsigned int def_tx_Time);
+
+int _bt_le_read_host_suggested_default_data_length(bluetooth_le_read_host_suggested_data_length_t *def_data_length);
+
+int _bt_le_set_data_length(bluetooth_device_address_t *device_address, const unsigned int max_tx_Octets, const unsigned int max_tx_Time);
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
