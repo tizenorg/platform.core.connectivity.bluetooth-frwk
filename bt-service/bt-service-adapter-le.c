@@ -1814,3 +1814,185 @@ int _bt_clear_white_list(void)
 	return BLUETOOTH_ERROR_NONE;
 }
 
+int _bt_le_read_maximum_data_length(
+		bluetooth_le_read_maximum_data_length_t *max_le_datalength)
+{
+	GError *error = NULL;
+	GDBusProxy *proxy;
+	GVariant *reply = NULL;
+	int ret = BLUETOOTH_ERROR_NONE;
+	guint16 max_tx_octets, max_tx_time;
+	guint16 max_rx_octets, max_rx_time;
+	int err;
+
+	proxy = _bt_get_adapter_proxy();
+	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	reply = g_dbus_proxy_call_sync(proxy, "LEReadMaximumDataLength",
+			NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+
+	g_object_unref(proxy);
+
+	if (reply == NULL) {
+		BT_ERR("LEReadMaximumDataLength dBUS-RPC failed");
+		if (error != NULL) {
+			BT_ERR("D-Bus API failure: errCode[%x], message[%s]",
+					error->code, error->message);
+			g_clear_error(&error);
+		}
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	g_variant_get(reply ,"(qqqqi)", &max_tx_octets, &max_tx_time,
+				&max_rx_octets, &max_rx_time, &err);
+
+	BT_DBG("error is : %d", err);
+
+	if (err) {
+		BT_DBG("returning error ");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	max_le_datalength->max_tx_octets = max_tx_octets;
+	max_le_datalength->max_tx_time = max_tx_time;
+	max_le_datalength->max_rx_octets = max_rx_octets;
+	max_le_datalength->max_rx_time = max_rx_time;
+
+	g_variant_unref(reply);
+
+	return BLUETOOTH_ERROR_NONE;
+}
+int _bt_le_write_host_suggested_default_data_length(
+	const unsigned int def_tx_Octets, const unsigned int def_tx_Time)
+{
+	GError *error = NULL;
+	GDBusProxy *proxy;
+	GVariant *reply = NULL;
+	int ret = BLUETOOTH_ERROR_NONE;
+
+	proxy = _bt_get_adapter_proxy();
+	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	reply = g_dbus_proxy_call_sync(proxy,
+			"LEWriteHostSuggestedDataLength",
+			g_variant_new("(qq)", def_tx_Octets, def_tx_Time),
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			&error);
+
+	g_object_unref(proxy);
+
+	if (reply == NULL) {
+		BT_ERR("_bt_le_write_host_suggested_default_data_length dBUS-RPC failed");
+		if (error != NULL) {
+			BT_ERR("D-Bus API failure: errCode[%x], message[%s]",
+					error->code, error->message);
+			g_clear_error(&error);
+		}
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	g_variant_unref(reply);
+
+	return BLUETOOTH_ERROR_NONE;
+}
+
+int _bt_le_read_host_suggested_default_data_length(
+		bluetooth_le_read_host_suggested_data_length_t *def_data_length)
+{
+	GError *error = NULL;
+	GDBusProxy *proxy;
+	GVariant *reply = NULL;
+	int ret = BLUETOOTH_ERROR_NONE;
+	guint16 def_tx_octets, def_tx_time;
+	int err;
+
+	proxy = _bt_get_adapter_proxy();
+	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	reply = g_dbus_proxy_call_sync(proxy, "LEReadHostSuggestedDataLength",
+			NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+
+	if (reply == NULL) {
+		BT_ERR("LEReadHostSuggestedDataLength dBUS-RPC failed");
+		if (error != NULL) {
+			BT_ERR("D-Bus API failure: errCode[%x], message[%s]",
+					error->code, error->message);
+			g_clear_error(&error);
+		}
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	g_variant_get(reply ,"(qqi)", &def_tx_octets, &def_tx_time, &err);
+
+	BT_DBG("printing error %d", err);
+
+	if (err) {
+		BT_DBG("returning error ");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	def_data_length->def_tx_octets = def_tx_octets;
+	def_data_length->def_tx_time = def_tx_time;
+
+	g_variant_unref(reply);
+
+	return BLUETOOTH_ERROR_NONE;
+}
+
+int _bt_le_set_data_length(bluetooth_device_address_t *device_address,
+	const unsigned int max_tx_Octets, const unsigned int max_tx_Time)
+{
+	GError *error = NULL;
+	GDBusProxy *proxy;
+	GVariant *reply = NULL;
+	int ret = BLUETOOTH_ERROR_NONE;
+	guint16 txOctets = max_tx_Octets;
+	guint16 txTime = max_tx_Time;
+	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
+	gchar *device_path = NULL;
+	GDBusConnection *conn;
+	GDBusProxy *device_proxy;
+
+	_bt_convert_addr_type_to_string(address, device_address->addr);
+
+	device_path = _bt_get_device_object_path(&address);
+
+	if (device_path == NULL) {
+		BT_DBG("Device path is null");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	conn = _bt_get_system_gconn();
+	if (conn == NULL) {
+		BT_ERR("conn == NULL");
+		g_free(device_path);
+		return NULL;
+	}
+
+	device_proxy = g_dbus_proxy_new_sync(conn, G_DBUS_PROXY_FLAGS_NONE,
+								NULL, BT_BLUEZ_NAME,
+								device_path, BT_DEVICE_INTERFACE,  NULL, NULL);
+
+	g_free(device_path);
+	retv_if(device_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	g_dbus_proxy_call_sync(device_proxy,
+					"LESetDataLength",
+					g_variant_new("(qq)", txOctets, txTime),
+					G_DBUS_CALL_FLAGS_NONE,
+					-1,
+					NULL,
+					&error);
+
+	g_object_unref(device_proxy);
+
+	if (error) {
+		 BT_ERR("LESetDataLength error: [%s]", error->message);
+		 g_error_free(error);
+		 return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	return BLUETOOTH_ERROR_NONE;
+}

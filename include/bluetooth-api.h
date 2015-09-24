@@ -372,6 +372,23 @@ typedef struct {
 	guint16 latency;
 	guint16 time_out;
 } bluetooth_le_conn_update_t;
+/*
+	LE Read Maximum Data Length
+ */
+typedef struct {
+	guint16 max_tx_octets;
+	guint16 max_tx_time;
+	guint16 max_rx_octets;
+	guint16 max_rx_time;
+} bluetooth_le_read_maximum_data_length_t;
+
+/*
+	LE Read Host suggested default Data Length
+ */
+typedef struct {
+	guint16 def_tx_octets;
+	guint16 def_tx_time;
+} bluetooth_le_read_host_suggested_data_length_t;
 
 /**
  * Samsung XSAT Vendor dependent command
@@ -573,6 +590,7 @@ typedef enum {
 	BLUETOOTH_EVENT_AVRCP_SONG_POSITION_STATUS, /**<AVRCP control play Postion status event*/
 	BLUETOOTH_EVENT_AVRCP_PLAY_STATUS_CHANGED, /**<AVRCP control play status event*/
 	BLUETOOTH_EVENT_AVRCP_TRACK_CHANGED, /**<AVRCP control song metadata event*/
+	BLUETOOTH_EVENT_LE_DATA_LENGTH_CHANGED,  /** LE data length values changed */
 } bluetooth_event_type_t;
 
  /**
@@ -1382,6 +1400,18 @@ typedef struct {
 	GList *list;
 	int count;
 } bt_hf_call_list_s;
+
+/**
+ * Structure for LE data length change params
+ */
+
+typedef struct {
+	bluetooth_device_address_t device_address;
+	guint16 max_tx_octets;
+	guint16 max_tx_time;
+	guint16 max_rx_octets;
+	guint16 max_rx_time;
+} bt_le_data_length_params_t;
 
 /**
  * Callback pointer type
@@ -5340,6 +5370,43 @@ int bluetooth_le_conn_update(const bluetooth_device_address_t *address,
  * @remark	None
  */
 int bluetooth_enable_le_privacy(gboolean enable_privacy);
+/**
+ * @fn int bluetooth_le_read_maximum_data_length()
+ * @brief reads the maximum LE data length supported in the controller.
+ *
+ * This function is a synchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *           BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *
+ * @exception  None
+ *
+ * @remark       None
+ */
+int bluetooth_le_read_maximum_data_length(
+			bluetooth_le_read_maximum_data_length_t *max_le_datalength);
+/**
+ * @fn int bluetooth_le_write_host_suggested_default_data_length()
+ * @brief writes the host suggested values for the controllers max transmitted no of payload
+ * octects to be used for new connections.
+ *
+ * This function is a synchronous call.
+ *
+ * @return   BLUETOOTH_ERROR_NONE  - Success \n
+ *           BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+ *
+ * @exception  None
+ *
+ * @remark       None
+ */
+int bluetooth_le_write_host_suggested_default_data_length(
+		const unsigned int def_tx_Octets, const unsigned int def_tx_Time);
+
+int bluetooth_le_read_suggested_default_data_length(
+	bluetooth_le_read_host_suggested_data_length_t *le_data_length);
+
+int bluetooth_le_set_data_length(bluetooth_device_address_t *address,
+	const unsigned int max_tx_octets, const unsigned int max_tx_time);
 
 int bluetooth_pbap_init(void);
 int bluetooth_pbap_deinit(void);

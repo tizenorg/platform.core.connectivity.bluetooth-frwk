@@ -889,6 +889,29 @@ void __bt_device_event_filter(GDBusConnection *connection,
 		_bt_common_event_cb(BLUETOOTH_EVENT_DEVICE_UNAUTHORIZED,
 				result, &dev_address,
 				event_info->cb, event_info->user_data);
+	} else if (strcasecmp(signal_name, BT_LE_DATA_LENGTH_CHANGED) == 0) {
+		const char *address = NULL;
+		bluetooth_device_address_t dev_address = { {0} };
+		uint tx_octets, tx_time, rx_octets, rx_time;
+		bt_le_data_length_params_t params;
+
+		BT_DBG("BT_LE_DATA_LENGTH_CHANGED");
+
+		g_variant_get(parameters, "(i&sqqqq)", &result, &address,
+				tx_octets, tx_time, rx_octets, rx_time);
+
+		params.max_tx_octets = tx_octets;
+		params.max_tx_time = tx_time;
+		params.max_rx_octets = rx_octets;
+		params.max_rx_time = rx_time;
+
+		_bt_convert_addr_string_to_type(dev_address.addr, address);
+
+		memcpy(&params.device_address,
+			&dev_address, BLUETOOTH_ADDRESS_LENGTH);
+
+		_bt_common_event_cb(BLUETOOTH_EVENT_LE_DATA_LENGTH_CHANGED,
+				result, &params, event_info->cb, event_info->user_data);
 	}
 }
 

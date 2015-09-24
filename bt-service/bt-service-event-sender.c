@@ -354,6 +354,9 @@ int _bt_send_event(int event_type, int event, GVariant *param)
 	case BLUETOOTH_EVENT_GATT_CHAR_VAL_CHANGED:
 		signal = BT_GATT_CHAR_VAL_CHANGED;
 		break;
+	case BLUETOOTH_EVENT_LE_DATA_LENGTH_CHANGED:
+		signal = BT_LE_DATA_LENGTH_CHANGED;
+		break;
 	default:
 		BT_ERR("Unknown event");
 		return BLUETOOTH_ERROR_INTERNAL;
