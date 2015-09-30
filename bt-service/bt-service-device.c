@@ -591,8 +591,6 @@ static int __bt_remove_and_bond(void)
 		return BLUETOOTH_ERROR_INTERNAL;
 
 	g_variant_get(result , "(&o)", &device_path);
-	g_variant_unref(result);
-
 	retv_if(device_path == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	result = g_dbus_proxy_call_sync(adapter_proxy, "UnpairDevice",
@@ -607,6 +605,8 @@ static int __bt_remove_and_bond(void)
 		g_error_free(err);
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
+
+	g_variant_unref(result);
 
 	return __bt_retry_bond();
 }
@@ -663,31 +663,31 @@ static void __bt_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
 	if (err != NULL) {
 		BT_ERR("Error occured in CreateBonding [%s]", err->message);
 
-		if (!strcmp(err->message, "Already Exists")) {
+		if (g_strrstr(err->message, "Already Exists")) {
 			BT_INFO("Existing Bond, remove and retry");
 			ret_if(__bt_remove_and_bond() == BLUETOOTH_ERROR_NONE);
 
 			result = BLUETOOTH_ERROR_PARING_FAILED;
 		} else if (_bt_agent_is_canceled() ||
-			!strcmp(err->message, "Authentication Canceled")) {
+			g_strrstr(err->message, "Authentication Canceled")) {
 			BT_INFO("Cancelled by USER");
 			result = BLUETOOTH_ERROR_CANCEL_BY_USER;
-		} else if (!strcmp(err->message, "Authentication Rejected")) {
+		} else if (g_strrstr(err->message, "Authentication Rejected")) {
 			BT_INFO("REJECTED");
 			result = BLUETOOTH_ERROR_ACCESS_DENIED;
-		} else if (!strcmp(err->message, "In Progress")) {
+		} else if (g_strrstr(err->message, "In Progress")) {
 			BT_INFO("Bond in progress, cancel and retry");
 			ret_if(__bt_cancel_and_bond() == BLUETOOTH_ERROR_NONE);
 
 			result = BLUETOOTH_ERROR_PARING_FAILED;
-		} else if (!strcmp(err->message, "Authentication Failed")) {
+		} else if (g_strrstr(err->message, "Authentication Failed")) {
 			BT_INFO("Authentication Failed");
 			if (bonding_info->is_autopair == TRUE) {
 				_bt_set_autopair_status_in_bonding_info(FALSE);
 				__ignore_auto_pairing_request(bonding_info->addr);
 			}
 			result = BLUETOOTH_ERROR_AUTHENTICATION_FAILED;
-		} else if (!strcmp(err->message, "Page Timeout")) {
+		} else if (g_strrstr(err->message, "Page Timeout")) {
 			BT_INFO("Page Timeout");
 			/* This is the special case
 			     As soon as call bluetooth_bond_device, try to cancel bonding.
@@ -695,7 +695,7 @@ static void __bt_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
 			     the procedure is stopped. So 'Cancle' error is not return.
 			*/
 			result = BLUETOOTH_ERROR_HOST_DOWN;
-		} else if (!strcmp(err->message, BT_TIMEOUT_MESSAGE)) {
+		} else if (g_strrstr(err->message, BT_TIMEOUT_MESSAGE)) {
 			g_dbus_proxy_call_sync(proxy, "CancelDeviceCreation",
 						g_variant_new("(s)", bonding_info->addr),
 						G_DBUS_CALL_FLAGS_NONE,
@@ -704,10 +704,10 @@ static void __bt_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
 						NULL);
 
 			result = BLUETOOTH_ERROR_INTERNAL;
-		} else if (!strcmp(err->message, "Connection Timeout")) {
+		} else if (g_strrstr(err->message, "Connection Timeout")) {
 			/* Pairing request timeout */
 			result = BLUETOOTH_ERROR_TIMEOUT;
-		} else if (!strcmp(err->message, "Authentication Timeout")) {
+		} else if (g_strrstr(err->message, "Authentication Timeout")) {
 			/* Pairing request timeout */
 			result = BLUETOOTH_ERROR_TIMEOUT;
 		} else {
