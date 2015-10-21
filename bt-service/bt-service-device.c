@@ -1468,21 +1468,22 @@ int _bt_is_gatt_connected(bluetooth_device_address_t *device_address,
 	retv_if(object_path == NULL, BLUETOOTH_ERROR_NOT_PAIRED);
 
 	device_proxy = g_dbus_proxy_new_sync(conn, G_DBUS_PROXY_FLAGS_NONE,
-								NULL, BT_BLUEZ_NAME,
-								object_path, BT_PROPERTIES_INTERFACE,  NULL, NULL);
+			NULL, BT_BLUEZ_NAME, object_path,
+			BT_PROPERTIES_INTERFACE,  NULL, NULL);
 	g_free(object_path);
 	retv_if(device_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	result = g_dbus_proxy_call_sync(device_proxy, "GetAll",
-				NULL,
-				G_DBUS_CALL_FLAGS_NONE,
-				-1,
-				NULL,
-				&error);
-
-	if (error != NULL || result == NULL) {
-		BT_ERR("Error occured in Proxy call [%s]\n", error->message);
-		g_error_free(error);
+			g_variant_new("(s)", BT_DEVICE_INTERFACE),
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			&error);
+	if (result == NULL) {
+		if (error != NULL) {
+			BT_ERR("Error occured in Proxy call [%s]\n", error->message);
+			g_error_free(error);
+		}
 		g_object_unref(device_proxy);
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
@@ -1490,14 +1491,17 @@ int _bt_is_gatt_connected(bluetooth_device_address_t *device_address,
 	g_variant_get(result , "(@a{sv})", &value);
 	g_variant_unref(result);
 
-	tmp_value = g_variant_lookup_value (value, "GattConnected", G_VARIANT_TYPE_BOOLEAN);
-	if (tmp_value != NULL) {
+	tmp_value = g_variant_lookup_value(value, "GattConnected", G_VARIANT_TYPE_BOOLEAN);
+	if (tmp_value == NULL) {
 		g_object_unref(device_proxy);
+		g_variant_unref(value);
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
-	*is_connected = g_variant_get_boolean (tmp_value);
+
+	*is_connected = g_variant_get_boolean(tmp_value);
 
 	BT_DBG("gatt is connected : %d", *is_connected);
+
 	g_variant_unref(tmp_value);
 	g_variant_unref(value);
 	g_object_unref(device_proxy);
