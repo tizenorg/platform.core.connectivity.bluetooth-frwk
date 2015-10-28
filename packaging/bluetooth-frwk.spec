@@ -194,27 +194,27 @@ sed -i 's/%TZ_SYS_DEFAULT_USER/app/' %{buildroot}%{_datadir}/dbus-1/system-servi
 %endif
 
 
-%post
-/sbin/ldconfig
-%if "%{?profile}" == "wearable"
-vconftool set -f -t int db/bluetooth/status "1" -g 6520
-%endif
-%if "%{?profile}" == "mobile"
-vconftool set -f -t int db/bluetooth/status "0" -g 6520
-%endif
-%if "%{?profile}" == "common"
-vconftool set -f -t int db/bluetooth/status "0" -g 6520
-%endif
+#%post
+#/sbin/ldconfig
+#%if "%{?profile}" == "wearable"
+#vconftool set -f -t int db/bluetooth/status "1" -g 6520
+#%endif
+#%if "%{?profile}" == "mobile"
+#vconftool set -f -t int db/bluetooth/status "0" -g 6520
+#%endif
+#%if "%{?profile}" == "common"
+#vconftool set -f -t int db/bluetooth/status "0" -g 6520
+#%endif
 
-vconftool set -f -t int db/bluetooth/status "0" -s User
-vconftool set -f -t int db/bluetooth/lestatus "0" -s User
-vconftool set -f -t int file/private/bt-core/flight_mode_deactivated "0" -s User
-vconftool set -f -t int file/private/bt-core/powersaving_mode_deactivated "0" -s User
-vconftool set -f -t int file/private/bt-service/bt_off_due_to_timeout "0" -s User
-vconftool set -f -t string memory/bluetooth/sco_headset_name "" -g 6520 -i
-vconftool set -f -t int memory/bluetooth/device "0" -g 6520 -i
-vconftool set -f -t bool memory/bluetooth/btsco "0" -g 6520 -i
-vconftool set -f -t bool memory/bluetooth/dutmode "0" -g 6520 -i
+#vconftool set -f -t int db/bluetooth/status "0" -s User
+#vconftool set -f -t int db/bluetooth/lestatus "0" -s User
+#vconftool set -f -t int file/private/bt-core/flight_mode_deactivated "0" -s User
+#vconftool set -f -t int file/private/bt-core/powersaving_mode_deactivated "0" -s User
+#vconftool set -f -t int file/private/bt-service/bt_off_due_to_timeout "0" -s User
+#vconftool set -f -t string memory/bluetooth/sco_headset_name "" -g 6520 -i
+#vconftool set -f -t int memory/bluetooth/device "0" -g 6520 -i
+#vconftool set -f -t bool memory/bluetooth/btsco "0" -g 6520 -i
+#vconftool set -f -t bool memory/bluetooth/dutmode "0" -g 6520 -i
 
 
 #%post service
