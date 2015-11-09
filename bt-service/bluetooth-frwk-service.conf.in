@@ -4,11 +4,17 @@
     <policy group="system">
         <allow own="org.projectx.bt"/>
         <allow own="org.projectx.bt_event"/>
+        <allow own="org.projectx.bluetooth.share"/>
+        <allow own="org.bluez.ag_agent"/>
+	 <allow own="org.tizen.csd.Call.Instance"/>
 	<allow send_type="method_call"/>
     </policy>
     <policy group="root">
         <allow own="org.projectx.bt"/>
         <allow own="org.projectx.bt_event"/>
+        <allow own="org.projectx.bluetooth.share"/>
+        <allow own="org.bluez.ag_agent"/>
+	 <allow own="org.tizen.csd.Call.Instance"/>
     <allow send_type="method_call"/>
     </policy>
     <policy at_console="true">
