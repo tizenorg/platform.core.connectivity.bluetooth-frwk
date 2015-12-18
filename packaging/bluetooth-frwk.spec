@@ -53,7 +53,6 @@ BuildRequires:  pkgconfig(pkgmgr)
 BuildRequires:  pkgconfig(capi-network-tethering)
 %endif
 BuildRequires:  cmake
-BuildRequires:  pkgconfig(libprivilege-control)
 BuildRequires:  pkgconfig(cynara-client)
 BuildRequires:  pkgconfig(cynara-creds-gdbus)
 BuildRequires:  pkgconfig(libtzplatform-config)

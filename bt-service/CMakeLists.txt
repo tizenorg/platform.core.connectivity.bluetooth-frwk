@@ -53,7 +53,6 @@ SET(PKG_MODULES
 	vconf
 	aul
 	vconf
-	libprivilege-control
 	syspopup-caller
 	dbus-glib-1
 	gio-2.0
