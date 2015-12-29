@@ -14,7 +14,6 @@ Source1001: bluetooth-frwk.manifest
 Source1002: bt-icon.png
 %endif
 
-Requires: sys-assert
 Requires: dbus
 Requires: syspopup
 %if "%{?profile}" != "mobile"
