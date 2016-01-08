@@ -46,40 +46,42 @@
 
 #define	 PBAP_SESSION_SERVICE	"org.bluez.obex"
 #define	 PBAP_SESSION_INTERFACE	"org.bluez.obex.PhonebookAccess1"
-#define PBAP_VCARDLIST_MAXLENGTH 256
+#define	PBAP_VCARDLIST_MAXLENGTH 256
 
-typedef enum {
-PBAP_FIELD_ALL,
-PBAP_FIELD_VERSION,
-PBAP_FIELD_FN,
-PBAP_FIELD_N,
-PBAP_FIELD_PHOTO,
-PBAP_FIELD_BDAY,
-PBAP_FIELD_ADR,
-PBAP_FIELD_LABEL,
-PBAP_FIELD_TEL,
-PBAP_FIELD_EMAIL,
-PBAP_FIELD_MAILER,
-PBAP_FIELD_TZ,
-PBAP_FIELD_GEO,
-PBAP_FIELD_TITLE,
-PBAP_FIELD_ROLE,
-PBAP_FIELD_LOGO,
-PBAP_FIELD_AGENT,
-PBAP_FIELD_ORG,
-PBAP_FIELD_NOTE,
-PBAP_FIELD_REV,
-PBAP_FIELD_SOUND,
-PBAP_FIELD_URL,
-PBAP_FIELD_UID,
-PBAP_FIELD_KEY,
-PBAP_FIELD_NICKNAME,
-PBAP_FIELD_CATEGORIES,
-PBAP_FIELD_PROID,
-PBAP_FIELD_CLASS,
-PBAP_FIELD_SORT_STRING,
-PBAP_FIELD_X_IRMC_CALL_DATETIME,
-} bt_pbap_field_e;
+#define	PBAP_NUM_OF_FIELDS_ENTRY 29
+#define	PBAP_FIELD_ALL (0xFFFFFFFFFFFFFFFFULL)
+
+char *FIELDS[] = {
+		"VERSION",
+		"FN",
+		"N",
+		"PHOTO",
+		"BDAY",
+		"ADR",
+		"LABEL",
+		"TEL",
+		"EMAIL",
+		"MAILER",
+		"TZ",
+		"GEO",
+		"TITLE",
+		"ROLE",
+		"LOGO",
+		"AGENT",
+		"ORG",
+		"NOTE",
+		"REV",
+		"SOUND",
+		"URL",
+		"UID",
+		"KEY",
+		"NICKNAME",
+		"CATEGORIES",
+		"PROID",
+		"CLASS",
+		"SORT-STRING",
+		"X-IRMC-CALL-DATETIME",	/* 29 */
+};
 
 char *SOURCE[] = {
 		"int",	//Phone memory
@@ -782,14 +784,18 @@ int __bt_pbap_call_get_phonebook(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 {
 	BT_DBG("+");
 
+	int i;
 	char *format_str = NULL;
+	char *fields_str = NULL;
 	char *order_str = NULL;
 	char *target_file = "/opt/usr/media/Downloads/pb.vcf";
 	bt_pbap_pull_parameters_t *app_param = pbap_data->app_param;
 	GVariantBuilder builder;
+	GVariantBuilder inner_builder;
 	GVariant *filters;
 
 	g_variant_builder_init (&builder, G_VARIANT_TYPE_ARRAY);
+	g_variant_builder_init (&inner_builder, G_VARIANT_TYPE_ARRAY);
 
 	/* Add MaxlistCount*/
 	g_variant_builder_add(&builder, "{sv}", "MaxCount",
@@ -813,6 +819,28 @@ int __bt_pbap_call_get_phonebook(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 		format_str = g_strdup(FORMAT[app_param->format]);
 		g_variant_builder_add(&builder, "{sv}", "Format",
 							g_variant_new("s", format_str));
+	}
+
+	/* Add Filter AttributeMask (64bit) */
+	if (app_param->fields > 0) {
+		if (app_param->fields == PBAP_FIELD_ALL) {
+			BT_DBG("** CHECKED ALL **");
+			fields_str = g_strdup("ALL");
+			g_variant_builder_add(&inner_builder, "s", fields_str);
+			g_free(fields_str);
+		} else {
+			for (i = 0; i < PBAP_NUM_OF_FIELDS_ENTRY; i++) {
+				if (app_param->fields & (1ULL << i)) {
+					BT_DBG("** CHECKED[%d]", i);
+					fields_str = g_strdup(FIELDS[i]);
+					g_variant_builder_add(&inner_builder, "s", fields_str);
+					g_free(fields_str);
+				}
+			}
+		}
+
+		g_variant_builder_add(&builder, "{sv}", "Fields",
+			g_variant_new("as", &inner_builder));
 	}
 
 	filters = g_variant_builder_end(&builder);
@@ -880,6 +908,9 @@ int __bt_pbap_call_get_vcards_list(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 	g_free(folder);
 	g_free(order_str);
 	g_hash_table_unref(filters);
+	/* In _bt_pbap_get_list(), path(type) is set to "nil", but current type is not null.
+	     The path should be reset here */
+	selected_path.type = -1;
 
 	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
@@ -889,15 +920,19 @@ int __bt_pbap_call_get_vcard(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 {
 	BT_DBG("+");
 
+	int i;
 	char *format_str = NULL;
+	char *fields_str = NULL;
 	char *target_file = "/opt/usr/media/Downloads/pb.vcf";
 	char *vcard_handle = NULL;
 	char vcard[10] = { 0, };
 	GVariantBuilder builder;
+	GVariantBuilder inner_builder;
 	GVariant *filters;
 	bt_pbap_pull_vcard_parameters_t *app_param = pbap_data->app_param;
 
 	g_variant_builder_init (&builder, G_VARIANT_TYPE_ARRAY);
+	g_variant_builder_init (&inner_builder, G_VARIANT_TYPE_ARRAY);
 
 	/* Add Format Filter only if other than vCard 2.1 (default)*/
 //	if (app_param->format > 0) {
@@ -905,6 +940,29 @@ int __bt_pbap_call_get_vcard(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 		g_variant_builder_add(&builder, "{sv}", "Format",
 							g_variant_new("s", format_str));
 //	}
+
+	/* Add Filter AttributeMask (64bit) */
+	if (app_param->fields > 0) {
+		if (app_param->fields == PBAP_FIELD_ALL) {
+			BT_DBG("** CHECKED ALL **");
+			fields_str = g_strdup("ALL");
+			g_variant_builder_add(&inner_builder, "s", fields_str);
+			g_free(fields_str);
+		} else {
+			for (i = 0; i < PBAP_NUM_OF_FIELDS_ENTRY; i++) {
+				if (app_param->fields & (1ULL << i)) {
+					BT_DBG("** CHECKED[%d]", i);
+					fields_str = g_strdup(FIELDS[i]);
+					g_variant_builder_add(&inner_builder, "s", fields_str);
+					g_free(fields_str);
+				}
+			}
+		}
+
+		g_variant_builder_add(&builder, "{sv}", "Fields",
+			g_variant_new("as", &inner_builder));
+	}
+
 	filters = g_variant_builder_end(&builder);
 
 //****************************

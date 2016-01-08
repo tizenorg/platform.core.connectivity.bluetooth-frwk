@@ -24,9 +24,7 @@
 #include <vconf.h>
 #include <vconf-keys.h>
 #include <bundle.h>
-#if 0
 #include <eventsystem.h>
-#endif
 
 #include "bt-core-main.h"
 #include "bt-core-adapter.h"
@@ -43,9 +41,7 @@ static bt_le_status_t adapter_le_status = BT_LE_DEACTIVATED;
 static gboolean is_recovery_mode = FALSE;
 
 static int bt_status_before[BT_MODE_MAX] = { VCONFKEY_BT_STATUS_OFF, };
-static int bt_le_status_before[BT_MODE_MAX] = { 0, };
-
-static DBusGConnection *conn = NULL;
+static int bt_le_status_before[BT_MODE_MAX] = { VCONFKEY_BT_LE_STATUS_OFF, };
 
 static void __bt_core_set_status(bt_status_t status)
 {
@@ -182,7 +178,12 @@ int _bt_enable_adapter(void)
 #endif
 	if (ret < 0) {
 		BT_ERR("running script failed");
+#ifdef USB_BLUETOOTH
+		char *argv_down[] = {"/usr/bin/hciconfig", "/usr/bin/hciconfig", "hci0", "down", NULL};
+		ret = __execute_command("/usr/bin/hciconfig", argv_down);
+#else
 		ret = __execute_command("/usr/etc/bluetooth/bt-dev-end.sh", NULL);
+#endif
 		__bt_core_set_status(BT_DEACTIVATED);
 		return -1;
 	}
@@ -199,6 +200,7 @@ int _bt_disable_adapter(void)
 
 	le_status = _bt_core_get_le_status();
 	BT_DBG("le_status : %d", le_status);
+#if 0 /* only the concept of private */
 	if (le_status == BT_LE_ACTIVATED) {
 		/* Turn off PSCAN, (ISCAN if needed) */
 		/* Return with 0 for the Disabled response. */
@@ -207,6 +209,7 @@ int _bt_disable_adapter(void)
 		g_timeout_add(BT_CORE_IDLE_TERM_TIME, __bt_core_idle_terminate, NULL);
 		return 0;
 	}
+#endif
 
 	status = _bt_core_get_status();
 	if (status == BT_ACTIVATING) {
@@ -262,7 +265,12 @@ int _bt_enable_adapter_le(void)
 #endif
 		if (ret < 0) {
 			BT_ERR("running script failed");
+#ifdef USB_BLUETOOTH
+			char *argv_down[] = {"/usr/bin/hciconfig", "/usr/bin/hciconfig", "hci0", "down", NULL};
+			ret = __execute_command("/usr/bin/hciconfig", argv_down);
+#else
 			ret = __execute_command("/usr/etc/bluetooth/bt-dev-end.sh &", NULL);
+#endif
 			__bt_core_set_status(BT_DEACTIVATED);
 			__bt_core_set_le_status(BT_LE_DEACTIVATED);
 			return -1;
@@ -271,6 +279,12 @@ int _bt_enable_adapter_le(void)
 		__bt_core_set_le_status(BT_LE_ACTIVATED);
 		g_timeout_add(BT_CORE_IDLE_TERM_TIME, __bt_core_idle_terminate, NULL);
 	}
+#ifdef HPS_FEATURE
+	ret = _bt_core_start_httpproxy();
+	if (ret < 0) {
+		BT_ERR("_bt_core_start_httpproxy() failed");
+	}
+#endif
 
 	return 0;
 }
@@ -285,6 +299,10 @@ int _bt_disable_adapter_le(void)
 	le_status = _bt_core_get_le_status();
 	retv_if(le_status == BT_LE_DEACTIVATED, 0);
 	retv_if(le_status == BT_LE_DEACTIVATING, -1);
+
+#ifdef HPS_FEATURE
+	_bt_core_stop_httpproxy();
+#endif
 
 	status = _bt_core_get_status();
 	BT_DBG("status : %d", status);
@@ -302,7 +320,7 @@ int _bt_disable_adapter_le(void)
 			return -1;
 		}
 	} else {
-		g_timeout_add(BT_CORE_IDLE_TERM_TIME, __bt_core_idle_terminate, NULL);
+			g_timeout_add(BT_CORE_IDLE_TERM_TIME, __bt_core_idle_terminate, NULL);
 	}
 
 	__bt_core_set_le_status(BT_LE_DEACTIVATED);
@@ -420,9 +438,9 @@ void _bt_core_update_status(void)
 
 		BT_INFO("bt_status = %d, bt_le_status = %d", bt_status, bt_le_status);
 
-		if(bt_status == VCONFKEY_BT_STATUS_ON)
+		if(bt_status & VCONFKEY_BT_STATUS_ON)
 			__bt_core_set_status(BT_ACTIVATED);
-		if(bt_le_status == VCONFKEY_BT_LE_STATUS_ON)
+		if(bt_le_status & VCONFKEY_BT_LE_STATUS_ON)
 			__bt_core_set_le_status(BT_ACTIVATED);
 	}
 }
@@ -707,7 +725,7 @@ static gboolean __bt_core_disable_timeout_cb(gpointer data)
 
 	return FALSE;
 }
-#if 0
+
 static int __bt_eventsystem_set_value(const char *event, const char *key, const char *value)
 {
 	int ret;
@@ -717,15 +735,15 @@ static int __bt_eventsystem_set_value(const char *event, const char *key, const 
 
 	bundle_add_str(b, key, value);
 
-	ret = eventsystem_request_sending_system_event(event, b);
+	ret = eventsystem_send_system_event(event, b);
 
-	BT_DBG("request_sending_system_event result: %d", ret);
+	BT_DBG("eventsystem_send_system_event result: %d", ret);
 
 	bundle_free(b);
 
 	return ret;
 }
-#endif
+
 void _bt_core_adapter_added_cb(void)
 {
 	bt_status_t status;
@@ -768,11 +786,9 @@ void _bt_core_adapter_removed_cb(void)
 	__bt_core_set_le_status(BT_LE_DEACTIVATED);
 	if (vconf_set_int(VCONFKEY_BT_STATUS, VCONFKEY_BT_STATUS_OFF) != 0)
 		BT_ERR("Set vconf failed");
-
 	if (vconf_set_int(VCONFKEY_BT_LE_STATUS, VCONFKEY_BT_LE_STATUS_OFF) != 0)
 		BT_ERR("Set vconf failed");
 
-#if 0
 	if (__bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_STATE,
 						EVT_VAL_BT_OFF) != ES_R_OK)
 		BT_ERR("Fail to set value");
@@ -780,7 +796,7 @@ void _bt_core_adapter_removed_cb(void)
 	if (__bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_LE_STATE,
 						EVT_VAL_BT_LE_OFF) != ES_R_OK)
 		BT_ERR("Fail to set value");
-#endif
+
 	if (is_recovery_mode == TRUE)
 	{
 		if (timer_id < 0)

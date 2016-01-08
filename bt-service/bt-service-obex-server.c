@@ -90,6 +90,11 @@ typedef struct {
 static GSList *transfers;
 static bt_obex_agent_info_t agent_info;
 
+int _bt_obex_get_native_pid(void)
+{
+	return agent_info.native_server->app_pid;
+}
+
 static GQuark __bt_obex_error_quark(void)
 {
 	static GQuark quark = 0;
@@ -230,7 +235,7 @@ static char *__bt_get_remote_device_name(const char *bdaddress)
 	device_path = _bt_get_device_object_path((char *)bdaddress);
 	retv_if(device_path == NULL, NULL);
 
-	conn = _bt_get_session_gconn();
+	conn = _bt_get_system_gconn();
 	retv_if(conn == NULL, NULL);
 	BT_INFO("Device_path %s", device_path);
 	device_proxy = g_dbus_proxy_new_sync(conn, G_DBUS_PROXY_FLAGS_NONE,

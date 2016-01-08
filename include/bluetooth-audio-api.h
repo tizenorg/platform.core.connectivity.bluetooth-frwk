@@ -25,8 +25,6 @@
 
 #include <stdint.h>
 #include <glib.h>
-#include <dbus/dbus-glib.h>
-#include <dbus/dbus-glib-lowlevel.h>
 #include <dlog.h>
 
 #include "bluetooth-api.h"

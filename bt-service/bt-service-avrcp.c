@@ -155,7 +155,7 @@ static void __bt_avrcp_agent_method(GDBusConnection *connection,
 	gchar *interface = NULL;
 	gchar *property = NULL;
 	gchar *loop_status = NULL;
-	GVariant *value;
+	GVariant *value = NULL;
 
 	if (g_strcmp0(method_name, "Set") == 0) {
 		g_variant_get(parameters, "(&s&sv)", &interface, &property,
@@ -165,6 +165,11 @@ static void __bt_avrcp_agent_method(GDBusConnection *connection,
 			ret = BT_AVRCP_ERROR_INVALID_INTERFACE;
 			goto fail;
 		}
+	}
+
+	if (value == NULL) {
+		BT_ERR("value is NULL");
+		goto fail;
 	}
 
 	BT_DBG("Property: %s\n", property);
@@ -215,7 +220,8 @@ static void __bt_avrcp_agent_method(GDBusConnection *connection,
 	return;
 
 fail:
-	g_variant_unref(value);
+	if (value)
+		g_variant_unref(value);
 	err = __bt_avrcp_set_error(ret);
 	g_dbus_method_invocation_return_gerror(invocation, err);
 	g_clear_error(&err);

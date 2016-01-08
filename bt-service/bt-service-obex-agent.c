@@ -389,13 +389,11 @@ void _bt_obex_agent_new(char *path)
 		}
 	}
 	info = (bt_obex_agent_info *)malloc (sizeof(bt_obex_agent_info));
-	if (info == NULL) {
-		BT_ERR("Failed to allocate memory");
-		return;
+	if (info) {
+		memset(info, 0, sizeof(bt_obex_agent_info));
+		info->path = g_strdup(path);
+		obex_agent_list = g_slist_append(obex_agent_list, info);
 	}
-	memset(info, 0, sizeof(bt_obex_agent_info));
-	info->path = g_strdup(path);
-	obex_agent_list = g_slist_append(obex_agent_list, info);
 }
 
 void _bt_obex_agent_destroy(char *path)
@@ -450,6 +448,8 @@ gboolean _bt_obex_setup(const char *path)
 	}
 
 	new_conn_node = g_dbus_node_info_new_for_xml(obex_service_agent_xml1, NULL);
+	if (new_conn_node == NULL)
+		return FALSE;
 
 	info->openobex_id = g_dbus_connection_register_object(conn, info->path,
 						new_conn_node->interfaces[0],
@@ -485,8 +485,10 @@ void _bt_obex_set_authorize_cb(char *object_path,
 {
 	bt_obex_agent_info *info = __find_obex_agent_info(object_path);;
 
-	info->authorize_cb = func;
-	info->authorize_data = data;
+	if (info) {
+		info->authorize_cb = func;
+		info->authorize_data = data;
+	}
 }
 
 void _bt_obex_set_release_cb(char *object_path,

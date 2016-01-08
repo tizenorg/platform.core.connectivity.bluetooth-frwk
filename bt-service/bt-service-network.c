@@ -205,7 +205,7 @@ static void __bt_network_disconnect_cb(GDBusProxy *proxy, GAsyncResult *res,
 	bt_function_data_t *func_data;
 	request_info_t *req_info;
 
-	g_dbus_proxy_call_finish(proxy, res, &g_error);
+	reply = g_dbus_proxy_call_finish(proxy, res, &g_error);
 	g_object_unref(proxy);
 
 	if (reply == NULL) {
@@ -285,6 +285,7 @@ int _bt_network_activate(void)
 				 NULL,
 				 &err);
 	if (err != NULL) {
+		g_dbus_error_strip_remote_error(err);
 		BT_ERR("Network server register Error: %s\n", err->message);
 		if (g_strcmp0(err->message, "Already Exists") == 0) {
 			ret = BLUETOOTH_ERROR_ALREADY_INITIALIZED;
@@ -329,6 +330,7 @@ int _bt_network_deactivate(void)
 				 NULL,
 				 &err);
 	if (err != NULL) {
+		g_dbus_error_strip_remote_error(err);
 		BT_ERR("Network server unregister Error: %s\n", err->message);
 		if (g_strcmp0(err->message,
 				"Operation currently not available") == 0) {
@@ -527,9 +529,6 @@ int _bt_network_server_disconnect(int request_id,
 				NULL,
 				(GAsyncReadyCallback)__bt_network_disconnect_cb,
 				func_data);
-
-	g_free(func_data->address);
-	g_free(func_data);
 
 	return BLUETOOTH_ERROR_NONE;
 }

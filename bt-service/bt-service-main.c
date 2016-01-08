@@ -21,16 +21,13 @@
  *
  */
 
-//#include <dbus/dbus-glib.h>
 #include <glib.h>
 #include <dlog.h>
 #include <string.h>
 #include <vconf.h>
 
 #include <bundle.h>
-#if 0
 #include <eventsystem.h>
-#endif
 
 #include "bt-internal-types.h"
 #include "bt-service-common.h"
@@ -59,6 +56,9 @@ static void __bt_release_service(void)
 
 	_bt_clear_request_list();
 
+#ifndef GATT_NO_RELAY
+	_bt_clear_gatt_client_senders();
+#endif
 	_bt_service_cynara_deinit();
 
 	BT_DBG("Terminating the bt-service daemon");
@@ -89,11 +89,10 @@ gboolean _bt_terminate_service(gpointer user_data)
 			if(vconf_set_int(VCONFKEY_BT_STATUS,
 					VCONFKEY_BT_STATUS_OFF) != 0)
 				BT_ERR("Set vconf failed\n");
-#if 0
+
 			if (_bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_STATE,
 							EVT_VAL_BT_OFF) != ES_R_OK)
 				BT_ERR("Fail to set value");
-#endif
 		}
 	}
 
@@ -104,11 +103,9 @@ gboolean _bt_terminate_service(gpointer user_data)
 			if(vconf_set_int(VCONFKEY_BT_LE_STATUS,
 					VCONFKEY_BT_LE_STATUS_OFF) != 0)
 				BT_ERR("Set vconf failed\n");
-#if 0
 			if (_bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_LE_STATE,
 							EVT_VAL_BT_LE_OFF) != ES_R_OK)
 				BT_ERR("Fail to set value");
-#endif
 		}
 	}
 
@@ -156,7 +153,7 @@ gboolean _bt_reliable_terminate_service(gpointer user_data)
 static gboolean __bt_check_bt_service(void *data)
 {
 	int bt_status = VCONFKEY_BT_STATUS_OFF;
-	int bt_le_status = 0;
+	int bt_le_status = VCONFKEY_BT_LE_STATUS_OFF;
 	bt_status_t status = BT_DEACTIVATED;
 	bt_le_status_t le_status = BT_LE_DEACTIVATED;
 	int flight_mode_deactivation = 0;
@@ -164,6 +161,7 @@ static gboolean __bt_check_bt_service(void *data)
 #if 0
 	int ps_mode_deactivation = 0;
 #endif
+
 	status = _bt_adapter_get_status();
 	le_status = _bt_adapter_get_le_status();
 	BT_DBG("State: %d, LE State: %d", status, le_status);
@@ -201,7 +199,7 @@ static gboolean __bt_check_bt_service(void *data)
 		_bt_enable_core();
 	}
 
-	if ((bt_le_status == 1) && (le_status == BT_LE_DEACTIVATED)) {
+	if ((bt_le_status == VCONFKEY_BT_LE_STATUS_ON) && (le_status == BT_LE_DEACTIVATED)) {
 		BT_DBG("Previous session was le enabled. Turn BT LE on automatically.");
 
 		/* Enable the BT LE */
@@ -213,6 +211,7 @@ static gboolean __bt_check_bt_service(void *data)
 
 		if ((status != BT_ACTIVATING && status != BT_ACTIVATED) &&
 				(le_status != BT_LE_ACTIVATING && le_status != BT_LE_ACTIVATED)){
+			_bt_terminate_service(NULL);
 		}
 	}
 #endif
@@ -268,6 +267,10 @@ int main(void)
 	_bt_init_request_id();
 
 	_bt_init_request_list();
+
+#ifndef GATT_NO_RELAY
+	_bt_init_gatt_client_senders();
+#endif
 
 	g_timeout_add(500, (GSourceFunc)__bt_check_bt_service, NULL);
 

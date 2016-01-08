@@ -25,7 +25,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <dbus/dbus.h>
-#include <dbus/dbus-glib-bindings.h>
 #include <unistd.h>
 #include <vconf.h>
 #include <vconf-keys.h>
@@ -278,6 +277,7 @@ static int __bt_telephony_check_privilege(void)
 	if (!reply) {
 		BT_ERR("Error returned in method call");
 		if (err) {
+			g_dbus_error_strip_remote_error(err);
 			ret = __bt_telephony_get_error(err->message);
 			g_error_free(err);
 			return ret;
@@ -375,6 +375,7 @@ static int __bluetooth_telephony_send_call_status(
 	if (!reply) {
 		BT_ERR("Error returned in method call");
 		if (err) {
+			g_dbus_error_strip_remote_error(err);
 			ret = __bt_telephony_get_error(err->message);
 			g_error_free(err);
 			return ret;
@@ -758,6 +759,7 @@ static int __bluetooth_telephony_register(void)
 	if (!reply) {
 		BT_ERR("Error returned in method call");
 		if (err) {
+			g_dbus_error_strip_remote_error(err);
 			ret = __bt_telephony_get_error(err->message);
 			BT_ERR("Error here %d\n", ret);
 			g_error_free(err);
@@ -792,6 +794,7 @@ static  int __bluetooth_telephony_unregister(void)
 	if (!reply) {
 		BT_ERR("Error returned in method call");
 		if (err) {
+			g_dbus_error_strip_remote_error(err);
 			ret = __bt_telephony_get_error(err->message);
 			g_error_free(err);
 			return ret;
@@ -825,7 +828,7 @@ static void __bluetooth_telephony_init_headset_state(void)
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
 		if (err) {
-			__bt_telephony_get_error(err->message);
+			BT_ERR("Error message = %s", err->message);
 			g_error_free(err);
 		}
 		return;
@@ -951,6 +954,7 @@ static int __bluetooth_telephony_get_connected_device(void)
 		BT_ERR("Unable to allocate new proxy \n");
 		ret = BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
 		if (error) {
+			g_dbus_error_strip_remote_error(error);
 			ret = __bt_telephony_get_error(error->message);
 			BT_ERR("Error here %d\n", ret);
 			g_error_free(error);
@@ -967,6 +971,7 @@ static int __bluetooth_telephony_get_connected_device(void)
 		BT_ERR("Can't get managed objects");
 		ret = BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
 		if (error) {
+			g_dbus_error_strip_remote_error(error);
 			ret = __bt_telephony_get_error(error->message);
 			BT_ERR("Error here %d\n", ret);
 			g_error_free(error);
@@ -1003,6 +1008,7 @@ static int __bluetooth_telephony_get_connected_device(void)
 				BT_ERR("Unable to allocate new proxy \n");
 				ret = BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
 				if (error) {
+					g_dbus_error_strip_remote_error(error);
 					ret = __bt_telephony_get_error(error->message);
 					BT_ERR("Error here %d\n", ret);
 					g_error_free(error);
@@ -1021,6 +1027,7 @@ static int __bluetooth_telephony_get_connected_device(void)
 				BT_ERR("Can't get managed objects");
 				ret = BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
 				if (error) {
+					g_dbus_error_strip_remote_error(error);
 					ret = __bt_telephony_get_error(error->message);
 					BT_ERR("Error here %d\n", ret);
 					g_error_free(error);
@@ -1069,6 +1076,7 @@ static int __bluetooth_telephony_get_connected_device(void)
 				BT_ERR("Unable to allocate new headset_agent_proxy");
 				ret = BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
 				if (error) {
+					g_dbus_error_strip_remote_error(error);
 					ret = __bt_telephony_get_error(error->message);
 					BT_ERR("Error here %d\n", ret);
 					g_error_free(error);
@@ -1085,6 +1093,7 @@ static int __bluetooth_telephony_get_connected_device(void)
 				BT_ERR("Can't get managed objects");
 				ret = BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
 				if (error) {
+					g_dbus_error_strip_remote_error(error);
 					ret = __bt_telephony_get_error(error->message);
 					BT_ERR("Error here %d\n", ret);
 					g_error_free(error);
@@ -1107,6 +1116,7 @@ static int __bluetooth_telephony_get_connected_device(void)
 						BT_ERR("Can't get managed objects");
 						ret = BLUETOOTH_TELEPHONY_ERROR_INTERNAL;
 						if (error) {
+							g_dbus_error_strip_remote_error(error);
 							ret = __bt_telephony_get_error(error->message);
 							BT_ERR("Error here %d\n", ret);
 							g_error_free(error);
@@ -1166,6 +1176,7 @@ static GDBusProxy *__bluetooth_telephony_get_connected_device_proxy(void)
 	if (proxy == NULL) {
 		BT_ERR("Unable to allocate new proxy");
 		if (error) {
+			g_dbus_error_strip_remote_error(error);
 			ret = __bt_telephony_get_error(error->message);
 			BT_ERR("Error here %d\n", ret);
 			g_error_free(error);
@@ -1344,6 +1355,7 @@ BT_EXPORT_API int bluetooth_telephony_init(bt_telephony_func_ptr cb,
 		telephony_dbus_info.conn = NULL;
 		is_initialized = FALSE;
 		if (error) {
+			g_dbus_error_strip_remote_error(error);
 			ret = __bt_telephony_get_error(error->message);
 			BT_ERR("Error here %d\n", ret);
 			g_error_free(error);
@@ -1477,7 +1489,7 @@ BT_EXPORT_API gboolean bluetooth_telephony_is_sco_connected(void)
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
 		if (err) {
-			__bt_telephony_get_error(err->message);
+			BT_ERR("Error message = %s", err->message);
 			g_error_free(err);
 		}
 		return FALSE;
@@ -1658,6 +1670,7 @@ BT_EXPORT_API int bluetooth_telephony_start_voice_recognition(void)
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
 		if (err) {
+			g_dbus_error_strip_remote_error(err);
 			ret = __bt_telephony_get_error(err->message);
 			g_error_free(err);
 			return ret;
@@ -1691,6 +1704,7 @@ BT_EXPORT_API int bluetooth_telephony_stop_voice_recognition(void)
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
 		if (err) {
+			g_dbus_error_strip_remote_error(err);
 			ret = __bt_telephony_get_error(err->message);
 			g_error_free(err);
 			return ret;
@@ -1760,6 +1774,7 @@ BT_EXPORT_API int bluetooth_telephony_audio_open(void)
 	if (proxy == NULL) {
 		BT_ERR("Unable to allocate new proxy");
 		if (err) {
+			g_dbus_error_strip_remote_error(err);
 			ret = __bt_telephony_get_error(err->message);
 			BT_ERR("Error here %d\n", ret);
 			g_error_free(err);
@@ -1830,6 +1845,7 @@ BT_EXPORT_API int bluetooth_telephony_audio_close(void)
 	if (proxy == NULL) {
 		BT_ERR("Unable to allocate new proxy");
 		if (err) {
+			g_dbus_error_strip_remote_error(err);
 			ret = __bt_telephony_get_error(err->message);
 			BT_ERR("Error here %d\n", ret);
 			g_error_free(err);
@@ -2094,6 +2110,7 @@ BT_EXPORT_API int bluetooth_telephony_indicate_outgoing_call(
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
 		if (err) {
+			g_dbus_error_strip_remote_error(err);
 			ret = __bt_telephony_get_error(err->message);
 			g_error_free(err);
 			return ret;
@@ -2145,6 +2162,7 @@ BT_EXPORT_API int bluetooth_telephony_indicate_incoming_call(
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
 		if (err) {
+			g_dbus_error_strip_remote_error(err);
 			ret = __bt_telephony_get_error(err->message);
 			g_error_free(err);
 			return ret;
@@ -2182,6 +2200,7 @@ BT_EXPORT_API int bluetooth_telephony_set_speaker_gain(
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
 		if (err) {
+			g_dbus_error_strip_remote_error(err);
 			ret = __bt_telephony_get_error(err->message);
 			g_error_free(err);
 			return ret;
@@ -2214,6 +2233,7 @@ BT_EXPORT_API int bluetooth_telephony_get_headset_volume(
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
 		if (err) {
+			g_dbus_error_strip_remote_error(err);
 			ret = __bt_telephony_get_error(err->message);
 			g_error_free(err);
 			return ret;
@@ -2246,6 +2266,7 @@ BT_EXPORT_API int bluetooth_telephony_is_connected(gboolean *ag_connected)
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
 		if (err) {
+			g_dbus_error_strip_remote_error(err);
 			ret = __bt_telephony_get_error(err->message);
 			g_error_free(err);
 			return ret;
