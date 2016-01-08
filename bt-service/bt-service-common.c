@@ -29,8 +29,6 @@
 #include <errno.h>
 #include <termios.h>
 #include <net_connection.h>
-#include <dbus/dbus-glib-lowlevel.h>
-#include <dbus/dbus-glib.h>
 #include <dbus/dbus.h>
 #include <glib.h>
 #include <dlog.h>
@@ -39,9 +37,7 @@
 #include <termios.h>
 #include <net_connection.h>
 #include <bundle.h>
-#if 0
 #include <eventsystem.h>
-#endif
 
 #include "bluetooth-api.h"
 #include "bt-service-common.h"
@@ -61,11 +57,7 @@ GDBusConnection *_bt_gdbus_init_system_gconn(void)
 {
 	GError *error = NULL;
 
-	if (!g_thread_supported()) {
-		g_thread_init(NULL);
-	}
-
-//	dbus_g_thread_init();
+	dbus_threads_init_default();
 
 	g_type_init();
 
@@ -139,6 +131,9 @@ static GDBusProxy *__bt_init_adapter_proxy(void)
 		retv_if(system_conn == NULL, NULL);
 	}
 
+	manager_proxy = _bt_get_manager_proxy();
+	retv_if(manager_proxy == NULL, NULL);
+
 	adapter_path = _bt_get_adapter_path();
 	retv_if(adapter_path == NULL, NULL);
 
@@ -167,6 +162,9 @@ static GDBusProxy *__bt_init_adapter_properties_proxy(void)
 		system_conn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, NULL);
 		retv_if(system_conn == NULL, NULL);
 	}
+
+	manager_proxy = _bt_get_manager_proxy();
+	retv_if(manager_proxy == NULL, NULL);
 
 	adapter_path = _bt_get_adapter_path();
 	retv_if(adapter_path == NULL, NULL);
@@ -299,13 +297,12 @@ static char *__bt_extract_adapter_path(GVariantIter *iter)
 		if (object_path == NULL)
 			continue;
 
-		while (g_variant_iter_loop(interface_iter, "{sa{sv}}",
+		while (g_variant_iter_loop(interface_iter, "{&sa{sv}}",
 				&interface_str, &svc_iter)) {
 			if (g_strcmp0(interface_str, "org.bluez.Adapter1") != 0)
 				continue;
 
 			BT_DBG("Object Path: %s", object_path);
-			g_free(interface_str);
 			g_variant_iter_free(svc_iter);
 			g_variant_iter_free(interface_iter);
 			return g_strdup(object_path);
@@ -796,7 +793,7 @@ void _bt_logging_connection(gboolean connect, int addr_type)
 	BT_INFO("[PM] Number of LE conn: %d disc: %d, Number of BR/EDR conn: %d disc: %d",
 			le_conn, le_disc, edr_conn, edr_disc);
 }
-#if 0
+
 int _bt_eventsystem_set_value(const char *event, const char *key, const char *value)
 {
 	int ret;
@@ -806,15 +803,15 @@ int _bt_eventsystem_set_value(const char *event, const char *key, const char *va
 
 	bundle_add_str(b, key, value);
 
-	ret = eventsystem_request_sending_system_event(event, b);
+	ret = eventsystem_send_system_event(event, b);
 
-	BT_DBG("request_sending_system_event result: %d", ret);
+	BT_DBG("eventsystem_send_system_event result: %d", ret);
 
 	bundle_free(b);
 
 	return ret;
 }
-#endif
+
 void _bt_swap_byte_ordering(char *data, int data_len)
 {
 	char temp;

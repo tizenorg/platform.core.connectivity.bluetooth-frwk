@@ -112,7 +112,6 @@ int _bt_oob_read_local_data(bt_oob_data_t *local_oob_data)
 		memcpy(local_oob_data->randomizer, local_randomizer,
 				local_oob_data->randomizer_len);
 
-
 	return BLUETOOTH_ERROR_NONE;
 }
 

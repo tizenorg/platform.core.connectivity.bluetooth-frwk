@@ -25,6 +25,7 @@
 #include <glib.h>
 #include <dlog.h>
 #include <gio/gio.h>
+#include <sys/smack.h>
 #include <cynara-client.h>
 #include <cynara-creds-gdbus.h>
 
@@ -101,6 +102,7 @@ int __bt_obexd_request(int function_name,
 		GVariant *in_param2,
 		GVariant *in_param3,
 		GVariant *in_param4,
+		GVariant *in_param5,
 		GArray **out_param1);
 int __bt_agent_request(int function_name,
 		int request_type,
@@ -217,7 +219,7 @@ static void __bt_service_method(GDBusConnection *connection,
 					request_type, request_id,
 					invocation, param1,
 					param2, param3,
-					param4, &out_param1);
+					param4, param5, &out_param1);
 			break;
 		case BT_AGENT_SERVICE:
 			result = __bt_agent_request(service_function,
@@ -700,18 +702,18 @@ int __bt_bluez_request(int function_name,
 	}
 	case BT_LE_CONN_UPDATE: {
 		bluetooth_device_address_t local_address = { {0} };
-		bluetooth_le_conn_update_t parameters = {0};
+		bluetooth_le_connection_param_t parameters = {0};
 
 		__bt_service_get_parameters(in_param1, &local_address,
 				sizeof(bluetooth_device_address_t));
 		__bt_service_get_parameters(in_param2, &parameters,
-				sizeof(bluetooth_le_conn_update_t));
+				sizeof(bluetooth_le_connection_param_t));
 
 		result =  _bt_le_conn_update(local_address.addr,
 					parameters.interval_min,
 					parameters.interval_max,
 					parameters.latency,
-					parameters.time_out);
+					parameters.timeout);
 		break;
 	}
 	case BT_IS_ADVERTISING: {
@@ -797,6 +799,24 @@ int __bt_bluez_request(int function_name,
 		result = _bt_cancel_bonding();
 		break;
 	}
+	case BT_PASSKEY_REPLY: {
+		const char *passkey = NULL;
+		gboolean authentication_reply = FALSE;
+
+		passkey = g_variant_get_data(in_param1);
+		__bt_service_get_parameters(in_param2,
+			&authentication_reply, sizeof(gboolean));
+		result = _bt_passkey_reply(passkey, authentication_reply);
+		break;
+	}
+	case BT_PASSKEY_CONFIRMATION_REPLY: {
+		gboolean confirmation_reply = FALSE;
+
+		__bt_service_get_parameters(in_param1,
+			&confirmation_reply, sizeof(gboolean));
+		result = _bt_passkey_confirmation_reply(confirmation_reply);
+		break;
+	}
 	case BT_UNBOND_DEVICE: {
 		bluetooth_device_address_t address = { {0} };
 
@@ -880,6 +900,48 @@ int __bt_bluez_request(int function_name,
 					sizeof(guint));
 		}
 
+		break;
+	}
+	case BT_SET_PIN_CODE: {
+		bluetooth_device_address_t address = { {0} };
+		bluetooth_device_pin_code_t pin_code = { {0} };
+
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2,
+				&pin_code, sizeof(bluetooth_device_pin_code_t));
+
+		result = _bt_set_pin_code(&address, &pin_code);
+		break;
+	}
+	case BT_UNSET_PIN_CODE: {
+		bluetooth_device_address_t address = { {0} };
+
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+
+		result = _bt_unset_pin_code(&address);
+		break;
+	}
+	case BT_UPDATE_LE_CONNECTION_MODE: {
+		bluetooth_device_address_t remote_address = { { 0 } };
+		bluetooth_le_connection_param_t param = { 0 };
+		bluetooth_le_connection_mode_t mode = BLUETOOTH_LE_CONNECTION_MODE_BALANCED;
+
+		__bt_service_get_parameters(in_param1, &remote_address,
+				sizeof(bluetooth_device_address_t));
+		__bt_service_get_parameters(in_param2, &mode,
+				sizeof(bluetooth_le_connection_mode_t));
+
+		result = _bt_get_le_connection_parameter(mode, &param);
+		if (result != BLUETOOTH_ERROR_NONE)
+			break;
+
+		result = _bt_le_conn_update(remote_address.addr,
+				param.interval_min,
+				param.interval_max,
+				param.latency,
+				param.timeout);
 		break;
 	}
 
@@ -1330,7 +1392,7 @@ int __bt_bluez_request(int function_name,
 		char *uuid;
 		int socket_fd = -1;
 
-		sender = dbus_g_method_get_sender(context);
+		sender = (char *)g_dbus_method_invocation_get_sender(context);
 		uuid = &g_array_index(in_param1, char, 0);
 
 		result = _bt_rfcomm_create_socket(sender, uuid);
@@ -1417,8 +1479,11 @@ int __bt_bluez_request(int function_name,
 		__bt_service_get_parameters(in_param2,
 				&auto_connect, sizeof(gboolean));
 
-		result = _bt_connect_le_device(&address, auto_connect);
-
+		result = _bt_connect_le_device(request_id, &address, auto_connect);
+		if (result != BLUETOOTH_ERROR_NONE) {
+			g_array_append_vals(*out_param1, &address,
+					sizeof(bluetooth_device_address_t));
+		}
 		break;
 	}
 	case BT_DISCONNECT_LE: {
@@ -1427,8 +1492,11 @@ int __bt_bluez_request(int function_name,
 		__bt_service_get_parameters(in_param1, &address,
 				sizeof(bluetooth_device_address_t));
 
-		result = _bt_disconnect_le_device(&address);
-
+		result = _bt_disconnect_le_device(request_id, &address);
+		if (result != BLUETOOTH_ERROR_NONE) {
+			g_array_append_vals(*out_param1, &address,
+					sizeof(bluetooth_device_address_t));
+		}
 		break;
 	}
 	case BT_SET_LE_PRIVACY: {
@@ -1452,6 +1520,49 @@ int __bt_bluez_request(int function_name,
 	case BT_GATT_DISCOVER_CHARACTERISTICS_DESCRIPTOR:
 		/* Just call to check the privilege */
 		break;
+#ifndef GATT_NO_RELAY
+	case BT_GATT_WATCH_CHARACTERISTIC: {
+		char *sender = NULL;
+
+		sender = (char *)g_dbus_method_invocation_get_sender(context);
+
+		result = _bt_insert_gatt_client_sender(sender);
+
+		break;
+	}
+	case BT_GATT_UNWATCH_CHARACTERISTIC: {
+		char *sender = NULL;
+
+		sender = (char *)g_dbus_method_invocation_get_sender(context);
+
+		result = _bt_delete_gatt_client_sender(sender);
+
+		break;
+	}
+#endif
+	case BT_LE_IPSP_INIT:
+		result = _bt_initialize_ipsp();
+		break;
+	case BT_LE_IPSP_DEINIT:
+		result = _bt_deinitialize_ipsp();
+		break;
+	case BT_LE_IPSP_CONNECT: {
+		bluetooth_device_address_t address = { {0} };
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
+
+		result = _bt_connect_le_ipsp_device(&address);
+		break;
+	}
+	case BT_LE_IPSP_DISCONNECT: {
+		bluetooth_device_address_t address = { {0} };
+
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
+
+		result = _bt_disconnect_le_ipsp_device(&address);
+		break;
+	}
 	case BT_LE_READ_MAXIMUM_DATA_LENGTH: {
 		bluetooth_le_read_maximum_data_length_t max_le_datalength = {0};
 
@@ -1515,6 +1626,7 @@ int __bt_obexd_request(int function_name,
 		GVariant *in_param2,
 		GVariant *in_param3,
 		GVariant *in_param4,
+		GVariant *in_param5,
 		GArray **out_param1)
 {
 	BT_DBG("+");
@@ -1531,6 +1643,14 @@ int __bt_obexd_request(int function_name,
 		bt_file_path_t path;
 		char **file_path;
 		int file_count;
+		GDBusProxy *process_proxy;
+		guint owner_pid = 0;
+		int opp_server_pid = 0;
+		gchar *owner_sender_name;
+		GDBusConnection *owner_connection = NULL;
+		GVariant *val_get = NULL;
+		GError *error_connection = NULL;
+		GError *errro_proxy = NULL;
 		GArray *param2;
 
 		__bt_service_get_parameters(in_param1, &address,
@@ -1547,17 +1667,77 @@ int __bt_obexd_request(int function_name,
 			path = g_array_index(param2, bt_file_path_t, i);
 			file_path[i] = g_strdup(path.path);
 		}
-		BT_DBG("_bt_opp_client_push_files");
-		result = _bt_opp_client_push_files(request_id, context,
-						&address, file_path,
-						file_count);
+
+		owner_connection = g_dbus_method_invocation_get_connection(context);
+		owner_sender_name = g_dbus_method_invocation_get_sender(context);
+
+		BT_DBG("sender = %s", owner_sender_name);
+
+		process_proxy = g_dbus_proxy_new_sync(owner_connection,
+						  G_DBUS_PROXY_FLAGS_NONE,
+						  NULL,
+						  "org.freedesktop.DBus",
+						  "/org/freedesktop/DBus",
+						  "org.freedesktop.DBus",
+						  NULL, &error_connection);
+
+		if(process_proxy == NULL)
+			BT_DBG("Fail to get process_proxy");
+
+		if (error_connection) {
+			BT_DBG("Fail to get proxy : %s", error_connection->message);
+			g_error_free(error_connection);
+			error_connection = NULL;
+		}
+
+		if (process_proxy) {
+			val_get = g_dbus_proxy_call_sync(process_proxy,
+							"GetConnectionUnixProcessID",
+							g_variant_new("(s)", owner_sender_name),
+							G_DBUS_CALL_FLAGS_NONE,
+							-1,	NULL,
+							&errro_proxy);
+
+			if (val_get == NULL) {
+				BT_DBG("Fail to get pid");
+			} else {
+				g_variant_get(val_get, "(u)", &owner_pid);
+				BT_DBG("request is from pid %d\n", owner_pid);
+			}
+
+			if (errro_proxy) {
+				g_error("Unable to get PID for %s: %s",
+						  owner_sender_name, errro_proxy->message);
+				g_error_free(errro_proxy);
+				errro_proxy = NULL;
+			}
+		} else {
+			BT_DBG("fail to get proxy");
+		}
+
+		opp_server_pid = _bt_obex_get_native_pid();
+
+		BT_DBG("owner_pid, agent_info.native_server->app_pid = %d, %d",
+					owner_pid, opp_server_pid);
+		if (opp_server_pid == owner_pid) {
+			BT_DBG("The exception case : _bt_opp_client_push_files");
+			result = _bt_opp_client_push_files(request_id, context,
+								&address, file_path,
+								file_count);
+		} else {
+            BT_DBG("normal case");
+            result = _bt_opp_client_push_files(request_id, context,
+							&address, file_path,
+							file_count);
+		}
 
 		for (i = 0; i < file_count; i++) {
 			g_free(file_path[i]);
 		}
 		g_free(file_path);
 		g_array_free(param2, TRUE);
-
+		if (process_proxy)
+			g_object_unref(process_proxy);
 		break;
 	}
 	case BT_OPP_CANCEL_PUSH: {
@@ -1587,7 +1767,6 @@ int __bt_obexd_request(int function_name,
 				sizeof(gboolean));
 		__bt_service_get_parameters(in_param3, &app_pid,
 				sizeof(int));
-
 		result = _bt_obex_server_allocate(sender,
 				path, app_pid, is_native);
 
@@ -1629,7 +1808,6 @@ int __bt_obexd_request(int function_name,
 		char *file_name;
 
 		file_name = (char *)g_variant_get_data(in_param1);
-
 		result = _bt_obex_server_accept_authorize(file_name, TRUE);
 
 		break;
@@ -1647,8 +1825,8 @@ int __bt_obexd_request(int function_name,
 		__bt_service_get_parameters(in_param2, &is_native,
 				sizeof(gboolean));
 
-		result = _bt_obex_server_set_destination_path(destination_path,
-							is_native);
+		result = _bt_obex_server_set_destination_path(
+				destination_path, is_native);
 
 		break;
 	}

@@ -735,6 +735,7 @@ int _bt_audio_disconnect(int request_id, int type,
 	_bt_convert_addr_type_to_string(address, device_address->addr);
 
 	func_data = g_malloc0(sizeof(bt_audio_function_data_t));
+	retv_if(func_data == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	func_data->address = g_strdup(address);
 	func_data->req_id = request_id;

@@ -536,7 +536,9 @@ int test_input_callback(void *data)
 			//bluetooth_device_address_t device_address={{0x00,0x19,0x0E,0x01,0x61,0x17}}; /* DO-DH79-PYUN04 */
 			//bluetooth_device_address_t device_address={{0x00,0x16,0x38,0xC3,0x1F,0xD2}}; /* DO-DH79-PYUN03 */
 			//bluetooth_device_address_t device_address={{0x58,0x17,0x0C,0xEC,0x6A,0xF3}}; /* MW600 */
-			bluetooth_device_address_t device_address={{0x00,0x0D,0xFD,0x24,0x5E,0xFF}}; /* Motorola S9 */
+			//bluetooth_device_address_t device_address={{0x00,0x0D,0xFD,0x24,0x5E,0xFF}}; /* Motorola S9 */
+			bluetooth_device_address_t device_address={{0xDC,0x2C,0x26,0xD0,0xF3,0xC1}}; /* BT Keyboard */
+			//bluetooth_device_address_t device_address={{0x00,0x1F,0x20,0x36,0x41,0xAC}}; /* BT Mouse */
 
 			TC_PRT("dev [%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X]", \
 				device_address.addr[0], device_address.addr[1], device_address.addr[2], \
@@ -1230,12 +1232,7 @@ void startup()
 {
 	TC_PRT("bluetooth framework TC startup");
 
-	if(!g_thread_supported())
-	{
-		g_thread_init(NULL);
-	}
-
-	dbus_g_thread_init();
+	dbus_threads_init_default();
 
 	g_type_init();
 	main_loop = g_main_loop_new(NULL, FALSE);
@@ -1705,6 +1702,65 @@ void bt_event_callback(int event, bluetooth_event_param_t* param, void *user_dat
 			break;
 		}
 #endif
+		case BLUETOOTH_EVENT_KEYBOARD_PASSKEY_DISPLAY:
+		{
+			bluetooth_authentication_request_info_t *auth_info = param->param_data;
+
+			TC_PRT("BLUETOOTH_EVENT_KEYBOARD_PASSKEY_DISPLAY");
+			TC_PRT("Device Address: [%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X]",
+				auth_info->device_address.addr[0], auth_info->device_address.addr[1],
+				auth_info->device_address.addr[2], auth_info->device_address.addr[3],
+				auth_info->device_address.addr[4], auth_info->device_address.addr[5]);
+			TC_PRT("Device Name : [%s]", auth_info->device_name.name);
+			TC_PRT("Passkey: [%s]", auth_info->str_passkey);
+			break;
+		}
+		case BLUETOOTH_EVENT_PIN_REQUEST:
+		{
+			bluetooth_authentication_request_info_t *auth_info = param->param_data;
+
+			TC_PRT("BLUETOOTH_EVENT_PIN_REQUEST");
+			TC_PRT("Device Address: [%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X]",
+				auth_info->device_address.addr[0], auth_info->device_address.addr[1],
+				auth_info->device_address.addr[2], auth_info->device_address.addr[3],
+				auth_info->device_address.addr[4], auth_info->device_address.addr[5]);
+			TC_PRT("Device Name : [%s]", auth_info->device_name.name);
+
+			TC_PRT("bluetooth_passkey_reply(\"0000\", TRUE)");
+			bluetooth_passkey_reply("0000", TRUE);
+			break;
+		}
+		case BLUETOOTH_EVENT_PASSKEY_REQUEST:
+		{
+			bluetooth_authentication_request_info_t *auth_info = param->param_data;
+
+			TC_PRT("BLUETOOTH_EVENT_PASSKEY_REQUEST");
+			TC_PRT("Device Address: [%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X]",
+				auth_info->device_address.addr[0], auth_info->device_address.addr[1],
+				auth_info->device_address.addr[2], auth_info->device_address.addr[3],
+				auth_info->device_address.addr[4], auth_info->device_address.addr[5]);
+			TC_PRT("Device Name : [%s]", auth_info->device_name.name);
+
+			TC_PRT("bluetooth_passkey_reply(\"0000\", TRUE)");
+			bluetooth_passkey_reply("0000", TRUE);
+			break;
+		}
+		case BLUETOOTH_EVENT_PASSKEY_CONFIRM_REQUEST:
+		{
+			bluetooth_authentication_request_info_t *auth_info = param->param_data;
+
+			TC_PRT("BLUETOOTH_EVENT_PASSKEY_CONFIRM_REQUEST");
+			TC_PRT("Device Address: [%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X]",
+				auth_info->device_address.addr[0], auth_info->device_address.addr[1],
+				auth_info->device_address.addr[2], auth_info->device_address.addr[3],
+				auth_info->device_address.addr[4], auth_info->device_address.addr[5]);
+			TC_PRT("Device Name : [%s]", auth_info->device_name.name);
+			TC_PRT("Passkey: [%s]", auth_info->str_passkey);
+
+			TC_PRT("bluetooth_passkey_confirmation_reply: TRUE");
+			bluetooth_passkey_confirmation_reply(TRUE);
+			break;
+		}
 		default:
 			TC_PRT("received event [0x%04x]", event);
 			break;

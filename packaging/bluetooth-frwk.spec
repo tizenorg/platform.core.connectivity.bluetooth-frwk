@@ -47,7 +47,8 @@ BuildRequires:  pkgconfig(capi-content-mime-type)
 BuildRequires:  pkgconfig(appcore-efl)
 BuildRequires:  pkgconfig(pkgmgr)
 #BuildRequires:  pkgconfig(journal)
-#BuildRequires:  pkgconfig(eventsystem)
+BuildRequires:  pkgconfig(eventsystem)
+BuildRequires:	pkgconfig(libsoup-2.4)
 %if "%{?profile}" == "mobile"
 BuildRequires:  pkgconfig(capi-network-tethering)
 %endif
@@ -82,6 +83,14 @@ Requires:   %{name} = %{version}-%{release}
 
 %description service
 This package is Bluetooth Service daemon to manage BT services.
+
+%package httpproxy
+Summary:    Bluetooth HTTP Proxy Service daemon
+Group:      TO_BE/FILLED
+Requires:   %{name} = %{version}-%{release}
+
+%description httpproxy
+This package is Bluetooth HTTP Proxy Service daemon
 
 %package core
 Summary:    Bluetooth Core daemon
@@ -173,6 +182,7 @@ rm -rf %{buildroot}
 
 install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk
 install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk-service
+install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk-httpproxy
 install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk-devel
 
 #mkdir -p %{buildroot}%{_libdir}/systemd/user
@@ -237,6 +247,7 @@ sed -i 's/%TZ_SYS_DEFAULT_USER/app/' %{buildroot}%{_datadir}/dbus-1/system-servi
 %{_includedir}/bt-service/bluetooth-telephony-api.h
 %{_includedir}/bt-service/bluetooth-media-control.h
 %{_includedir}/bt-service/bluetooth-scmst-api.h
+%{_includedir}/bt-service/bluetooth-ipsp-api.h
 %{_libdir}/pkgconfig/bluetooth-api.pc
 %{_libdir}/libbluetooth-api.so
 %{_datadir}/license/bluetooth-frwk-devel
@@ -245,7 +256,6 @@ sed -i 's/%TZ_SYS_DEFAULT_USER/app/' %{buildroot}%{_datadir}/dbus-1/system-servi
 %manifest %{name}.manifest
 %defattr(-, root, root)
 %{_datadir}/dbus-1/system-services/org.projectx.bt.service
-
 %{_bindir}/bt-service
 #%{_libdir}/systemd/user/bluetooth-frwk-tv.service
 %{_unitdir}/%{_servicedir}/bluetooth-frwk.service
@@ -262,6 +272,13 @@ sed -i 's/%TZ_SYS_DEFAULT_USER/app/' %{buildroot}%{_datadir}/dbus-1/system-servi
 %if %{with bluetooth_frwk_libnotify} || %{with bluetooth_frwk_libnotification}
 %{_datadir}/icons/default/bt-icon.png
 %endif
+
+%files httpproxy
+%manifest %{name}.manifest
+%defattr(-, root, root)
+%{_bindir}/bt-httpproxy
+%{_datadir}/license/bluetooth-frwk-httpproxy
+%{_datadir}/dbus-1/system-services/org.projectx.httpproxy.service
 
 %files core
 %manifest %{name}.manifest

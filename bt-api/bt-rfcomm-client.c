@@ -459,7 +459,7 @@ static void __bt_connect_response_cb(GDBusProxy *proxy, GAsyncResult *res,
 
 	if (!g_dbus_proxy_call_finish(proxy, res, &error)) {
 		int result;
-
+		g_dbus_error_strip_remote_error(error);
 		BT_ERR("Error : %s \n", error->message);
 
 		if (g_strcmp0(error->message, "In Progress") == 0)
@@ -504,6 +504,7 @@ static void __bt_discover_service_response_cb(GDBusProxy *proxy,
 		g_object_unref(proxy);
 
 	if (err != NULL) {
+		g_dbus_error_strip_remote_error(err);
 		BT_ERR("Error occured in Proxy call [%s]\n", err->message);
 		if (!strcmp("Operation canceled", err->message)) {
 			result = BLUETOOTH_ERROR_CANCEL_BY_USER;
@@ -809,6 +810,13 @@ BT_EXPORT_API int bluetooth_rfcomm_write(int fd, const char *buf, int length)
 	int result;
 
 	BT_CHECK_PARAMETER(buf, return);
+	if (fd < 0) {
+		BT_ERR("Invalid FD");
+		return BLUETOOTH_ERROR_INVALID_PARAM;
+	}
+
+	BT_DBG("FD : %d", fd);
+
 #ifndef RFCOMM_DIRECT
 	BT_CHECK_ENABLED(return);
 #endif

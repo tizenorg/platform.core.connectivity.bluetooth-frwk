@@ -8,7 +8,7 @@ SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/bt-api)
 
 INCLUDE(FindPkgConfig)
-pkg_check_modules(package REQUIRED dlog dbus-glib-1 glib-2.0 gthread-2.0)
+pkg_check_modules(package REQUIRED dlog dbus-1 glib-2.0 gthread-2.0 gobject-2.0)
 
 FOREACH(flag ${package_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")

@@ -27,7 +27,6 @@
 
 #include <sys/types.h>
 #include <libintl.h>
-#include <dbus/dbus-glib.h>
 #include <dbus/dbus.h>
 #include <dlog.h>
 #include <glib.h>
@@ -333,20 +332,17 @@ int _bt_register_new_conn(const char *path, bt_new_connection_cb cb);
 int _bt_register_new_conn_ex(const char *path, const char *bus_name,bt_new_connection_cb cb);
 void _bt_swap_addr(unsigned char *dst, const unsigned char *src);
 
-DBusGProxy *_bt_get_adapter_proxy(DBusGConnection *conn);
-
 void _bt_device_path_to_address(const char *device_path, char *device_address);
 
-DBusGConnection *__bt_init_system_gconn(void);
+GDBusConnection *g_bus_get_private_conn(void);
 
-DBusGConnection *_bt_get_system_gconn(void);
+DBusConnection *__bt_init_system_conn(void);
 
 DBusConnection *_bt_get_system_conn(void);
 
-GDBusConnection *_bt_init_system_gdbus_conn(void);
-
 int _bt_register_osp_server_in_agent(int type, char *uuid, char *path, int fd);
 int _bt_unregister_osp_server_in_agent(int type, char *uuid);
+
 
 int _bt_check_privilege(int service_type, int service_function);
 

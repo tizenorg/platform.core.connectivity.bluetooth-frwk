@@ -267,7 +267,11 @@ static void __bt_core_power_saving_mode_cb(keynode_t *node, void *data)
 void _bt_core_init_vconf_value(void)
 {
 	gboolean flight_mode = FALSE;
+#ifndef ENABLE_TIZEN_2_4
 	int power_saving_mode = 0;
+#endif
+	int bt_flight_mode = 0;
+	int bt_ps_mode = 0;
 
 	_bt_core_handle_flight_mode_noti();
 	_bt_core_handle_power_saving_mode_noti();
@@ -275,17 +279,28 @@ void _bt_core_init_vconf_value(void)
 	flight_mode = _bt_core_is_flight_mode_enabled();
 
 #ifndef TIZEN_WEARABLE
-#ifdef ENABLE_TIZEN_2_4
+#ifndef ENABLE_TIZEN_2_4
 	if (vconf_get_int(VCONFKEY_SETAPPL_PSMODE, &power_saving_mode) != 0)
 		BT_ERR("Fail to get the power_saving_mode status value");
+	BT_DBG("flight_mode = %d, power_saving_mode = %d", flight_mode, power_saving_mode);
 #endif
 #endif
 	BT_DBG("flight_mode = %d, power_saving_mode = %d", flight_mode, power_saving_mode);
 
+	if (vconf_get_int(BT_OFF_DUE_TO_FLIGHT_MODE, &bt_flight_mode))
+		BT_ERR("Fail get flight mode value");
+	_bt_core_set_bt_status(BT_FLIGHT_MODE, bt_flight_mode);
+
+	if (vconf_get_int(BT_OFF_DUE_TO_POWER_SAVING_MODE, &bt_ps_mode))
+		BT_ERR("Fail get power saving mode value");
+	_bt_core_set_bt_status(BT_POWER_SAVING_MODE, bt_ps_mode);
+
 	if (flight_mode == TRUE)
 		__bt_core_handle_adapter_with_flight_mode(flight_mode);
+#ifndef ENABLE_TIZEN_2_4
 	else if (power_saving_mode > 0)
 		__bt_core_handle_adapter_with_power_saving_mode(power_saving_mode);
+#endif
 	else
 		BT_ERR("");
 }

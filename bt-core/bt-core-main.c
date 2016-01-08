@@ -80,12 +80,13 @@ static void __bt_core_sigterm_handler(int signo)
 static gboolean __bt_check_bt_core(void *data)
 {
 	int bt_status = VCONFKEY_BT_STATUS_OFF;
-	int bt_le_status = 0;
+	int bt_le_status = VCONFKEY_BT_LE_STATUS_OFF;
 	bt_status_t status = BT_DEACTIVATED;
 	bt_le_status_t le_status = BT_LE_DEACTIVATED;
 	int flight_mode_deactivation = 0;
 	int bt_off_due_to_timeout = 0;
 	int ps_mode_deactivation = 0;
+	int ret;
 
 	status = _bt_core_get_status();
 	le_status = _bt_core_get_le_status();
@@ -128,7 +129,7 @@ static gboolean __bt_check_bt_core(void *data)
 		_bt_core_set_bt_status(BT_POWER_SAVING_MODE, ps_mode_deactivation);
 	}
 
-	if ((bt_le_status == 1) && (le_status == BT_LE_DEACTIVATED)) {
+	if ((bt_le_status == VCONFKEY_BT_LE_STATUS_ON) && (le_status == BT_LE_DEACTIVATED)) {
 		BT_DBG("Previous session was le enabled. Turn BT LE on automatically.");
 
 		/* Enable the BT LE */
