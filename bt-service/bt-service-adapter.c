@@ -33,11 +33,8 @@
 #include <aul.h>
 #include <dbus/dbus-glib.h>
 #include <dbus/dbus.h>
-
 #include <bundle.h>
-#if 0
 #include <eventsystem.h>
-#endif
 #include <bundle_internal.h>
 
 #include "alarm.h"
@@ -224,13 +221,13 @@ int __bt_set_visible_time(int timeout)
 
 	visible_timer.timeout = timeout;
 
-	if (timeout <= 0)
-		return BLUETOOTH_ERROR_NONE;
-
 #ifndef TIZEN_WEARABLE
 	if (vconf_set_int(BT_FILE_VISIBLE_TIME, timeout) != 0)
 		BT_ERR("Set vconf failed");
 #endif
+
+	if (timeout <= 0)
+		return BLUETOOTH_ERROR_NONE;
 
 	if (!visible_timer.alarm_init) {
 		/* Set Alarm timer to switch off BT */
@@ -480,6 +477,12 @@ static void __bt_set_visible_mode(void)
 			if (vconf_set_int(BT_FILE_VISIBLE_TIME, 0) != 0)
 				BT_ERR("Set vconf failed");
 		}
+	} else {
+		if (_bt_set_discoverable_mode(
+			BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE,
+			timeout) != BLUETOOTH_ERROR_NONE) {
+				BT_ERR("Set connectable mode failed");
+		}
 	}
 }
 #endif
@@ -560,11 +563,9 @@ void _bt_set_disabled(int result)
 	ret_pm_ignore = vconf_get_int(VCONFKEY_PM_KEY_IGNORE, &pm_ignore_mode);
 
 	/* Update the vconf BT status in normal Deactivation case only */
-
-#if 0
 	if (ret == 0 && power_off_status == VCONFKEY_SYSMAN_POWER_OFF_NONE &&
 		ret_pm_ignore == 0 && pm_ignore_mode != VCONFKEY_PM_KEY_LOCK) {
-#endif
+
 		BT_DBG("Update vconf for BT normal Deactivation");
 
 		if (result == BLUETOOTH_ERROR_TIMEOUT)
@@ -574,12 +575,11 @@ void _bt_set_disabled(int result)
 		/* Update Bluetooth Status to notify other modules */
 		if (vconf_set_int(VCONFKEY_BT_STATUS, VCONFKEY_BT_STATUS_OFF) != 0)
 			BT_ERR("Set vconf failed");
-#if 0
+
 		if (_bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_STATE,
 							EVT_VAL_BT_OFF) != ES_R_OK)
 			BT_ERR("Fail to set value");
-#endif
-//
+	}
 
 	if (vconf_set_int(VCONFKEY_BT_DEVICE, VCONFKEY_BT_DEVICE_NONE) != 0)
 		BT_ERR("Set vconf failed\n");
@@ -607,11 +607,9 @@ static int __bt_set_le_enabled(void)
 	if (vconf_set_int(VCONFKEY_BT_LE_STATUS, VCONFKEY_BT_LE_STATUS_ON) != 0)
 		BT_ERR("Set vconf failed\n");
 
-#if 0
 	if (_bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_LE_STATE,
 						EVT_VAL_BT_LE_ON) != ES_R_OK)
 		BT_ERR("Fail to set value");
-#endif
 
 	/* Send enabled event to API */
 	/*
@@ -647,21 +645,17 @@ void _bt_set_le_disabled(int result)
 
 	/* Update Bluetooth Status to notify other modules */
 	BT_DBG("Update vconf for BT LE normal Deactivation");
-
 	if (vconf_set_int(VCONFKEY_BT_LE_STATUS, VCONFKEY_BT_LE_STATUS_OFF) != 0)
 		BT_ERR("Set vconf failed\n");
 	_bt_adapter_set_le_status(BT_LE_DEACTIVATED);
-#if 0
+
 	if (_bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_LE_STATE,
 						EVT_VAL_BT_LE_OFF) != ES_R_OK)
 		BT_ERR("Fail to set value");
-#endif
 
-	if (_bt_adapter_get_status() != BT_DEACTIVATED) {
-		/* Send disabled event */
-		_bt_send_event(BT_LE_ADAPTER_EVENT, BLUETOOTH_EVENT_LE_DISABLED,
-				g_variant_new_int32(result));
-	}
+	/* Send disabled event */
+	_bt_send_event(BT_LE_ADAPTER_EVENT, BLUETOOTH_EVENT_LE_DISABLED,
+			g_variant_new_int32(result));
 }
 
 void *_bt_get_adapter_agent(void)
@@ -824,10 +818,12 @@ void _bt_handle_adapter_added(void)
 	if (ret < 0)
 		BT_ERR("Unable to register key handler");
 
-	if (le_status == BT_LE_ACTIVATING) {
+	if (le_status == BT_LE_ACTIVATING ||
+		 status == BT_ACTIVATING) {
 		__bt_set_le_enabled();
 		_bt_adapter_set_le_status(BT_LE_ACTIVATED);
 	}
+
 	if (status == BT_ACTIVATING) {
 		__bt_set_enabled();
 		_bt_adapter_set_status(BT_ACTIVATED);
@@ -837,13 +833,12 @@ void _bt_handle_adapter_added(void)
 #endif
 
 	_bt_service_register_vconf_handler();
-#if 0
+
 	/* eventsystem */
 	if (eventsystem_register_event(SYS_EVENT_BT_STATE, &status_reg_id,
 			(eventsystem_handler)__bt_state_event_handler, NULL) != ES_R_OK) {
 		BT_ERR("Fail to register system event");
 	}
-#endif
 }
 
 void _bt_handle_adapter_removed(void)
@@ -872,11 +867,10 @@ void _bt_handle_adapter_removed(void)
 	adapter_agent = NULL;
 
 	_bt_reliable_terminate_service(NULL);
-#if 0 
+
 	if (eventsystem_unregister_event(status_reg_id) != ES_R_OK) {
 		BT_ERR("Fail to unregister system event");
 	}
-#endif
 
 }
 
@@ -916,7 +910,6 @@ static gboolean __bt_enable_timeout_cb(gpointer user_data)
 	}
 
 	g_variant_unref(result);
-
 	_bt_set_disabled(BLUETOOTH_ERROR_TIMEOUT);
 
 	_bt_terminate_service(NULL);
@@ -959,7 +952,6 @@ static gboolean __bt_enable_le_timeout_cb(gpointer user_data)
 	}
 
 	g_variant_unref(result);
-
 	_bt_adapter_set_le_status(BT_LE_DEACTIVATED);
 
 	_bt_set_le_disabled(BLUETOOTH_ERROR_TIMEOUT);
@@ -995,17 +987,6 @@ void _bt_adapter_start_enable_timer(void)
 
 	return;
 }
-
-static gboolean __bt_adapter_enabled_cb(gpointer user_data)
-{
-	BT_DBG("+");
-
-	__bt_set_enabled();
-	_bt_adapter_set_status(BT_ACTIVATED);
-
-	return FALSE;
-}
-
 
 int _bt_enable_adapter(void)
 {
@@ -1092,7 +1073,6 @@ int _bt_enable_adapter(void)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 	g_variant_unref(result);
-
 	if (le_status == BT_LE_ACTIVATED) {
 		__bt_set_enabled();
 	} else {
@@ -1243,7 +1223,6 @@ int __bt_disable_cb(void)
 	}
 
 	g_variant_unref(result);
-
 	return BLUETOOTH_ERROR_NONE;
 }
 
@@ -1543,7 +1522,6 @@ int _bt_disable_adapter_le(void)
 	}
 
 	g_variant_unref(result);
-
 	_bt_set_le_disabled(BLUETOOTH_ERROR_NONE);
 	BT_DBG("le status : %d", _bt_adapter_get_le_status());
 	BT_DBG("-");
@@ -1749,7 +1727,7 @@ int _bt_is_service_used(char *service_uuid, gboolean *used)
 	int ret = BLUETOOTH_ERROR_NONE;
 	GVariant *result;
 	GVariant *value;
-	GVariantIter *iter;
+	GVariantIter *iter = NULL;
 	gchar *uuid;
 
 	BT_DBG("+");
@@ -1779,8 +1757,7 @@ int _bt_is_service_used(char *service_uuid, gboolean *used)
 
 	g_variant_get(result, "(v)", &value);
 	g_variant_get(value, "as", &iter);
-
-	if (iter == NULL) {
+	if(iter == NULL) {
 		BT_ERR("Failed to get UUIDs(%s)",service_uuid);
 		*used = FALSE;
 		g_variant_unref(result);
@@ -1832,7 +1809,7 @@ static gboolean __bt_get_discoverable_property(void)
 			g_clear_error(&error);
 		} else
 			BT_ERR("Failed to get Discoverable property");
-		return FALSE;
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
 	g_variant_get(result, "(v)", &temp);
@@ -2579,9 +2556,4 @@ int _bt_set_manufacturer_data(bluetooth_manufacturer_data_t *m_data)
 	g_variant_unref(result);
 
 	return BLUETOOTH_ERROR_NONE;
-}
-
-int _bt_get_enable_timer_id(void)
-{
-	return timer_id;
 }

@@ -127,6 +127,23 @@ int _bt_le_write_host_suggested_default_data_length(const unsigned int def_tx_Oc
 int _bt_le_read_host_suggested_default_data_length(bluetooth_le_read_host_suggested_data_length_t *def_data_length);
 
 int _bt_le_set_data_length(bluetooth_device_address_t *device_address, const unsigned int max_tx_Octets, const unsigned int max_tx_Time);
+
+int _bt_initialize_ipsp(void);
+
+int _bt_deinitialize_ipsp(void);
+
+void _bt_init_gatt_client_senders(void);
+
+int _bt_insert_gatt_client_sender(char *sender);
+
+int _bt_delete_gatt_client_sender(char *sender);
+
+void _bt_clear_gatt_client_senders(void);
+
+void _bt_send_char_value_changed_event(void *param);
+
+gboolean _bt_is_set_scan_parameter(void);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

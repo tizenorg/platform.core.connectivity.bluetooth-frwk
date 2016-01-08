@@ -23,7 +23,8 @@ bt-scmst.c
 bt-gatt-service.c
 bt-pbap.c
 bt-hid-device.c
-bt-gatt-client.c)
+bt-gatt-client.c
+bt-ipsp.c)
 
 SET(HEADERS
 bluetooth-api.h
@@ -31,7 +32,8 @@ bluetooth-hid-api.h
 bluetooth-audio-api.h
 bluetooth-telephony-api.h
 bluetooth-media-control.h
-bluetooth-scmst-api.h)
+bluetooth-scmst-api.h
+bluetooth-ipsp-api.h)
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 SET(EXEC_PREFIX "\${prefix}")
@@ -56,6 +58,7 @@ SET(PKG_MODULES
 	glib-2.0
 	gio-2.0
 	gio-unix-2.0
+	dbus-1
 )
 
 INCLUDE(FindPkgConfig)
@@ -76,6 +79,8 @@ IF("${ARCH}" STREQUAL "arm")
 	ADD_DEFINITIONS("-DTARGET")
 	MESSAGE("add -DTARGET")
 ENDIF("${ARCH}" STREQUAL "arm")
+
+ADD_DEFINITIONS("-DHPS_FEATURE")
 
 FIND_PROGRAM(MARSHALTOOL NAMES glib-genmarshal)
 EXEC_PROGRAM("${MARSHALTOOL}" ARGS "--prefix=marshal ${CMAKE_CURRENT_SOURCE_DIR}/marshal.list --header > ${CMAKE_CURRENT_SOURCE_DIR}/include/marshal.h")

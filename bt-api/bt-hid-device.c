@@ -35,32 +35,32 @@
 #define	REPORTID_MOUSE	1
 #define BT_HID_BUFFER_LEN 100
 
-/* HIDP header masks */
-#define HIDP_HEADER_TRANS_MASK			0xf0
-#define HIDP_HEADER_PARAM_MASK			0x0f
+/* The types of HIDP transaction */
+#define BT_HIDP_TRANSACTION_SET_PROTOCOL		0x70
+#define BT_HIDP_TRANSACTION_GET_IDLE			0x80
+#define BT_HIDP_TRANSACTION_SET_IDLE			0x90
+#define BT_HIDP_TRANSACTION_DATA			0xa0
+#define BT_HIDP_TRANSACTION_DATC			0xb0
+#define BT_HIDP_TRANSACTION_HANDSHAKE                   0x00
+#define BT_HIDP_TRANSACTION_HID_CONTROL                 0x10
+#define BT_HIDP_TRANSACTION_GET_REPORT                  0x40
+#define BT_HIDP_TRANSACTION_SET_REPORT                  0x50
+#define BT_HIDP_TRANSACTION_GET_PROTOCOL                0x60
 
-/* HIDP transaction types */
-#define HIDP_TRANS_HANDSHAKE			0x00
-#define HIDP_TRANS_HID_CONTROL			0x10
-#define HIDP_TRANS_GET_REPORT			0x40
-#define HIDP_TRANS_SET_REPORT			0x50
-#define HIDP_TRANS_GET_PROTOCOL			0x60
-#define HIDP_TRANS_SET_PROTOCOL			0x70
-#define HIDP_TRANS_GET_IDLE			0x80
-#define HIDP_TRANS_SET_IDLE			0x90
-#define HIDP_TRANS_DATA				0xa0
-#define HIDP_TRANS_DATC				0xb0
+#define BT_HIDP_DATA_OUT_RTYPE				0x02
+#define BT_HIDP_DATA_IN_RTYPE				0x01
 
-#define HIDP_DATA_RTYPE_INPUT			0x01
-#define HIDP_DATA_RTYPE_OUTPUT			0x02
+#define BT_HIDP_HSHK_ERROR_UNSUPPORTED_REQUEST          0x03
+#define BT_HIDP_HSHK_ERROR_INVALID_PARAM                0x04
+#define BT_HIDP_HSHK_ERROR_UNKNOWN                      0x0E
+#define BT_HIDP_HSHK_ERROR_FATAL                        0x0F
+#define BT_HIDP_HSHK_OK_SUCCESSFUL			0x00
+#define BT_HIDP_HSHK_NOT_AVAILABLE			0x01
+#define BT_HIDP_HSHK_ERROR_INVALID_REPORT_ID		0x02
 
-#define HIDP_HSHK_SUCCESSFUL	0x00
-#define HIDP_HSHK_NOT_READY	0x01
-#define HIDP_HSHK_ERR_INVALID_REPORT_ID	0x02
-#define HIDP_HSHK_ERR_UNSUPPORTED_REQUEST	0x03
-#define HIDP_HSHK_ERR_INVALID_PARAMETER	0x04
-#define HIDP_HSHK_ERR_UNKNOWN	0x0E
-#define HIDP_HSHK_ERR_FATAL	0x0F
+/* The masks of BT_HIDP header */
+#define BT_HIDP_HEADER_PARAMETER_MASK                   0x0f
+#define BT_HIDP_HEADER_TRANSACTION_MASK                 0xf0
 
 typedef struct {
 	guint object_id;
@@ -234,72 +234,52 @@ static gboolean __received_cb(GIOChannel *chan, GIOCondition cond,
 		BT_INFO("Parsing Data");
 		bluetooth_hid_received_data_t data = {0};
 		header = buffer[0];
-		type = header & HIDP_HEADER_TRANS_MASK;
-		param = header & HIDP_HEADER_PARAM_MASK;
+		type = header & BT_HIDP_HEADER_TRANSACTION_MASK;
+		param = header & BT_HIDP_HEADER_PARAMETER_MASK;
 		BT_INFO("type %d , param %d", type, param);
 		BT_INFO("Data Reveived from %s" , info->address);
 		data.address = g_strdup(info->address);
 		switch (type) {
-			case HIDP_TRANS_HANDSHAKE:
+			case BT_HIDP_TRANSACTION_HANDSHAKE:
 				BT_INFO("TRANS HANDSHAKE");
 				data.type = HTYPE_TRANS_HANDSHAKE;
 				data.buffer_size = len;
 				data.buffer = (char *) malloc(sizeof(char) * len);
-				/* Fix : NULL_RETURNS */
-				if (NULL == data.buffer) {
-					BT_ERR("Failed to allocate memory");
-					data.buffer_size = 0;
-				} else {
+				if (data.buffer)
 					memcpy(data.buffer, buffer, len);
-				}
 			break;
-			case HIDP_TRANS_HID_CONTROL:
+			case BT_HIDP_TRANSACTION_HID_CONTROL:
 				BT_INFO("HID CONTROL");
 				data.type = HTYPE_TRANS_HID_CONTROL;
 				data.buffer_size = len;
 				data.buffer = (char *) malloc(sizeof(char) * len);
-				/* Fix : NULL_RETURNS */
-				if (NULL == data.buffer) {
-					BT_ERR("Failed to allocate memory");
-					data.buffer_size = 0;
-				} else {
+				if (data.buffer)
 					memcpy(data.buffer, buffer, len);
-				}
 			break;
-			case HIDP_TRANS_DATA:
+			case BT_HIDP_TRANSACTION_DATA:
 				BT_INFO("TRANS DATA");
 				data.type = HTYPE_TRANS_DATA;
-				if ( param & HIDP_DATA_RTYPE_INPUT) {
+				if ( param & BT_HIDP_DATA_IN_RTYPE) {
 					BT_INFO("Input Report");
 					data.param = PTYPE_DATA_RTYPE_INPUT;
 					data.buffer_size = len;
 					data.buffer = (char *) malloc(sizeof(char) * len);
-					/* Fix : NULL_RETURNS */
-					if (NULL == data.buffer) {
-						BT_ERR("Failed to allocate memory");
-						data.buffer_size = 0;
-					} else {
+					if (data.buffer)
 						memcpy(data.buffer, buffer, len);
-					}
 				}
 				else {
 					BT_INFO("Out Report");
 					data.param = PTYPE_DATA_RTYPE_OUTPUT;
 					data.buffer_size = len;
 					data.buffer = (char *) malloc(sizeof(char) * len);
-					/* Fix : NULL_RETURNS */
-					if (NULL == data.buffer) {
-						BT_ERR("Failed to allocate memory");
-						data.buffer_size = 0;
-					} else {
+					if (data.buffer)
 						memcpy(data.buffer, buffer, len);
-					}
 				}
 			break;
-			case HIDP_TRANS_GET_REPORT: {
+			case BT_HIDP_TRANSACTION_GET_REPORT: {
 				BT_INFO("Get Report");
 				data.type = HTYPE_TRANS_GET_REPORT;
-				if (param & HIDP_DATA_RTYPE_INPUT) {
+				if (param & BT_HIDP_DATA_IN_RTYPE) {
 					BT_INFO("Input Report");
 					data.param = PTYPE_DATA_RTYPE_INPUT;
 				} else {
@@ -308,19 +288,14 @@ static gboolean __received_cb(GIOChannel *chan, GIOCondition cond,
 				}
 				data.buffer_size = len;
 				data.buffer = (char *) malloc(sizeof(char) * len);
-				/* Fix : NULL_RETURNS */
-				if (NULL == data.buffer) {
-					BT_ERR("Failed to allocate memory");
-					data.buffer_size = 0;
-				} else {
+				if (data.buffer)
 					memcpy(data.buffer, buffer, len);
-				}
 				break;
 			}
-			case HIDP_TRANS_SET_REPORT: {
+			case BT_HIDP_TRANSACTION_SET_REPORT: {
 				BT_INFO("Set Report");
 				data.type = HTYPE_TRANS_SET_REPORT;
-				if (param & HIDP_DATA_RTYPE_INPUT) {
+				if (param & BT_HIDP_DATA_IN_RTYPE) {
 					BT_INFO("Input Report");
 					data.param = PTYPE_DATA_RTYPE_INPUT;
 				} else {
@@ -329,50 +304,35 @@ static gboolean __received_cb(GIOChannel *chan, GIOCondition cond,
 				}
 				data.buffer_size = len;
 				data.buffer = (char *) malloc(sizeof(char) * len);
-				/* Fix : NULL_RETURNS */
-				if (NULL == data.buffer) {
-					BT_ERR("Failed to allocate memory");
-					data.buffer_size = 0;
-				} else {
+				if (data.buffer)
 					memcpy(data.buffer, buffer, len);
-				}
 				break;
 			}
-			case HIDP_TRANS_GET_PROTOCOL:{
+			case BT_HIDP_TRANSACTION_GET_PROTOCOL:{
 				BT_INFO("Get_PROTOCOL");
 				data.type = HTYPE_TRANS_GET_PROTOCOL;
 				data.param = PTYPE_DATA_RTYPE_INPUT;
 				data.buffer_size = len;
 				data.buffer = (char *) malloc(sizeof(char) * len);
-				/* Fix : NULL_RETURNS */
-				if (NULL == data.buffer) {
-					BT_ERR("Failed to allocate memory");
-					data.buffer_size = 0;
-				} else {
+				if (data.buffer)
 					memcpy(data.buffer, buffer, len);
-				}
 				break;
 			}
-			case HIDP_TRANS_SET_PROTOCOL:{
+			case BT_HIDP_TRANSACTION_SET_PROTOCOL:{
 				BT_INFO("Set_PROTOCOL");
 				data.type = HTYPE_TRANS_SET_PROTOCOL;
 				data.param = PTYPE_DATA_RTYPE_INPUT;
 				data.buffer_size = len;
 				data.buffer = (char *) malloc(sizeof(char) * len);
-				/* Fix : NULL_RETURNS */
-				if (NULL == data.buffer) {
-					BT_ERR("Failed to allocate memory");
-					data.buffer_size = 0;
-				} else {
+				if (data.buffer)
 					memcpy(data.buffer, buffer, len);
-				}
 				break;
 			}
 			default: {
 				BT_INFO("unsupported HIDP control message");
 				BT_ERR("Send Handshake Message");
-				guint8 type = HIDP_TRANS_HANDSHAKE |
-					HIDP_HSHK_ERR_UNSUPPORTED_REQUEST;
+				guint8 type = BT_HIDP_TRANSACTION_HANDSHAKE |
+					BT_HIDP_HSHK_ERROR_UNSUPPORTED_REQUEST;
 				data.type = HTYPE_TRANS_UNKNOWN;
 				int fd = g_io_channel_unix_get_fd(chan);
 				int bytes = write(fd,  &type, sizeof(type));
@@ -381,16 +341,18 @@ static gboolean __received_cb(GIOChannel *chan, GIOCondition cond,
 			}
 		}
 		event_info = _bt_event_get_cb_data(BT_HID_DEVICE_EVENT);
-		if (event_info == NULL)
+		if (event_info == NULL) {
+			g_free(data.buffer);
+			g_free((char *)data.address);
 			return FALSE;
+		}
 
 		_bt_common_event_cb(BLUETOOTH_HID_DEVICE_DATA_RECEIVED,
 				BLUETOOTH_ERROR_NONE, &data,
 				event_info->cb, event_info->user_data);
-		if (data.buffer)
-			g_free(data.buffer);
-		if (data.address)
-			g_free((char *)data.address);
+
+		g_free(data.buffer);
+		g_free((char *)data.address);
 	} else {
 		BT_INFO("Error while reading data");
 	}
@@ -413,6 +375,11 @@ int new_hid_connection(const char *path, int fd, bluetooth_device_address_t *add
 	if (dev_info == NULL) {
 		dev_info = (hid_connected_device_info_t *)
 			g_malloc0(sizeof(hid_connected_device_info_t));
+		if (dev_info == NULL) {
+			BT_ERR("Fail to allocation memory");
+			return -1;
+		}
+
 		dev_info->intr_fd = -1;
 		dev_info->ctrl_fd = -1;
 		dev_info->intr_fd = fd;
@@ -553,6 +520,7 @@ BT_EXPORT_API int bluetooth_hid_device_connect(const char *remote_addr)
 {
 	char device_address[BT_ADDRESS_STRING_SIZE] = {0};
 	hid_connected_device_info_t *info = NULL;
+	int ret;
 	BT_DBG("+");
 	BT_CHECK_PARAMETER(remote_addr, return);
 
@@ -568,9 +536,9 @@ BT_EXPORT_API int bluetooth_hid_device_connect(const char *remote_addr)
 	}
 
 	memcpy(device_address, remote_addr, BT_ADDRESS_STRING_SIZE);
-	_bt_connect_profile(device_address, HID_UUID, NULL, NULL);
+	ret = _bt_connect_profile(device_address, HID_UUID, NULL, NULL);
 
-	return BLUETOOTH_ERROR_NONE;
+	return ret;
 }
 BT_EXPORT_API int bluetooth_hid_device_disconnect(const char *remote_addr)
 {
@@ -597,6 +565,7 @@ BT_EXPORT_API int bluetooth_hid_device_send_mouse_event(const char *remote_addr,
 {
 	int result;
 	int written = 0;
+	int socket_fd;
 	hid_connected_device_info_t *info = NULL;
 
 	switch (privilege_token_send_mouse) {
@@ -627,10 +596,6 @@ BT_EXPORT_API int bluetooth_hid_device_send_mouse_event(const char *remote_addr,
 		BT_ERR("Connection Information not found");
 		return BLUETOOTH_ERROR_INVALID_PARAM;
 	}
-	int socket_fd;
-
-	if (info == NULL)
-		return -1;
 
 	if (info->intr_fd != -1 && info->ctrl_fd == -1)
 		socket_fd = info->intr_fd;
@@ -647,6 +612,7 @@ BT_EXPORT_API int bluetooth_hid_device_send_key_event(const char *remote_addr,
 {
 	int result;
 	int written = 0;
+	int socket_fd;
 	hid_connected_device_info_t *info = NULL;
 
 	switch (privilege_token_send_key) {
@@ -678,11 +644,6 @@ BT_EXPORT_API int bluetooth_hid_device_send_key_event(const char *remote_addr,
 		BT_ERR("Connection Information not found");
 		return BLUETOOTH_ERROR_INVALID_PARAM;
 	}
-
-	int socket_fd;
-
-	if (info == NULL)
-		return -1;
 
 	if (info->intr_fd != -1 && info->ctrl_fd == -1)
 		socket_fd = info->intr_fd;
@@ -738,8 +699,8 @@ BT_EXPORT_API int bluetooth_hid_device_reply_to_report(const char *remote_addr,
 		case HTYPE_TRANS_GET_REPORT: {
 			switch(ptype) {
 				case PTYPE_DATA_RTYPE_INPUT: {
-					output_report.type = HIDP_TRANS_DATA |
-							HIDP_DATA_RTYPE_INPUT;
+					output_report.type = BT_HIDP_TRANSACTION_DATA |
+							BT_HIDP_DATA_IN_RTYPE;
 					memcpy(output_report.rep_data, data, data_len);
 					bytes = write(info->intr_fd, &output_report,
 								sizeof(output_report));
@@ -753,7 +714,7 @@ BT_EXPORT_API int bluetooth_hid_device_reply_to_report(const char *remote_addr,
 			break;
 		case HTYPE_TRANS_GET_PROTOCOL: {
 			BT_DBG("Replying to Get_PROTOCOL");
-			output_report.type = HIDP_TRANS_DATA | HIDP_DATA_RTYPE_OUTPUT;
+			output_report.type = BT_HIDP_TRANSACTION_DATA | BT_HIDP_DATA_OUT_RTYPE;
 			output_report.rep_data[0] = data[0];
 			bytes = write(info->intr_fd, &output_report, 2);
 			BT_DBG("Bytes Written %d", bytes);
@@ -761,7 +722,7 @@ BT_EXPORT_API int bluetooth_hid_device_reply_to_report(const char *remote_addr,
 		}
 		case HTYPE_TRANS_SET_PROTOCOL: {
 			BT_DBG("Reply to Set_Protocol");
-			output_report.type = HIDP_TRANS_DATA | HIDP_DATA_RTYPE_INPUT;
+			output_report.type = BT_HIDP_TRANSACTION_DATA | BT_HIDP_DATA_IN_RTYPE;
 			memcpy(output_report.rep_data, data, data_len);
 			bytes = write(info->ctrl_fd, &output_report,
 					sizeof(output_report));
@@ -770,7 +731,7 @@ BT_EXPORT_API int bluetooth_hid_device_reply_to_report(const char *remote_addr,
 		}
 		case HTYPE_TRANS_HANDSHAKE: {
 			BT_DBG("Replying Handshake");
-			output_report.type = HIDP_TRANS_HANDSHAKE | data[0];
+			output_report.type = BT_HIDP_TRANSACTION_HANDSHAKE | data[0];
 			memset(output_report.rep_data, 0, sizeof(output_report.rep_data));
 			bytes = write(info->intr_fd,  &output_report.type,
 					sizeof(output_report.type));

@@ -69,6 +69,9 @@ typedef enum {
 	BT_AVRCP_CONTROL_EVENT,
 	BT_A2DP_SOURCE_EVENT,
 	BT_HID_DEVICE_EVENT,
+#ifdef GATT_NO_RELAY
+	BT_GATT_BLUEZ_EVENT, /* GattValueChanged from bluez directly */
+#endif
 	/* Will be added */
 } bt_event_type_t;
 
@@ -129,6 +132,7 @@ typedef enum {
 #define BT_FUNC_PBAP_BASE ((int)(BT_FUNC_RFCOMM_BASE + 0x0020))
 #define BT_FUNC_HDP_BASE ((int)(BT_FUNC_PBAP_BASE + 0x0020))
 #define BT_FUNC_GATT_BASE ((int)(BT_FUNC_HDP_BASE + 0x0020))
+#define BT_FUNC_IPSP_BASE ((int)(BT_FUNC_GATT_BASE + 0x0020))
 
 typedef enum {
 	BT_CHECK_ADAPTER = BT_FUNC_BASE,
@@ -182,6 +186,8 @@ typedef enum {
 	BT_BOND_DEVICE = BT_FUNC_DEVICE_BASE,
 	BT_BOND_DEVICE_BY_TYPE,
 	BT_CANCEL_BONDING,
+	BT_PASSKEY_REPLY,
+	BT_PASSKEY_CONFIRMATION_REPLY,
 	BT_UNBOND_DEVICE,
 	BT_SEARCH_SERVICE,
 	BT_CANCEL_SEARCH_SERVICE,
@@ -191,6 +197,9 @@ typedef enum {
 	BT_UNSET_AUTHORIZATION,
 	BT_IS_DEVICE_CONNECTED,
 	BT_GET_CONNECTED_LINK_TYPE,
+	BT_SET_PIN_CODE,
+	BT_UNSET_PIN_CODE,
+	BT_UPDATE_LE_CONNECTION_MODE,
 	BT_HID_CONNECT = BT_FUNC_HID_BASE,
 	BT_HID_DISCONNECT,
 	BT_HID_DEVICE_ACTIVATE,
@@ -280,6 +289,14 @@ typedef enum {
 	BT_GATT_SET_PROPERTY_REQUEST,
 	BT_GATT_READ_CHARACTERISTIC,
 	BT_GATT_DISCOVER_CHARACTERISTICS_DESCRIPTOR,
+#ifndef GATT_NO_RELAY
+	BT_GATT_WATCH_CHARACTERISTIC,
+	BT_GATT_UNWATCH_CHARACTERISTIC,
+#endif
+	BT_LE_IPSP_INIT = BT_FUNC_IPSP_BASE,
+	BT_LE_IPSP_DEINIT,
+	BT_LE_IPSP_CONNECT,
+	BT_LE_IPSP_DISCONNECT,
 } bt_function_t;
 
 typedef struct {
@@ -310,6 +327,9 @@ typedef struct {
 #define BT_HF_SERVICE_INTERFACE "org.tizen.HfApp"
 #define BT_CORE_EVENT_INTERFACE "org.projectx.bt_core_event"
 #define BT_HF_LOCAL_TERM_EVENT_INTERFACE "org.projectx.bt_hf_local_term"
+#ifdef GATT_NO_RELAY
+#define BT_GATT_CHARACTERISTIC_INTERFACE "org.bluez.GattCharacteristic1"
+#endif
 
 #define BT_ADAPTER_PATH "/org/projectx/bt/adapter"
 #define BT_LE_ADAPTER_PATH "/org/projectx/bt/le/adapter"
@@ -344,6 +364,7 @@ typedef struct {
 #define BT_LE_DISCOVERY_STARTED "LEDiscoveryStarted"
 #define BT_LE_DISCOVERY_FINISHED "LEDiscoveryFinished"
 #define BT_LE_DEVICE_FOUND "LEDeviceFound"
+#define BT_READ_MAXIMUM_LE_DATA_LENGTH "ReadMaximumLEDataLength"
 #define BT_ADVERTISING_STARTED "AdvertisingStarted"
 #define BT_ADVERTISING_STOPPED "AdvertisingStopped"
 #define BT_ADVERTISING_MANUFACTURER_DATA_CHANGED "AdvertisingManufacturerDataChanged"
@@ -354,6 +375,10 @@ typedef struct {
 #define BT_DEVICE_PROFILE_STATE_CHANGED "ProfileStateChanged"
 #define BT_BOND_CREATED "BondCreated"
 #define BT_BOND_DESTROYED "BondDestroyed"
+#define BT_KBD_PASSKEY_DISPLAY_REQ_RECEIVED "KeyBoardPasskeyDisplayRequest"
+#define BT_PIN_REQ_RECEIVED "PinRequest"
+#define BT_PASSKEY_REQ_RECEIVED "PasskeyRequest"
+#define BT_PASSKEY_CFM_REQ_RECEIVED "PasskeyConfirmRequest"
 #define BT_DEVICE_AUTHORIZED "DeviceAuthorized"
 #define BT_DEVICE_UNAUTHORIZED "DeviceUnauthorized"
 #define BT_RSSI_MONITORING_ENABLED "RssiMonitoringEnabled"
@@ -413,11 +438,17 @@ typedef struct {
 #define BT_GATT_CONNECTED "GattConnected"
 #define BT_GATT_DISCONNECTED "GattDisconnected"
 #define BT_GATT_CHAR_VAL_CHANGED "GattCharValueChanged"
+#ifdef GATT_NO_RELAY
+#define BT_GATT_BLUEZ_CHAR_VAL_CHANGED "GattValueChanged"
+#endif
 #define BT_HARDWARE_ERROR "HardwareError"
 #define BT_TX_TIMEOUT_ERROR "TxTimeoutError"
 #define BT_HF_LOCAL_TERM "HandsfreeLocalTermination"
 #define BT_HID_DEVICE_CONNECTED "HIDConnected"
 #define BT_HID_DEVICE_DISCONNECTED "HIDDisconnected"
+#define BT_IPSP_INITIALIZED "IpspInitStateChanged"
+#define BT_IPSP_CONNECTED "IpspConnected"
+#define BT_IPSP_DISCONNECTED "IpspDisconnected"
 #define BT_LE_DATA_LENGTH_CHANGED "LEDataLengthChanged"
 
 #ifdef __cplusplus

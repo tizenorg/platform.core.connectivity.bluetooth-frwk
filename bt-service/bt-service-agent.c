@@ -90,6 +90,8 @@ extern guint nap_connected_device_count;
 	g_variant_unref(variant); \
 	variant = NULL
 
+static gboolean syspopup_mode = TRUE;
+
 static int __bt_agent_is_auto_response(uint32_t dev_class, const gchar *address,
 							const gchar *name);
 static gboolean __bt_agent_is_hid_keyboard(uint32_t dev_class);
@@ -468,6 +470,8 @@ static gboolean __pincode_request(GapAgentPrivate *agent, GDBusProxy *device)
 	GVariant *reply = NULL;
 	GVariant *reply_temp = NULL;
 	GVariant *tmp_value;
+	GVariant *param;
+	int result = BLUETOOTH_ERROR_NONE;
 
 	BT_DBG("+");
 
@@ -525,14 +529,31 @@ static gboolean __pincode_request(GapAgentPrivate *agent, GDBusProxy *device)
 		gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, "0000",
 											NULL);
 #else
-		_bt_launch_system_popup(BT_AGENT_EVENT_KEYBOARD_PASSKEY_REQUEST,
-						name, str_passkey, NULL,
-						_gap_agent_get_path(agent));
+		if (syspopup_mode) {
+			BT_DBG("LAUNCH SYSPOPUP");
+			_bt_launch_system_popup(BT_AGENT_EVENT_KEYBOARD_PASSKEY_REQUEST,
+					name, str_passkey, NULL,
+					_gap_agent_get_path(agent));
+		} else {
+			BT_DBG("Send BLUETOOTH_EVENT_KEYBOARD_PASSKEY_DISPLAY");
+			param = g_variant_new("(isss)", result, address, name, str_passkey);
+			_bt_send_event(BT_ADAPTER_EVENT,
+					BLUETOOTH_EVENT_KEYBOARD_PASSKEY_DISPLAY, param);
+		}
 #endif
 	} else {
 		BT_DBG("Show Pin entry");
-		_bt_launch_system_popup(BT_AGENT_EVENT_PIN_REQUEST, name, NULL,
+
+		if (syspopup_mode) {
+			BT_DBG("LAUNCH SYSPOPUP");
+			_bt_launch_system_popup(BT_AGENT_EVENT_PIN_REQUEST, name, NULL,
 					NULL, _gap_agent_get_path(agent));
+		} else {
+			BT_DBG("Send BLUETOOTH_EVENT_PIN_REQUEST");
+			param = g_variant_new("(iss)", result, address, name);
+			_bt_send_event(BT_ADAPTER_EVENT,
+					BLUETOOTH_EVENT_PIN_REQUEST, param);
+		}
 	}
 
 done:
@@ -581,8 +602,19 @@ static gboolean __passkey_request(GapAgentPrivate *agent, GDBusProxy *device)
 	gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, "0000",
 										NULL);
 #else
-	_bt_launch_system_popup(BT_AGENT_EVENT_PASSKEY_REQUEST, name, NULL, NULL,
-						_gap_agent_get_path(agent));
+	if (syspopup_mode) {
+		BT_DBG("LAUNCH SYSPOPUP");
+		_bt_launch_system_popup(BT_AGENT_EVENT_PASSKEY_REQUEST, name, NULL, NULL,
+					_gap_agent_get_path(agent));
+	} else {
+		int result = BLUETOOTH_ERROR_NONE;
+		GVariant *param;
+
+		BT_DBG("Send BLUETOOTH_EVENT_PASSKEY_REQUEST");
+		param = g_variant_new("(iss)", result, address, name);
+		_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_PASSKEY_REQUEST, param);
+	}
 #endif
 
 done:
@@ -635,9 +667,21 @@ static gboolean __display_request(GapAgentPrivate *agent, GDBusProxy *device,
 	gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, str_passkey,
 										NULL);
 #else
-	_bt_launch_system_popup(BT_AGENT_EVENT_KEYBOARD_PASSKEY_REQUEST, name,
-						str_passkey, NULL,
-						_gap_agent_get_path(agent));
+	if (syspopup_mode) {
+		BT_DBG("LAUNCH SYSPOPUP");
+		_bt_launch_system_popup(BT_AGENT_EVENT_KEYBOARD_PASSKEY_REQUEST, name,
+				str_passkey, NULL,
+				_gap_agent_get_path(agent));
+	} else {
+		int result = BLUETOOTH_ERROR_NONE;
+		GVariant *param;
+
+		BT_DBG("Send BLUETOOTH_EVENT_KEYBOARD_PASSKEY_DISPLAY");
+		param = g_variant_new("(isss)", result, address, name, str_passkey);
+		_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_KEYBOARD_PASSKEY_DISPLAY, param);
+	}
+
 #endif
 	g_free(str_passkey);
 
@@ -721,10 +765,20 @@ static gboolean __confirm_request(GapAgentPrivate *agent, GDBusProxy *device,
 	BT_DBG("Confirm reply");
 	gap_agent_reply_confirmation(agent, GAP_AGENT_ACCEPT, NULL);
 #else
-	BT_DBG("LAUNCH SYSPOPUP");
-	_bt_launch_system_popup(BT_AGENT_EVENT_PASSKEY_CONFIRM_REQUEST, name,
-						str_passkey, NULL,
-						_gap_agent_get_path(agent));
+	if (syspopup_mode) {
+		BT_DBG("LAUNCH SYSPOPUP");
+		_bt_launch_system_popup(BT_AGENT_EVENT_PASSKEY_CONFIRM_REQUEST, name,
+				str_passkey, NULL,
+				_gap_agent_get_path(agent));
+	} else {
+		int result = BLUETOOTH_ERROR_NONE;
+		GVariant *param;
+
+		BT_DBG("Send BLUETOOTH_EVENT_PASSKEY_CONFIRM_REQUEST");
+		param = g_variant_new("(isss)", result, address, name, str_passkey);
+		_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_PASSKEY_CONFIRM_REQUEST, param);
+	}
 #endif
 #endif
 
@@ -740,6 +794,7 @@ done:
 static gboolean __pairing_cancel_request(GapAgentPrivate *agent, const char *address)
 {
 	BT_DBG("On Going Pairing is cancelled by remote\n");
+
 #if !defined(LIBNOTIFY_SUPPORT) && !defined(LIBNOTIFICATION_SUPPORT)
 	syspopup_destroy_all();
 #endif
@@ -900,7 +955,7 @@ fail:
 					NULL) == TRUE) {
 		_bt_send_event(BT_OPP_SERVER_EVENT,
 				BLUETOOTH_EVENT_OBEX_SERVER_CONNECTION_AUTHORIZE,
-				g_variant_new("iss", result, address, name));
+				g_variant_new("(iss)", result, address, name));
 
 		goto done;
 	}
@@ -911,10 +966,12 @@ fail:
 		osp_serv = _gap_agent_get_osp_server(agent,
 						BT_RFCOMM_SERVER, (char *)uuid);
 
-		_bt_send_event(BT_RFCOMM_SERVER_EVENT,
-			BLUETOOTH_EVENT_RFCOMM_AUTHORIZE,
-			g_variant_new("issssn", result, address, uuid,
-					name, osp_serv->path, osp_serv->fd));
+		if (osp_serv) {
+			_bt_send_event(BT_RFCOMM_SERVER_EVENT,
+				BLUETOOTH_EVENT_RFCOMM_AUTHORIZE,
+				g_variant_new("(issssn)", result, address, uuid,
+						name, osp_serv->path, osp_serv->fd));
+		}
 
 		goto done;
 	}

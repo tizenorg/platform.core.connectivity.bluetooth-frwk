@@ -55,6 +55,7 @@ SET(PKG_MODULES
 	vconf
 	syspopup-caller
 	dbus-glib-1
+	dbus-1
 	gio-2.0
 	alarm-service
 	capi-content-mime-type
@@ -62,6 +63,7 @@ SET(PKG_MODULES
 	pkgmgr
 	cynara-client
 	cynara-creds-gdbus
+	eventsystem
 )
 
 IF("$ENV{CFLAGS}" MATCHES "-DTIZEN_NETWORK_TETHERING_ENABLE")
@@ -107,6 +109,7 @@ ADD_DEFINITIONS("-DAPPNAME=\"${APP_NAME}\"")
 ADD_DEFINITIONS("-DAPP_DIR=\"${APP_DIR}\"")
 ADD_DEFINITIONS("-DAPP_LOCALEDIR=\"${APP_LOCALEDIR}\"")
 ADD_DEFINITIONS("-DAPP_SYSCONFDIR=\"${APP_SYSCONFDIR}\"")
+ADD_DEFINITIONS("-DHPS_FEATURE")
 
 IF(LIBNOTIFY_SUPPORT OR LIBNOTIFICATION_SUPPORT)
 	ADD_DEFINITIONS("-DDATA_DIR_ICON=\"${SHARE_INSTALL_PREFIX}\"")
@@ -116,6 +119,7 @@ ENDIF(LIBNOTIFY_SUPPORT OR LIBNOTIFICATION_SUPPORT)
 SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed -pie")
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SRCS})
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS})
 
 # to permit usage of bluetooth_cancel_bonding in bt-popup.c. This build bluetooth-api first.
 IF(LIBNOTIFY_SUPPORT)

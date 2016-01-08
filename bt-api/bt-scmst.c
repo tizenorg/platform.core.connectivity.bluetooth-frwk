@@ -23,8 +23,6 @@
 
 #include <glib.h>
 #include <dbus/dbus.h>
-#include <dbus/dbus-glib.h>
-#include <dbus/dbus-glib-lowlevel.h>
 
 #include "bt-common.h"
 #include "bt-internal-types.h"

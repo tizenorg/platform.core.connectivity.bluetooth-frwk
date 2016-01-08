@@ -33,6 +33,35 @@
 static GDBusConnection *event_conn;
 static GDBusConnection *hf_local_term_event_conn;
 
+#ifdef HPS_FEATURE
+int _bt_send_to_hps(void)
+{
+	gboolean ret = FALSE;
+	GError *error = NULL;
+
+	BT_DBG(" ");
+
+	retv_if(event_conn == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	ret = g_dbus_connection_emit_signal(event_conn, NULL,
+					"/org/projectx/httpproxy",
+					"org.projectx.httpproxy_service",
+					BT_LE_ENABLED,
+					NULL, &error);
+	if (!ret) {
+		if (error != NULL) {
+			BT_ERR("D-Bus API failure: errCode[%x], \
+					message[%s]",
+					error->code, error->message);
+			g_clear_error(&error);
+		}
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	return BLUETOOTH_ERROR_NONE;
+}
+#endif
+
 int _bt_send_event(int event_type, int event, GVariant *param)
 {
 	BT_DBG("+");
@@ -171,6 +200,18 @@ int _bt_send_event(int event_type, int event, GVariant *param)
 	case BLUETOOTH_EVENT_RAW_RSSI:
 		signal = BT_RAW_RSSI_EVENT;
 		break;
+	case BLUETOOTH_EVENT_KEYBOARD_PASSKEY_DISPLAY:
+		signal = BT_KBD_PASSKEY_DISPLAY_REQ_RECEIVED;
+		break;
+	case BLUETOOTH_EVENT_PIN_REQUEST:
+		signal = BT_PIN_REQ_RECEIVED;
+		break;
+	case BLUETOOTH_EVENT_PASSKEY_REQUEST:
+		signal = BT_PASSKEY_REQ_RECEIVED;
+		break;
+	case BLUETOOTH_EVENT_PASSKEY_CONFIRM_REQUEST:
+		signal = BT_PASSKEY_CFM_REQ_RECEIVED;
+		break;
 	case BLUETOOTH_EVENT_SERVICE_SEARCHED:
 		signal = BT_SERVICE_SEARCHED;
 		break;
@@ -306,10 +347,10 @@ int _bt_send_event(int event_type, int event, GVariant *param)
 		signal = BT_A2DP_SOURCE_CONNECTED;
 		BT_INFO_C("Connected [A2DP Source]");
 		break;
-        case BLUETOOTH_EVENT_AV_SOURCE_DISCONNECTED:
-                signal = BT_A2DP_SOURCE_DISCONNECTED;
-                BT_INFO_C("Disconnected [A2DP Source]");
-                break;
+    case BLUETOOTH_EVENT_AV_SOURCE_DISCONNECTED:
+        signal = BT_A2DP_SOURCE_DISCONNECTED;
+        BT_INFO_C("Disconnected [A2DP Source]");
+        break;
 	case BLUETOOTH_EVENT_AVRCP_CONNECTED:
 	case BLUETOOTH_EVENT_AVRCP_CONTROL_CONNECTED:
 		signal = BT_AVRCP_CONNECTED;
@@ -351,6 +392,15 @@ int _bt_send_event(int event_type, int event, GVariant *param)
 	case BLUETOOTH_EVENT_GATT_DISCONNECTED:
 		signal = BT_GATT_DISCONNECTED;
 		break;
+	case BLUETOOTH_EVENT_IPSP_INIT_STATE_CHANGED:
+		signal = BT_IPSP_INITIALIZED;
+		break;
+	case BLUETOOTH_EVENT_IPSP_CONNECTED:
+		signal = BT_IPSP_CONNECTED;
+		break;
+	case BLUETOOTH_EVENT_IPSP_DISCONNECTED:
+		signal = BT_IPSP_DISCONNECTED;
+		break;
 	case BLUETOOTH_EVENT_GATT_CHAR_VAL_CHANGED:
 		signal = BT_GATT_CHAR_VAL_CHANGED;
 		break;
@@ -372,7 +422,12 @@ int _bt_send_event(int event_type, int event, GVariant *param)
 	}
 
 	g_object_unref(msg1);
-	BT_DBG("-");
+
+#ifdef HPS_FEATURE
+	if (g_strcmp0(signal, BT_LE_ENABLED) == 0)
+		_bt_send_to_hps();
+#endif
+
 	return BLUETOOTH_ERROR_NONE;
 }
 
@@ -386,6 +441,7 @@ int _bt_send_event_to_dest(const char* dest, int event_type,
 
 	retv_if(event_conn == NULL, BLUETOOTH_ERROR_INTERNAL);
 
+	BT_DBG("dest : %s", dest);
 	BT_DBG("event_type [%d], event [%d]", event_type, event);
 
 	switch (event_type) {
@@ -394,6 +450,9 @@ int _bt_send_event_to_dest(const char* dest, int event_type,
 		break;
 	case BT_LE_ADAPTER_EVENT:
 		path = BT_LE_ADAPTER_PATH;
+		break;
+	case BT_DEVICE_EVENT:
+                path = BT_DEVICE_PATH;
 		break;
 	default:
 		BT_ERR("Unknown event");
@@ -415,6 +474,9 @@ int _bt_send_event_to_dest(const char* dest, int event_type,
 		break;
 	case BLUETOOTH_EVENT_LE_DISCOVERY_FINISHED:
 		signal = BT_LE_DISCOVERY_FINISHED;
+		break;
+	case BLUETOOTH_EVENT_GATT_CHAR_VAL_CHANGED:
+		signal = BT_GATT_CHAR_VAL_CHANGED;
 		break;
 	default:
 		BT_ERR("Unknown event");

@@ -35,8 +35,17 @@
 #define BT_SERVICE_NAME		"org.projectx.bt"
 #define BT_SERVICE_PATH		"/org/projectx/bt_service"
 
+#ifdef HPS_FEATURE
+#define BT_HPS_SERVICE_NAME "org.projectx.httpproxy"
+#define BT_HPS_OBJECT_PATH "/org/projectx/httpproxy"
+#define BT_HPS_INTERFACE_NAME "org.projectx.httpproxy_service"
+#endif
+
 static GDBusConnection *service_gconn;
 static GDBusProxy *service_gproxy;
+#ifdef HPS_FEATURE
+static GDBusProxy *hps_gproxy;
+#endif
 
 void _bt_core_fill_garray_from_variant(GVariant *var, GArray *param)
 {
@@ -107,6 +116,90 @@ GDBusProxy *_bt_core_gdbus_get_service_proxy(void)
 	return (service_gproxy) ? service_gproxy : __bt_core_gdbus_init_service_proxy();
 }
 
+#ifdef HPS_FEATURE
+int _bt_core_start_httpproxy(void)
+{
+	GVariant *variant = NULL;
+	unsigned char enabled;
+
+	BT_DBG(" ");
+
+	hps_gproxy = _bt_core_gdbus_get_hps_proxy();
+	if (!hps_gproxy) {
+		BT_DBG("Couldn't get service proxy");
+		return -1;
+	}
+
+	variant = g_dbus_proxy_call_sync(hps_gproxy, "enable",
+				NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, NULL);
+	if (variant) {
+		g_variant_get(variant, "(y)", &enabled);
+		BT_ERR("HPS enabled status 0x%x", enabled);
+	}
+	return 0;
+}
+
+int _bt_core_stop_httpproxy(void)
+{
+	GVariant *variant = NULL;
+	unsigned char enabled;
+
+	BT_DBG(" ");
+
+	hps_gproxy = _bt_core_gdbus_get_hps_proxy();
+	if (!hps_gproxy) {
+		BT_DBG("Couldn't get service proxy");
+		return -1;
+	}
+
+	variant = g_dbus_proxy_call_sync(hps_gproxy, "disable",
+				NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, NULL);
+	if (variant) {
+		g_variant_get(variant, "(y)", &enabled);
+		BT_ERR("HPS disabled status 0x%x", enabled);
+	}
+	return 0;
+}
+
+static GDBusProxy *_bt_core_gdbus_init_hps_proxy(void)
+{
+	GDBusProxy *proxy;
+	GError *err = NULL;
+	GDBusConnection *conn;
+
+	g_type_init();
+
+	BT_DBG(" ");
+
+	conn = _bt_core_get_gdbus_connection();
+	if (!conn)
+		return NULL;
+
+	proxy =  g_dbus_proxy_new_sync(conn,
+			G_DBUS_PROXY_FLAGS_NONE, NULL,
+			BT_HPS_SERVICE_NAME,
+			BT_HPS_OBJECT_PATH,
+			BT_HPS_INTERFACE_NAME,
+			NULL, &err);
+	if (proxy == NULL) {
+		if (err) {
+			 BT_ERR("Unable to create proxy: %s", err->message);
+			 g_clear_error(&err);
+		}
+		return NULL;
+	}
+
+	hps_gproxy = proxy;
+
+	return proxy;
+}
+
+GDBusProxy *_bt_core_gdbus_get_hps_proxy(void)
+{
+	return (hps_gproxy) ? hps_gproxy : _bt_core_gdbus_init_hps_proxy();
+}
+#endif
+
 void _bt_core_gdbus_deinit_proxys(void)
 {
 	BT_DBG("");
@@ -115,6 +208,13 @@ void _bt_core_gdbus_deinit_proxys(void)
 		g_object_unref(service_gproxy);
 		service_gproxy = NULL;
 	}
+
+#ifdef HPS_FEATURE
+	if (hps_gproxy) {
+		g_object_unref(hps_gproxy);
+		hps_gproxy = NULL;
+	}
+#endif
 
 	if (service_gconn) {
 		g_object_unref(service_gconn);
@@ -138,37 +238,49 @@ int _bt_core_service_request(int service_type, int service_function,
 	int result = BLUETOOTH_ERROR_NONE;
 	GError *error = NULL;
 	GArray *in_param5 = NULL;
-	GArray *out_param2 = NULL;
+
+	int retry = 5;
 
 	proxy = _bt_core_gdbus_get_service_proxy();
 	if (!proxy)
 		return BLUETOOTH_ERROR_INTERNAL;
 	in_param5 = g_array_new(TRUE, TRUE, sizeof(gchar));
 
-	param1 = g_variant_new_from_data((const GVariantType *)"ay",
-				in_param1->data, in_param1->len,
-				TRUE, NULL, NULL);
-	param2 = g_variant_new_from_data((const GVariantType *)"ay",
-				in_param2->data, in_param2->len,
-				TRUE, NULL, NULL);
-	param3 = g_variant_new_from_data((const GVariantType *)"ay",
-				in_param3->data, in_param3->len,
-				TRUE, NULL, NULL);
-	param4 = g_variant_new_from_data((const GVariantType *)"ay",
-				in_param4->data, in_param4->len,
-				TRUE, NULL, NULL);
-	param5 = g_variant_new_from_data((const GVariantType *)"ay",
-				in_param5->data, in_param5->len,
-				TRUE, NULL, NULL);
+	while (--retry >= 0) {
+		param1 = g_variant_new_from_data((const GVariantType *)"ay",
+					in_param1->data, in_param1->len,
+					TRUE, NULL, NULL);
+		param2 = g_variant_new_from_data((const GVariantType *)"ay",
+					in_param2->data, in_param2->len,
+					TRUE, NULL, NULL);
+		param3 = g_variant_new_from_data((const GVariantType *)"ay",
+					in_param3->data, in_param3->len,
+					TRUE, NULL, NULL);
+		param4 = g_variant_new_from_data((const GVariantType *)"ay",
+					in_param4->data, in_param4->len,
+					TRUE, NULL, NULL);
+		param5 = g_variant_new_from_data((const GVariantType *)"ay",
+					in_param5->data, in_param5->len,
+					TRUE, NULL, NULL);
 
-	ret = g_dbus_proxy_call_sync(proxy, "service_request",
-				g_variant_new("(iii@ay@ay@ay@ay@ay)",
-					service_type, service_function,
-					BT_SYNC_REQ, param1,
-					param2, param3,
-					param4, param5),
-				G_DBUS_CALL_FLAGS_NONE, -1,
-				NULL, &error);
+		ret = g_dbus_proxy_call_sync(proxy, "service_request",
+					g_variant_new("(iii@ay@ay@ay@ay@ay)",
+						service_type, service_function,
+						BT_SYNC_REQ, param1,
+						param2, param3,
+						param4, param5),
+					G_DBUS_CALL_FLAGS_NONE, 2000,
+					NULL, &error);
+		if (ret == NULL && error != NULL) {
+			if (error->code == G_IO_ERROR_TIMED_OUT) {
+				BT_ERR("D-Bus Timed out.");
+				g_clear_error(&error);
+				continue;
+			}
+		}
+
+		break;
+	}
 
 	g_array_free(in_param5, TRUE);
 
@@ -191,24 +303,13 @@ int _bt_core_service_request(int service_type, int service_function,
 	}
 
 	param1 = NULL;
-	param2 = NULL;
 
-	g_variant_get(ret, "(@ay@ay)", &param1, &param2);
+	g_variant_get(ret, "(iv)", &result, &param1);
 
 	if (param1) {
 		*out_param1 = g_array_new(TRUE, TRUE, sizeof(gchar));
 		_bt_core_fill_garray_from_variant(param1, *out_param1);
 		g_variant_unref(param1);
-	}
-
-	if (param2) {
-		out_param2 = g_array_new(TRUE, TRUE, sizeof(gchar));
-		_bt_core_fill_garray_from_variant(param2, out_param2);
-		result = g_array_index(out_param2, int, 0);
-		g_variant_unref(param2);
-		g_array_free(out_param2, TRUE);
-	} else {
-		result = BLUETOOTH_ERROR_INTERNAL;
 	}
 
 	g_variant_unref(ret);

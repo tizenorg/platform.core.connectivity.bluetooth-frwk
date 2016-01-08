@@ -57,6 +57,9 @@ int _bt_core_service_request(int service_type, int service_function,
 			GArray **out_param1);
 void _bt_core_fill_garray_from_variant(GVariant *var, GArray *param);
 GDBusProxy *_bt_core_gdbus_get_service_proxy(void);
+#ifdef HPS_FEATURE
+GDBusProxy *_bt_core_gdbus_get_hps_proxy(void);
+#endif
 void _bt_core_gdbus_deinit_proxys(void);
 
 GDBusConnection * _bt_core_get_gdbus_connection(void);

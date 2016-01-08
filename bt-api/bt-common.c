@@ -37,14 +37,18 @@
 #include "bluetooth-hid-api.h"
 #include "bluetooth-media-control.h"
 #include "bt-internal-types.h"
+#include "bluetooth-ipsp-api.h"
 
 #include "bt-common.h"
 #include "bt-request-sender.h"
 #include "bt-event-handler.h"
 
 static bt_user_info_t user_info[BT_MAX_USER_INFO];
-static DBusGConnection *system_conn = NULL;
+static DBusConnection *system_conn = NULL;
 static GDBusConnection *system_gdbus_conn = NULL;
+
+static char *cookie;
+static size_t cookie_size;
 
 static guint bus_id;
 
@@ -52,48 +56,58 @@ static GDBusConnection *system_gconn = NULL;
 
 #define DBUS_TIMEOUT 20 * 1000 /* 20 Seconds */
 
-GDBusConnection *_bt_gdbus_init_system_gconn(void)
+GDBusConnection *g_bus_get_private_conn(void)
 {
 	GError *error = NULL;
+	char *address;
+	GDBusConnection *private_gconn = NULL;
 
-	if (!g_thread_supported()) {
-		g_thread_init(NULL);
+	address = g_dbus_address_get_for_bus_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
+	if (address == NULL) {
+		if (error) {
+			BT_ERR ("Failed to get bus address: %s", error->message);
+			g_clear_error(&error);
+		}
+		return NULL;
 	}
 
-	dbus_g_thread_init();
+	private_gconn = g_dbus_connection_new_for_address_sync (address,
+				G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT |
+				G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION,
+				NULL, /* GDBusAuthObserver */
+				NULL,
+				&error);
+	if (!private_gconn) {
+		if (error) {
+			BT_ERR("Unable to connect to dbus: %s", error->message);
+			g_clear_error(&error);
+		}
+		return NULL;
+	}
+
+	return private_gconn;
+}
+
+GDBusConnection *_bt_gdbus_init_system_gconn(void)
+{
+	dbus_threads_init_default();
 
 	g_type_init();
 
 	if (system_gconn != NULL)
 		return system_gconn;
 
-	system_gconn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
-
-	if (!system_gconn) {
-		BT_ERR("Unable to connect to dbus: %s", error->message);
-		g_clear_error(&error);
-	}
+	system_gconn = g_bus_get_private_conn();
 
 	return system_gconn;
 }
 
 GDBusConnection *_bt_gdbus_get_system_gconn(void)
 {
-	GDBusConnection *local_system_gconn = NULL;
-	GError *error = NULL;
-
 	if (system_gconn == NULL) {
 		system_gconn = _bt_gdbus_init_system_gconn();
 	} else if (g_dbus_connection_is_closed(system_gconn)){
-
-		local_system_gconn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
-
-		if (!local_system_gconn) {
-			BT_ERR("Unable to connect to dbus: %s", error->message);
-			g_clear_error(&error);
-		}
-
-		system_gconn = local_system_gconn;
+		system_gconn = g_bus_get_private_conn();
 	}
 
 	return system_gconn;
@@ -431,18 +445,8 @@ void __rfcomm_delete_id(int id)
 
 static GDBusConnection *__get_gdbus_connection()
 {
-	GError *err = NULL;
-
 	if (gconn == NULL)
-		gconn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &err);
-
-	if (!gconn) {
-		if (err) {
-			BT_ERR("Unable to connect to dbus: %s", err->message);
-			g_clear_error(&err);
-		}
-		return NULL;
-	}
+		gconn = g_bus_get_private_conn();
 
 	return gconn;
 }
@@ -688,6 +692,7 @@ int _bt_register_profile(bt_register_profile_info_t *info, gboolean use_default_
 					G_DBUS_CALL_FLAGS_NONE, -1,
 					NULL, &err);
 	if (err) {
+		g_dbus_error_strip_remote_error(err);
 		BT_ERR("RegisterProfile failed: %s", err->message);
 
 		if (g_strrstr(err->message, BT_ACCESS_DENIED_MSG))
@@ -756,6 +761,7 @@ int _bt_register_profile_ex(bt_register_profile_info_t *info, gboolean use_defau
 					G_DBUS_CALL_FLAGS_NONE, -1,
 					NULL, &err);
 	if (err) {
+		g_dbus_error_strip_remote_error(err);
 		BT_ERR("RegisterProfile failed: %s", err->message);
 
 		if (g_strrstr(err->message, BT_ACCESS_DENIED_MSG))
@@ -823,6 +829,7 @@ int _bt_register_profile_platform(bt_register_profile_info_t *info, gboolean use
 					NULL, &err);
 
 	if (err) {
+		g_dbus_error_strip_remote_error(err);
 		BT_ERR("RegisterProfile failed: %s", err->message);
 
 		if (g_strrstr(err->message, BT_ACCESS_DENIED_MSG))
@@ -923,6 +930,11 @@ int _bt_connect_profile(char *address, char *uuid, void *cb,
 		BT_ERR("No searched device");
 		adapter_proxy = __bt_gdbus_get_adapter_proxy();
 
+		if (adapter_proxy == NULL) {
+			BT_ERR("adapter proxy is NULL");
+			return BLUETOOTH_ERROR_INTERNAL;
+		}
+
 		ret = g_dbus_proxy_call_sync(adapter_proxy, "CreateDevice",
 				g_variant_new("(s)", address),
 				G_DBUS_CALL_FLAGS_NONE,
@@ -984,7 +996,9 @@ int _bt_discover_services(char *address, char *uuid, void *cb,
 		}
 		if (ret)
 			g_variant_unref(ret);
+
 		g_object_unref(adapter_proxy);
+
 		object_path = _bt_get_device_object_path(address);
 		if (object_path == NULL)
 			return BLUETOOTH_ERROR_INTERNAL;
@@ -1028,7 +1042,9 @@ int _bt_cancel_discovers(char *address)
 		}
 		if (ret)
 			g_variant_unref(ret);
+
 		g_object_unref(adapter_proxy);
+
 		object_path = _bt_get_device_object_path(address);
 		if (object_path == NULL)
 			return BLUETOOTH_ERROR_INTERNAL;
@@ -1057,7 +1073,7 @@ int _bt_discover_service_uuids(char *address, char *remote_uuid)
 	GDBusConnection *gconn;
 	GError *err = NULL;
 	char **uuid_value = NULL;
-	gsize size;
+	gsize size = 0;
 	int i =0;
 	GVariant *value = NULL;
 	GVariant *ret = NULL;
@@ -1100,22 +1116,26 @@ int _bt_discover_service_uuids(char *address, char *remote_uuid)
 		GVariant *temp_value = g_variant_lookup_value(value, "UUIDs",
 			G_VARIANT_TYPE_STRING_ARRAY);
 
-		size = g_variant_get_size(temp_value);
-		if (size > 0) {
-			uuid_value = (char **)g_variant_get_strv(temp_value, &size);
-			BT_DBG("Size items %d", size);
-		}
-		if (temp_value)
-			g_variant_unref(temp_value);
-		for (i = 0; uuid_value[i] != NULL; i++) {
-			BT_DBG("Remote uuids %s", uuid_value[i]);
-			if (strcasecmp(uuid_value[i], remote_uuid) == 0) {
-				result = BLUETOOTH_ERROR_NONE;
-				goto done;
+		if (temp_value) {
+			size = g_variant_get_size(temp_value);
+			if (size > 0) {
+				uuid_value = (char **)g_variant_get_strv(temp_value, &size);
+				BT_DBG("Size items %d", size);
+
+				if (uuid_value) {
+					for (i = 0; uuid_value[i] != NULL; i++) {
+						BT_DBG("Remote uuids %s", uuid_value[i]);
+						if (strcasecmp(uuid_value[i], remote_uuid) == 0) {
+							result = BLUETOOTH_ERROR_NONE;
+							g_variant_unref(temp_value);
+							goto done;
+						}
+					}
+				}
 			}
+			g_variant_unref(temp_value);
 		}
 	}
-
 done:
 	if (proxy)
 		g_object_unref(proxy);
@@ -1388,57 +1408,10 @@ char *_bt_get_device_object_path(char *address)
 fail:
 	g_clear_error(&err);
 
-	if (result)
-		g_variant_unref(result);
-
 	if (proxy)
 		g_object_unref(proxy);
 
 	return object_path;
-}
-
-
-DBusGProxy *_bt_get_adapter_proxy(DBusGConnection *conn)
-{
-	GError *err = NULL;
-	DBusGProxy *manager_proxy = NULL;
-	DBusGProxy *adapter_proxy = NULL;
-	char *adapter_path = NULL;
-
-	retv_if(conn == NULL, NULL);
-
-	manager_proxy = dbus_g_proxy_new_for_name(conn, BT_BLUEZ_NAME,
-				BT_MANAGER_PATH, BT_MANAGER_INTERFACE);
-
-	retv_if(manager_proxy == NULL, NULL);
-
-	if (!dbus_g_proxy_call(manager_proxy, "DefaultAdapter", &err,
-				G_TYPE_INVALID, DBUS_TYPE_G_OBJECT_PATH,
-				&adapter_path,
-				G_TYPE_INVALID)) {
-		if (err != NULL) {
-			BT_ERR("Getting DefaultAdapter failed: [%s]\n", err->message);
-			g_error_free(err);
-		}
-		g_object_unref(manager_proxy);
-		return NULL;
-	}
-
-	if (adapter_path == NULL || strlen(adapter_path) >= BT_ADAPTER_OBJECT_PATH_MAX) {
-		BT_ERR("Adapter path is inproper\n");
-		g_free(adapter_path);
-		g_object_unref(manager_proxy);
-		return NULL;
-	}
-
-	adapter_proxy = dbus_g_proxy_new_for_name(conn,
-					BT_BLUEZ_NAME,
-					adapter_path,
-					BT_ADAPTER_INTERFACE);
-	g_free(adapter_path);
-	g_object_unref(manager_proxy);
-
-	return adapter_proxy;
 }
 
 void _bt_device_path_to_address(const char *device_path, char *device_address)
@@ -1463,51 +1436,64 @@ void _bt_device_path_to_address(const char *device_path, char *device_address)
 	}
 }
 
-DBusGConnection *__bt_init_system_gconn(void)
+/* TODO : replace the dbus-glib APIs to gdbus APIs */
+DBusConnection *__bt_init_system_conn(void)
 {
-	g_type_init();
-
 	if (system_conn == NULL)
-		system_conn = dbus_g_bus_get(DBUS_BUS_SYSTEM, NULL);
+		system_conn = dbus_bus_get_private(DBUS_BUS_SYSTEM, NULL);
+
+	if (system_conn) {
+		dbus_connection_setup_with_g_main(system_conn, NULL);
+		dbus_connection_set_exit_on_disconnect(system_conn, FALSE);
+	}
 
 	return system_conn;
 }
 
-DBusGConnection *_bt_get_system_gconn(void)
-{
-	return (system_conn) ? system_conn : __bt_init_system_gconn();
-}
-
-GDBusConnection *_bt_init_system_gdbus_conn(void)
-{
-	g_type_init();
-	GError *error = NULL;
-	if (system_gdbus_conn == NULL) {
-		system_gdbus_conn =
-		g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
-		if (error) {
-			BT_ERR("GDBus connection Error : %s \n",
-				error->message);
-			g_clear_error(&error);
-			return NULL;
-		}
-	}
-	return system_gdbus_conn;
-}
-
 DBusConnection *_bt_get_system_conn(void)
 {
-	DBusGConnection *g_conn;
+	DBusConnection *conn = NULL;
 
 	if (system_conn == NULL) {
-		g_conn = __bt_init_system_gconn();
+		conn = __bt_init_system_conn();
 	} else {
-		g_conn = system_conn;
+		conn = system_conn;
 	}
 
-	retv_if(g_conn == NULL, NULL);
+	return conn;
+}
 
-	return dbus_g_connection_get_connection(g_conn);
+void _bt_generate_cookie(void)
+{
+	int retval;
+
+	ret_if(cookie != NULL);
+
+	cookie_size = security_server_get_cookie_size();
+
+	cookie = g_malloc0((cookie_size*sizeof(char))+1);
+
+	retval = security_server_request_cookie(cookie, cookie_size);
+	if(retval < 0) {
+		BT_ERR("Fail to get cookie: %d", retval);
+	}
+}
+
+void _bt_destroy_cookie(void)
+{
+	g_free(cookie);
+	cookie = NULL;
+	cookie_size = 0;
+}
+
+char *_bt_get_cookie(void)
+{
+	return cookie;
+}
+
+int _bt_get_cookie_size(void)
+{
+	return cookie_size;
 }
 
 int _bt_register_osp_server_in_agent(int type, char *uuid, char *path, int fd)
@@ -1661,7 +1647,7 @@ BT_EXPORT_API int bluetooth_register_callback(bluetooth_cb_func_ptr callback_ptr
 	int ret;
 
 	_bt_gdbus_init_system_gconn();
-	__bt_init_system_gconn();
+	__bt_init_system_conn();
 
 	ret = _bt_init_event_handler();
 	if (ret != BLUETOOTH_ERROR_NONE &&
@@ -1669,6 +1655,8 @@ BT_EXPORT_API int bluetooth_register_callback(bluetooth_cb_func_ptr callback_ptr
 		BT_ERR("Fail to init the event handler");
 		return ret;
 	}
+
+	_bt_generate_cookie();
 
 	_bt_set_user_data(BT_COMMON, (void *)callback_ptr, user_data);
 
@@ -1688,6 +1676,11 @@ BT_EXPORT_API int bluetooth_register_callback(bluetooth_cb_func_ptr callback_ptr
 	ret = _bt_register_event(BT_RFCOMM_SERVER_EVENT, (void *)callback_ptr, user_data);
 	if (ret != BLUETOOTH_ERROR_NONE)
 		goto fail;
+#ifdef GATT_NO_RELAY
+	ret = _bt_register_event(BT_GATT_BLUEZ_EVENT, (void *)callback_ptr, user_data);
+	if (ret != BLUETOOTH_ERROR_NONE)
+		goto fail;
+#endif
 
 	_bt_register_name_owner_changed();
 
@@ -1702,6 +1695,8 @@ BT_EXPORT_API int bluetooth_unregister_callback(void)
 {
 	int ret;
 
+	_bt_destroy_cookie();
+
 	ret = _bt_deinit_event_handler();
 	if (ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Fail to deinit the event handler");
@@ -1712,13 +1707,16 @@ BT_EXPORT_API int bluetooth_unregister_callback(void)
 	_bt_set_user_data(BT_COMMON, NULL, NULL);
 
 	if (system_conn) {
-		dbus_g_connection_unref(system_conn);
+		dbus_connection_flush(system_conn);
+		dbus_connection_close(system_conn);
+		dbus_connection_unref(system_conn);
 		system_conn = NULL;
 	}
 	if (system_gconn) {
 		g_object_unref(system_gconn);
 		system_gconn = NULL;
 	}
+	_bt_gdbus_deinit_proxys();
 	return BLUETOOTH_ERROR_NONE;
 }
 

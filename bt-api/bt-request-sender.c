@@ -21,7 +21,6 @@
  *
  */
 
-#include <dbus/dbus-glib.h>
 #include <glib.h>
 #include <dlog.h>
 #include <string.h>
@@ -30,6 +29,7 @@
 #include "bluetooth-hid-api.h"
 #include "bluetooth-audio-api.h"
 #include "bt-internal-types.h"
+#include "bluetooth-ipsp-api.h"
 
 #include "bt-common.h"
 #include "bt-request-sender.h"
@@ -41,30 +41,20 @@
 
 static GSList *sending_requests;
 
-DBusGConnection *service_conn;
-DBusGConnection *system_conn;
-DBusGProxy *service_proxy;
-
-static GDBusConnection *service_gconn;
 static GDBusProxy *service_gproxy;
 
 static GDBusProxy *__bt_gdbus_init_service_proxy(void)
 {
+	GDBusConnection *service_gconn;
 	GDBusProxy *proxy;
 	GError *err = NULL;
 
 	g_type_init();
 
-	if (service_gconn == NULL)
-		service_gconn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &err);
+	service_gconn = _bt_gdbus_get_system_gconn();
 
-	if (!service_gconn) {
-		if (err) {
-			BT_ERR("Unable to connect to dbus: %s", err->message);
-			g_clear_error(&err);
-		}
+	if (!service_gconn)
 		return NULL;
-	}
 
 	proxy =  g_dbus_proxy_new_sync(service_gconn,
 			G_DBUS_PROXY_FLAGS_NONE, NULL,
@@ -78,8 +68,6 @@ static GDBusProxy *__bt_gdbus_init_service_proxy(void)
 			 g_clear_error(&err);
 		}
 
-		g_object_unref(service_gconn);
-		service_gconn = NULL;
 		return NULL;
 	}
 
@@ -96,13 +84,8 @@ static GDBusProxy *__bt_gdbus_get_service_proxy(void)
 void _bt_gdbus_deinit_proxys(void)
 {
 	if (service_gproxy) {
-		g_object_unref(service_proxy);
-		service_proxy = NULL;
-	}
-
-	if (service_gconn) {
-		g_object_unref(service_gconn);
-		service_gconn = NULL;
+		g_object_unref(service_gproxy);
+		service_gproxy = NULL;
 	}
 }
 
@@ -231,6 +214,20 @@ static void __bt_get_event_info(int service_function, GArray *output,
 		*event = BLUETOOTH_EVENT_AVRCP_CONTROL_DISCONNECTED;
 		ret_if(output == NULL);
 		*param_data = &g_array_index(output, char, 0);
+		break;
+	case BT_CONNECT_LE:
+		*event_type = BT_DEVICE_EVENT;
+		*event = BLUETOOTH_EVENT_GATT_CONNECTED;
+		ret_if(output == NULL);
+		*param_data = &g_array_index(output,
+				bluetooth_device_address_t, 0);
+		break;
+	case BT_DISCONNECT_LE:
+		*event_type = BT_DEVICE_EVENT;
+		*event = BLUETOOTH_EVENT_GATT_DISCONNECTED;
+		ret_if(output == NULL);
+		*param_data = &g_array_index(output,
+				bluetooth_device_address_t, 0);
 		break;
 	default:
 		BT_ERR("Unknown function");
@@ -383,6 +380,7 @@ int _bt_sync_send_request(int service_type, int service_function,
 			GArray **out_param1)
 {
 	int result = BLUETOOTH_ERROR_NONE;
+	char *cookie;
 	GError *error = NULL;
 	GArray *in_param5 = NULL;
 //	GArray *out_param2 = NULL;
@@ -405,6 +403,13 @@ int _bt_sync_send_request(int service_type, int service_function,
 			return BLUETOOTH_ERROR_INTERNAL;
 
 		in_param5 = g_array_new(TRUE, TRUE, sizeof(gchar));
+
+		cookie = _bt_get_cookie();
+
+		if (cookie) {
+			g_array_append_vals(in_param5, cookie,
+					_bt_get_cookie_size());
+		}
 
 		param1 = g_variant_new_from_data((const GVariantType *)"ay",
 					in_param1->data, in_param1->len,
@@ -489,6 +494,7 @@ int _bt_async_send_request(int service_type, int service_function,
 {
 	GArray* in_param5 = NULL;
 	bt_req_info_t *cb_data;
+	char *cookie;
 
 	GDBusProxy *proxy;
 	int timeout;
@@ -526,6 +532,12 @@ int _bt_async_send_request(int service_type, int service_function,
 
 		in_param5 = g_array_new(TRUE, TRUE, sizeof(gchar));
 
+		cookie = _bt_get_cookie();
+
+		if (cookie) {
+			g_array_append_vals(in_param5, cookie,
+					_bt_get_cookie_size());
+		}
 		param1 = g_variant_new_from_data((const GVariantType *)"ay",
 					in_param1->data, in_param1->len,
 					TRUE, NULL, NULL);
