@@ -25,7 +25,6 @@
 #include <glib.h>
 #include <dlog.h>
 #include <gio/gio.h>
-#include <sys/smack.h>
 #include <cynara-client.h>
 #include <cynara-creds-gdbus.h>
 

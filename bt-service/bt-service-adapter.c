@@ -988,6 +988,18 @@ void _bt_adapter_start_enable_timer(void)
 	return;
 }
 
+#ifdef TIZEN_TV
+static gboolean __bt_adapter_enabled_cb(gpointer user_data)
+{
+	BT_DBG("+");
+
+	__bt_set_enabled();
+	_bt_adapter_set_status(BT_ACTIVATED);
+
+	return FALSE;
+}
+#endif
+
 int _bt_enable_adapter(void)
 {
 	GDBusProxy *proxy;
@@ -2557,3 +2569,10 @@ int _bt_set_manufacturer_data(bluetooth_manufacturer_data_t *m_data)
 
 	return BLUETOOTH_ERROR_NONE;
 }
+
+#ifdef TIZEN_TV
+int _bt_get_enable_timer_id(void)
+{
+	return timer_id;
+}
+#endif
