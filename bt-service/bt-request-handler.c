@@ -25,7 +25,9 @@
 #include <glib.h>
 #include <dlog.h>
 #include <gio/gio.h>
+#ifndef TIZEN_WEARABLE
 #include <sys/smack.h>
+#endif
 #include <cynara-client.h>
 #include <cynara-creds-gdbus.h>
 
