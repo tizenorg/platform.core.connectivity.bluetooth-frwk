@@ -1,11 +1,5 @@
 /*
- * Bluetooth-frwk
- *
- * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
- *
- * Contact:  Hocheol Seo <hocheol.seo@samsung.com>
- *		 Girishashok Joshi <girish.joshi@samsung.com>
- *		 Chanyeol Park <chanyeol.park@samsung.com>
+ * Copyright (c) 2011 Samsung Electronics Co., Ltd All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.

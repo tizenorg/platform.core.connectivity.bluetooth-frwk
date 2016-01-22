@@ -1,0 +1,92 @@
+[general]
+#Current profile name which should match a profile section name
+profile = profile.tizenorg_api_change
+upstream_branch = origin
+
+[profile.tizenorg_api_change]
+#Common authentication info for whole profile
+#user = 
+#CAUTION: please use the key name "passwd" to reset plaintext password
+#passwdx =
+obs = obs.tizenorg
+#Comma separated list of repositories
+#repos = repo.slp_latest_build
+#repos = repo.slp_latest_standard
+#repos = repo.slp_latest_release
+#repos = repo.slp_local,repo.slp_latest_build
+#repos = repo.slp_latest_eur-open
+#repos = repo.slp_latest_lte-jpn-dcm
+#repos = repo.slp_latest_lte-eur-ora
+#repos = repo.slp_latest_tizen_ulc
+#repos = repo.slp_watch
+#repos = repo.slp_latest_tizenw2
+repos = repo.slp_latest_jpn-dcm, repo.slp_latest_cis-open
+
+[obs.tizenorg]
+#OBS API URL pointing to a remote OBS.
+url = http://165.213.148.149:81
+#url = http://165.213.148.149:8008
+#Optional user and password, set if differ from profile's user and password
+#user =
+#passwd =
+
+[repo.slp_latest_build]
+#Build against repo's URL
+url = http://165.213.148.149:8008/snapshots/build/latest
+#url = http://165.213.148.149:8008/snapshots/standard/latest
+#Optional user and password, set if differ from profile's user and password
+#user =
+#passwd =
+
+# Redwood(3G) CIS OPEN
+[repo.slp_latest_cis-open]
+#url = https://download.tizen.org/snapshots/tizen/mobile/tizen-mobile_20150202.1/
+#url = https://download.tizen.org/snapshots/tizen/common/tizen-common_20150209.1/repos/arm-x11/packages/
+#url = https://download.tizen.org/snapshots/tizen/common/tizen-common_20150630.1/repos/arm-x11/packages/
+##url = https://download.tizen.org/snapshots/tizen/common/tizen-common_20150223.4/repos/arm-x11/packages/
+#url = https://download.tizen.org/snapshots/tizen/common/tizen-common_20150227.4/repos/arm-wayland/packages/
+#url = https://download.tizen.org/snapshots/tizen/common/tizen-common_20150630.1/repos/arm-wayland/packages/
+#url = https://download.tizen.org/snapshots/tizen/tv/tizen-tv_20150922.2/repos/arm-wayland/packages/
+#url = https://download.tizen.org/snapshots/tizen/tv/tizen-tv_20150918.1/repos/arm-wayland/packages/
+#url = https://download.tizen.org/snapshots/tizen/tv/tizen-tv_20151006.3/repos/arm-wayland/packages/
+url = https://download.tizen.org/snapshots/tizen/tv/tizen-tv_20160115.1/repos/arm-wayland/packages/
+#url = https://download.tizen.org/snapshots/tizen/rd-pq/tizen_20140602.4/
+#url = https://download.tizen.org/snapshots/tizen/mobile/tizen-mobile_20150202.1/
+#url = http://165.213.148.149:8008/snapshots/redwood/SM-Z9005_EUR_XX/daily/latest/
+#url = http://10.252.248.23:8008/snapshots/ponte/SM-R750_EUR_XX/daily/DayR750XX_20141006.001/
+#url = http://10.252.248.23:8008/snapshots/redwood/SM-Z910F_EUR_XX/daily/DayZ910FXX_20140922.006/
+#url = http://10.252.248.23:8008/snapshots/redwood/SM-Z910F_EUR_XX/daily/DayZ910FXX_20141204.005/
+#url = http://10.252.248.22:8008/snapshots/redwood/SM-Z910F_EUR_XX/daily/latest/
+#this is for redwood device
+#url = http://165.213.148.149:8008/snapshots/redwood/SM-Z9005_EUR_XX/release/RelZ9005XX_20140711.005/
+#url = http://165.213.148.149:8008/snapshots/redwood/SM-Z910F_EUR_XX/release/RelZ910FXX_20140715.005/
+#this is for b2-3g watch
+#url = http://165.213.148.149:8008/snapshots/rinato/SM-R710_EUR_XX/release/latest/
+#url = http://165.213.148.149:8008/snapshots/dbuild/connsol/latest/
+#url = http://165.213.148.149:8008/snapshots/dbuild/connsol/DBUILDConnsol_20140707.002/
+#for kiran device
+#url = http://165.213.148.149:8008/snapshots/kiran/SM-Z130E_SWA_DD/daily/DayZ130EDD_20140721.001/
+
+# Redwood(3G) JAPAN DOCOMO
+[repo.slp_latest_jpn-dcm]
+url = https://download.tizen.org/snapshots/tizen/base/tizen-base_20160115.1/repos/arm/
+
+# Redwood(3G) EUROPE OPEN
+[repo.slp_latest_eur-open]
+url = http://165.213.148.149:8008/snapshots/rel/redwood/eur-open/latest
+
+[repo.slp_latest_release]
+url = http://165.213.148.149:8008/snapshots/release/latest
+
+[repo.slp_snapshot]
+url = http://165.213.148.151/snapshots/standard/SLP_20121128.002
+
+[repo.slp_latest_tizen_ulc]
+url = http://165.213.148.149:8008/snapshots/staging/devel_msm8210/latest/
+
+#[repo.slp_local]
+#repo for your local packages
+#url = /path_to_your_local_repo
+#url = http://local_server/path_to_repo
+#[repo.slp_local]
+#url = /home/sanjeev/Debi/Binaries/
