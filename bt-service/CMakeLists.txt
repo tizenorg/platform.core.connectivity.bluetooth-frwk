@@ -27,6 +27,7 @@ bt-request-handler.c
 bt-service-agent.c
 bt-service-gap-agent.c
 bt-service-pbap.c
+bt-service-dpm.c
 )
 
 IF(LIBNOTIFY_SUPPORT)
