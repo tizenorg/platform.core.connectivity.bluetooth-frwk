@@ -1114,6 +1114,24 @@ static void __bt_device_property_changed_event(GVariant *msg, const char *path)
 					event,
 					param);
 			g_free(address);
+		} else if (strcasecmp(property, "IpspBtInterfaceInfo") == 0) {
+			char *ifname = NULL;
+
+			g_variant_get(val, "s", &ifname);
+
+			address = g_malloc0(BT_ADDRESS_STRING_SIZE);
+
+			_bt_convert_device_path_to_address(path, address);
+
+			BT_DBG("Ipsp BT Interface Name: %s", ifname);
+			BT_DBG("address: %s", address);
+			param = g_variant_new("(iss)", result, address, ifname);
+
+			/* Send event to application */
+			_bt_send_event(BT_DEVICE_EVENT,
+					BLUETOOTH_EVENT_IPSP_BT_INTERFACE_INFO,
+					param);
+			g_free(address);
 		}
 	}
 	BT_DBG("-");
