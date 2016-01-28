@@ -633,6 +633,7 @@ typedef enum {
 	BLUETOOTH_EVENT_IPSP_INIT_STATE_CHANGED = BLUETOOTH_EVENT_IPSP_BASE, /**<IPSP init event*/
 	BLUETOOTH_EVENT_IPSP_CONNECTED, /**< IPSP connected event  */
 	BLUETOOTH_EVENT_IPSP_DISCONNECTED, /**< IPSP Disconnected event */
+	BLUETOOTH_EVENT_IPSP_BT_INTERFACE_INFO, /** IPSP BT Interface Info after connection */
 	BLUETOOTH_EVENT_LE_DATA_LENGTH_CHANGED,  /** LE data length values changed */
 } bluetooth_event_type_t;
 
@@ -1620,6 +1621,14 @@ typedef struct {
 	int count;
 	char uuids[BLUETOOTH_MAX_DPM_LIST][BLUETOOTH_UUID_STRING_MAX];
 } bt_dpm_uuids_list_t;
+
+/**
+ * Structure for IPSP Interface Info
+ */
+typedef struct {
+	bluetooth_device_address_t btaddr;
+	char if_name[16];
+} bt_ipsp_interface_info_t;
 
 /**
  * Callback pointer type
