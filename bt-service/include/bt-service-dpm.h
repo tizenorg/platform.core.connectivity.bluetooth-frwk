@@ -61,8 +61,8 @@ typedef enum _dpm_status {
 	DPM_ALLOWED			= 0,	/**< DPM Policy status allowed. */
 	DPM_RESTRICTED		= 1,	/**< DPM Policy status restricted. */
 
-	DPM_ENABLED			= 0,	/**< DPM Policy status enabled. */
-	DPm_DISABLED		= 1,	/**< DPM Policy status disabled. */
+	DPM_ENABLE			= 1,	/**< DPM Policy status enabled. */
+	DPM_DISABLE		= 0,	/**< DPM Policy status disabled. */
 
 	DPM_FALSE			= 0,	/**< DPM Policy status false. */
 	DPM_TRUE			= 1,	/**< DPM Policy status true. */
@@ -78,8 +78,14 @@ typedef enum _dpm_policy_cmd {
 	DPM_POLICY_BLUETOOTH_UUIDS_WHITELIST,
 	DPM_POLICY_BLUETOOTH_UUIDS_BLACKLIST,
 	DPM_POLICY_ALLOW_BLUETOOTH_OUTGOING_CALL,
+	DPM_POLICY_BLUETOOTH_PAIRING_STATE,
+	DPM_POLICY_BLUETOOTH_DESKTOP_CONNECTIVITY_STATE,
+	DPM_POLICY_BLUETOOTH_DISCOVERABLE_STATE,
+	DPM_POLICY_BLUETOOTH_LIMITED_DISCOVERABLE_STATE,
+	DPM_POLICY_BLUETOOTH_DATA_TRANSFER_STATE,
 	DPM_POLICY_END,
 } dpm_policy_cmd_t;
+
 
 struct dpm_policy {
 	union {
@@ -88,6 +94,26 @@ struct dpm_policy {
 	};
 };
 typedef struct dpm_policy dpm_policy_t;
+
+
+typedef enum dpm_profile {
+	DPM_POLICY_BLUETOOTH_A2DP_PROFILE_STATE,
+	DPM_POLICY_BLUETOOTH_AVRCP_PROFILE_STATE,
+	DPM_POLICY_BLUETOOTH_BPP_PROFILE_STATE,
+	DPM_POLICY_BLUETOOTH_DUN_PROFILE_STATE,
+	DPM_POLICY_BLUETOOTH_FTP_PROFILE_STATE,
+	DPM_POLICY_BLUETOOTH_HFP_PROFILE_STATE,
+	DPM_POLICY_BLUETOOTH_HSP_PROFILE_STATE,
+	DPM_POLICY_BLUETOOTH_PBAP_PROFILE_STATE,
+	DPM_POLICY_BLUETOOTH_SAP_PROFILE_STATE,
+	DPM_POLICY_BLUETOOTH_SPP_PROFILE_STATE,
+	DPM_PROFILE_NONE,
+} dpm_profile_t;
+
+struct dpm_profile_val {
+		int value; //tells whether the profile is enabled or disabled
+};
+typedef struct dpm_profile_val dpm_profile_state_t;
 
 dpm_result_t _bt_dpm_set_allow_bluetooth_mode(dpm_bt_allow_t value);
 dpm_bt_allow_t _bt_dpm_get_allow_bluetooth_mode(void);
@@ -111,6 +137,23 @@ GSList *_bt_dpm_get_bluetooth_uuids_from_blacklist(void);
 GSList *_bt_dpm_get_bluetooth_uuids_from_whitelist(void);
 dpm_status_t _bt_dpm_is_bluetooth_device_restriction_active(void);
 dpm_status_t _bt_dpm_is_bluetooth_uuid_restriction_active(void);
+dpm_status_t _bt_dpm_set_bluetooth_pairing_state(dpm_status_t value);
+dpm_status_t _bt_dpm_get_bluetooth_pairing_state(void);
+dpm_status_t _bt_dpm_set_bluetooth_profile_state(dpm_profile_t profile, dpm_status_t value);
+dpm_status_t _bt_dpm_get_bluetooth_profile_state(dpm_profile_t profile);
+dpm_status_t _bt_dpm_set_bluetooth_desktop_connectivity_state(dpm_status_t value);
+dpm_status_t _bt_dpm_get_bluetooth_desktop_connectivity_state(void);
+dpm_status_t _bt_dpm_set_bluetooth_discoverable_state(dpm_status_t value);
+dpm_status_t _bt_dpm_get_bluetooth_discoverable_state(void);
+dpm_result_t _bt_dpm_clear_bluetooth_devices_from_list(void);
+dpm_result_t _bt_dpm_clear_bluetooth_uuids_from_list(void);
+dpm_status_t _bt_dpm_set_bluetooth_limited_discoverable_state(dpm_status_t value);
+dpm_status_t _bt_dpm_get_bluetooth_limited_discoverable_state(void);
+dpm_status_t _bt_dpm_set_bluetooth_data_transfer_state(dpm_status_t value);
+dpm_result_t _bt_dpm_remove_bluetooth_devices_from_whitelist(GSList *device_addresses);
+dpm_result_t _bt_dpm_remove_bluetooth_devices_from_blacklist(GSList *device_addresses);
+dpm_result_t _bt_dpm_remove_bluetooth_uuids_from_whitelist(GSList *uuids);
+dpm_result_t _bt_dpm_remove_bluetooth_uuids_from_blacklist(GSList *uuids);
 
 #ifdef __cplusplus
 }

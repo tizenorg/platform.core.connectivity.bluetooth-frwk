@@ -38,6 +38,29 @@ static dpm_policy_t policy_table[DPM_POLICY_END] = {
 	[DPM_POLICY_BLUETOOTH_UUIDS_WHITELIST] = {NULL},
 	[DPM_POLICY_BLUETOOTH_UUIDS_BLACKLIST] = {NULL},
 	[DPM_POLICY_ALLOW_BLUETOOTH_OUTGOING_CALL] = {DPM_STATUS_ERROR},
+	[DPM_POLICY_BLUETOOTH_PAIRING_STATE] = {DPM_STATUS_ERROR},
+	[DPM_POLICY_BLUETOOTH_DESKTOP_CONNECTIVITY_STATE] = {DPM_STATUS_ERROR},
+	[DPM_POLICY_BLUETOOTH_DISCOVERABLE_STATE] = {DPM_STATUS_ERROR},
+	[DPM_POLICY_BLUETOOTH_LIMITED_DISCOVERABLE_STATE] = {DPM_STATUS_ERROR},
+	[DPM_POLICY_BLUETOOTH_DATA_TRANSFER_STATE] = {DPM_STATUS_ERROR},
+};
+
+
+/**
+ * @brief DPM profile state
+ * @see
+ */
+static dpm_profile_state_t dpm_profile_state[DPM_PROFILE_NONE]  = {
+	[DPM_POLICY_BLUETOOTH_A2DP_PROFILE_STATE] = {DPM_STATUS_ERROR},
+	[DPM_POLICY_BLUETOOTH_AVRCP_PROFILE_STATE] = {DPM_STATUS_ERROR},
+	[DPM_POLICY_BLUETOOTH_BPP_PROFILE_STATE] = {DPM_STATUS_ERROR},
+	[DPM_POLICY_BLUETOOTH_DUN_PROFILE_STATE] = {DPM_STATUS_ERROR},
+	[DPM_POLICY_BLUETOOTH_FTP_PROFILE_STATE] = {DPM_STATUS_ERROR},
+	[DPM_POLICY_BLUETOOTH_HFP_PROFILE_STATE] = {DPM_STATUS_ERROR},
+	[DPM_POLICY_BLUETOOTH_HSP_PROFILE_STATE] = {DPM_STATUS_ERROR},
+	[DPM_POLICY_BLUETOOTH_PBAP_PROFILE_STATE] = {DPM_STATUS_ERROR},
+	[DPM_POLICY_BLUETOOTH_SAP_PROFILE_STATE] = {DPM_STATUS_ERROR},
+	[DPM_POLICY_BLUETOOTH_SPP_PROFILE_STATE] = {DPM_STATUS_ERROR},
 };
 
 dpm_result_t _bt_dpm_set_allow_bluetooth_mode(dpm_bt_allow_t value)
@@ -291,4 +314,266 @@ dpm_result_t _bt_dpm_clear_bluetooth_uuids_from_whitelist(void)
 		}
 	}
 	return DPM_RESULT_SUCCESS;
+}
+
+dpm_status_t _bt_dpm_set_bluetooth_pairing_state(dpm_status_t value)
+{
+	BT_INFO("_bt_dpm_set_bluetooth_pairing_state");
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESTRICTED;
+
+	policy_table[DPM_POLICY_BLUETOOTH_PAIRING_STATE].value = value;
+
+	return DPM_RESULT_SUCCESS;
+}
+
+dpm_status_t _bt_dpm_get_bluetooth_pairing_state(void)
+{
+	BT_INFO("_bt_dpm_get_bluetooth_pairing_state");
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESTRICTED;
+
+	return policy_table[DPM_POLICY_BLUETOOTH_PAIRING_STATE].value;
+}
+
+dpm_status_t _bt_dpm_set_bluetooth_profile_state(dpm_profile_t profile, dpm_status_t value)
+{
+	BT_INFO("_bt_dpm_set_bluetooth_profile_state");
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESTRICTED;
+
+	dpm_profile_state[profile].value = value;
+
+	return DPM_RESULT_SUCCESS;
+}
+
+dpm_status_t _bt_dpm_get_bluetooth_profile_state(dpm_profile_t profile)
+{
+	BT_INFO("_bt_dpm_get_bluetooth_profile_state");
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESTRICTED;
+
+	return dpm_profile_state[profile].value;
+}
+
+dpm_status_t _bt_dpm_set_bluetooth_desktop_connectivity_state(dpm_status_t value)
+{
+	BT_INFO("_bt_dpm_set_bluetooth_desktop_connectivity_state");
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESTRICTED;
+
+	policy_table[DPM_POLICY_BLUETOOTH_DESKTOP_CONNECTIVITY_STATE].value = value;
+
+	return DPM_RESULT_SUCCESS;
+}
+
+dpm_status_t _bt_dpm_get_bluetooth_desktop_connectivity_state(void)
+{
+	BT_INFO("_bt_dpm_get_bluetooth_desktop_connectivity_state");
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESTRICTED;
+
+	return policy_table[DPM_POLICY_BLUETOOTH_DESKTOP_CONNECTIVITY_STATE].value;
+}
+
+dpm_status_t _bt_dpm_set_bluetooth_discoverable_state(dpm_status_t value)
+{
+	BT_INFO("_bt_dpm_set_bluetooth_discoverable_state");
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESTRICTED;
+
+	policy_table[DPM_POLICY_BLUETOOTH_DISCOVERABLE_STATE].value = value;
+
+	return DPM_RESULT_SUCCESS;
+}
+
+dpm_status_t _bt_dpm_get_bluetooth_discoverable_state(void)
+{
+	BT_INFO("_bt_dpm_get_bluetooth_discoverable_state");
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESTRICTED;
+
+	return policy_table[DPM_POLICY_BLUETOOTH_DISCOVERABLE_STATE].value;
+}
+
+dpm_status_t _bt_dpm_set_bluetooth_limited_discoverable_state(dpm_status_t value)
+{
+	BT_INFO("_bt_dpm_set_bluetooth_limited_discoverable_state");
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESTRICTED;
+
+	policy_table[DPM_POLICY_BLUETOOTH_LIMITED_DISCOVERABLE_STATE].value = value;
+
+	return DPM_RESULT_SUCCESS;
+}
+
+dpm_status_t _bt_dpm_get_bluetooth_limited_discoverable_state(void)
+{
+	BT_INFO("_bt_dpm_get_bluetooth_limited_discoverable_state");
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESTRICTED;
+
+	return policy_table[DPM_POLICY_BLUETOOTH_LIMITED_DISCOVERABLE_STATE].value;
+}
+
+dpm_status_t _bt_dpm_set_bluetooth_data_transfer_state(dpm_status_t value)
+{
+	BT_INFO("_bt_dpm_set_bluetooth_data_transfer_state");
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESTRICTED;
+
+	return policy_table[DPM_POLICY_BLUETOOTH_DATA_TRANSFER_STATE].value = value;
+}
+
+dpm_status_t _bt_dpm_get_allow_bluetooth_data_transfer_state(dpm_status_t value)
+{
+	BT_INFO("_bt_dpm_get_allow_bluetooth_data_transfer_state");
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESTRICTED;
+
+	return policy_table[DPM_POLICY_BLUETOOTH_DATA_TRANSFER_STATE].value;
+}
+
+dpm_result_t _bt_dpm_remove_bluetooth_devices_from_whitelist(GSList *device_addresses)
+{
+	GSList *l = NULL;
+	GSList *device_list = NULL;
+	BT_INFO("_bt_dpm_remove_bluetooth_devices_from_whitelist");
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESULT_ACCESS_DENIED;
+
+	for (device_list = device_addresses; device_list; device_list = g_slist_next(device_list)) {
+		for (l = policy_table[DPM_POLICY_BLUETOOTH_DEVICES_WHITELIST].list; l; l = g_slist_next(l)) {
+			if (l->data == device_list->data) {
+				char *addr = device_list->data;
+				if (addr) {
+					policy_table[DPM_POLICY_BLUETOOTH_DEVICES_WHITELIST].list =
+						g_slist_remove(policy_table[DPM_POLICY_BLUETOOTH_DEVICES_WHITELIST].list, addr);
+					g_free(addr);
+					break;
+				}
+			}
+		}
+	}
+	return DPM_RESULT_SUCCESS;
+}
+
+dpm_result_t _bt_dpm_remove_bluetooth_devices_from_blacklist(GSList *device_addresses)
+{
+	GSList *l = NULL;
+	GSList *device_list = NULL;
+	BT_INFO("_bt_dpm_remove_bluetooth_devices_from_blacklist");
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESULT_ACCESS_DENIED;
+
+	for (device_list = device_addresses; device_list; device_list = g_slist_next(device_list)) {
+		for (l = policy_table[DPM_POLICY_BLUETOOTH_DEVICES_BLACKLIST].list; l; l = g_slist_next(l)) {
+			if (l->data == device_list->data) {
+				char *addr = device_list->data;
+				if (addr) {
+					policy_table[DPM_POLICY_BLUETOOTH_DEVICES_BLACKLIST].list =
+						g_slist_remove(policy_table[DPM_POLICY_BLUETOOTH_DEVICES_BLACKLIST].list, addr);
+					g_free(addr);
+					break;
+				}
+			}
+		}
+	}
+	return DPM_RESULT_SUCCESS;
+}
+
+dpm_result_t _bt_dpm_remove_bluetooth_uuids_from_whitelist(GSList *uuids)
+{
+	GSList *l = NULL;
+	GSList *uuids_list = NULL;
+	BT_INFO("_bt_dpm_remove_bluetooth_uuids_from_whitelist");
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESULT_ACCESS_DENIED;
+
+	for (uuids_list = uuids; uuids_list; uuids_list = g_slist_next(uuids_list)) {
+		for (l = policy_table[DPM_POLICY_BLUETOOTH_UUIDS_WHITELIST].list; l; l = g_slist_next(l)) {
+			if (l->data == uuids_list->data) {
+				char *uuid = uuids_list->data;
+				if (uuid) {
+					policy_table[DPM_POLICY_BLUETOOTH_UUIDS_WHITELIST].list =
+						g_slist_remove(policy_table[DPM_POLICY_BLUETOOTH_UUIDS_WHITELIST].list, uuid);
+					g_free(uuid);
+					break;
+				}
+			}
+		}
+	}
+	return DPM_RESULT_SUCCESS;
+}
+
+dpm_result_t _bt_dpm_remove_bluetooth_uuids_from_blacklist(GSList *uuids)
+{
+	GSList *l = NULL;
+	GSList *uuids_list = NULL;
+	BT_INFO("_bt_dpm_remove_bluetooth_uuids_from_blacklist");
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESULT_ACCESS_DENIED;
+
+	for (uuids_list = uuids; uuids_list; uuids_list = g_slist_next(uuids_list)) {
+		for (l = policy_table[DPM_POLICY_BLUETOOTH_UUIDS_BLACKLIST].list; l; l = g_slist_next(l)) {
+			if (l->data == uuids_list->data) {
+				char *uuid = uuids_list->data;
+				if (uuid) {
+					policy_table[DPM_POLICY_BLUETOOTH_UUIDS_BLACKLIST].list =
+						g_slist_remove(policy_table[DPM_POLICY_BLUETOOTH_UUIDS_BLACKLIST].list, uuid);
+					g_free(uuid);
+					break;
+				}
+			}
+		}
+	}
+	return DPM_RESULT_SUCCESS;
+}
+
+dpm_result_t _bt_dpm_clear_bluetooth_uuids_from_list(void)
+{
+	BT_INFO("_bt_dpm_clear_bluetooth_uuids_from_list");
+	dpm_result_t err = DPM_RESULT_FAIL;
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESULT_ACCESS_DENIED;
+
+	err = _bt_dpm_clear_bluetooth_uuids_from_blacklist();
+	if (!err){
+		err = _bt_dpm_clear_bluetooth_uuids_from_blacklist();
+	}
+
+	return err;
+}
+
+dpm_result_t _bt_dpm_clear_bluetooth_devices_from_list(void)
+{
+	BT_INFO("_bt_dpm_clear_bluetooth_devices_from_list");
+	dpm_result_t err = DPM_RESULT_FAIL;
+
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
+		return DPM_RESULT_ACCESS_DENIED;
+
+	err = _bt_dpm_clear_bluetooth_devices_from_blacklist();
+	if (!err){
+		err = _bt_dpm_clear_bluetooth_devices_from_blacklist();
+	}
+
+	return err;
 }
