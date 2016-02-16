@@ -77,16 +77,16 @@ typedef enum http_request_state_tag {
 } http_request_state;
 
 
-// Temporary UUIDs. SIG has to define the UUIDs yet.
-#define HPS_UUID "00001900-0000-1000-8000-00805f9b34fb"
-#define HTTP_URI_UUID "00001901-0000-1000-8000-00805f9b34fb"
-#define HTTP_HDR_UUID "00001902-0000-1000-8000-00805f9b34fb"
-#define HTTP_ENTITY_UUID "00001903-0000-1000-8000-00805f9b34fb"
-#define HTTP_CP_UUID "00001904-0000-1000-8000-00805f9b34fb"
-#define HTTP_STATUS_UUID "00001905-0000-1000-8000-00805f9b34fb"
+/* HPS UUIDs. defined by SIG */
+#define HPS_UUID "1823"
+#define HTTP_URI_UUID "2ab6"
+#define HTTP_HDR_UUID "2ab7"
+#define HTTP_ENTITY_UUID "2ab9"
+#define HTTP_CP_UUID "2aba"
+#define HTTP_STATUS_UUID "2ab8"
+#define HTTP_SECURITY_UUID "2abb"
 /* CCC descriptor UUID is predefined by SIG */
 #define HTTP_STATUS_CCC_DESC_UUID "2902"
-#define HTTP_SECURITY_UUID "00001906-0000-1000-8000-00805f9b34fb"
 
 void _bt_hps_exit(void);
 int _bt_hps_prepare_httpproxy(void);
