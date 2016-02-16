@@ -284,6 +284,7 @@ sed -i 's/%TZ_SYS_DEFAULT_USER/app/' %{buildroot}%{_datadir}/dbus-1/system-servi
 %{_bindir}/bt-httpproxy
 %{_datadir}/license/bluetooth-frwk-httpproxy
 %{_datadir}/dbus-1/system-services/org.projectx.httpproxy.service
+%{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-httpproxy.conf
 
 %files core
 %manifest %{name}.manifest
