@@ -678,7 +678,7 @@ static void __bt_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
 
 		if (g_strrstr(err->message, "Already Exists")) {
 			BT_INFO("Existing Bond, remove and retry");
-			ret_if(__bt_remove_and_bond(device_path) == BLUETOOTH_ERROR_NONE);
+			ret_if(__bt_remove_and_bond((char *)device_path) == BLUETOOTH_ERROR_NONE);
 
 			BT_INFO("Fail to retry bonding");
 

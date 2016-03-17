@@ -138,6 +138,10 @@ void _bt_send_char_value_changed_event(void *param);
 
 gboolean _bt_is_set_scan_parameter(void);
 
+void _bt_register_adv_slot_owner(const char *sender, int adv_handle, int slot_id);
+
+void _bt_unregister_adv_slot_owner(int slot_id);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

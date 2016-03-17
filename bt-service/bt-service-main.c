@@ -223,8 +223,6 @@ int main(void)
 	sigaction(SIGINT, &sa, NULL);
 	sigaction(SIGTERM, &sa, NULL);
 
-	g_type_init();
-
 	/* Security Initialization */
 	if (_bt_service_cynara_init() != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Fail to init cynara");

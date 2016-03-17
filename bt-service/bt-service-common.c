@@ -53,8 +53,6 @@ GDBusConnection *_bt_gdbus_init_system_gconn(void)
 
 	dbus_threads_init_default();
 
-	g_type_init();
-
 	if (system_gconn != NULL)
 		return system_gconn;
 
@@ -94,8 +92,6 @@ static GDBusProxy *__bt_init_manager_proxy(void)
 {
 	GDBusProxy *proxy;
 
-	g_type_init();
-
 	if (system_conn == NULL) {
 		system_conn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, NULL);
 		retv_if(system_conn == NULL, NULL);
@@ -117,8 +113,6 @@ static GDBusProxy *__bt_init_adapter_proxy(void)
 	GDBusProxy *manager_proxy;
 	GDBusProxy *proxy;
 	char *adapter_path = NULL;
-
-	g_type_init();
 
 	if (system_conn == NULL) {
 		system_conn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, NULL);
@@ -150,8 +144,6 @@ static GDBusProxy *__bt_init_adapter_properties_proxy(void)
 	GDBusProxy *proxy;
 	char *adapter_path = NULL;
 
-	g_type_init();
-
 	if (system_conn == NULL) {
 		system_conn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, NULL);
 		retv_if(system_conn == NULL, NULL);
@@ -178,8 +170,6 @@ static GDBusProxy *__bt_init_adapter_properties_proxy(void)
 
 GDBusConnection *__bt_init_system_gconn(void)
 {
-	g_type_init();
-
 	if (system_conn == NULL)
 		system_conn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, NULL);
 

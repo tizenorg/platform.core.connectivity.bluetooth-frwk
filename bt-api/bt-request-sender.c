@@ -43,8 +43,6 @@ static GDBusProxy *__bt_gdbus_init_service_proxy(void)
 	GDBusProxy *proxy;
 	GError *err = NULL;
 
-	g_type_init();
-
 	service_gconn = _bt_gdbus_get_system_gconn();
 
 	if (!service_gconn)

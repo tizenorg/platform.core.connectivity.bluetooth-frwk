@@ -79,8 +79,6 @@ static GDBusProxy *__bt_core_gdbus_init_service_proxy(void)
 	GError *err = NULL;
 	GDBusConnection *conn;
 
-	g_type_init();
-
 	conn = _bt_core_get_gdbus_connection();
 	if (!conn)
 		return NULL;
@@ -160,8 +158,6 @@ static GDBusProxy *_bt_core_gdbus_init_hps_proxy(void)
 	GDBusProxy *proxy;
 	GError *err = NULL;
 	GDBusConnection *conn;
-
-	g_type_init();
 
 	BT_DBG(" ");
 
