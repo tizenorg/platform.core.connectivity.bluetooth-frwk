@@ -2514,7 +2514,6 @@ static void __bt_event_data_free(void *data)
 
 int _bt_register_event(int event_type, void *event_cb, void *user_data)
 {
-	GError *error = NULL;
 	GDBusConnection *connection_type;
 	GDBusSignalCallback event_func;
 	bt_event_info_t *cb_data;

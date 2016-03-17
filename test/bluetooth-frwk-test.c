@@ -1228,7 +1228,6 @@ void startup()
 
 	dbus_threads_init_default();
 
-	g_type_init();
 	main_loop = g_main_loop_new(NULL, FALSE);
 }
 

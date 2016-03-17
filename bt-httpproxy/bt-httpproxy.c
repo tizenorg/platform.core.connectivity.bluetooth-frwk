@@ -1704,9 +1704,6 @@ int main(void)
 	sigaction(SIGTERM, &sa, NULL);
 	sigaction(SIGKILL, &sa, NULL);
 
-	// g_type_init is deprecated glib 2.36 onwards, current version id 2.15
-	g_type_init();
-
 #ifndef	HPS_GATT_DB
 	if(bluetooth_register_callback(bt_hps_event_callback, NULL) != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("bluetooth_register_callback returned failiure");

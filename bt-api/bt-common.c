@@ -39,7 +39,6 @@
 
 static bt_user_info_t user_info[BT_MAX_USER_INFO];
 static DBusConnection *system_conn = NULL;
-static GDBusConnection *system_gdbus_conn = NULL;
 
 
 static guint bus_id;
@@ -83,8 +82,6 @@ GDBusConnection *g_bus_get_private_conn(void)
 GDBusConnection *_bt_gdbus_init_system_gconn(void)
 {
 	dbus_threads_init_default();
-
-	g_type_init();
 
 	if (system_gconn != NULL)
 		return system_gconn;

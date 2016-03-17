@@ -487,7 +487,7 @@ void _bt_handle_adapter_event(GVariant *msg, const char *member)
 				param);
 
 		if (event == BLUETOOTH_EVENT_ADVERTISING_STOPPED)
-			__bt_unregister_adv_slot_owner(slot_id);
+			_bt_unregister_adv_slot_owner(slot_id);
 	} else if (strcasecmp(member, "RssiEnabled") == 0) {
 		BT_DBG("RSSI Enabled");
 		gboolean status = FALSE;
@@ -1475,7 +1475,7 @@ void _bt_handle_gatt_event(GVariant *msg, const char *member, const char *path)
 
 void _bt_handle_device_event(GVariant *msg, const char *member, const char *path)
 {
-	int event;
+	int event = 0;
 	int result = BLUETOOTH_ERROR_NONE;
 	char *address;
 	char *dev_name;
@@ -1939,7 +1939,7 @@ void _bt_handle_device_event(GVariant *msg, const char *member, const char *path
 		param = g_variant_new("(isqqqq)", result, address, tx_octets, tx_time,
 				rx_octets, rx_time);
 		/* Send event to application */
-		_bt_send_event(BT_DEVICE_EVENT,	event, param);
+		_bt_send_event(BT_DEVICE_EVENT, event, param);
 		g_free(address);
 	}
 

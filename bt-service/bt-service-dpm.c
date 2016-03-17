@@ -121,7 +121,6 @@ dpm_status_t _bt_dpm_is_bluetooth_uuid_restriction_active(void)
 
 dpm_result_t _bt_dpm_add_bluetooth_devices_to_blacklist(char *device_address)
 {
-	GSList *l = NULL;
 	char *dev_addr;
 	BT_INFO("_bt_dpm_add_bluetooth_devices_to_blacklist");
 
@@ -147,7 +146,6 @@ GSList *_bt_dpm_get_bluetooth_devices_from_blacklist(void)
 
 dpm_result_t _bt_dpm_add_bluetooth_devices_to_whitelist(char *device_address)
 {
-	GSList *l = NULL;
 	char *dev_addr;
 	BT_INFO("_bt_dpm_add_bluetooth_devices_to_whitelist");
 
@@ -173,7 +171,6 @@ GSList *_bt_dpm_get_bluetooth_devices_from_whitelist(void)
 
 dpm_result_t _bt_dpm_add_bluetooth_uuids_to_blacklist(char *uuid)
 {
-	GSList *l = NULL;
 	char *l_uuid;
 	BT_INFO("_bt_dpm_add_bluetooth_uuids_to_blacklist");
 
@@ -199,7 +196,6 @@ GSList *_bt_dpm_get_bluetooth_uuids_from_blacklist(void)
 
 dpm_result_t _bt_dpm_add_bluetooth_uuids_to_whitelist(char *uuid)
 {
-	GSList *l = NULL;
 	char *l_uuid;
 	BT_INFO("_bt_dpm_add_bluetooth_uuids_to_blacklist");
 

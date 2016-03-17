@@ -851,7 +851,7 @@ int __bt_pbap_call_get_phonebook(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 
 	g_free(format_str);
 	g_free(order_str);
-	g_hash_table_destroy(filters);
+	g_hash_table_destroy((GHashTable *)filters);
 
 	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
@@ -900,7 +900,7 @@ int __bt_pbap_call_get_vcards_list(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 
 	g_free(folder);
 	g_free(order_str);
-	g_hash_table_unref(filters);
+	g_hash_table_unref((GHashTable *)filters);
 	/* In _bt_pbap_get_list(), path(type) is set to "nil", but current type is not null.
 	     The path should be reset here */
 	selected_path.type = -1;
@@ -977,7 +977,7 @@ int __bt_pbap_call_get_vcard(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 
 	g_free(format_str);
 	g_free(vcard_handle);
-	g_hash_table_destroy(filters);
+	g_hash_table_destroy((GHashTable *)filters);
 
 	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
@@ -1027,7 +1027,7 @@ int __bt_pbap_call_search_phonebook(GDBusProxy *proxy, bt_pbap_data_t *pbap_data
 	g_free(value);
 	g_free(order_str);
 	g_free(field);
-	g_hash_table_destroy(filters);
+	g_hash_table_destroy((GHashTable *)filters);
 
 	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
