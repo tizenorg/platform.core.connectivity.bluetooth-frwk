@@ -123,7 +123,11 @@ export FFLAGS="$FFLAGS -DTIZEN_DEBUG_ENABLE"
 
 %if "%{?profile}" == "mobile"
 export CFLAGS="$CFLAGS -DTIZEN_NETWORK_TETHERING_ENABLE -DTIZEN_BT_FLIGHTMODE_ENABLED -DTIZEN_MOBILE -DTIZEN_TELEPHONY_ENABLED"
+%if "%{?tizen_target_name}" == "TM1"
+%define _servicefile packaging/bluetooth-frwk-mobile-sprd.service
+%else
 %define _servicefile packaging/bluetooth-frwk-mobile.service
+%endif
 %define _servicedir multi-user.target.wants
 %endif
 
