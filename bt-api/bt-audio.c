@@ -366,52 +366,43 @@ BT_EXPORT_API int bluetooth_ag_set_speaker_gain(unsigned int speaker_gain)
 #define BT_HF_INTERFACE "org.tizen.HfApp"
 
 
-static DBusMessage* __bt_hf_agent_dbus_send(const char *path,
-			const char *interface, const char *method, DBusError *err,  int type, ...)
+static GVariant* __bt_hf_agent_dbus_send(const char *path, const char *interface,
+				const char *method, GError **err, GVariant *parameters)
 {
-	DBusMessage *msg;
-	DBusMessage *reply;
-	va_list args;
+	GVariant *reply = NULL;
+	GDBusProxy *proxy = NULL;
+	GDBusConnection *conn = NULL;
 
-	msg = dbus_message_new_method_call(BT_HF_SERVICE_NAME,
-			path, interface, method);
-	if (!msg) {
-		BT_ERR("Unable to allocate new D-Bus %s message \n", method);
+	conn = _bt_gdbus_get_system_gconn();
+	retv_if(conn == NULL, NULL);
+
+	proxy = g_dbus_proxy_new_sync(conn, G_DBUS_PROXY_FLAGS_NONE,
+		NULL, BT_HF_SERVICE_NAME, path, interface, NULL, err);
+	if (proxy == NULL) {
+		BT_ERR("Unable to allocate new proxy");
 		return NULL;
 	}
 
-	va_start(args, type);
+	reply = g_dbus_proxy_call_sync(proxy, method, parameters,
+				G_DBUS_CALL_FLAGS_NONE, -1, NULL, err);
 
-	if (!dbus_message_append_args_valist(msg, type, args)) {
-		dbus_message_unref(msg);
-		va_end(args);
-		return NULL;
-	}
-
-	va_end(args);
-
-	dbus_error_init(err);
-
-	BT_DBG("DBus HF API call, method = %s", method);
-
-	reply = dbus_connection_send_with_reply_and_block(_bt_get_system_conn(),
-					msg, 4000, err);
-	dbus_message_unref(msg);
-
+	g_object_unref(proxy);
 	return reply;
 }
 
-static int __bt_hf_agent_read_call_list(DBusMessage *reply,
+static int __bt_hf_agent_read_call_list(GVariant *reply,
 				bt_hf_call_list_s **call_list) {
 
-	DBusMessageIter iter;
-	DBusMessageIter iter_struct;
+	GVariantIter iter;
+	GVariant *var_temp = NULL;
 	int32_t call_count;
+	gchar *num = NULL;
+	int dir, status, mpart, idx;
 
 	BT_DBG("+");
 
-	dbus_message_iter_init(reply, &iter);
-	dbus_message_iter_get_basic(&iter, &call_count);
+	g_variant_get(reply, "(i@a(siiii))", &call_count, &var_temp);
+
 	if(call_count <= 0) {
 		*call_list = NULL;
 		return BLUETOOTH_ERROR_NOT_FOUND;
@@ -423,35 +414,23 @@ static int __bt_hf_agent_read_call_list(DBusMessage *reply,
 	retv_if(*call_list == NULL, BLUETOOTH_ERROR_MEMORY_ALLOCATION);
 
 	(*call_list)->count = call_count;
-	dbus_message_iter_next(&iter);
-	dbus_message_iter_recurse(&iter, &iter_struct);
-	while(dbus_message_iter_get_arg_type(&iter_struct) ==
-			DBUS_TYPE_STRUCT) {
 
-		gchar *number = NULL;
+	g_variant_iter_init(&iter, var_temp);
+	while(g_variant_iter_loop(&iter, "(siiii)", &num, &dir, &status, &mpart, &idx)){
 		bt_hf_call_status_info_t *call_info;
-		DBusMessageIter entry_iter;
 
 		call_info = g_malloc0(sizeof(bt_hf_call_status_info_t));
 		/* Fix : NULL_RETURNS */
 		retv_if(call_info == NULL, BLUETOOTH_ERROR_MEMORY_ALLOCATION);
 
-		dbus_message_iter_recurse(&iter_struct,&entry_iter);
-
-		dbus_message_iter_get_basic(&entry_iter, &number);
-		call_info->number = g_strdup(number);
-		dbus_message_iter_next(&entry_iter);
-		dbus_message_iter_get_basic(&entry_iter, &call_info->direction);
-		dbus_message_iter_next(&entry_iter);
-		dbus_message_iter_get_basic(&entry_iter, &call_info->status);
-		dbus_message_iter_next(&entry_iter);
-		dbus_message_iter_get_basic(&entry_iter, &call_info->mpart);
-		dbus_message_iter_next(&entry_iter);
-		dbus_message_iter_get_basic(&entry_iter, &call_info->idx);
+		call_info->number = g_strdup(num);
+		call_info->direction = dir;
+		call_info->status = status;
+		call_info->mpart= mpart;
+		call_info->idx = idx;
 
 		(*call_list)->list = g_list_append((*call_list)->list,
 							(gpointer)call_info);
-		dbus_message_iter_next(&iter_struct);
 	}
 	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
@@ -465,13 +444,6 @@ BT_EXPORT_API int bluetooth_hf_init(bt_hf_func_ptr cb, void *user_data)
 		BT_ERR("callback is NULL");
 		return BLUETOOTH_ERROR_INVALID_PARAM;
 	}
-
-	ret = dbus_threads_init_default();
-
-	if (ret)
-		BT_ERR("dbus_thread_init_default Success");
-	else
-		BT_ERR("dbus_thread_init_default Fail");
 
 	ret = _bt_init_event_handler();
 
@@ -571,62 +543,62 @@ BT_EXPORT_API int bluetooth_hf_disconnect(bluetooth_device_address_t *remote_add
 
 BT_EXPORT_API int bluetooth_hf_answer_call()
 {
-	DBusMessage *reply;
-	DBusError err;
+	GVariant *reply = NULL;
+	GError *err = NULL;
 	int ret = BLUETOOTH_ERROR_INTERNAL;
 
 	BT_CHECK_ENABLED(return);
 
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
-			"AnswerCall", &err, DBUS_TYPE_INVALID);
+			"AnswerCall", &err, NULL);
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("Error = %s", err.message);
-			if (strcmp(err.message, "Operation not supported") == 0)
+		if (err) {
+			BT_ERR("Error = %s", err->message);
+			g_dbus_error_strip_remote_error(err);
+			if (strcmp(err->message, "Operation not supported") == 0)
 				ret = BLUETOOTH_ERROR_NOT_IN_OPERATION;
-			else if (strcmp(err.message, "Operation not allowed") == 0)
+			else if (strcmp(err->message, "Operation not allowed") == 0)
 				ret = BLUETOOTH_ERROR_PERMISSION_DEINED;
 			else
 				ret = BLUETOOTH_ERROR_INTERNAL;
-			dbus_error_free(&err);
+			g_clear_error(&err);
 		}
 		return ret;
 	}
 
-	dbus_message_unref(reply);
-
+	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;
 
 }
 
 BT_EXPORT_API int bluetooth_hf_terminate_call()
 {
-	DBusMessage *reply;
-	DBusError err;
+	GVariant *reply = NULL;
+	GError *err = NULL;
 
 	BT_CHECK_ENABLED(return);
 
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
-			"TerminateCall", &err, DBUS_TYPE_INVALID);
+			"TerminateCall", &err, NULL);
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("Error = %s", err.message);
-			dbus_error_free(&err);
+		if (err) {
+			BT_ERR("Error = %s", err->message);
+			g_clear_error(&err);
 		}
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	dbus_message_unref(reply);
-
+	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_hf_initiate_call(char *number)
 {
-	DBusMessage *reply;
-	DBusError err;
+	GVariant *reply = NULL;
+	GError *err = NULL;
+	GVariant *param = NULL;
 	int ret = BLUETOOTH_ERROR_INTERNAL;
 
 	BT_CHECK_ENABLED(return);
@@ -634,240 +606,240 @@ BT_EXPORT_API int bluetooth_hf_initiate_call(char *number)
 	if (!number)
 		number = "";
 
+	param = g_variant_new("(s)", number);
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
-			"InitiateCall", &err, DBUS_TYPE_STRING, &number, DBUS_TYPE_INVALID);
+			"InitiateCall", &err, param);
 	if (!reply) {
 		BT_ERR("Error returned in method call");
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("Error = %s", err.message);
-			if (strcmp(err.message, "NotConnected") == 0)
+		if (err) {
+			BT_ERR("Error = %s", err->message);
+			g_dbus_error_strip_remote_error(err);
+			if (strcmp(err->message, "NotConnected") == 0)
 				ret = BLUETOOTH_ERROR_NOT_CONNECTED;
-			else if (strcmp(err.message, "Operation not allowed") == 0)
+			else if (strcmp(err->message, "Operation not allowed") == 0)
 				ret = BLUETOOTH_ERROR_IN_PROGRESS;
 			else
 				ret = BLUETOOTH_ERROR_INTERNAL;
-			dbus_error_free(&err);
+			g_clear_error(&err);
 		}
 		return ret;
 	}
 
-	dbus_message_unref(reply);
-
+	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_hf_voice_recognition(unsigned int status)
 {
-	DBusMessage *reply;
-	DBusError err;
+	GVariant *reply = NULL;
+	GError *err = NULL;
+	GVariant *param = NULL;
 
 	BT_CHECK_ENABLED(return);
 
+	param = g_variant_new("(i)", status);
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
-			"VoiceRecognition", &err, DBUS_TYPE_INT32, &status, DBUS_TYPE_INVALID);
+			"VoiceRecognition", &err, param);
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("Error = %s", err.message);
-			dbus_error_free(&err);
+		if (err) {
+			BT_ERR("Error = %s", err->message);
+			g_clear_error(&err);
 		}
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	dbus_message_unref(reply);
-
+	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_hf_audio_disconnect(void)
 {
-	DBusMessage *reply;
-	DBusError err;
+	GVariant *reply = NULL;
+	GError *err = NULL;
 
 	BT_CHECK_ENABLED(return);
 
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
-			"ScoDisconnect", &err, DBUS_TYPE_INVALID);
+			"ScoDisconnect", &err, NULL);
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("Error = %s", err.message);
-			dbus_error_free(&err);
+		if (err) {
+			BT_ERR("Error = %s", err->message);
+			g_clear_error(&err);
 		}
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	dbus_message_unref(reply);
-
+	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_hf_set_speaker_gain(unsigned int speaker_gain)
 {
-	DBusMessage *reply;
-	DBusError err;
+	GVariant *reply = NULL;
+	GError *err = NULL;
+	GVariant *param = NULL;
 
 	BT_CHECK_ENABLED(return);
 
+	param = g_variant_new("(u)", speaker_gain);
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
-			"SpeakerGain", &err, DBUS_TYPE_UINT32, &speaker_gain, DBUS_TYPE_INVALID);
+			"SpeakerGain", &err, param);
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("Error = %s", err.message);
-			dbus_error_free(&err);
+		if (err) {
+			BT_ERR("Error = %s", err->message);
+			g_clear_error(&err);
 		}
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	dbus_message_unref(reply);
-
+	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_hf_send_dtmf(char *dtmf)
 {
-	DBusMessage *reply;
-	DBusError err;
+	GVariant *reply = NULL;
+	GError *err = NULL;
+	GVariant *param = NULL;
 
 	BT_CHECK_ENABLED(return);
 
+	param = g_variant_new("(s)", dtmf);
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
-			"SendDtmf", &err, DBUS_TYPE_STRING, &dtmf, DBUS_TYPE_INVALID);
+			"SendDtmf", &err, param);
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("Error = %s", err.message);
-			dbus_error_free(&err);
+		if (err) {
+			BT_ERR("Error = %s", err->message);
+			g_clear_error(&err);
 		}
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	dbus_message_unref(reply);
-
+	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_hf_send_xsat_cmd(int app_id, char *xsat_cmd)
 {
-	DBusMessage *reply;
-	DBusError err;
+	GVariant *reply = NULL;
+	GError *err = NULL;
+	GVariant *param = NULL;
 	char buffer[200] = {0,};
 	char *ptr = buffer;
 
 	BT_CHECK_ENABLED(return);
 
 	strcpy(buffer, "AT+XSAT=");
-	/* Fix : OVERRUN */
-	snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), "%d,", app_id);
+	snprintf(buffer + strlen(buffer), sizeof(buffer), "%d,", app_id);
 	strncat(buffer, xsat_cmd, (sizeof(buffer) - 1) - strlen(buffer));
 	BT_DBG("Xsat cmd received = %s", buffer);
+
+	param = g_variant_new("(s)", ptr);
+
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
-					"SendAtCmd", &err, DBUS_TYPE_STRING,
-						&ptr, DBUS_TYPE_INVALID);
+					"SendAtCmd", &err, param);
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("Error = %s", err.message);
-			dbus_error_free(&err);
+		if (err) {
+			BT_ERR("Error = %s", err->message);
+			g_clear_error(&err);
 		}
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	dbus_message_unref(reply);
-
+	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_hf_release_and_accept(void)
 {
-	DBusMessage *reply;
-	DBusError err;
+	GVariant *reply = NULL;
+	GError *err = NULL;
 
 	BT_CHECK_ENABLED(return);
 
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
-			"ReleaseAndAccept", &err, DBUS_TYPE_INVALID);
+			"ReleaseAndAccept", &err, NULL);
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("Error = %s", err.message);
-			dbus_error_free(&err);
+		if (err) {
+			BT_ERR("Error = %s", err->message);
+			g_clear_error(&err);
 		}
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	dbus_message_unref(reply);
-
+	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_hf_swap_call(void)
 {
-	DBusMessage *reply;
-	DBusError err;
+	GVariant *reply = NULL;
+	GError *err = NULL;
 
 	BT_CHECK_ENABLED(return);
 
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
-			"CallSwap", &err, DBUS_TYPE_INVALID);
+			"CallSwap", &err, NULL);
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("Error = %s", err.message);
-			dbus_error_free(&err);
+		if (err) {
+			BT_ERR("Error = %s", err->message);
+			g_clear_error(&err);
 		}
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	dbus_message_unref(reply);
-
+	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_hf_release_all_call(void)
 {
-	DBusMessage *reply;
-	DBusError err;
+	GVariant *reply = NULL;
+	GError *err = NULL;
 
 	BT_CHECK_ENABLED(return);
 
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
-			"ReleaseAllCall", &err, DBUS_TYPE_INVALID);
+			"ReleaseAllCall", &err, NULL);
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("Error = %s", err.message);
-			dbus_error_free(&err);
+		if (err) {
+			BT_ERR("Error = %s", err->message);
+			g_clear_error(&err);
 		}
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	dbus_message_unref(reply);
-
+	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_hf_join_call(void)
 {
-	DBusMessage *reply;
-	DBusError err;
+	GVariant *reply = NULL;
+	GError *err = NULL;
 
 	BT_CHECK_ENABLED(return);
 
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
-			"JoinCall", &err, DBUS_TYPE_INVALID);
+			"JoinCall", &err, NULL);
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("Error = %s", err.message);
-			dbus_error_free(&err);
+		if (err) {
+			BT_ERR("Error = %s", err->message);
+			g_clear_error(&err);
 		}
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	dbus_message_unref(reply);
-
+	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;
 }
 
@@ -924,78 +896,75 @@ BT_EXPORT_API int bluetooth_hf_free_call_list(bt_hf_call_list_s *call_list)
 BT_EXPORT_API int bluetooth_hf_request_call_list(
 					bt_hf_call_list_s **call_list)
 {
-	DBusMessage *reply;
-	DBusError err;
+	GVariant *reply = NULL;
+	GError *err = NULL;
 
 	BT_CHECK_ENABLED(return);
 
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
-			"RequestCallList", &err, DBUS_TYPE_INVALID);
+			"RequestCallList", &err, NULL);
 	if (!reply) {
 		BT_ERR("dbus Error or call list is null\n");
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("Error = %s", err.message);
-			dbus_error_free(&err);
+		if (err) {
+			BT_ERR("Error = %s", err->message);
+			g_clear_error(&err);
 		}
 		*call_list = NULL;
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 	__bt_hf_agent_read_call_list(reply, call_list);
 
-	dbus_message_unref(reply);
+	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_hf_get_codec(unsigned int *codec_id)
 {
-	DBusMessage *reply;
-	DBusError err;
-	DBusMessageIter iter;
+	GVariant *reply = NULL;
+	GError *err = NULL;
 	int32_t current_codec;
 
 	BT_CHECK_ENABLED(return);
 
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
-			"GetCurrentCodec", &err, DBUS_TYPE_INVALID);
+			"GetCurrentCodec", &err, NULL);
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("Error = %s", err.message);
-			dbus_error_free(&err);
+		if (err) {
+			BT_ERR("Error = %s", err->message);
+			g_clear_error(&err);
 		}
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
-	dbus_message_iter_init(reply, &iter);
-	dbus_message_iter_get_basic(&iter, &current_codec);
+
+	g_variant_get(reply, "(i)", &current_codec);
 	*codec_id = current_codec;
 	BT_DBG(" Codec ID is : %d", *codec_id);
 
-	dbus_message_unref(reply);
-
+	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_hf_get_audio_connected(unsigned int *audio_connected)
 {
-	DBusMessage *reply;
-	DBusError err;
-	DBusMessageIter iter;
+	GVariant *reply = NULL;
+	GError *err = NULL;
 	int32_t sco_audio_connected_from_bt_agent;
 
 	BT_CHECK_ENABLED(return);
 
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
-			"GetAudioConnected", &err, DBUS_TYPE_INVALID);
+			"GetAudioConnected", &err, NULL);
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("Error = %s", err.message);
-			dbus_error_free(&err);
+		if (err) {
+			BT_ERR("Error = %s", err->message);
+			g_clear_error(&err);
 		}
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
-	dbus_message_iter_init(reply, &iter);
-	dbus_message_iter_get_basic(&iter, &sco_audio_connected_from_bt_agent);
+
+	g_variant_get(reply, "(i)", &sco_audio_connected_from_bt_agent);
 	*audio_connected = sco_audio_connected_from_bt_agent;
 
 	if (*audio_connected == BLUETOOTH_HF_AUDIO_CONNECTED) {
@@ -1004,38 +973,35 @@ BT_EXPORT_API int bluetooth_hf_get_audio_connected(unsigned int *audio_connected
 		BT_DBG("SCO Audio is Disconnected");
 	}
 
-	dbus_message_unref(reply);
-
+	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_hf_is_connected(gboolean *hf_connected)
 {
-	DBusMessage *reply;
-	DBusError err;
-	DBusMessageIter iter;
+	GVariant *reply = NULL;
+	GError *err = NULL;
 	gboolean hf_connected_from_bt_agent;
 
 	BT_CHECK_ENABLED(return);
 
 	reply = __bt_hf_agent_dbus_send(BT_HF_OBJECT_PATH, BT_HF_INTERFACE,
-			"IsHfConnected", &err, DBUS_TYPE_INVALID);
+			"IsHfConnected", &err, NULL);
 	if (!reply) {
 		BT_ERR("Error returned in method call\n");
-		if (dbus_error_is_set(&err)) {
-			BT_ERR("Error = %s", err.message);
-			dbus_error_free(&err);
+		if (err) {
+			BT_ERR("Error = %s", err->message);
+			g_clear_error(&err);
 		}
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
-	dbus_message_iter_init(reply, &iter);
-	dbus_message_iter_get_basic(&iter, &hf_connected_from_bt_agent);
+
+	g_variant_get(reply, "(b)", &hf_connected_from_bt_agent);
 	*hf_connected = hf_connected_from_bt_agent;
 
 	BT_DBG("%s", *hf_connected ? "Connected":"Disconnected");
 
-	dbus_message_unref(reply);
-
+	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;
 }
 
