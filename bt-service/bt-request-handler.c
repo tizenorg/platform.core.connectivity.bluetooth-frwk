@@ -165,7 +165,7 @@ static void __bt_service_method(GDBusConnection *connection,
 		GVariant *out_var = NULL;
 		int result = 0;
 		int request_id = -1;
-		char *sender = NULL;
+		const char *sender = NULL;
 
 		g_variant_get(parameters, "(iii@ay@ay@ay@ay@ay)", &service_type,
 				&service_function, &request_type,
@@ -1639,7 +1639,7 @@ int __bt_obexd_request(int function_name,
 		GDBusProxy *process_proxy;
 		guint owner_pid = 0;
 		int opp_server_pid = 0;
-		gchar *owner_sender_name;
+		const gchar *owner_sender_name =  NULL;
 		GDBusConnection *owner_connection = NULL;
 		GVariant *val_get = NULL;
 		GError *error_connection = NULL;

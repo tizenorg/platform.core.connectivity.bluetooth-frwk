@@ -557,29 +557,6 @@ static struct gatt_service_info *__bt_gatt_find_gatt_service_from_desc(const cha
 	return NULL;
 }
 
-static struct gatt_char_info *__bt_gatt_find_gatt_char_from_desc(const char *desc_path)
-{
-	GSList *l1, *l2, *l3;
-
-	for (l1 = gatt_services; l1 != NULL; l1 = l1->next) {
-		struct gatt_service_info *serv_info = l1->data;
-
-		for (l2 = serv_info->char_data; l2 != NULL; l2 = l2->next) {
-			struct gatt_char_info *char_info = l2->data;
-
-			for (l3 = char_info->desc_data; l3 != NULL; l3 = l3->next) {
-				struct gatt_desc_info *desc_info = l3->data;
-
-				if (g_strcmp0(desc_info->desc_path, desc_path)
-							== 0)
-					return char_info;
-			}
-		}
-	}
-	BT_ERR("Gatt Characterisitc not found");
-	return NULL;
-}
-
 static void __bt_gatt_char_method_call(GDBusConnection *connection,
 					const gchar *sender,
 					const gchar *object_path,
@@ -599,7 +576,6 @@ static void __bt_gatt_char_method_call(GDBusConnection *connection,
 		struct gatt_req_info *req_info = NULL;
 		struct gatt_service_info *svc_info = NULL;
 
-		int i;
 		BT_DBG("ReadValue");
 
 		g_variant_get(parameters, "(&syq)", &addr, &req_id, &offset);
@@ -633,7 +609,6 @@ static void __bt_gatt_char_method_call(GDBusConnection *connection,
 			gatt_requests = g_slist_append(gatt_requests, req_info);
 
 			if (user_info != NULL) {
-				struct gatt_char_info *char_info = NULL;
 				_bt_common_event_cb(
 					BLUETOOTH_EVENT_GATT_SERVER_READ_REQUESTED,
 					BLUETOOTH_ERROR_NONE, &read_req,
@@ -821,9 +796,6 @@ static void __bt_gatt_desc_method_call(GDBusConnection *connection,
 					GDBusMethodInvocation *invocation,
 					gpointer user_data)
 {
-	GVariantBuilder *inner_builder = NULL;
-	int i;
-
 	if (g_strcmp0(method_name, "ReadValue") == 0) {
 		gchar *addr = NULL;
 		guint8 req_id = 1;
@@ -862,8 +834,6 @@ static void __bt_gatt_desc_method_call(GDBusConnection *connection,
 			gatt_requests = g_slist_append(gatt_requests, req_info);
 
 			if (user_info != NULL) {
-				struct gatt_char_info *char_info = NULL;
-
 				_bt_common_event_cb(
 					BLUETOOTH_EVENT_GATT_SERVER_READ_REQUESTED,
 					BLUETOOTH_ERROR_NONE, &read_req,
@@ -1114,48 +1084,6 @@ static int desc_info_cmp(gconstpointer a1, gconstpointer a2)
 	const struct gatt_desc_info *attrib2 = a2;
 
 	return g_strcmp0(attrib1->desc_path, attrib2->desc_path);
-}
-
-static gboolean __bt_gatt_update_attribute_info(struct gatt_req_info *req_info,
-			char *value, int value_length)
-{
-	GSList *l1, *l2, *l3;
-	int found = 0;
-	for (l1 = gatt_services; l1 != NULL; l1 = l1->next) {
-		struct gatt_service_info *serv_info = l1->data;
-
-		if (serv_info && g_strcmp0(serv_info->serv_path, req_info->svc_path) == 0) {
-
-			for (l2 = serv_info->char_data; l2 != NULL; l2 = l2->next) {
-				struct gatt_char_info *char_info = l2->data;
-
-				if (char_info) {
-					if (g_strcmp0(char_info->char_path, req_info->attr_path) == 0) {
-						memcpy(&char_info->char_value[req_info->offset], value, value_length);
-						serv_info->char_data = g_slist_insert_sorted (serv_info->char_data, char_info, char_info_cmp);
-						found = 1;
-						break;
-					} else {
-						for (l3 = char_info->desc_data; l3 != NULL; l3 = l3->next) {
-							struct gatt_desc_info *desc_info = l3->data;
-
-							if (desc_info && g_strcmp0(desc_info->desc_path, req_info->attr_path)
-										== 0) {
-								memcpy(&desc_info->desc_value[req_info->offset], value, value_length);
-								char_info->desc_data = g_slist_insert_sorted (char_info->desc_data, desc_info, desc_info_cmp);
-								found = 1;
-								break;
-							}
-						}
-					}
-				}
-			}
-		}
-		if (found) {
-			return TRUE;;
-		}
-	}
-	return FALSE;
 }
 
 static GDBusProxy *__bt_gatt_gdbus_init_manager_proxy(const gchar *service,

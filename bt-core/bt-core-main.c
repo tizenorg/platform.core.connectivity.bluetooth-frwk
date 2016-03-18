@@ -80,7 +80,6 @@ static gboolean __bt_check_bt_core(void *data)
 	int flight_mode_deactivation = 0;
 	int bt_off_due_to_timeout = 0;
 	int ps_mode_deactivation = 0;
-	int ret;
 
 	status = _bt_core_get_status();
 	le_status = _bt_core_get_le_status();
@@ -149,7 +148,6 @@ int main(void)
 	gboolean ret;
 	struct sigaction sa;
 
-	g_type_init();
 	BT_INFO_C("Starting bt-core daemeon");
 
 	_bt_core_update_status();

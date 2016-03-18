@@ -194,7 +194,6 @@ int main()
 	GMainLoop *agent_loop;
 	int cmd;
 
-	g_type_init();
 	agent_loop = g_main_loop_new(NULL, FALSE);
 
 	printf("MP-AV test application started\n");

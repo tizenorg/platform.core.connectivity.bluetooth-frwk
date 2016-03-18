@@ -32,6 +32,7 @@
 #include "bt-service-event.h"
 #include "bt-service-adapter.h"
 #include "bt-service-adapter-le.h"
+#include "bt-service-util.h"
 
 
 #define BT_ADV_INTERVAL_MIN 20 /* msec */
@@ -252,7 +253,7 @@ int __bt_get_available_adv_slot_id(const char *sender, int adv_handle, gboolean 
 	return -1;
 }
 
-void __bt_register_adv_slot_owner(const char *sender, int adv_handle, int slot_id)
+void _bt_register_adv_slot_owner(const char *sender, int adv_handle, int slot_id)
 {
 	if (le_adv_slot[slot_id].sender == NULL) {
 		le_adv_slot[slot_id].sender = strdup(sender);
@@ -260,7 +261,7 @@ void __bt_register_adv_slot_owner(const char *sender, int adv_handle, int slot_i
 	}
 }
 
-void __bt_unregister_adv_slot_owner(int slot_id)
+void _bt_unregister_adv_slot_owner(int slot_id)
 {
 	g_free(le_adv_slot[slot_id].sender);
 	le_adv_slot[slot_id].sender = NULL;
@@ -374,7 +375,7 @@ int _bt_set_advertising(const char *sender, int adv_handle, gboolean enable, gbo
 	}
 
 	if (enable == TRUE)
-		__bt_register_adv_slot_owner(sender, adv_handle, slot_id);
+		_bt_register_adv_slot_owner(sender, adv_handle, slot_id);
 
 	le_adv_slot[slot_id].is_advertising = enable;
 	BT_INFO("Set advertising [%d]", enable);
@@ -472,9 +473,9 @@ int _bt_set_custom_advertising(const char *sender, int adv_handle,
 	}
 
 	if (enable == TRUE)
-		__bt_register_adv_slot_owner(sender, adv_handle, slot_id);
+		_bt_register_adv_slot_owner(sender, adv_handle, slot_id);
 	else
-		__bt_unregister_adv_slot_owner(slot_id);
+		_bt_unregister_adv_slot_owner(slot_id);
 
 	le_adv_slot[slot_id].is_advertising = enable;
 	BT_INFO_C("Set advertising [%d]", enable);
@@ -598,7 +599,7 @@ int _bt_set_advertising_data(const char *sender, int adv_handle,
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	__bt_register_adv_slot_owner(sender, adv_handle, slot_id);
+	_bt_register_adv_slot_owner(sender, adv_handle, slot_id);
 
 	__bt_get_ad_data_by_type((char *)adv_data.data, adv_data_len, 0xff,
 			&old_mdata, &old_len);
@@ -692,7 +693,7 @@ int _bt_set_scan_response_data(const char *sender, int adv_handle,
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	__bt_register_adv_slot_owner(sender, adv_handle, slot_id);
+	_bt_register_adv_slot_owner(sender, adv_handle, slot_id);
 
 	/* Compare with previous scan resp data */
 	__bt_get_ad_data_by_type((char *)resp_data.data, resp_data_len, 0xff,
@@ -1969,7 +1970,6 @@ int _bt_deinitialize_ipsp(void)
 	GDBusProxy *proxy;
 	GError *error = NULL;
 	GVariant *ret;
-	bt_le_status_t le_status = _bt_adapter_get_le_status();
 
 	if (_bt_adapter_get_status() != BT_ACTIVATED &&
 		_bt_adapter_get_le_status() != BT_LE_ACTIVATED) {
@@ -2001,7 +2001,6 @@ int _bt_le_read_maximum_data_length(
 	GError *error = NULL;
 	GDBusProxy *proxy;
 	GVariant *reply = NULL;
-	int ret = BLUETOOTH_ERROR_NONE;
 	guint16 max_tx_octets, max_tx_time;
 	guint16 max_rx_octets, max_rx_time;
 
@@ -2041,7 +2040,6 @@ int _bt_le_write_host_suggested_default_data_length(
 	GError *error = NULL;
 	GDBusProxy *proxy;
 	GVariant *reply = NULL;
-	int ret = BLUETOOTH_ERROR_NONE;
 
 	proxy = _bt_get_adapter_proxy();
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
@@ -2077,7 +2075,6 @@ int _bt_le_read_host_suggested_default_data_length(
 	GError *error = NULL;
 	GDBusProxy *proxy;
 	GVariant *reply = NULL;
-	int ret = BLUETOOTH_ERROR_NONE;
 	guint16 def_tx_octets, def_tx_time;
 
 	proxy = _bt_get_adapter_proxy();
@@ -2110,9 +2107,6 @@ int _bt_le_set_data_length(bluetooth_device_address_t *device_address,
 	const unsigned int max_tx_Octets, const unsigned int max_tx_Time)
 {
 	GError *error = NULL;
-	GDBusProxy *proxy;
-	GVariant *reply = NULL;
-	int ret = BLUETOOTH_ERROR_NONE;
 	guint16 txOctets = max_tx_Octets;
 	guint16 txTime = max_tx_Time;
 	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
@@ -2122,7 +2116,7 @@ int _bt_le_set_data_length(bluetooth_device_address_t *device_address,
 
 	_bt_convert_addr_type_to_string(address, device_address->addr);
 
-	device_path = _bt_get_device_object_path(&address);
+	device_path = _bt_get_device_object_path(address);
 
 	if (device_path == NULL) {
 		BT_DBG("Device path is null");

@@ -64,7 +64,7 @@ static GDBusProxy *core_proxy = NULL;
 static guint timer_id = 0;
 static guint le_timer_id = 0;
 
-static int status_reg_id;
+static uint status_reg_id;
 
 #define BT_CORE_NAME "org.projectx.bt_core"
 #define BT_CORE_PATH "/org/projectx/bt_core"
@@ -758,11 +758,10 @@ void _bt_service_unregister_vconf_handler(void)
 
 static void __bt_state_event_handler(const char *event_name, bundle *data, void *user_data)
 {
+#ifdef ENABLE_TIZEN_2_4
 	const char *bt_status = NULL;
 	const char *bt_le_status = NULL;
-	const char *bt_transfering_status = NULL;
 	BT_DBG("bt state set event(%s) received", event_name);
-#ifdef ENABLE_TIZEN_2_4
 	bt_status = bundle_get_val(data, EVT_KEY_BT_STATE);
 	BT_DBG("bt_state: (%s)", bt_status);
 

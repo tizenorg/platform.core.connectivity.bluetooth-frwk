@@ -1540,7 +1540,6 @@ int main()
 {
 	GMainLoop *main_loop = NULL;
 	int ret = 0;
-	g_type_init();
 	main_loop = g_main_loop_new(NULL, FALSE);
 	ret = bluetooth_register_callback(bt_event_callback, (void*)main_loop);
 	if (ret >= BLUETOOTH_ERROR_NONE)
@@ -1636,7 +1635,6 @@ int main()
 {
 	GMainLoop *main_loop = NULL;
 	int ret = 0;
-	g_type_init();
 	main_loop = g_main_loop_new(NULL, FALSE);
 	ret = bluetooth_register_callback(bt_event_callback, (void*)main_loop);
 	if (ret >= BLUETOOTH_ERROR_NONE)

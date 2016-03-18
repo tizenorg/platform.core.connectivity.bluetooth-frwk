@@ -239,6 +239,7 @@ static void __bt_core_flight_mode_cb(keynode_t *node, void *data)
 #endif
 
 #ifndef TIZEN_WEARABLE
+#ifdef ENABLE_TIZEN_2_4
 static void __bt_core_power_saving_mode_cb(keynode_t *node, void *data)
 {
 	int power_saving_mode = 0;
@@ -256,6 +257,7 @@ static void __bt_core_power_saving_mode_cb(keynode_t *node, void *data)
 
 	__bt_core_handle_adapter_with_power_saving_mode(power_saving_mode);
 }
+#endif
 #endif
 
 void _bt_core_init_vconf_value(void)
