@@ -2200,6 +2200,8 @@ gboolean __bt_service_check_privilege(int function_name,
         case BT_AG_DISCONNECT:
         case BT_AV_CONNECT:
         case BT_AV_DISCONNECT:
+        case BT_AV_SOURCE_CONNECT:
+        case BT_AV_SOURCE_DISCONNECT:
         case BT_AVRCP_CONTROL_CONNECT:
         case BT_AVRCP_CONTROL_DISCONNECT:
         case BT_HF_CONNECT:
