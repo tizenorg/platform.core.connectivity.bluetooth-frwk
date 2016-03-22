@@ -733,7 +733,7 @@ BT_EXPORT_API int bluetooth_hf_send_xsat_cmd(int app_id, char *xsat_cmd)
 
 	BT_CHECK_ENABLED(return);
 
-	strcpy(buffer, "AT+XSAT=");
+	strncpy(buffer, "AT+XSAT=", strlen("AT+XSAT="));
 	snprintf(buffer + strlen(buffer), sizeof(buffer), "%d,", app_id);
 	strncat(buffer, xsat_cmd, (sizeof(buffer) - 1) - strlen(buffer));
 	BT_DBG("Xsat cmd received = %s", buffer);
