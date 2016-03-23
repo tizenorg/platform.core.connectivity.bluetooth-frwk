@@ -1947,7 +1947,7 @@ void __bt_pbap_client_event_filter(GDBusConnection *connection,
 	} else if (strcasecmp(signal_name, BT_PBAP_VCARD_LIST) == 0) {
 		bt_pbap_vcard_list_t vc_list = { { { 0 } }, };
 		char *address = NULL;
-		unsigned int count = 0;
+		gsize count = 0;
 		gchar **list = NULL;
 		GVariant *string_var;
 		int success = -1;
@@ -1998,7 +1998,7 @@ void __bt_pbap_client_event_filter(GDBusConnection *connection,
 	} else if (strcasecmp(signal_name, BT_PBAP_SEARCH_PHONEBOOK) == 0) {
 		bt_pbap_phonebook_search_list_t vc_list = { { { 0 } }, };
 		char *address = NULL;
-		unsigned int count = 0;
+		gsize count = 0;
 		gchar **list = NULL;
 		GVariant *string_var;
 		int success = -1;
