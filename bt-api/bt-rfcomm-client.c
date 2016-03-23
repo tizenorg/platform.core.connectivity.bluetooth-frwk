@@ -112,9 +112,10 @@ gint compare(gpointer *a, gpointer *b)
 gint compare_fd(gpointer *a, gpointer *b)
 {
 	rfcomm_conn_info_t *node = (rfcomm_conn_info_t *)a;
-	int fd = (int )*b;
-	if (node->fd == fd)
+	int *fd = (int *)b;
+	if (node->fd == *fd)
 		return 0;
+
 	return 1;
 }
 static void __bt_free_conn(rfcomm_conn_info_t *conn)
