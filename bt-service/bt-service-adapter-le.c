@@ -2127,7 +2127,7 @@ int _bt_le_set_data_length(bluetooth_device_address_t *device_address,
 	if (conn == NULL) {
 		BT_ERR("conn == NULL");
 		g_free(device_path);
-		return NULL;
+		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
 	device_proxy = g_dbus_proxy_new_sync(conn, G_DBUS_PROXY_FLAGS_NONE,

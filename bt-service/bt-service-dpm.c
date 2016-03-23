@@ -29,7 +29,6 @@
 #include "bt-service-dpm.h"
 
 static dpm_policy_t policy_table[DPM_POLICY_END] = {
-	/* policy-group : BLUETOOTH */
 	[DPM_POLICY_ALLOW_BLUETOOTH] = {DPM_BT_ERROR},
 	[DPM_POLICY_BLUETOOTH_DEVICE_RESTRICTION] = {DPM_STATUS_ERROR},
 	[DPM_POLICY_BLUETOOTH_UUID_RESTRICTION] = {DPM_STATUS_ERROR},

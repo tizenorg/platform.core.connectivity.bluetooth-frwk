@@ -25,6 +25,7 @@
 #include <glib.h>
 #include <dbus/dbus-glib.h>
 #include <pthread.h>
+#include <dbus/dbus.h>
 
 #include "bluetooth-api.h"
 #include "bluetooth-hid-api.h"

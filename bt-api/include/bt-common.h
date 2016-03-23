@@ -21,6 +21,7 @@
 
 #include <sys/types.h>
 #include <libintl.h>
+#include <dbus/dbus-glib.h>
 #include <dbus/dbus.h>
 #include <dlog.h>
 #include <glib.h>
@@ -330,7 +331,7 @@ void _bt_device_path_to_address(const char *device_path, char *device_address);
 
 GDBusConnection *g_bus_get_private_conn(void);
 
-DBusConnection *__bt_init_system_conn(void);
+DBusGConnection *_bt_get_system_gconn(void);
 
 DBusConnection *_bt_get_system_conn(void);
 

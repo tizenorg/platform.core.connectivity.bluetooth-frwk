@@ -38,7 +38,7 @@
 #include "bt-event-handler.h"
 
 static bt_user_info_t user_info[BT_MAX_USER_INFO];
-static DBusConnection *system_conn = NULL;
+static GDBusConnection *system_gdbus_conn = NULL;
 
 
 static guint bus_id;
@@ -93,6 +93,8 @@ GDBusConnection *_bt_gdbus_init_system_gconn(void)
 
 GDBusConnection *_bt_gdbus_get_system_gconn(void)
 {
+
+
 	if (system_gconn == NULL) {
 		system_gconn = _bt_gdbus_init_system_gconn();
 	} else if (g_dbus_connection_is_closed(system_gconn)){
@@ -1425,31 +1427,20 @@ void _bt_device_path_to_address(const char *device_path, char *device_address)
 	}
 }
 
-/* TODO : replace the dbus-glib APIs to gdbus APIs */
-DBusConnection *__bt_init_system_conn(void)
+GDBusConnection *_bt_init_system_gdbus_conn(void)
 {
-	if (system_conn == NULL)
-		system_conn = dbus_bus_get_private(DBUS_BUS_SYSTEM, NULL);
-
-	if (system_conn) {
-		dbus_connection_setup_with_g_main(system_conn, NULL);
-		dbus_connection_set_exit_on_disconnect(system_conn, FALSE);
+	GError *error = NULL;
+	if (system_gdbus_conn == NULL) {
+		system_gdbus_conn =
+		g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
+		if (error) {
+			BT_ERR("GDBus connection Error : %s \n",
+				error->message);
+			g_clear_error(&error);
+			return NULL;
+		}
 	}
-
-	return system_conn;
-}
-
-DBusConnection *_bt_get_system_conn(void)
-{
-	DBusConnection *conn = NULL;
-
-	if (system_conn == NULL) {
-		conn = __bt_init_system_conn();
-	} else {
-		conn = system_conn;
-	}
-
-	return conn;
+	return system_gdbus_conn;
 }
 
 
@@ -1604,7 +1595,6 @@ BT_EXPORT_API int bluetooth_register_callback(bluetooth_cb_func_ptr callback_ptr
 	int ret;
 
 	_bt_gdbus_init_system_gconn();
-	__bt_init_system_conn();
 
 	ret = _bt_init_event_handler();
 	if (ret != BLUETOOTH_ERROR_NONE &&
@@ -1661,17 +1651,10 @@ BT_EXPORT_API int bluetooth_unregister_callback(void)
 
 	_bt_set_user_data(BT_COMMON, NULL, NULL);
 
-	if (system_conn) {
-		dbus_connection_flush(system_conn);
-		dbus_connection_close(system_conn);
-		dbus_connection_unref(system_conn);
-		system_conn = NULL;
-	}
 	if (system_gconn) {
 		g_object_unref(system_gconn);
 		system_gconn = NULL;
 	}
-	_bt_gdbus_deinit_proxys();
 	return BLUETOOTH_ERROR_NONE;
 }
 

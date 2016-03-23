@@ -546,6 +546,9 @@ int _bt_async_send_request(int service_type, int service_function,
 
 		g_array_free(in_param5, TRUE);
 		break;
+	default:
+		g_free(cb_data);
+		break;
 	}
 
 	return BLUETOOTH_ERROR_NONE;

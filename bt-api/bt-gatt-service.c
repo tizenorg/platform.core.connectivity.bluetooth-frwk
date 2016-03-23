@@ -1070,22 +1070,6 @@ static struct gatt_req_info *__bt_gatt_find_request_info(guint request_id)
 	return NULL;
 }
 
-static int char_info_cmp(gconstpointer a1, gconstpointer a2)
-{
-	const struct gatt_char_info *attrib1 = a1;
-	const struct gatt_char_info *attrib2 = a2;
-
-	return g_strcmp0(attrib1->char_path, attrib2->char_path);
-}
-
-static int desc_info_cmp(gconstpointer a1, gconstpointer a2)
-{
-	const struct gatt_desc_info *attrib1 = a1;
-	const struct gatt_desc_info *attrib2 = a2;
-
-	return g_strcmp0(attrib1->desc_path, attrib2->desc_path);
-}
-
 static GDBusProxy *__bt_gatt_gdbus_init_manager_proxy(const gchar *service,
 				const gchar *path, const gchar *interface)
 {

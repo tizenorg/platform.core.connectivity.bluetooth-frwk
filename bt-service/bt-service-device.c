@@ -591,7 +591,6 @@ static int __bt_retry_bond(void)
 static int __bt_remove_and_bond(char *device_path)
 {
 	GDBusProxy *adapter_proxy;
-	GVariant *result = NULL;
 	GError *err = NULL;
 
 	BT_CHECK_PARAMETER(bonding_info, return);
@@ -602,12 +601,12 @@ static int __bt_remove_and_bond(char *device_path)
 	adapter_proxy = _bt_get_adapter_proxy();
 	retv_if(adapter_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	result = g_dbus_proxy_call_sync(adapter_proxy, "UnpairDevice",
-				g_variant_new("(o)", device_path),
-				G_DBUS_CALL_FLAGS_NONE,
-				-1,
-				NULL,
-				&err);
+	g_dbus_proxy_call_sync(adapter_proxy, "UnpairDevice",
+			g_variant_new("(o)", device_path),
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			&err);
 
 	if (err != NULL) {
 		BT_ERR("UnpairDevice Fail: %s", err->message);
