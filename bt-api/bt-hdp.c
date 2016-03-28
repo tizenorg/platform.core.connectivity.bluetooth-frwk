@@ -318,11 +318,12 @@ static void __bt_hdp_internal_event_filter(GDBusConnection *connection,
 
 static void __bt_hdp_internal_handle_connect(GVariant *parameters)
 {
+	BT_DBG("+");
 	const char *obj_channel_path;
 	bt_user_info_t *user_info;
 	int ret;
 
-	BT_INFO("+********Signal - ChannelConnected******\n\n");
+	BT_INFO("*********Signal - ChannelConnected******\n\n");
 	g_variant_get(parameters, "(&o)", &obj_channel_path);
 
 	BT_INFO("Channel connected, Path = %s", obj_channel_path);
@@ -336,12 +337,7 @@ static void __bt_hdp_internal_handle_connect(GVariant *parameters)
 		_bt_common_event_cb(BLUETOOTH_EVENT_HDP_CONNECTED,
 				BLUETOOTH_ERROR_CONNECTION_ERROR, NULL,
 				user_info->cb, user_info->user_data);
-	} else {
-		_bt_common_event_cb(BLUETOOTH_EVENT_HDP_CONNECTED,
-				BLUETOOTH_ERROR_NONE, NULL,
-				user_info->cb, user_info->user_data);
 	}
-
 	BT_DBG("-");
 }
 
@@ -936,7 +932,6 @@ static void __bt_hdp_connect_request_cb(GDBusProxy *hdp_proxy,
 	bt_hdp_connected_t *conn_ind = user_data;
 	bt_user_info_t *user_info;
 	GVariant *reply = NULL;
-	int ret = BLUETOOTH_ERROR_NONE;
 
 	reply = g_dbus_proxy_call_finish(hdp_proxy, res, &err);
 
@@ -957,20 +952,7 @@ static void __bt_hdp_connect_request_cb(GDBusProxy *hdp_proxy,
 		}
 	} else {
 		g_variant_get(reply, "(&o)", &obj_connect_path);
-
 		BT_DBG("Obj Path returned = %s\n", obj_connect_path);
-		user_info = _bt_get_user_data(BT_COMMON);
-
-		ret = __bt_hdp_internal_acquire_fd(obj_connect_path);
-		if (ret != BLUETOOTH_ERROR_NONE) {
-			user_info = _bt_get_user_data(BT_COMMON);
-			if (user_info->cb) {
-				_bt_common_event_cb(BLUETOOTH_EVENT_HDP_CONNECTED,
-						BLUETOOTH_ERROR_CONNECTION_ERROR, NULL,
-							user_info->cb, user_info->user_data);
-			}
-		}
-		g_variant_unref(reply);
 	}
 	g_free((void *)conn_ind->app_handle);
 	g_free(conn_ind);
@@ -1071,9 +1053,6 @@ BT_EXPORT_API int bluetooth_hdp_connect(const char *app_handle,
 				param);
 
 	g_free(dev_path);
-	g_free((void *)param->app_handle);
-	g_free(param);
-	g_object_unref(hdp_proxy);
 
 	return BLUETOOTH_ERROR_NONE;
 }
