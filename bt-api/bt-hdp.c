@@ -320,7 +320,6 @@ static void __bt_hdp_internal_handle_connect(GVariant *parameters)
 {
 	const char *obj_channel_path;
 	bt_user_info_t *user_info;
-	int ret;
 
 	BT_INFO("+********Signal - ChannelConnected******\n\n");
 	g_variant_get(parameters, "(&o)", &obj_channel_path);
@@ -331,6 +330,8 @@ static void __bt_hdp_internal_handle_connect(GVariant *parameters)
 	if (user_info == NULL || user_info->cb == NULL)
 		return;
 
+	/* acquire_fd called in request_cb */
+#if 0
 	ret = __bt_hdp_internal_acquire_fd(obj_channel_path);
 	if (ret != BLUETOOTH_ERROR_NONE) {
 		_bt_common_event_cb(BLUETOOTH_EVENT_HDP_CONNECTED,
@@ -341,7 +342,7 @@ static void __bt_hdp_internal_handle_connect(GVariant *parameters)
 				BLUETOOTH_ERROR_NONE, NULL,
 				user_info->cb, user_info->user_data);
 	}
-
+#endif
 	BT_DBG("-");
 }
 
@@ -1071,9 +1072,6 @@ BT_EXPORT_API int bluetooth_hdp_connect(const char *app_handle,
 				param);
 
 	g_free(dev_path);
-	g_free((void *)param->app_handle);
-	g_free(param);
-	g_object_unref(hdp_proxy);
 
 	return BLUETOOTH_ERROR_NONE;
 }
