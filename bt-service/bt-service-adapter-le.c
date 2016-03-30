@@ -153,8 +153,12 @@ static void __bt_send_foreach_event(gpointer data, gpointer user_data)
 
 void _bt_send_char_value_changed_event(void *param)
 {
+#if 0
 	g_slist_foreach(gatt_client_senders, __bt_send_foreach_event,
 					(gpointer)param);
+#else
+	_bt_send_event(BT_DEVICE_EVENT, BLUETOOTH_EVENT_GATT_CHAR_VAL_CHANGED, param);
+#endif
 }
 
 void __bt_free_le_adv_slot(void)
@@ -1815,8 +1819,12 @@ void _bt_send_scan_result_event(const bt_remote_le_dev_info_t *le_dev_info,
 					scan_data_len,
 					scan_data_param);
 
+#if 0
 		_bt_send_event_to_dest(scanner->sender, BT_LE_ADAPTER_EVENT,
 				BLUETOOTH_EVENT_REMOTE_LE_DEVICE_FOUND, param);
+#else
+		_bt_send_event(BT_LE_ADAPTER_EVENT, BLUETOOTH_EVENT_REMOTE_LE_DEVICE_FOUND, param);
+#endif
 	}
 }
 

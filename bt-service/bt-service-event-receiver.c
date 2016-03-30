@@ -482,9 +482,14 @@ void _bt_handle_adapter_event(GVariant *msg, const char *member)
 			event = BLUETOOTH_EVENT_ADVERTISING_STOPPED;
 		param = g_variant_new("(ii)", result,
 					adv_handle);
+
+#if 0
 		_bt_send_event_to_dest(sender, BT_ADAPTER_EVENT,
 				event,
 				param);
+#else
+		_bt_send_event(BT_ADAPTER_EVENT, event, param);
+#endif
 
 		if (event == BLUETOOTH_EVENT_ADVERTISING_STOPPED)
 			_bt_unregister_adv_slot_owner(slot_id);
