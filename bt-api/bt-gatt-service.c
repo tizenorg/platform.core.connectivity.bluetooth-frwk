@@ -37,12 +37,7 @@ static int register_pending_cnt = 0;
 /* Introspection data for the service we are exporting */
 static const gchar service_introspection_xml[] =
 "<node name='/'>"
-"  <interface name='org.freedesktop.DBus.ObjectManager'>"
-"	 <method name='GetManagedObjects'>"
-"	  <arg type='a{oa{sa{sv}}}' name='object_paths_interfaces_and_properties' direction='out'/>"
-"	 </method>"
-"  </interface>"
-"  <interface name='org.bluez.GattService1'>"
+"  <interface name='org.freedesktop.DBus.Properties'>"
 "    <property type='s' name='UUID' access='read'>"
 "    </property>"
 "	 <property type='b' name='primary' access='read'>"
@@ -88,14 +83,14 @@ static const gchar characteristics_introspection_xml[] =
 "    </property>"
 "    <property type='ay' name='Value' access='readwrite'>"
 "    </property>"
-"    <property type='b' name='Notifying' access='read'>"
-"    </property>"
+"	 <property type='b' name='Notifying' access='read'>"
+"	 </property>"
 "    <property type='as' name='Flags' access='read'>"
 "    </property>"
 "    <property type='s' name='Unicast' access='read'>"
 "    </property>"
-"    <property type='ao' name='Descriptors' access='read'>"
-"    </property>"
+"	 <property type='ao' name='Descriptors' access='read'>"
+"	 </property>"
 "  </interface>"
 "</node>";
 
@@ -123,8 +118,17 @@ static const gchar descriptor_introspection_xml[] =
 "    </property>"
 "    <property type='ay' name='Value' access='read'>"
 "    </property>"
-"    <property type='s' name='Permissions' access='read'>"
+"    <property type='as' name='Flags' access='read'>"
 "    </property>"
+"  </interface>"
+"</node>";
+
+static const gchar manager_introspection_xml[] =
+"<node name='/'>"
+"  <interface name='org.freedesktop.DBus.ObjectManager'>"
+"    <method name='GetManagedObjects'>"
+"     <arg type='a{oa{sa{sv}}}' name='object_paths_interfaces_and_properties' direction='out'/>"
+"	 </method>"
 "  </interface>"
 "</node>";
 
@@ -155,7 +159,9 @@ struct gatt_desc_info {
 	guint desc_id;
 	gchar *desc_uuid;
 	gchar *desc_value;
+	gchar *desc_flags[NUMBER_OF_FLAGS];
 	int value_length;
+	int flags_length;
 };
 
 struct gatt_req_info {
@@ -168,6 +174,7 @@ struct gatt_req_info {
 
 static GSList *gatt_services = NULL;
 static GSList *gatt_requests = NULL;
+static gchar *app_path = NULL;
 
 #define BT_GATT_SERVICE_NAME	"org.frwk.gatt_service"
 #define BT_GATT_SERVICE_PATH "/org/frwk/gatt_service"
@@ -252,7 +259,7 @@ static int __bt_send_event_to_hps(int event, GVariant *var)
 }
 #endif
 
-static void __bt_gatt_serv_method_call(GDBusConnection *connection,
+static void __bt_gatt_manager_method_call(GDBusConnection *connection,
 					const gchar *sender,
 					const gchar *object_path,
 					const gchar *interface_name,
@@ -262,6 +269,8 @@ static void __bt_gatt_serv_method_call(GDBusConnection *connection,
 					gpointer user_data)
 {
 	GSList *l1;
+	int len = 0;
+	int i = 0;
 
 	if (g_strcmp0(method_name, "GetManagedObjects") == 0) {
 		BT_DBG("Getting values for service, chars and descriptors");
@@ -276,235 +285,252 @@ static void __bt_gatt_serv_method_call(GDBusConnection *connection,
 
 		/* Prepare inner builder for GattService1 interface */
 
-		GVariantBuilder *svc_builder = NULL;
-		GVariantBuilder *inner_builder = NULL;
+		len = g_slist_length(gatt_services);
 
-		if (register_pending_cnt > 1) {
-			int len = g_slist_length(gatt_services);
-			l1 = g_slist_nth(gatt_services, len - register_pending_cnt);
-		} else {
-			l1 = g_slist_last(gatt_services);
-		}
-		register_pending_cnt--;
-
-		struct gatt_service_info *serv_info = l1->data;
-		if (serv_info == NULL) {
-			BT_ERR("service info value is NULL");
-			g_dbus_method_invocation_return_value(invocation, NULL);
-			return;
-		}
-
-		/* Prepare inner builder for GattService1 interface */
-		BT_DBG("Creating builder for service");
-		svc_builder = g_variant_builder_new(
-					G_VARIANT_TYPE("a{sa{sv}}"));
-		inner_builder = g_variant_builder_new(G_VARIANT_TYPE("a{sv}"));
-
-		g_variant_builder_add(inner_builder, "{sv}", "UUID",
-				g_variant_new_string(serv_info->service_uuid));
-
-		g_variant_builder_add(inner_builder, "{sv}", "Primary",
-				g_variant_new_boolean(serv_info->is_svc_primary));
-
-		/*Characteristics*/
-		inner_builder1 = g_variant_builder_new(G_VARIANT_TYPE("ao"));
-		BT_DBG("Adding Charatarisitcs list");
-		for (l4 = serv_info->char_data; l4 != NULL; l4 = l4->next) {
-			struct gatt_char_info *char_info = l4->data;
-				g_variant_builder_add(inner_builder1, "o",
-					char_info->char_path);
-				BT_DBG("%s", char_info->char_path);
-		}
-
-		svc_char = g_variant_new("ao", inner_builder1);
-		g_variant_builder_add(inner_builder, "{sv}", "Characteristics",
-					svc_char);
-
-		g_variant_builder_add(svc_builder, "{sa{sv}}",
-							GATT_SERV_INTERFACE,
-							inner_builder);
-
-		g_variant_builder_add(builder, "{oa{sa{sv}}}",
-							serv_info->serv_path,
-							svc_builder);
-
-		g_variant_builder_unref(inner_builder1);
-
-		/* Prepare inner builder for GattCharacteristic1 interface */
-
-		GSList *l2 = serv_info->char_data;
-		BT_DBG("Creating builder for characteristics \n");
-
-		if (l2 == NULL)
-			BT_DBG("characteristic data is NULL");
-
-		for (l2 = serv_info->char_data; l2 != NULL; l2 = l2->next) {
-
-			GVariantBuilder *char_builder = NULL;
+		for (i = 0; i <= len; i++) {
+			GVariantBuilder *svc_builder = NULL;
 			GVariantBuilder *inner_builder = NULL;
-			GVariantBuilder *builder1 = NULL;
-			GVariantBuilder *builder2 = NULL;
-			GVariantBuilder *builder3 = NULL;
-			GVariant *char_val = NULL;
-			GVariant *flags_val = NULL;
-			GVariant *char_desc = NULL;
-			char *unicast = NULL;
-			gboolean notify = FALSE;
-			int i = 0;
 
-			char_builder = g_variant_builder_new(
-							G_VARIANT_TYPE(
-								"a{sa{sv}}"));
-			inner_builder = g_variant_builder_new(
-							G_VARIANT_TYPE(
-								"a{sv}"));
+			if (register_pending_cnt > 1) {
+				l1 = g_slist_nth(gatt_services, len - register_pending_cnt);
+			} else {
+				l1 = g_slist_last(gatt_services);
+			}
+			register_pending_cnt--;
 
-			struct gatt_char_info *char_info = l2->data;
-			if (char_info == NULL) {
-				BT_ERR("char_info is NULL");
-				continue;
+			struct gatt_service_info *serv_info = l1->data;
+			if (serv_info == NULL) {
+				BT_ERR("service info value is NULL");
+				g_dbus_method_invocation_return_value(invocation, NULL);
+				return;
 			}
 
-			/*Uuid*/
+			/* Prepare inner builder for GattService1 interface */
+			BT_DBG("Creating builder for service");
+			svc_builder = g_variant_builder_new(
+						G_VARIANT_TYPE("a{sa{sv}}"));
+			inner_builder = g_variant_builder_new(G_VARIANT_TYPE("a{sv}"));
+
 			g_variant_builder_add(inner_builder, "{sv}", "UUID",
-				g_variant_new_string(char_info->char_uuid));
-			/*Service*/
-			g_variant_builder_add(inner_builder, "{sv}", "Service",
-				g_variant_new("o", serv_info->serv_path));
-			/*Value*/
-			builder1 = g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
+					g_variant_new_string(serv_info->service_uuid));
 
-			if(char_info->char_value != NULL) {
-				for (i = 0; i < char_info->value_length; i++) {
-					g_variant_builder_add(builder1, "y",
-						char_info->char_value[i]);
-				}
-				char_val = g_variant_new("ay", builder1);
-				g_variant_builder_add(inner_builder, "{sv}",
-						"Value", char_val);
-			}
-			/*Flags*/
-			builder2 = g_variant_builder_new(G_VARIANT_TYPE("as"));
+			g_variant_builder_add(inner_builder, "{sv}", "Primary",
+					g_variant_new_boolean(serv_info->is_svc_primary));
 
-			for (i = 0; i < char_info->flags_length; i++) {
-				g_variant_builder_add(builder2, "s",
-					char_info->char_flags[i]);
+			/*Characteristics*/
+			inner_builder1 = g_variant_builder_new(G_VARIANT_TYPE("ao"));
+			BT_DBG("Adding Charatarisitcs list");
+			for (l4 = serv_info->char_data; l4 != NULL; l4 = l4->next) {
+				struct gatt_char_info *char_info = l4->data;
+					g_variant_builder_add(inner_builder1, "o",
+						char_info->char_path);
+					BT_DBG("%s", char_info->char_path);
 			}
 
-			flags_val = g_variant_new("as", builder2);
-			g_variant_builder_add(inner_builder, "{sv}", "Flags",
-						flags_val);
+			svc_char = g_variant_new("ao", inner_builder1);
+			g_variant_builder_add(inner_builder, "{sv}", "Characteristics",
+						svc_char);
 
-			/* Notifying */
-			g_variant_builder_add(inner_builder, "{sv}", "Notifying",
-						g_variant_new("b", notify));
+			g_variant_builder_add(svc_builder, "{sa{sv}}",
+								GATT_SERV_INTERFACE,
+								inner_builder);
 
-			/* Unicast */
-			unicast = g_strdup("00:00:00:00:00:00");
-			g_variant_builder_add(inner_builder, "{sv}", "Unicast",
-						g_variant_new("s", unicast));
-
-			/*Descriptors*/
-			builder3 = g_variant_builder_new(G_VARIANT_TYPE("ao"));
-			BT_DBG("Adding Descriptors list");
-
-			for (l4 = char_info->desc_data; l4 != NULL; l4 = l4->next) {
-				struct gatt_desc_info *desc_info = l4->data;
-					g_variant_builder_add(builder3, "o",
-						desc_info->desc_path);
-					BT_DBG("%s", desc_info->desc_path);
-			}
-
-			char_desc = g_variant_new("ao", builder3);
-			g_variant_builder_add(inner_builder, "{sv}", "Descriptors",
-						char_desc);
-
-			g_variant_builder_add(char_builder, "{sa{sv}}",
-					GATT_CHAR_INTERFACE , inner_builder);
 			g_variant_builder_add(builder, "{oa{sa{sv}}}",
-					char_info->char_path, char_builder);
+								serv_info->serv_path,
+								svc_builder);
 
-			/*Prepare inner builder for GattDescriptor1 interface*/
+			g_variant_builder_unref(inner_builder1);
 
-			GSList *l3 = char_info->desc_data;
+			/* Prepare inner builder for GattCharacteristic1 interface */
 
-			if (l3 == NULL)
-				BT_DBG("descriptor data is NULL");
+			GSList *l2 = serv_info->char_data;
+			BT_DBG("Creating builder for characteristics \n");
 
-			for (l3 = char_info->desc_data; l3 != NULL; l3 = l3->next) {
+			if (l2 == NULL)
+				BT_DBG("characteristic data is NULL");
 
-				BT_DBG("Creating builder for descriptor \n");
+			for (l2 = serv_info->char_data; l2 != NULL; l2 = l2->next) {
 
-				GVariantBuilder *desc_builder = NULL;
+				GVariantBuilder *char_builder = NULL;
 				GVariantBuilder *inner_builder = NULL;
 				GVariantBuilder *builder1 = NULL;
-				GVariant *desc_val = NULL;
+				GVariantBuilder *builder2 = NULL;
+				GVariantBuilder *builder3 = NULL;
+				GVariant *char_val = NULL;
+				GVariant *flags_val = NULL;
+				GVariant *char_desc = NULL;
+				char *unicast = NULL;
+				gboolean notify = FALSE;
+				int i = 0;
 
-				desc_builder = g_variant_builder_new(
-							G_VARIANT_TYPE(
-							"a{sa{sv}}"));
+				char_builder = g_variant_builder_new(
+								G_VARIANT_TYPE(
+									"a{sa{sv}}"));
 				inner_builder = g_variant_builder_new(
-							G_VARIANT_TYPE(
-							"a{sv}"));
+								G_VARIANT_TYPE(
+									"a{sv}"));
 
-				struct gatt_desc_info *desc_info = l3->data;
-				if (desc_info == NULL) {
-					BT_ERR("desc_info is NULL");
+				struct gatt_char_info *char_info = l2->data;
+				if (char_info == NULL) {
+					BT_ERR("char_info is NULL");
 					continue;
 				}
 
 				/*Uuid*/
-				g_variant_builder_add(inner_builder,
-					"{sv}", "UUID",
-					g_variant_new_string(
-						desc_info->desc_uuid));
-
-				/*Characteristic*/
-				g_variant_builder_add(inner_builder, "{sv}",
-					"Characteristic",
-					g_variant_new("o",
-						char_info->char_path));
-
+				g_variant_builder_add(inner_builder, "{sv}", "UUID",
+					g_variant_new_string(char_info->char_uuid));
+				/*Service*/
+				g_variant_builder_add(inner_builder, "{sv}", "Service",
+					g_variant_new("o", serv_info->serv_path));
 				/*Value*/
 				builder1 = g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
 
-				if(desc_info->desc_value != NULL) {
-					for (i = 0; i < desc_info->value_length; i++) {
+				if(char_info->char_value != NULL) {
+					for (i = 0; i < char_info->value_length; i++) {
 						g_variant_builder_add(builder1, "y",
-							desc_info->desc_value[i]);
+							char_info->char_value[i]);
 					}
-					desc_val = g_variant_new("ay", builder1);
+					char_val = g_variant_new("ay", builder1);
 					g_variant_builder_add(inner_builder, "{sv}",
-							"Value", desc_val);
+							"Value", char_val);
+				}
+				/*Flags*/
+				builder2 = g_variant_builder_new(G_VARIANT_TYPE("as"));
+
+				for (i = 0; i < char_info->flags_length; i++) {
+					g_variant_builder_add(builder2, "s",
+						char_info->char_flags[i]);
 				}
 
-				g_variant_builder_add(desc_builder, "{sa{sv}}",
-						GATT_DESC_INTERFACE,
-						inner_builder);
+				flags_val = g_variant_new("as", builder2);
+				g_variant_builder_add(inner_builder, "{sv}", "Flags",
+							flags_val);
 
+				/* Notifying */
+				g_variant_builder_add(inner_builder, "{sv}", "Notifying",
+							g_variant_new("b", notify));
+
+				/* Unicast */
+				unicast = g_strdup("00:00:00:00:00:00");
+				g_variant_builder_add(inner_builder, "{sv}", "Unicast",
+							g_variant_new("s", unicast));
+
+				/*Descriptors*/
+				builder3 = g_variant_builder_new(G_VARIANT_TYPE("ao"));
+				BT_DBG("Adding Descriptors list");
+
+				for (l4 = char_info->desc_data; l4 != NULL; l4 = l4->next) {
+					struct gatt_desc_info *desc_info = l4->data;
+						g_variant_builder_add(builder3, "o",
+							desc_info->desc_path);
+						BT_DBG("%s", desc_info->desc_path);
+				}
+
+				char_desc = g_variant_new("ao", builder3);
+				g_variant_builder_add(inner_builder, "{sv}", "Descriptors",
+							char_desc);
+
+				g_variant_builder_add(char_builder, "{sa{sv}}",
+						GATT_CHAR_INTERFACE , inner_builder);
 				g_variant_builder_add(builder, "{oa{sa{sv}}}",
-						desc_info->desc_path,
-						desc_builder);
+						char_info->char_path, char_builder);
 
-				/*unref descriptor builder pointers*/
+				/*Prepare inner builder for GattDescriptor1 interface*/
+
+				GSList *l3 = char_info->desc_data;
+
+				if (l3 == NULL)
+					BT_DBG("descriptor data is NULL");
+
+				for (l3 = char_info->desc_data; l3 != NULL; l3 = l3->next) {
+
+					BT_DBG("Creating builder for descriptor \n");
+
+					GVariantBuilder *desc_builder = NULL;
+					GVariantBuilder *inner_builder = NULL;
+					GVariantBuilder *builder1 = NULL;
+					GVariantBuilder *builder2 = NULL;
+					GVariant *desc_val = NULL;
+
+					desc_builder = g_variant_builder_new(
+								G_VARIANT_TYPE(
+								"a{sa{sv}}"));
+					inner_builder = g_variant_builder_new(
+								G_VARIANT_TYPE(
+								"a{sv}"));
+
+					struct gatt_desc_info *desc_info = l3->data;
+					if (desc_info == NULL) {
+						BT_ERR("desc_info is NULL");
+						continue;
+					}
+
+					/*Uuid*/
+					g_variant_builder_add(inner_builder,
+						"{sv}", "UUID",
+						g_variant_new_string(
+							desc_info->desc_uuid));
+
+					/*Characteristic*/
+					g_variant_builder_add(inner_builder, "{sv}",
+						"Characteristic",
+						g_variant_new("o",
+							char_info->char_path));
+
+					/*Value*/
+					builder1 = g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
+
+					if(desc_info->desc_value != NULL) {
+						for (i = 0; i < desc_info->value_length; i++) {
+							g_variant_builder_add(builder1, "y",
+								desc_info->desc_value[i]);
+						}
+						desc_val = g_variant_new("ay", builder1);
+						g_variant_builder_add(inner_builder, "{sv}",
+								"Value", desc_val);
+					}
+
+					/*Flags*/
+					builder2 = g_variant_builder_new(G_VARIANT_TYPE("as"));
+
+					for (i = 0; i < desc_info->flags_length; i++) {
+						g_variant_builder_add(builder2, "s",
+							desc_info->desc_flags[i]);
+					}
+
+					flags_val = g_variant_new("as", builder2);
+					g_variant_builder_add(inner_builder, "{sv}", "Flags",
+								flags_val);
+
+					g_variant_builder_add(desc_builder, "{sa{sv}}",
+							GATT_DESC_INTERFACE,
+							inner_builder);
+
+					g_variant_builder_add(builder, "{oa{sa{sv}}}",
+							desc_info->desc_path,
+							desc_builder);
+
+					/*unref descriptor builder pointers*/
+					g_variant_builder_unref(builder1);
+					g_variant_builder_unref(builder2);
+					g_variant_builder_unref(inner_builder);
+					g_variant_builder_unref(desc_builder);
+				}
+
+				if (unicast)
+					g_free(unicast);
+				/*unref char builder pointers*/
 				g_variant_builder_unref(builder1);
+				g_variant_builder_unref(builder2);
+				g_variant_builder_unref(builder3);
 				g_variant_builder_unref(inner_builder);
-				g_variant_builder_unref(desc_builder);
+				g_variant_builder_unref(char_builder);
 			}
 
-			if (unicast)
-				g_free(unicast);
-			/*unref char builder pointers*/
-			g_variant_builder_unref(builder1);
-			g_variant_builder_unref(builder2);
-			g_variant_builder_unref(builder3);
+			/*unref service builder pointers*/
 			g_variant_builder_unref(inner_builder);
-			g_variant_builder_unref(char_builder);
+			g_variant_builder_unref(svc_builder);
 		}
-
-		/*unref service builder pointers*/
-		g_variant_builder_unref(inner_builder);
-		g_variant_builder_unref(svc_builder);
 
 		/* Return builder as method reply */
 		BT_DBG("Sending gatt service builder values to Bluez");
@@ -778,7 +804,7 @@ static void __bt_gatt_char_method_call(GDBusConnection *connection,
 
 			if (user_info != NULL) {
 				_bt_common_event_cb(
-					BLUETOOTH_EVENT_GATT_SERVER_INDICATE_CONFIRMED,
+					BLUETOOTH_EVENT_GATT_SERVER_NOTIFICATION_COMPLETED,
 					BLUETOOTH_ERROR_NONE, &confirm,
 					user_info->cb, user_info->user_data);
 			}
@@ -961,11 +987,16 @@ static const GDBusInterfaceVTable char_interface_vtable = {
 };
 
 static const GDBusInterfaceVTable serv_interface_vtable = {
-	__bt_gatt_serv_method_call,
+	NULL,
 	NULL,
 	NULL,
 };
 
+static const GDBusInterfaceVTable manager_interface_vtable = {
+	__bt_gatt_manager_method_call,
+	NULL,
+	NULL
+};
 
 static GDBusNodeInfo *__bt_gatt_create_method_node_info(
 				const gchar *introspection_data)
@@ -1147,6 +1178,69 @@ int bluetooth_gatt_convert_prop2string(
 		char_properties[flag_count] = g_strdup("authenticated-signed-writes");
 		flag_count++;
 	}
+	if (properties & BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_RELIABLE_WRITE) {
+		char_properties[flag_count] = g_strdup("reliable-write");
+		flag_count++;
+	}
+	if (properties & BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITABLE_AUXILIARIES) {
+		char_properties[flag_count] = g_strdup("writable-auxiliaries");
+		flag_count++;
+	}
+	if (properties & BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_ENCRYPT_READ) {
+		char_properties[flag_count] = g_strdup("encrypt-read");
+		flag_count++;
+	}
+	if (properties & BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_ENCRYPT_WRITE) {
+		char_properties[flag_count] = g_strdup("encrypt-write");
+		flag_count++;
+	}
+	if (properties & BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_ENCRYPT_AUTHENTICATED_READ) {
+		char_properties[flag_count] = g_strdup("encrypt-authenticated-read");
+		flag_count++;
+	}
+	if (properties & BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_ENCRYPT_AUTHENTICATED_WRITE) {
+		char_properties[flag_count] = g_strdup("encrypt-authenticated-write");
+		flag_count++;
+	}
+
+	if (flag_count == 0) {
+		char_properties[flag_count] = g_strdup("read");
+		flag_count++;
+	}
+
+	return flag_count;
+}
+
+int bluetooth_gatt_convert_perm2string(
+			bt_gatt_permission_t properties,
+			char *char_properties[])
+{
+	int flag_count = 0;
+
+	if (properties & BLUETOOTH_GATT_PERMISSION_READ) {
+		char_properties[flag_count] = g_strdup("read");
+		flag_count++;
+	}
+	if (properties & BLUETOOTH_GATT_PERMISSION_WRITE) {
+		char_properties[flag_count] = g_strdup("write");
+		flag_count++;
+	}
+	if (properties & BLUETOOTH_GATT_PERMISSION_ENCRYPT_READ) {
+		char_properties[flag_count] = g_strdup("encrypt-read");
+		flag_count++;
+	}
+	if (properties & BLUETOOTH_GATT_PERMISSION_ENCRYPT_WRITE) {
+		char_properties[flag_count] = g_strdup("encrypt-write");
+		flag_count++;
+	}
+	if (properties & BLUETOOTH_GATT_PERMISSION_ENCRYPT_AUTHENTICATED_READ) {
+		char_properties[flag_count] = g_strdup("encrypt-authenticated-read");
+		flag_count++;
+	}
+	if (properties & BLUETOOTH_GATT_PERMISSION_ENCRYPT_AUTHENTICATED_WRITE) {
+		char_properties[flag_count] = g_strdup("encrypt-authenticated-write");
+		flag_count++;
+	}
 
 	if (flag_count == 0) {
 		char_properties[flag_count] = g_strdup("read");
@@ -1239,9 +1333,9 @@ void get_service_cb(GObject *object, GAsyncResult *res, gpointer user_data)
 			g_free(char_cmp);
 	}
 }
-void register_service_cb(GObject *object, GAsyncResult *res, gpointer user_data)
+void register_application_cb(GObject *object, GAsyncResult *res, gpointer user_data)
 {
-	BT_DBG("register_service_cb\n");
+	BT_INFO("RegisterApplication is completed");
 
 	GError *error = NULL;
 	GVariant *result;
@@ -1263,10 +1357,10 @@ void register_service_cb(GObject *object, GAsyncResult *res, gpointer user_data)
 	}
 }
 
-void unregister_service_cb(GObject *object, GAsyncResult *res,
+void unregister_application_cb(GObject *object, GAsyncResult *res,
 		gpointer user_data)
 {
-	BT_DBG("unregister_service_cb\n");
+	BT_INFO("UnregisterApplication is completed");
 
 	GError *error = NULL;
 	GVariant *result;
@@ -1293,25 +1387,30 @@ static int __bt_gatt_unregister_service(const char *service_path)
 		return BLUETOOTH_ERROR_NOT_FOUND;
 	}
 
+	return BLUETOOTH_ERROR_NONE;
+}
+
+BT_EXPORT_API int bluetooth_gatt_unregister_application(void)
+{
 	GDBusProxy *proxy = NULL;
 
 	proxy = __bt_gatt_gdbus_get_manager_proxy("org.bluez",
 					"/org/bluez/hci0", GATT_MNGR_INTERFACE);
 
-	if (proxy == NULL)
+	if (proxy == NULL || app_path == NULL)
 		return BLUETOOTH_ERROR_INTERNAL;
+
+	BT_INFO("UnregisterApplication");
 
 	/* Async Call to Unregister Service */
 	g_dbus_proxy_call(proxy,
-				"UnregisterService",
+				"UnregisterApplication",
 				g_variant_new("(o)",
-				service_path),
+				app_path),
 				G_DBUS_CALL_FLAGS_NONE, -1,
 				NULL,
-				(GAsyncReadyCallback) unregister_service_cb,
+				(GAsyncReadyCallback) unregister_application_cb,
 				NULL);
-
-	__bt_gatt_set_service_state(service_path, FALSE);
 
 	return BLUETOOTH_ERROR_NONE;
 }
@@ -1347,6 +1446,8 @@ static GDBusConnection *__bt_gatt_get_gdbus_connection(void)
 BT_EXPORT_API int bluetooth_gatt_init(void)
 {
 	GDBusConnection *conn;
+	GDBusNodeInfo *obj_info;
+	GError *error = NULL;
 
 	owner_id = g_bus_own_name(G_BUS_TYPE_SYSTEM,
 				BT_GATT_SERVICE_NAME,
@@ -1354,6 +1455,7 @@ BT_EXPORT_API int bluetooth_gatt_init(void)
 				NULL, NULL, NULL, NULL, NULL);
 
 	BT_DBG("owner_id is [%d]", owner_id);
+	app_path = g_strdup_printf("/com/%d", getpid());
 
 	serv_id = 1;
 
@@ -1363,11 +1465,32 @@ BT_EXPORT_API int bluetooth_gatt_init(void)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
+	/* Register ObjectManager interface */
+	obj_info = __bt_gatt_create_method_node_info(
+					manager_introspection_xml);
+
+	if (obj_info == NULL) {
+		BT_ERR("failed to get node info");
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	manager_id = g_dbus_connection_register_object(g_conn, app_path,
+						obj_info->interfaces[0],
+						&manager_interface_vtable,
+						NULL, NULL, &error);
+
+	if (manager_id == 0) {
+		BT_ERR("failed to register: %s", error->message);
+		g_error_free(error);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
 	return BLUETOOTH_ERROR_NONE;
 }
 
 BT_EXPORT_API int bluetooth_gatt_deinit()
 {
+	int ret = BLUETOOTH_ERROR_NONE;
 	/* Unown gdbus bus */
 	if (owner_id) {
 
@@ -1377,12 +1500,23 @@ BT_EXPORT_API int bluetooth_gatt_deinit()
 
 		g_bus_unown_name(owner_id);
 
+		/* unregister the exported interface for object manager */
+		g_dbus_connection_unregister_object(g_conn,
+					manager_id);
+
 		BT_DBG("Gatt service deinitialized \n");
 
 		g_slist_free(gatt_services);
 		gatt_services = NULL;
 
-		return BLUETOOTH_ERROR_NONE;
+		ret = bluetooth_gatt_unregister_application();
+
+		if (ret == BLUETOOTH_ERROR_NONE) {
+			g_free(app_path);
+			app_path = NULL;
+		}
+
+		return ret;
 	}
 
 	return BLUETOOTH_ERROR_NOT_FOUND;
@@ -1407,7 +1541,7 @@ BT_EXPORT_API int bluetooth_gatt_add_service(const char *svc_uuid,
 	if (node_info == NULL)
 		return BLUETOOTH_ERROR_INTERNAL;
 
-	path = g_strdup_printf(GATT_SERV_OBJECT_PATH"%d", serv_id++);
+	path = g_strdup_printf("%s"GATT_SERV_OBJECT_PATH"%d", app_path, serv_id++);
 	BT_DBG("gatt service path is [%s]", path);
 
 	object_id = g_dbus_connection_register_object(g_conn, path,
@@ -1475,6 +1609,7 @@ BT_EXPORT_API int bluetooth_gatt_add_service(const char *svc_uuid,
 
 BT_EXPORT_API int bluetooth_gatt_add_new_characteristic(
 			const char *svc_path, const char *char_uuid,
+			bt_gatt_permission_t permissions,
 			bt_gatt_characteristic_property_t properties,
 			char **char_path)
 {
@@ -1525,6 +1660,15 @@ BT_EXPORT_API int bluetooth_gatt_add_new_characteristic(
 
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
+
+	if (permissions & BLUETOOTH_GATT_PERMISSION_ENCRYPT_READ)
+		properties |= BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_ENCRYPT_READ;
+	if (permissions & BLUETOOTH_GATT_PERMISSION_ENCRYPT_AUTHENTICATED_READ)
+		properties |= BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_ENCRYPT_AUTHENTICATED_READ;
+	if (permissions & BLUETOOTH_GATT_PERMISSION_ENCRYPT_WRITE)
+		properties |= BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_ENCRYPT_WRITE;
+	if (permissions & BLUETOOTH_GATT_PERMISSION_ENCRYPT_AUTHENTICATED_WRITE)
+		properties |= BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_ENCRYPT_AUTHENTICATED_WRITE;
 
 	flag_count = bluetooth_gatt_convert_prop2string(properties, char_flags);
 
@@ -1606,7 +1750,7 @@ BT_EXPORT_API int bluetooth_gatt_set_characteristic_value(
 	int res = BLUETOOTH_ERROR_NONE;
 
 	line_argv = g_strsplit_set(characteristic, "/", 0);
-	serv_path = g_strdup_printf("/%s", line_argv[1]);
+	serv_path = g_strdup_printf("/%s/%s/%s", line_argv[1], line_argv[2], line_argv[3]);
 
 	char_info = __bt_gatt_find_gatt_char_info(serv_path, characteristic);
 
@@ -1663,6 +1807,7 @@ done:
 
 BT_EXPORT_API int bluetooth_gatt_add_descriptor(
 			const char *char_path, const char *desc_uuid,
+			bt_gatt_permission_t permissions,
 			char **desc_path)
 {
 	static int desc_id = 1;
@@ -1676,6 +1821,11 @@ BT_EXPORT_API int bluetooth_gatt_add_descriptor(
 	struct gatt_desc_info *desc_info = NULL;
 	gchar **line_argv = NULL;
 	char *serv_path;
+	GVariantBuilder *builder2 = NULL;
+	GVariant *flags_val = NULL;
+	int i = 0;
+	char *desc_flags[NUMBER_OF_FLAGS];
+	int flag_count = 0;
 
 	if (new_char) {
 		desc_id = 1;
@@ -1683,7 +1833,7 @@ BT_EXPORT_API int bluetooth_gatt_add_descriptor(
 	}
 
 	line_argv = g_strsplit_set(char_path, "/", 0);
-	serv_path = g_strdup_printf("/%s", line_argv[1]);
+	serv_path = g_strdup_printf("/%s/%s/%s", line_argv[1], line_argv[2], line_argv[3]);
 
 	char_info = __bt_gatt_find_gatt_char_info(serv_path, char_path);
 	if (char_info == NULL) {
@@ -1716,11 +1866,19 @@ BT_EXPORT_API int bluetooth_gatt_add_descriptor(
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
+	flag_count = bluetooth_gatt_convert_perm2string(permissions, desc_flags);
+
 	desc_info = g_new0(struct gatt_desc_info, 1);
 
 	desc_info->desc_path = g_strdup(path);
 	desc_info->desc_id = object_id;
 	desc_info->desc_uuid = g_strdup(desc_uuid);
+
+	for (i = 0; i < flag_count; i++) {
+		desc_info->desc_flags[i] = desc_flags[i];
+		}
+
+	desc_info->flags_length = flag_count;
 
 	char_info->desc_data = g_slist_append(char_info->desc_data, desc_info);
 
@@ -1731,6 +1889,16 @@ BT_EXPORT_API int bluetooth_gatt_add_descriptor(
 				g_variant_new("s", desc_uuid));
 	g_variant_builder_add(inner_builder, "{sv}", "Characteristic",
 				g_variant_new("o", char_path));
+
+	builder2 = g_variant_builder_new(G_VARIANT_TYPE("as"));
+
+	for (i = 0; i < flag_count; i++) {
+		g_variant_builder_add(builder2, "s", desc_flags[i]);
+	}
+
+	flags_val = g_variant_new("as", builder2);
+	g_variant_builder_add(inner_builder, "{sv}", "Flags",
+				flags_val);
 
 	g_variant_builder_add(builder, "{sa{sv}}",
 				GATT_DESC_INTERFACE,
@@ -1769,8 +1937,8 @@ BT_EXPORT_API int bluetooth_gatt_set_descriptor_value(
 	int i ;
 
 	line_argv = g_strsplit_set(desc_path, "/", 0);
-	serv_path = g_strdup_printf("/%s", line_argv[1]);
-	char_path = g_strdup_printf("%s/%s", serv_path, line_argv[2]);
+	serv_path = g_strdup_printf("/%s/%s/%s", line_argv[1], line_argv[2], line_argv[3]);
+	char_path = g_strdup_printf("%s/%s", serv_path, line_argv[4]);
 
 	desc_info = __bt_gatt_find_gatt_desc_info(serv_path, char_path, desc_path);
 
@@ -1850,9 +2018,6 @@ int bluetooth_gatt_get_service(const char *svc_uuid)
 BT_EXPORT_API int bluetooth_gatt_register_service(
 			const char *svc_path)
 {
-	GDBusProxy *proxy = NULL;
-	gchar *path = NULL;
-
 	register_pending_cnt++;
 
 	if (__bt_gatt_get_service_state(svc_path)) {
@@ -1860,25 +2025,30 @@ BT_EXPORT_API int bluetooth_gatt_register_service(
 		return BLUETOOTH_ERROR_NONE;
 	}
 
-	proxy = __bt_gatt_gdbus_get_manager_proxy("org.bluez",
-					"/org/bluez/hci0", GATT_MNGR_INTERFACE);
-	if (proxy == NULL)
-		return BLUETOOTH_ERROR_INTERNAL;
-
-	path = g_strdup(svc_path);
-
-	g_dbus_proxy_call(proxy,
-			"RegisterService",
-			g_variant_new("(oa{sv})",
-			path, NULL),
-			G_DBUS_CALL_FLAGS_NONE, -1,
-			NULL,
-			(GAsyncReadyCallback) register_service_cb,
-			NULL);
-
 	__bt_gatt_set_service_state(svc_path, TRUE);
 
-	g_free(path);
+	return BLUETOOTH_ERROR_NONE;
+}
+
+BT_EXPORT_API int bluetooth_gatt_register_application(void)
+{
+	GDBusProxy *proxy = NULL;
+
+	proxy = __bt_gatt_gdbus_get_manager_proxy("org.bluez",
+					"/org/bluez/hci0", GATT_MNGR_INTERFACE);
+	if (proxy == NULL || app_path == NULL)
+		return BLUETOOTH_ERROR_INTERNAL;
+
+	BT_INFO("RegisterApplication");
+
+	g_dbus_proxy_call(proxy,
+			"RegisterApplication",
+			g_variant_new("(oa{sv})",
+			app_path, NULL),
+			G_DBUS_CALL_FLAGS_NONE, -1,
+			NULL,
+			(GAsyncReadyCallback) register_application_cb,
+			NULL);
 
 	return BLUETOOTH_ERROR_NONE;
 }
@@ -1932,7 +2102,7 @@ BT_EXPORT_API int bluetooth_gatt_update_characteristic(
 	gchar *serv_path = NULL;
 
 	line_argv = g_strsplit_set(char_path, "/", 0);
-	serv_path = g_strdup_printf("/%s", line_argv[1]);
+	serv_path = g_strdup_printf("/%s/%s/%s", line_argv[1], line_argv[2], line_argv[3]);
 
 	if (!__bt_gatt_get_service_state(serv_path)) {
 		BT_DBG("service not registered for this characteristic \n");
@@ -2143,7 +2313,7 @@ BT_EXPORT_API int bluetooth_gatt_server_set_notification(const char *char_path,
 	char addr[20] = { 0 };
 
 	line_argv = g_strsplit_set(char_path, "/", 0);
-	serv_path = g_strdup_printf("/%s", line_argv[1]);
+	serv_path = g_strdup_printf("/%s/%s/%s", line_argv[1], line_argv[2], line_argv[3]);
 
 	if (!__bt_gatt_get_service_state(serv_path)) {
 		BT_DBG("service not registered for this characteristic \n");

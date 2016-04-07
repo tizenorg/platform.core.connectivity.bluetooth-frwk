@@ -1447,7 +1447,7 @@ int _bt_hps_prepare_httpproxy(void)
 	props = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ |
 			BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE;
 	char_uuid = g_strdup(HTTP_URI_UUID);
-	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, props, &http_uri_obj_path);
+	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, 0, props, &http_uri_obj_path);
 	if(ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Failed to add new char %d", ret);
 		goto fail;
@@ -1471,7 +1471,7 @@ int _bt_hps_prepare_httpproxy(void)
 	props = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ |
 			BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE;
 	char_uuid = g_strdup(HTTP_HDR_UUID);
-	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, props, &http_hdr_obj_path);
+	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, 0, props, &http_hdr_obj_path);
 	if(ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Failed to add new char %d", ret);
 		goto fail;
@@ -1494,7 +1494,7 @@ int _bt_hps_prepare_httpproxy(void)
 	props = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ |
 			BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE;
 	char_uuid = g_strdup(HTTP_ENTITY_UUID);
-	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, props, &http_entity_obj_path);
+	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, 0, props, &http_entity_obj_path);
 	if(ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Failed to add new char %d", ret);
 		goto fail;
@@ -1517,7 +1517,7 @@ int _bt_hps_prepare_httpproxy(void)
 	props = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ |
 			BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE;
 	char_uuid = g_strdup(HTTP_CP_UUID);
-	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, props, &http_cp_obj_path);
+	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, 0, props, &http_cp_obj_path);
 	if(ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Failed to add new char %d", ret);
 		goto fail;
@@ -1541,7 +1541,7 @@ int _bt_hps_prepare_httpproxy(void)
 			BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE |
 			BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_NOTIFY;
 	char_uuid = g_strdup(HTTP_STATUS_UUID);
-	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, props, &http_status_obj_path);
+	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, 0, props, &http_status_obj_path);
 	if(ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Failed to add new char %d", ret);
 		goto fail;
@@ -1554,7 +1554,9 @@ int _bt_hps_prepare_httpproxy(void)
 	}
 #endif
 	desc_uuid = g_strdup(HTTP_STATUS_CCC_DESC_UUID);
-	ret = bluetooth_gatt_add_descriptor(http_status_obj_path, desc_uuid, &http_status_desc_obj_path);
+	ret = bluetooth_gatt_add_descriptor(http_status_obj_path, desc_uuid,
+					(BLUETOOTH_GATT_PERMISSION_READ | BLUETOOTH_GATT_PERMISSION_WRITE),
+					&http_status_desc_obj_path);
 	if(ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Failed to add new char descriptor %d", ret);
 		goto fail;
@@ -1571,7 +1573,7 @@ int _bt_hps_prepare_httpproxy(void)
 	props = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ |
 			BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE;
 	char_uuid = g_strdup(HTTP_SECURITY_UUID);
-	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, props, &http_security_obj_path);
+	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, 0, props, &http_security_obj_path);
 	if(ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Failed to add new char %d", ret);
 		goto fail;
@@ -1593,6 +1595,12 @@ int _bt_hps_prepare_httpproxy(void)
 	ret = bluetooth_gatt_register_service(hps_obj_path);
 	if(ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Failed to register service %d", ret);
+		goto fail;
+	}
+
+	ret = bluetooth_gatt_register_application();
+	if(ret != BLUETOOTH_ERROR_NONE) {
+		BT_ERR("Failed to register application %d", ret);
 		goto fail;
 	}
 
