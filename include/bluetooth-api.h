@@ -336,6 +336,16 @@ typedef enum {
 
 typedef enum
 {
+	BLUETOOTH_GATT_PERMISSION_READ = 0x01,
+	BLUETOOTH_GATT_PERMISSION_WRITE = 0x02,
+	BLUETOOTH_GATT_PERMISSION_ENCRYPT_READ = 0x04,
+	BLUETOOTH_GATT_PERMISSION_ENCRYPT_WRITE = 0x08,
+	BLUETOOTH_GATT_PERMISSION_ENCRYPT_AUTHENTICATED_READ = 0x10,
+	BLUETOOTH_GATT_PERMISSION_ENCRYPT_AUTHENTICATED_WRITE = 0x20,
+} bt_gatt_permission_t;
+
+typedef enum
+{
 	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_BROADCAST = 0x01,
 	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ = 0x02,
 	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE_NO_RESPONSE = 0x04,
@@ -343,7 +353,13 @@ typedef enum
 	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_NOTIFY = 0x10,
 	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_INDICATE = 0x20,
 	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_SIGNED_WRITE = 0x40,
-	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_EXTENDED_PROPS = 0x80
+	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_RELIABLE_WRITE = 0x80,
+	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITABLE_AUXILIARIES = 0x100,
+	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_ENCRYPT_READ = 0x200,
+	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_ENCRYPT_WRITE = 0x400,
+	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_ENCRYPT_AUTHENTICATED_READ = 0x800,
+	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_ENCRYPT_AUTHENTICATED_WRITE = 0x1000,
+	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_EXTENDED_PROPS = 0xffff,
 }bt_gatt_characteristic_property_t;
 
 /**
@@ -542,7 +558,7 @@ typedef enum {
 	BLUETOOTH_EVENT_GATT_SERVER_READ_REQUESTED, /** <GATT Characteristic/Descriptor Read Request event */
 	BLUETOOTH_EVENT_GATT_SERVER_VALUE_CHANGED, /** <GATT Characteristic/Descriptor Value change event */
 	BLUETOOTH_EVENT_GATT_SERVER_NOTIFICATION_STATE_CHANGED, /** <GATT Characteristic Notification change event */
-	BLUETOOTH_EVENT_GATT_SERVER_INDICATE_CONFIRMED, /** <GATT Characteristic Notification change event */
+	BLUETOOTH_EVENT_GATT_SERVER_NOTIFICATION_COMPLETED, /** <GATT Characteristic Notification or Indication completed event */
 
 	BLUETOOTH_EVENT_AG_CONNECTED = BLUETOOTH_EVENT_AUDIO_BASE, /**<AG service connected event*/
 	BLUETOOTH_EVENT_AG_DISCONNECTED, /**<AG service disconnected event*/
@@ -4927,7 +4943,8 @@ int bluetooth_gatt_add_service(const char *svc_uuid,
 
 /* @fn int bluetooth_gatt_add_new_characteristic(
 			const char *svc_path, const char *char_uuid,
-			bt_gatt_characteristic_property_t *properties,
+			bt_gatt_permission_t permissions,
+			bt_gatt_characteristic_property_t properties,
 			int flags_length, char **char_path);;
 *
 * @brief Exports a new gatt characteristic to the characteristic interface.
@@ -4948,6 +4965,7 @@ int bluetooth_gatt_add_service(const char *svc_uuid,
 */
 int bluetooth_gatt_add_new_characteristic(
 			const char *svc_path, const char *char_uuid,
+			bt_gatt_permission_t permissions,
 			bt_gatt_characteristic_property_t properties,
 			char **char_path);
 
@@ -4974,9 +4992,9 @@ int bluetooth_gatt_set_characteristic_value(
 			const char *characteristic, const char *char_value,
 			int value_length);
 
-/* @fn int bluetooth_gatt_add_descriptor(const char *desc_uuid,
-			const char *desc_value, int value_length,
-			const char *permissions, const char *char_path,
+/* @fn  int bluetooth_gatt_add_descriptor(
+			const char *char_path, const char *desc_uuid,
+			bt_gatt_permission_t permissions,
 			char **desc_path);
 *
 * @brief Exports a new gatt descriptor to the descriptor interface.
@@ -4993,14 +5011,16 @@ int bluetooth_gatt_set_characteristic_value(
 * @param[in]   desc_value	GATT descriptor value.
 * @param[in]   value_length 	Length of GATT descriptor value.
 * @param[in]   permissions	descriptor permissions.
+* @param[in]   properties	GATT descriptor properties.
 * @param[in]  char_path	characteristics object path of the exported character.
 *
 * @remark  Adapter should be enabled
 * @see	bluetooth_gatt_add_service()
 * @see	bluetooth_gatt_add_characteristics()
 */
-int bluetooth_gatt_add_descriptor(const char *char_path,
-			const char *desc_uuid,
+int bluetooth_gatt_add_descriptor(
+			const char *char_path, const char *desc_uuid,
+			bt_gatt_permission_t permissions,
 			char **desc_path);
 
 /* @fn int bluetooth_gatt_set_descriptor_value(
@@ -5066,8 +5086,31 @@ int bluetooth_gatt_get_service(const char *svc_uuid);
 * @see	bluetooth_gatt_add_service()
 * @see	bluetooth_gatt_add_characteristics()
 * @see	bluetooth_gatt_add_descriptor()
+* @see  bluetooth_gatt_register_application()
 */
 int bluetooth_gatt_register_service(const char *svc_path);
+
+/* @fn int bluetooth_gatt_register_application(void)
+*
+* @brief Registers the application with the bluez gatt server.
+*
+* This function is a synchronous call.
+*
+* @return	BLUETOOTH_ERROR_NONE	- Success \n
+*	 BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+*	 BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+*	 BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+*
+* @exception	 None
+*
+* @remark  Adapter should be enabled
+* @see  bluetooth_gatt_init()
+* @see	bluetooth_gatt_add_service()
+* @see	bluetooth_gatt_add_characteristics()
+* @see	bluetooth_gatt_add_descriptor()
+* @see	bluetooth_gatt_register_service()
+*/
+int bluetooth_gatt_register_application(void);
 
 /* @fn int bluetooth_gatt_unregister_service(const  char *svc_path)
 *
@@ -5090,6 +5133,30 @@ int bluetooth_gatt_register_service(const char *svc_path);
 * @see bluetooth_gatt_register_service()
 */
 int bluetooth_gatt_unregister_service(const char *svc_path);
+
+/* @fn int bluetooth_gatt_unregister_application(void)
+*
+* @brief Removes(unregister) the application with the bluez gatt server,
+*        and deletes all the service registered.
+*
+* This function is a synchronous call.
+*
+* @return	BLUETOOTH_ERROR_NONE	- Success \n
+*	 BLUETOOTH_ERROR_INTERNAL - Internal Error \n
+*	 BLUETOOTH_ERROR_INVALID_PARAM -Invalid Parameters \n
+*	 BLUETOOTH_ERROR_DEVICE_NOT_ENABLED - Adapter is disabled \n
+*
+* @exception	 None
+*
+* @remark  Adapter should be enabled
+* @see  bluetooth_gatt_init()
+* @see	bluetooth_gatt_add_service()
+* @see	bluetooth_gatt_add_characteristics()
+* @see	bluetooth_gatt_add_descriptor()
+* @see	bluetooth_gatt_register_service()
+* @see  bluetooth_gatt_unregister_service()
+*/
+int bluetooth_gatt_unregister_application(void);
 
 /* @fn int bluetooth_gatt_send_response(int request_id,
 *				int offset, char *value, int value_length)

@@ -1161,6 +1161,7 @@ int test_input_callback(void *data)
 		case 95: {
 			/* testing with dummy values*/
 			char *char_uuid = g_strdup("00002a06-0000-1000-8000-00805f9b34fb");
+			bt_gatt_permission_t perms = 0;
 			bt_gatt_characteristic_property_t props = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ |
 					BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE |
 					BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_NOTIFY |
@@ -1168,7 +1169,7 @@ int test_input_callback(void *data)
 
 			ret = bluetooth_gatt_add_new_characteristic(
 				svc_obj_path, char_uuid,
-				props, &char_obj_path);
+				perms, props, &char_obj_path);
 
 			TC_PRT("characteristic obj_path is %s", char_obj_path);
 
@@ -1177,9 +1178,11 @@ int test_input_callback(void *data)
 
 		case 96: {
 			char *desc_uuid = g_strdup("000026ff-0000-1000-8000-00805f9b34fb");
+			bt_gatt_permission_t perms = BLUETOOTH_GATT_PERMISSION_READ |
+					BLUETOOTH_GATT_PERMISSION_WRITE;
 
 			ret = bluetooth_gatt_add_descriptor(char_obj_path,
-				desc_uuid, &desc_obj_path);
+				desc_uuid, perms, &desc_obj_path);
 
 			TC_PRT("add descriptor error is %d", ret);
 
@@ -1193,6 +1196,13 @@ int test_input_callback(void *data)
 			break;
 		}
 		case 98: {
+			ret = bluetooth_gatt_register_application();
+
+			TC_PRT("register service error is %d", ret);
+
+			break;
+		}
+		case 99: {
 			char char_data[4] = {10, 20, 30, 40};
 			int char_length = 4;
 			ret = bluetooth_gatt_update_characteristic(char_obj_path,
@@ -1202,14 +1212,14 @@ int test_input_callback(void *data)
 
 			break;
 		}
-		case 99: {
+		case 100: {
 			ret = bluetooth_gatt_unregister_service(svc_obj_path);
 
 			TC_PRT("service removed with error is %d", ret);
 
 			break;
 		}
-		case 100: {
+		case 101: {
 			ret = bluetooth_gatt_delete_services();
 
 			TC_PRT("services deleted with error is %d", ret);
