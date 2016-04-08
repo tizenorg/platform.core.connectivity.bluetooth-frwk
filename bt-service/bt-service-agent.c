@@ -739,7 +739,9 @@ static gboolean __authorize_request(GapAgentPrivate *agent, GDBusProxy *device,
 	tethering_h tethering = NULL;
 #endif
 	int result = BLUETOOTH_ERROR_NONE;
+#ifndef AUTO_ACCEPT
 	int request_type = BT_AGENT_EVENT_AUTHORIZE_REQUEST;
+#endif
 
 	BT_DBG("+");
 
@@ -890,23 +892,23 @@ fail:
 		goto done;
 	}
 
-	if (!strcasecmp(uuid, OPP_UUID))
-		request_type = BT_AGENT_EVENT_EXCHANGE_REQUEST;
-	else if (!strcasecmp(uuid, PBAP_UUID))
-		request_type = BT_AGENT_EVENT_PBAP_REQUEST;
-	else if (!strcasecmp(uuid, MAP_UUID))
-		request_type = BT_AGENT_EVENT_MAP_REQUEST;
-
 	if (trust) {
 		BT_INFO("Trusted device, so authorize\n");
 		gap_agent_reply_authorize(agent,
-					      GAP_AGENT_ACCEPT, NULL);
+				GAP_AGENT_ACCEPT, NULL);
 	} else {
 #ifdef AUTO_ACCEPT
 		gap_agent_reply_authorize(agent, GAP_AGENT_ACCEPT, NULL);
 #else
+		if (!strcasecmp(uuid, OPP_UUID))
+			request_type = BT_AGENT_EVENT_EXCHANGE_REQUEST;
+		else if (!strcasecmp(uuid, PBAP_UUID))
+			request_type = BT_AGENT_EVENT_PBAP_REQUEST;
+		else if (!strcasecmp(uuid, MAP_UUID))
+			request_type = BT_AGENT_EVENT_MAP_REQUEST;
+
 		_bt_launch_system_popup(request_type, name, NULL, NULL,
-						_gap_agent_get_path(agent));
+				_gap_agent_get_path(agent));
 #endif
 	}
 

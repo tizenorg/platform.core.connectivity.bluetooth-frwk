@@ -60,11 +60,10 @@ static void __bt_release_service(void)
 
 static void __bt_sigterm_handler(int signo, siginfo_t *info, void *data)
 {
-	int ret;
-
 	BT_INFO("signal [%d] is sent by [%d]", signo, info->si_pid);
 
 #ifndef TIZEN_TV
+	int ret;
 	ret = _bt_recover_adapter();
 	if (ret != BLUETOOTH_ERROR_NONE)
 		BT_ERR("_bt_recover_adapter is failed : %d", ret);
@@ -146,12 +145,14 @@ gboolean _bt_reliable_terminate_service(gpointer user_data)
 
 static gboolean __bt_check_bt_service(void *data)
 {
-	int bt_status = VCONFKEY_BT_STATUS_OFF;
-	int bt_le_status = VCONFKEY_BT_LE_STATUS_OFF;
 	bt_status_t status = BT_DEACTIVATED;
 	bt_le_status_t le_status = BT_LE_DEACTIVATED;
+#ifndef TIZEN_TV
+	int bt_status = VCONFKEY_BT_STATUS_OFF;
+	int bt_le_status = VCONFKEY_BT_LE_STATUS_OFF;
 	int flight_mode_deactivation = 0;
 	int bt_off_due_to_timeout = 0;
+#endif
 #if 0
 	int ps_mode_deactivation = 0;
 #endif
