@@ -2110,8 +2110,8 @@ gboolean __bt_service_check_privilege(int function_name,
         char *client_creds = NULL;
         char *user_creds = NULL;
         char *client_session = "";
-        int client_creds_method = CLIENT_METHOD_SMACK;
-        int user_creds_method = USER_METHOD_UID;
+        enum cynara_client_creds client_creds_method = CLIENT_METHOD_SMACK;
+        enum cynara_user_creds user_creds_method = USER_METHOD_UID;
         char err_msg[256] = {0, };
 
         retv_if(unique_name == NULL, FALSE);

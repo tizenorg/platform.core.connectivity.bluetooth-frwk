@@ -461,7 +461,6 @@ void _bt_handle_adapter_event(GVariant *msg, const char *member)
 	} else if (strcasecmp(member, "AdvertisingEnabled") == 0) {
 		BT_DBG("Advertising Enabled");
 		int slot_id;
-		const char *sender;
 		int event;
 		int adv_handle;
 		gboolean status = FALSE;
@@ -473,7 +472,6 @@ void _bt_handle_adapter_event(GVariant *msg, const char *member)
 		/* Send event to application */
 		_bt_set_advertising_status(slot_id, status);
 
-		sender = _bt_get_adv_slot_owner(slot_id);
 		adv_handle = _bt_get_adv_slot_adv_handle(slot_id);
 
 		if (status)
@@ -484,6 +482,8 @@ void _bt_handle_adapter_event(GVariant *msg, const char *member)
 					adv_handle);
 
 #if 0
+		const char *sender;
+		sender = _bt_get_adv_slot_owner(slot_id);
 		_bt_send_event_to_dest(sender, BT_ADAPTER_EVENT,
 				event,
 				param);

@@ -141,7 +141,7 @@ void _bt_clear_gatt_client_senders(void)
 		gatt_client_senders = NULL;
 	}
 }
-
+#if 0
 static void __bt_send_foreach_event(gpointer data, gpointer user_data)
 {
 	char *sender = data;
@@ -150,7 +150,7 @@ static void __bt_send_foreach_event(gpointer data, gpointer user_data)
 	_bt_send_event_to_dest(sender, BT_DEVICE_EVENT,BLUETOOTH_EVENT_GATT_CHAR_VAL_CHANGED,
 					param);
 }
-
+#endif
 void _bt_send_char_value_changed_event(void *param)
 {
 #if 0
