@@ -349,7 +349,6 @@ int _bt_pbap_connect(const bluetooth_device_address_t *address)
 			temp,
 			G_DBUS_CALL_FLAGS_NONE, -1, NULL,
 			(GAsyncReadyCallback)__bt_pbap_connect_cb, ptr);
-	g_free(ptr);
 
 	BT_DBG("-");
 	return 0;
@@ -851,7 +850,6 @@ int __bt_pbap_call_get_phonebook(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 
 	g_free(format_str);
 	g_free(order_str);
-	g_hash_table_destroy((GHashTable *)filters);
 
 	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
@@ -977,7 +975,6 @@ int __bt_pbap_call_get_vcard(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 
 	g_free(format_str);
 	g_free(vcard_handle);
-	g_hash_table_destroy((GHashTable *)filters);
 
 	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
@@ -1027,7 +1024,6 @@ int __bt_pbap_call_search_phonebook(GDBusProxy *proxy, bt_pbap_data_t *pbap_data
 	g_free(value);
 	g_free(order_str);
 	g_free(field);
-	g_hash_table_destroy((GHashTable *)filters);
 
 	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
@@ -1370,7 +1366,7 @@ int _bt_pbap_phonebook_search(const bluetooth_device_address_t *address,
 		BT_DBG("Address String: %s", address_string);
 
 	source_string = g_strdup(SOURCE[source]);
-	type_string = g_strdup("nil");
+	type_string = g_strdup(TYPE[type]);
 
 	BT_DBG("Address[%s] Source[%s] Type[%s]",
 			address_string, source_string, type_string);
