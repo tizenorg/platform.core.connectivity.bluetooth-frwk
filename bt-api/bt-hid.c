@@ -23,6 +23,10 @@
 #include "bt-request-sender.h"
 #include "bt-event-handler.h"
 
+#ifdef TIZEN_DPM_ENABLE
+#include "bt-dpm.h"
+#endif
+
 BT_EXPORT_API int bluetooth_hid_init(hid_cb_func_ptr callback_ptr, void *user_data)
 {
 	int ret;
@@ -70,6 +74,17 @@ BT_EXPORT_API int bluetooth_hid_connect(hid_device_address_t *device_address)
 		BT_ERR("Don't have a privilege to use this API");
 		return BLUETOOTH_ERROR_PERMISSION_DEINED;
 	}
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_ADDRESS, device_address) == BT_DPM_RESTRICTED) {
+		BT_ERR("Blacklist device");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+
+	if (_bt_check_dpm(BT_DPM_UUID, BT_HID_UUID) == BT_DPM_RESTRICTED) {
+		BT_ERR("Blacklist uuid");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
 
 	user_info = _bt_get_user_data(BT_HID);
 	retv_if(user_info->cb == NULL, BLUETOOTH_ERROR_INTERNAL);
