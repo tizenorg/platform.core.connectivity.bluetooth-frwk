@@ -87,6 +87,10 @@ BT_EXPORT_API int bluetooth_enable_adapter(void)
 	BT_INFO("");
 	retv_if(bluetooth_check_adapter() == BLUETOOTH_ADAPTER_ENABLED,
 				BLUETOOTH_ERROR_DEVICE_ALREADY_ENABLED);
+#if 0
+	retv_if(bluetooth_dpm_is_bluetooth_mode_allowed() == BLUETOOTH_DPM_RESULT_ACCESS_DENIED,
+				BLUETOOTH_ERROR_PERMISSION_DEINED);
+#endif
 
 	user_info = _bt_get_user_data(BT_COMMON);
 	retv_if(user_info->cb == NULL, BLUETOOTH_ERROR_INTERNAL);
