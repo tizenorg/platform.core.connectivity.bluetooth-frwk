@@ -46,6 +46,10 @@
 #include "bt-service-device.h"
 #include "bt-service-audio.h"
 
+#ifdef TIZEN_DPM_ENABLE
+#include "bt-service-dpm.h"
+#endif
+
 #define BT_APP_AUTHENTICATION_TIMEOUT		35
 #define BT_APP_AUTHORIZATION_TIMEOUT		15
 
@@ -389,6 +393,15 @@ static gboolean __pincode_request(GapAgentPrivate *agent, GDBusProxy *device)
 
 	BT_DBG("+");
 
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_dpm_get_bluetooth_pairing_state() == DPM_RESTRICTED) {
+		BT_ERR("Not allow to pair the device");
+		gap_agent_reply_confirmation(agent, GAP_AGENT_REJECT, NULL);
+		__bt_agent_release_memory();
+		return TRUE;
+	}
+#endif
+
 	reply_temp = __bt_service_getall(device, BT_DEVICE_INTERFACE);
 
 	if (reply_temp == NULL) {
@@ -487,6 +500,15 @@ static gboolean __passkey_request(GapAgentPrivate *agent, GDBusProxy *device)
 	GVariant *reply_temp = NULL;
 	GVariant *tmp_value;
 	BT_DBG("+");
+
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_dpm_get_bluetooth_pairing_state() == DPM_RESTRICTED) {
+		BT_ERR("Not allow to pair the device");
+		gap_agent_reply_confirmation(agent, GAP_AGENT_REJECT, NULL);
+		__bt_agent_release_memory();
+		return TRUE;
+	}
+#endif
 
 	reply_temp = __bt_service_getall(device, BT_DEVICE_INTERFACE);
 
@@ -619,6 +641,15 @@ static gboolean __confirm_request(GapAgentPrivate *agent, GDBusProxy *device,
 	GVariant *tmp_value;
 	BT_DBG("+ passkey[%.6d]", passkey);
 
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_dpm_get_bluetooth_pairing_state() == DPM_RESTRICTED) {
+		BT_ERR("Not allow to pair the device");
+		gap_agent_reply_confirmation(agent, GAP_AGENT_REJECT, NULL);
+		__bt_agent_release_memory();
+		return TRUE;
+	}
+#endif
+
 	snprintf(str_passkey, sizeof(str_passkey), "%.6d", passkey);
 
 	reply_temp = __bt_service_getall(device, BT_DEVICE_INTERFACE);
@@ -741,6 +772,46 @@ static gboolean __authorize_request(GapAgentPrivate *agent, GDBusProxy *device,
 	int result = BLUETOOTH_ERROR_NONE;
 #ifndef AUTO_ACCEPT
 	int request_type = BT_AGENT_EVENT_AUTHORIZE_REQUEST;
+#endif
+
+#if 0
+	const char *path;
+	char *dev_address;
+	bluetooth_device_address_t addr_s = { {0} };
+
+	BT_DBG("+");
+
+	/* Check the blacklist uuid by DPM */
+	if (_bt_check_mdm_blacklist_uuid((char *)uuid) == BT_MDM_RESTRICTED) {
+		BT_ERR("Blacklist uuid");
+		gap_agent_reply_authorize(agent, GAP_AGENT_REJECT,
+						  NULL);
+		goto done;
+	}
+	if (_bt_check_mdm_desktop_connectivity_restriction() ==
+				BT_MDM_RESTRICTED &&
+				__bt_is_major_class_computer(device)) {
+		BT_ERR("Reject a authorization due to MDM Policy");
+		gap_agent_reply_authorize(agent, GAP_AGENT_REJECT,
+						  NULL);
+		goto done;
+	}
+
+	/* Check the blacklist device by DPM */
+	path = g_dbus_proxy_get_object_path(device);
+	dev_address = g_malloc0(BT_ADDRESS_STRING_SIZE);
+
+	_bt_convert_device_path_to_address(path, dev_address);
+	_bt_convert_addr_string_to_type(addr_s.addr, dev_address);
+
+	g_free(dev_address);
+
+	if (_bt_check_mdm_blacklist_device(&addr_s) == BT_MDM_RESTRICTED) {
+		BT_ERR("Blacklist device");
+		gap_agent_reply_authorize(agent, GAP_AGENT_REJECT,
+						  NULL);
+		goto done;
+	}
 #endif
 
 	BT_DBG("+");

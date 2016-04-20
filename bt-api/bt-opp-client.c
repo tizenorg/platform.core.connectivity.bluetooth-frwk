@@ -24,6 +24,10 @@
 #include "bt-request-sender.h"
 #include "bt-event-handler.h"
 
+#ifdef TIZEN_DPM_ENABLE
+#include "bt-dpm.h"
+#endif
+
 static void __bt_get_file_size(char **files, unsigned long *file_size, int *count)
 {
 	int file_count = 0;
@@ -72,6 +76,31 @@ BT_EXPORT_API int bluetooth_opc_push_files(bluetooth_device_address_t *remote_ad
 		BT_ERR("Don't have a privilege to use this API");
 		return BLUETOOTH_ERROR_PERMISSION_DEINED;
 	}
+
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_ADDRESS, remote_address) == BT_DPM_RESTRICTED) {
+		BT_ERR("Blacklist device");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+
+	if (_bt_check_dpm(BT_DPM_OPP, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to send files");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+
+	if (_bt_check_dpm(BT_DPM_DESKTOP, NULL) == BT_DPM_RESTRICTED) {
+		char address[BT_ADDRESS_STRING_SIZE] = { 0 };
+		bluetooth_device_class_t dev_class;
+
+		_bt_convert_addr_type_to_string(address, remote_address->addr);
+		_bt_get_cod_by_address(address, &dev_class);
+
+		if (dev_class.major_class == BLUETOOTH_DEVICE_MAJOR_CLASS_COMPUTER) {
+			BT_ERR("Reject a authorization due to MDM Policy");
+			return BLUETOOTH_ERROR_ACCESS_DENIED;
+		}
+	}
+#endif
 
 	__bt_get_file_size(file_name_array, &size, &file_count);
 	retv_if(file_count == 0, BLUETOOTH_ERROR_INVALID_PARAM);
