@@ -41,6 +41,10 @@
 
 #include "bt-service-opp-client.h"
 
+#ifdef TIZEN_DPM_ENABLE
+#include "bt-service-dpm.h"
+#endif
+
 #define DBUS_TIMEOUT 20 * 1000 /* 20 Sec */
 static GDBusConnection *manager_conn;
 static GDBusConnection *obexd_conn;
@@ -887,6 +891,23 @@ static void __bt_device_property_changed_event(GVariant *msg, const char *path)
 
 			if (remote_dev_info->addr_type == 0) {
 				BT_DBG("Name %s", remote_dev_info->name);
+
+#ifdef TIZEN_DPM_ENABLE
+				if (_bt_dpm_get_bluetooth_desktop_connectivity_state() ==
+							DPM_RESTRICTED) {
+					bluetooth_device_class_t device_class;
+					_bt_divide_device_class(&device_class, remote_dev_info->class);
+
+					if (device_class.major_class ==
+						BLUETOOTH_DEVICE_MAJOR_CLASS_COMPUTER) {
+						_bt_free_device_info(remote_dev_info);
+						g_free(property);
+						g_variant_unref(val);
+						g_free(address);
+						return;
+					}
+				}
+#endif
 
 				GVariant *uuids = NULL;
 				GVariantBuilder *builder = NULL;
@@ -2406,6 +2427,22 @@ static  void __bt_manager_event_filter(GDBusConnection *connection,
 					 * then display address as name.
 					 */
 					dev_info->name = g_strdup(dev_info->address);
+
+#ifdef TIZEN_DPM_ENABLE
+				if (_bt_dpm_get_bluetooth_desktop_connectivity_state() ==
+							DPM_RESTRICTED) {
+					bluetooth_device_class_t device_class;
+					_bt_divide_device_class(&device_class, dev_info->class);
+					BT_DBG("[%s]device_class.major_class : %d", dev_info->name, device_class.major_class);
+
+					if (device_class.major_class ==
+						BLUETOOTH_DEVICE_MAJOR_CLASS_COMPUTER) {
+						__bt_free_cache_info(cache_info);
+						g_variant_unref(value);
+						return;
+					}
+				}
+#endif
 
 				GVariant *uuids = NULL;
 				GVariantBuilder *builder = NULL;

@@ -71,6 +71,9 @@ extern "C" {
 #define BLUETOOTH_PBAP_MAX_SEARCH_VALUE_LENGTH 100
 
 
+#define BLUETOOTH_MAX_DPM_LIST 20	/**< This specifies maximum number of devices/uuids
+							dpm shall store */
+
 /**
  * This is Bluetooth error code
  */
@@ -1513,6 +1516,110 @@ typedef struct {
 	guint16 max_rx_octets;
 	guint16 max_rx_time;
 } bt_le_data_length_params_t;
+
+
+ /**
+ * @brief DPM BT allowance state
+ * @see
+ */
+ typedef enum {
+	 BLUETOOTH_DPM_ERROR	 = -1,	 /**< bluetooth allowance error */
+	 BLUETOOTH_DPM_BT_ALLOWED,		 /**< bluetooth allowance allowed */
+	 BLUETOOTH_DPM_HANDSFREE_ONLY,  /**< bluetooth allowance handsfree only */
+	 BLUETOOTH_DPM_BT_RESTRICTED,  /**< bluetooth allowance restricted */
+ } bt_dpm_allow_t;
+
+ /**
+ * @brief DPM API result
+ * @see
+ */
+typedef enum {
+	BLUETOOTH_DPM_RESULT_SERVICE_NOT_ENABLED = -5,	/**< DPM API result service not enabled. */
+	BLUETOOTH_DPM_RESULT_ACCESS_DENIED = -4,			/**< DPM API result access denied. */
+	BLUETOOTH_DPM_RESULT_INVALID_PARAM = -3,			/**< DPM API result invalid parameter. */
+	BLUETOOTH_DPM_RESULT_NOT_SUPPORTED = -2,			/**< DPM API result not supported. */
+	BLUETOOTH_DPM_RESULT_FAIL 	 = -1,				/**< DPM API result fail. */
+	BLUETOOTH_DPM_RESULT_SUCCESS	 = 0,				/**< DPM API result success. */
+} bt_dpm_result_t;
+
+/**
+ * @brief DPM Policy status
+ * @see
+ */
+typedef enum {
+	BLUETOOTH_DPM_STATUS_ERROR	= -1,
+
+	BLUETOOTH_DPM_ALLOWED 		= 0,	/**< DPM Policy status allowed. */
+	BLUETOOTH_DPM_RESTRICTED		= 1,	/**< DPM Policy status restricted. */
+
+	BLUETOOTH_DPM_ENABLE			= 1,	/**< DPM Policy status enabled. */
+	BLUETOOTH_DPM_DISABLE 	= 0,	/**< DPM Policy status disabled. */
+
+	BLUETOOTH_DPM_FALSE			= 0,	/**< DPM Policy status false. */
+	BLUETOOTH_DPM_TRUE			= 1,	/**< DPM Policy status true. */
+} bt_dpm_status_t;
+
+typedef enum {
+	/* policy-group : BLUETOOTH */
+	BLUETOOTH_DPM_POLICY_ALLOW,
+	BLUETOOTH_DPM_POLICY_DEVICE_RESTRICTION,
+	BLUETOOTH_DPM_POLICY_UUID_RESTRICTION,
+	BLUETOOTH_DPM_POLICY_DEVICES_WHITELIST,
+	BLUETOOTH_DPM_POLICY_DEVICES_BLACKLIST,
+	BLUETOOTH_DPM_POLICY_UUIDS_WHITELIST,
+	BLUETOOTH_DPM_POLICY_UUIDS_BLACKLIST,
+	BLUETOOTH_DPM_POLICY_ALLOW_OUTGOING_CALL,
+	BLUETOOTH_DPM_POLICY_PAIRING_STATE,
+	BLUETOOTH_DPM_POLICY_DESKTOP_CONNECTIVITY_STATE,
+	BLUETOOTH_DPM_POLICY_DISCOVERABLE_STATE,
+	BLUETOOTH_DPM_POLICY_LIMITED_DISCOVERABLE_STATE,
+	BLUETOOTH_DPM_POLICY_DATA_TRANSFER_STATE,
+	BLUETOOTH_DPM_POLICY_END,
+} bt_dpm_policy_cmd_t;
+
+
+struct bt_dpm_policy {
+	union {
+		int value;
+		GSList *list;
+	};
+};
+typedef struct bt_dpm_policy bt_dpm_policy_t;
+
+typedef enum {
+	BLUETOOTH_DPM_POLICY_A2DP_PROFILE_STATE,
+	BLUETOOTH_DPM_POLICY_AVRCP_PROFILE_STATE,
+	BLUETOOTH_DPM_POLICY_BPP_PROFILE_STATE,
+	BLUETOOTH_DPM_POLICY_DUN_PROFILE_STATE,
+	BLUETOOTH_DPM_POLICY_FTP_PROFILE_STATE,
+	BLUETOOTH_DPM_POLICY_HFP_PROFILE_STATE,
+	BLUETOOTH_DPM_POLICY_HSP_PROFILE_STATE,
+	BLUETOOTH_DPM_POLICY_PBAP_PROFILE_STATE,
+	BLUETOOTH_DPM_POLICY_SAP_PROFILE_STATE,
+	BLUETOOTH_DPM_POLICY_SPP_PROFILE_STATE,
+	BLUETOOTH_DPM_PROFILE_NONE,
+} bt_dpm_profile_t;
+
+struct bt_dpm_profile_val {
+		int value; /* tells whether the profile is enabled or disabled */
+};
+typedef struct dpm_profile_val dpm_profile_state_t;
+
+/**
+ * Structure to DPM device list
+ */
+typedef struct {
+	int count;
+	bluetooth_device_address_t addresses[BLUETOOTH_MAX_DPM_LIST];
+} bt_dpm_device_list_t;
+
+/**
+ * Structure to DPM uuid list
+ */
+typedef struct {
+	int count;
+	char uuids[BLUETOOTH_MAX_DPM_LIST][BLUETOOTH_UUID_STRING_MAX];
+} bt_dpm_uuids_list_t;
 
 /**
  * Callback pointer type
@@ -5661,6 +5768,752 @@ int bluetooth_pbap_phonebook_search(const bluetooth_device_address_t *address,
  * @remark	None
  */
 int bluetooth_set_manufacturer_data(const bluetooth_manufacturer_data_t *value);
+
+#ifdef TIZEN_DPM_VCONF_ENABLE
+/**
+ * @fn int bluetooth_dpm_is_bluetooth_mode_allowed(void);
+ *
+ * @brief Checks Restriction for BT mode(BT allowed or not)
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ *  @param[in] None
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_is_bluetooth_mode_allowed(void);
+#endif
+
+/**
+ * @fn int bluetooth_dpm_set_allow_bluetooth_mode(bt_dpm_allow_t value);
+ *
+ * @brief Sets Restriction for BT mode(BT allowed or not)
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	value - BT Allow value.
+ *		BLUETOOTH_DPM_ERROR  = -1,	 < bluetooth allowance error
+ *		BLUETOOTH_DPM_BT_ALLOWED,		 < bluetooth allowance allowed
+ *		BLUETOOTH_DPM_HANDSFREE_ONLY,  < bluetooth allowance handsfree only
+ *		BLUETOOTH_DPM_BT_RESTRICTED,  < bluetooth allowance restricted
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_set_allow_bluetooth_mode(bt_dpm_allow_t value);
+
+/**
+ * @fn int bluetooth_dpm_get_allow_bluetooth_mode(bt_dpm_allow_t value);
+ *
+ * @brief Reads the Restriction for BT mode(BT allowed or not)
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ *  @param[in] None
+ * @param[out]	value - BT Allow value.
+ * 	 	BLUETOOTH_DPM_ERROR	 = -1,	 < bluetooth allowance error
+ *	 	BLUETOOTH_DPM_BT_ALLOWED,		 < bluetooth allowance allowed
+ *	 	BLUETOOTH_DPM_HANDSFREE_ONLY,  < bluetooth allowance handsfree only
+ *	 	BLUETOOTH_DPM_BT_RESTRICTED,  < bluetooth allowance restricted
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_get_allow_bluetooth_mode(bt_dpm_allow_t *value);
+
+/**
+ * @fn int bluetooth_dpm_activate_bluetooth_device_restriction(bt_dpm_status_t value);
+ *
+ * @brief Sets the Restriction for device.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED 		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_activate_bluetooth_device_restriction(bt_dpm_status_t value);
+
+/**
+ * @fn int bluetooth_dpm_is_bluetooth_device_restriction_active(bt_dpm_status_t *value);
+ *
+ * @brief Reads the Restriction for device.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in] None
+ * @param[out]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_is_bluetooth_device_restriction_active(bt_dpm_status_t *value);
+
+/**
+ * @fn int bluetooth_dpm_activate_bluetoooth_uuid_restriction(bt_dpm_status_t value);
+ *
+ * @brief Sets the Restriction for uuid.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_activate_bluetoooth_uuid_restriction(bt_dpm_status_t value);
+
+/**
+ * @fn int bluetooth_dpm_is_bluetooth_uuid_restriction_active(bt_dpm_status_t *value);
+ *
+ * @brief Reads the Restriction for uuid.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in] None
+ * @param[out]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_is_bluetooth_uuid_restriction_active(bt_dpm_status_t *value);
+
+/**
+ * @fn int bluetooth_dpm_add_bluetooth_devices_to_blacklist(const bluetooth_device_address_t *device_address);
+ *
+ * @brief Adds the device to blacklist.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	device_address - Device address
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_add_bluetooth_devices_to_blacklist(const bluetooth_device_address_t *device_address);
+
+/**
+ * @fn int bluetooth_dpm_add_bluetooth_devices_to_whitelist(const bluetooth_device_address_t *device_address);
+ *
+ * @brief Adds the device to whitelist.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	device_address - Device address
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_add_bluetooth_devices_to_whitelist(const bluetooth_device_address_t *device_address);
+
+/**
+ * @fn int bluetooth_dpm_add_bluetooth_uuids_to_blacklist(const char *service_uuid);
+ *
+ * @brief Adds the Service UUIDS to blacklist.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	service_uuids - profile or custom service uuids
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_add_bluetooth_uuids_to_blacklist(const char *service_uuid);
+
+/**
+ * @fn int bluetooth_dpm_add_bluetooth_uuids_to_whitelist(const char *service_uuid);
+ *
+ * @brief Adds the Service UUIDS to whitelist.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	service_uuids - profile or custom service uuids
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_add_bluetooth_uuids_to_whitelist(const char *service_uuid);
+
+/**
+ * @fn int bluetooth_dpm_clear_bluetooth_devices_from_blacklist();
+ *
+ * @brief Clears the devices from blacklist.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	None
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_clear_bluetooth_devices_from_blacklist(void);
+
+/**
+ * @fn int bluetooth_dpm_clear_bluetooth_devices_from_whitelist();
+ *
+ * @brief Clears the devices from whitelist.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	None
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_clear_bluetooth_devices_from_whitelist(void);
+
+/**
+ * @fn int bluetooth_dpm_clear_bluetooth_uuids_from_blacklist();
+ *
+ * @brief Clears the uuids from blacklist.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	None
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_clear_bluetooth_uuids_from_blacklist(void);
+
+/**
+ * @fn int bluetooth_dpm_clear_bluetooth_uuids_from_whitelist();
+ *
+ * @brief Clears the uuids from whitelist.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	None
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_clear_bluetooth_uuids_from_whitelist(void);
+
+/**
+ * @fn int bluetooth_dpm_get_bluetooth_devices_from_blacklist(bt_dpm_device_list_t *device_list);
+ *
+ * @brief reads the devices from blacklist.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[out]	device_list - list of devices
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_get_bluetooth_devices_from_blacklist(bt_dpm_device_list_t *device_list);
+
+/**
+ * @fn int bluetooth_dpm_get_bluetooth_devices_from_whitelist(bt_dpm_device_list_t *device_list);
+ *
+ * @brief reads the devices from whitelist.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[out]	device_list - list of devices
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_get_bluetooth_devices_from_whitelist(bt_dpm_device_list_t *device_list);
+
+/**
+ * @fn int bluetooth_dpm_get_bluetooth_uuids_from_blacklist(bt_dpm_uuids_list_t *uuid_list);
+ *
+ * @brief reads the uuids from blacklist.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	uuid_list - list of uuids
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_get_bluetooth_uuids_from_blacklist(bt_dpm_uuids_list_t *uuid_list);
+
+/**
+ * @fn int bluetooth_dpm_get_bluetooth_uuids_from_whitelist(bt_dpm_uuids_list_t *uuid_list);
+ *
+ * @brief reads the uuids from whitelist.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	uuid_list - list of uuids
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_get_bluetooth_uuids_from_whitelist(bt_dpm_uuids_list_t *uuid_list);
+
+/**
+ * @fn int bluetooth_dpm_remove_bluetooth_device_from_whitelist(const bluetooth_device_address_t *device_address);
+ *
+ * @brief Removes the device from whitelist.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	device_address - Device address
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_remove_bluetooth_device_from_whitelist(const bluetooth_device_address_t *device_address);
+
+/**
+ * @fn int bluetooth_dpm_remove_bluetooth_device_from_blacklist(const bluetooth_device_address_t *device_address);
+ *
+ * @brief Removes the device from blacklist.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	device_address - Device address
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_remove_bluetooth_device_from_blacklist(const bluetooth_device_address_t *device_address);
+
+/**
+ * @fn int bluetooth_dpm_remove_bluetooth_uuid_from_whitelist(const char *service_uuid);
+ *
+ * @brief Removes the Service UUIDS from whitelist.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	service_uuids - profile or custom service uuids
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_remove_bluetooth_uuid_from_whitelist(const char *service_uuid);
+
+/**
+ * @fn int bluetooth_dpm_remove_bluetooth_uuid_from_blacklist(const char *service_uuid);
+ *
+ * @brief Removes the Service UUIDS from blacklist.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	service_uuids - profile or custom service uuids
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_remove_bluetooth_uuid_from_blacklist(const char *service_uuid);
+
+/**
+ * @fn int bluetooth_dpm_set_allow_bluetooth_outgoing_call(bt_dpm_status_t value);
+ *
+ * @brief Sets the Restriction for outgoing call.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_set_allow_bluetooth_outgoing_call(bt_dpm_status_t value);
+
+/**
+ * @fn int bluetooth_dpm_get_allow_bluetooth_outgoing_call(bt_dpm_status_t *value);
+ *
+ * @brief Reads the Restriction for  outgoing call.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in] None
+ * @param[out]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_get_allow_bluetooth_outgoing_call(bt_dpm_status_t *value);
+
+/**
+ * @fn int bluetooth_dpm_set_bluetooth_pairing_state(bt_dpm_status_t value);
+ *
+ * @brief Sets the Restriction for Pairing.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_set_bluetooth_pairing_state(bt_dpm_status_t value);
+
+/**
+ * @fn int bluetooth_dpm_get_bluetooth_pairing_state(bt_dpm_status_t *value);
+ *
+ * @brief Reads the Restriction for Pairing
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in] None
+ * @param[out]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_get_bluetooth_pairing_state(bt_dpm_status_t *value);
+
+/**
+ * @fnint bluetooth_dpm_set_bluetooth_profile_state(bt_dpm_profile_t profile, bt_dpm_status_t value);
+ *
+ * @brief Sets the Restriction for using Profiles.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]profile - Profile.
+ *		BLUETOOTH_DPM_POLICY_A2DP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_AVRCP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_BPP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_DUN_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_FTP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_HFP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_HSP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_PBAP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_SAP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_SPP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_PROFILE_NONE
+ * @param[in]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_set_bluetooth_profile_state(bt_dpm_profile_t profile, bt_dpm_status_t value);
+
+/**
+ * @fn int bluetooth_dpm_get_bluetooth_profile_state(bt_dpm_profile_t profile, bt_dpm_status_t *value);
+ *
+ * @brief Reads the Restriction for using Profiles.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]profile - Profile.
+ *		BLUETOOTH_DPM_POLICY_A2DP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_AVRCP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_BPP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_DUN_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_FTP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_HFP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_HSP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_PBAP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_SAP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_POLICY_SPP_PROFILE_STATE,
+ *		BLUETOOTH_DPM_PROFILE_NONE
+ * @param[out]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_get_bluetooth_profile_state(bt_dpm_profile_t profile, bt_dpm_status_t *value);
+
+/**
+ * @fn int bluetooth_dpm_set_bluetooth_desktop_connectivity_state(bt_dpm_status_t value);
+ *
+ * @brief Sets the Restriction for Desktop Connectivity.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_set_bluetooth_desktop_connectivity_state(bt_dpm_status_t value);
+
+/**
+ * @fn int bluetooth_dpm_get_bluetooth_desktop_connectivity_state(bt_dpm_status_t *value);
+ *
+ * @brief Reads the Restriction for Desktop Connectivity.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in] None
+ * @param[out]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_get_bluetooth_desktop_connectivity_state(bt_dpm_status_t *value);
+
+/**
+ * @fn int bluetooth_dpm_set_bluetooth_discoverable_state(bt_dpm_status_t value);
+ *
+ * @brief Sets the Restriction for Discoverable state.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_set_bluetooth_discoverable_state(bt_dpm_status_t value);
+
+/**
+ * @fn int bluetooth_dpm_get_bluetooth_discoverable_state(bt_dpm_status_t *value);
+ *
+ * @brief Reads the Restriction for Discoverable state.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in] None
+ * @param[out]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_get_bluetooth_discoverable_state(bt_dpm_status_t *value);
+
+/**
+ * @fn int bluetooth_dpm_set_bluetooth_limited_discoverable_state(bt_dpm_status_t value);
+ *
+ * @brief Sets the Restriction for linited discoverable state..
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_set_bluetooth_limited_discoverable_state(bt_dpm_status_t value);
+
+/**
+ * @fn int bluetooth_dpm_get_bluetooth_limited_discoverable_state(bt_dpm_status_t *value);
+ *
+ * @brief Reads the Restriction for limited discoverable state.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in] None
+ * @param[out]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_get_bluetooth_limited_discoverable_state(bt_dpm_status_t *value);
+/**
+ * @fn int bluetooth_dpm_set_bluetooth_data_transfer_state(bt_dpm_status_t value);
+ *
+ * @brief Sets the Restriction for Data trasnfer.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_set_bluetooth_data_transfer_state(bt_dpm_status_t value);
+
+
+/**
+ * @fn int bluetooth_dpm_get_bluetooth_data_transfer_state(bt_dpm_status_t *value);
+ *
+ * @brief Reads the Restriction for Data trasnfer.
+ *
+ * This function is a synchronous call.
+ *
+ * @return	BLUETOOTH_DPM_RESULT_SUCCESS - Success \n
+ *		BLUETOOTH_DPM_RESULT_ACCESS_DENIED - BT restricted \n
+ *		BLUETOOTH_DPM_RESULT_FAIL - Internal error \n
+ *
+ * @exception	None
+ * @param[in] None
+ * @param[out]	value - State value.
+ *		BLUETOOTH_DPM_ALLOWED		= 0,	< DPM Policy status allowed.
+ *		BLUETOOTH_DPM_RESTRICTED		= 1,	< DPM Policy status restricted.
+ *
+ * @remark	None
+ */
+int bluetooth_dpm_get_bluetooth_data_transfer_state(bt_dpm_status_t *value);
+
 /**
  * @}
  */
