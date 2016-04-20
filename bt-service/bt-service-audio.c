@@ -464,7 +464,7 @@ void _bt_add_headset_to_list(int type, int status, const char *address)
 	}
 
 	connected_device->device_state = status;
-	if (status == BT_STATE_CONNECTED)
+	if ((status == BT_STATE_CONNECTED) || (status == BT_STATE_CONNECTING))
 		connected_device->type |= type;
 	g_strlcpy(connected_device->device_address, address,
 			sizeof(connected_device->device_address));
