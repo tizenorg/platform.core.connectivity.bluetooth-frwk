@@ -24,7 +24,8 @@ bt-gatt-service.c
 bt-pbap.c
 bt-hid-device.c
 bt-gatt-client.c
-bt-ipsp.c)
+bt-ipsp.c
+bt-dpm.c)
 
 SET(HEADERS
 bluetooth-api.h
@@ -81,6 +82,8 @@ IF("${ARCH}" STREQUAL "arm")
 ENDIF("${ARCH}" STREQUAL "arm")
 
 ADD_DEFINITIONS("-DHPS_FEATURE")
+ADD_DEFINITIONS("-DTIZEN_DPM_ENABLE")
+ADD_DEFINITIONS("-DTIZEN_DPM_VCONF_ENABLE")
 
 FIND_PROGRAM(MARSHALTOOL NAMES glib-genmarshal)
 EXEC_PROGRAM("${MARSHALTOOL}" ARGS "--prefix=marshal ${CMAKE_CURRENT_SOURCE_DIR}/marshal.list --header > ${CMAKE_CURRENT_SOURCE_DIR}/include/marshal.h")

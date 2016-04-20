@@ -29,6 +29,10 @@
 #include "bt-request-sender.h"
 #include "bt-event-handler.h"
 
+#ifdef TIZEN_DPM_ENABLE
+#include "bt-dpm.h"
+#endif
+
 #ifdef RFCOMM_DIRECT
 
 static GSList *rfcomm_nodes;
@@ -385,6 +389,13 @@ BT_EXPORT_API int bluetooth_rfcomm_create_socket(const char *uuid)
 		return BLUETOOTH_ERROR_PERMISSION_DEINED;
 	}
 
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_SPP, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to use SPP profile");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
+
 #ifdef RFCOMM_DIRECT
 	BT_INFO("<<<<<<<<< RFCOMM Create socket from app >>>>>>>>>");
 	info = __register_method();
@@ -433,6 +444,13 @@ BT_EXPORT_API int bluetooth_rfcomm_create_socket_ex(const char *uuid, const char
 		BT_ERR("Don't have a privilege to use this API");
 		return BLUETOOTH_ERROR_PERMISSION_DEINED;
 	}
+
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_SPP, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to use SPP profile");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
 
 	BT_INFO("<<<<<<<<< RFCOMM Create socket from app >>>>>>>>>");
 	info = __register_method_2(path, bus_name);
@@ -661,6 +679,14 @@ BT_EXPORT_API int bluetooth_rfcomm_listen_and_accept(int socket_fd, int max_pend
 #endif
 
 	BT_CHECK_ENABLED(return);
+
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_SPP, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to use SPP profile");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
+
 	if (socket_fd < 0) {
 		BT_ERR("Invalid FD");
 		return BLUETOOTH_ERROR_INVALID_PARAM;
@@ -713,6 +739,13 @@ BT_EXPORT_API int bluetooth_rfcomm_listen_and_accept_ex(const char *uuid, int ma
 
 	BT_CHECK_ENABLED(return);
 
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_SPP, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to use SPP profile");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
+
 	BT_INFO("<<<<<<<<< RFCOMM Listen & accept from app >>>>>>>>>>>");
 
 	info = __find_rfcomm_info_with_uuid(uuid);
@@ -748,6 +781,14 @@ BT_EXPORT_API int bluetooth_rfcomm_listen(int socket_fd, int max_pending_connect
 #endif
 
 	BT_CHECK_ENABLED(return);
+
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_SPP, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to use SPP profile");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
+
 	if (socket_fd < 0) {
 		BT_ERR("Invalid FD");
 		return BLUETOOTH_ERROR_INVALID_PARAM;
@@ -806,6 +847,14 @@ BT_EXPORT_API int bluetooth_rfcomm_accept_connection(int server_fd)
 	int result;
 
 	BT_CHECK_ENABLED(return);
+
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_SPP, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to use SPP profile");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
+
 	if (server_fd < 0) {
 		BT_ERR("Invalid FD");
 		return BLUETOOTH_ERROR_INVALID_PARAM;
