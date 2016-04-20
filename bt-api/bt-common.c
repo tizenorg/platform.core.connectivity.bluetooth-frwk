@@ -37,6 +37,11 @@
 #include "bt-request-sender.h"
 #include "bt-event-handler.h"
 
+#ifdef TIZEN_DPM_ENABLE
+#include "bt-dpm.h"
+#endif
+
+
 static bt_user_info_t user_info[BT_MAX_USER_INFO];
 static GDBusConnection *system_gdbus_conn = NULL;
 

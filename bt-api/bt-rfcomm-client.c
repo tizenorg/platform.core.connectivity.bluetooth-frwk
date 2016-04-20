@@ -28,6 +28,10 @@
 #include "bt-request-sender.h"
 #include "bt-event-handler.h"
 
+#ifdef TIZEN_DPM_ENABLE
+#include "bt-dpm.h"
+#endif
+
 #ifdef RFCOMM_DIRECT
 
 #define BT_TIMEOUT_MESSAGE "Did not receive a reply. Possible causes include: " \
@@ -567,6 +571,32 @@ BT_EXPORT_API int bluetooth_rfcomm_connect(
 	BT_CHECK_PARAMETER(remote_uuid, return);
 	BT_CHECK_ENABLED(return);
 
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_ADDRESS, (void *)remote_bt_address) == BT_DPM_RESTRICTED) {
+		BT_ERR("Blacklist device");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+
+	if (_bt_check_dpm(BT_DPM_SPP, NULL) == BT_DPM_RESTRICTED ||
+		_bt_check_dpm(BT_DPM_HF_ONLY, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to connect the RFCOMM service");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+
+	if (_bt_check_dpm(BT_DPM_DESKTOP, NULL) == BT_DPM_RESTRICTED) {
+		char address[BT_ADDRESS_STRING_SIZE] = { 0 };
+		bluetooth_device_class_t dev_class;
+
+		_bt_convert_addr_type_to_string(address, (unsigned char *)remote_bt_address->addr);
+		_bt_get_cod_by_address(address, &dev_class);
+
+		if (dev_class.major_class == BLUETOOTH_DEVICE_MAJOR_CLASS_COMPUTER) {
+			BT_ERR("Reject a authorization due to MDM Policy");
+			return BLUETOOTH_ERROR_ACCESS_DENIED;
+		}
+	}
+#endif
+
 #ifdef RFCOMM_DIRECT
 	BT_INFO_C("<<<<<<<<< RFCOMM Connect request from app >>>>>>>>>>>");
 	int ret;
@@ -816,6 +846,14 @@ BT_EXPORT_API int bluetooth_rfcomm_write(int fd, const char *buf, int length)
 	BT_CHECK_ENABLED(return);
 #endif
 	retv_if(length <= 0, BLUETOOTH_ERROR_INVALID_PARAM);
+
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_SPP, NULL) == BT_DPM_RESTRICTED ||
+		_bt_check_dpm(BT_DPM_HF_ONLY, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to write RFCOMM data");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
 
 #ifdef RFCOMM_DIRECT
 	switch (privilege_token) {

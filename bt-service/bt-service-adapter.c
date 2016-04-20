@@ -44,6 +44,9 @@
 #include "bt-service-main.h"
 #include "bt-service-avrcp.h"
 #include "bt-service-device.h"
+#ifdef TIZEN_DPM_ENABLE
+#include "bt-service-dpm.h"
+#endif
 
 typedef struct {
 	guint event_id;
@@ -216,8 +219,14 @@ int __bt_set_visible_time(int timeout)
 	visible_timer.timeout = timeout;
 
 #ifndef TIZEN_WEARABLE
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_dpm_get_bluetooth_limited_discoverable_state() != DPM_RESTRICTED) {
+#endif
 	if (vconf_set_int(BT_FILE_VISIBLE_TIME, timeout) != 0)
 		BT_ERR("Set vconf failed");
+#ifdef TIZEN_DPM_ENABLE
+	}
+#endif
 #endif
 
 	if (timeout <= 0)
@@ -464,6 +473,23 @@ static void __bt_set_visible_mode(void)
 	if (vconf_get_int(BT_FILE_VISIBLE_TIME, &timeout) != 0)
                 BT_ERR("Fail to get the timeout value");
 
+#ifdef TIZEN_DPM_ENABLE
+	if (timeout == -1 ||
+	_bt_dpm_get_bluetooth_limited_discoverable_state() == DPM_RESTRICTED) {
+		if (_bt_set_discoverable_mode(
+			BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE,
+			timeout) != BLUETOOTH_ERROR_NONE) {
+			if (vconf_set_int(BT_FILE_VISIBLE_TIME, 0) != 0)
+				BT_ERR("Set vconf failed");
+		}
+	} else {
+		if (_bt_set_discoverable_mode(
+			BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE,
+			timeout) != BLUETOOTH_ERROR_NONE) {
+				BT_ERR("Set connectable mode failed");
+		}
+	}
+#else
 	if (timeout == -1) {
 		if (_bt_set_discoverable_mode(
 			BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE,
@@ -478,6 +504,7 @@ static void __bt_set_visible_mode(void)
 				BT_ERR("Set connectable mode failed");
 		}
 	}
+#endif
 }
 #endif
 
@@ -1861,6 +1888,19 @@ int _bt_set_discoverable_mode(int discoverable_mode, int timeout)
 	proxy = _bt_get_adapter_properties_proxy();
 
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+#ifdef TIZEN_DPM_ENABLE
+	if (discoverable_mode != BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE &&
+		_bt_dpm_get_bluetooth_limited_discoverable_state() == DPM_RESTRICTED) {
+		_bt_launch_dpm_popup("MDM_POLICY_DISABLE_BT_HANDSFREE");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+	if (discoverable_mode != BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE &&
+		 _bt_dpm_get_bluetooth_limited_discoverable_state() == DPM_RESTRICTED) {
+		_bt_launch_dpm_popup("MDM_POLICY_DISABLE_BT");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
 
 	switch (discoverable_mode) {
 	case BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE:

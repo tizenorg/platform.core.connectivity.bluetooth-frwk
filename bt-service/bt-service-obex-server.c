@@ -20,9 +20,10 @@
 #include <dlog.h>
 #include <string.h>
 #include <dirent.h>
-#ifdef TIZEN_MDM_ENABLE
-#include <bt-service-mdm.h>
+#ifdef TIZEN_DPM_ENABLE
+#include "bt-service-dpm.h"
 #endif
+
 #include <vconf.h>
 
 #include <gio/gio.h>
@@ -443,10 +444,6 @@ static gboolean __bt_authorize_cb(GDBusMethodInvocation *context,
 		return FALSE;
 	}
 
-#ifdef TIZEN_MDM_ENABLE
-	mdm_bt_allow_t mode = MDM_BT_ALLOWED;
-#endif
-
 	__bt_free_auth_info(agent_info.auth_info);
 
 	agent_info.auth_info = g_malloc(sizeof(bt_auth_info_t));
@@ -456,6 +453,14 @@ static gboolean __bt_authorize_cb(GDBusMethodInvocation *context,
 	agent_info.auth_info->reply_context = context;
 
 	agent_info.auth_info->transfer_path = g_strdup(path);
+
+#ifdef TIZEN_DPM_ENABLE
+	if(_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_HANDSFREE_ONLY) {
+		/* Free auth info in next function */
+		_bt_obex_server_reject_authorize();
+		return FALSE;
+	}
+#endif
 
 	if (iter) {
 		const gchar *key;

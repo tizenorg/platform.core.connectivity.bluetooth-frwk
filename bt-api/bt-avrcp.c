@@ -24,6 +24,10 @@
 #include "bt-common.h"
 #include "bt-request-sender.h"
 #include "bt-event-handler.h"
+#ifdef TIZEN_DPM_ENABLE
+#include "bt-dpm.h"
+#endif
+
 
 BT_EXPORT_API int bluetooth_media_player_init(media_cb_func_ptr callback_ptr,
 						void *user_data)
@@ -68,6 +72,13 @@ BT_EXPORT_API int bluetooth_media_player_change_property(
 
 	BT_CHECK_ENABLED(return);
 
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to use AVRCP profile");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
+
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
@@ -90,6 +101,13 @@ BT_EXPORT_API int bluetooth_media_player_set_properties(
 	BT_CHECK_PARAMETER(setting, return);
 	BT_CHECK_ENABLED(return);
 
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to use AVRCP profile");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
+
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
@@ -111,6 +129,13 @@ BT_EXPORT_API int bluetooth_media_player_change_track(
 
 	BT_CHECK_PARAMETER(metadata, return);
 	BT_CHECK_ENABLED(return);
+
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to use AVRCP profile");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -203,6 +228,18 @@ BT_EXPORT_API int bluetooth_media_control_connect(
 		return BLUETOOTH_ERROR_PERMISSION_DEINED;
 	}
 
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_ADDRESS, remote_address) == BT_DPM_RESTRICTED) {
+		BT_ERR("Blacklist device");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+
+	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to use AVRCP profile");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
+
 	user_info = _bt_get_user_data(BT_AVRCP);
 	retv_if(user_info->cb == NULL, BLUETOOTH_ERROR_INTERNAL);
 
@@ -263,6 +300,13 @@ BT_EXPORT_API int bluetooth_media_control_command(
 
 	BT_CHECK_ENABLED(return);
 
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to use AVRCP profile");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
+
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
@@ -283,6 +327,13 @@ BT_EXPORT_API int bluetooth_media_control_set_property(
 	int result;
 
 	BT_CHECK_ENABLED(return);
+
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to use AVRCP profile");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
@@ -309,6 +360,13 @@ BT_EXPORT_API int bluetooth_media_control_get_property(
 	BT_CHECK_PARAMETER(value, return);
 	BT_CHECK_ENABLED(return);
 
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to use AVRCP profile");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
+
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 	g_array_append_vals(in_param1, &type, sizeof(int));
@@ -334,6 +392,13 @@ BT_EXPORT_API int bluetooth_media_control_get_track_info(
 
 	BT_CHECK_PARAMETER(metadata, return);
 	BT_CHECK_ENABLED(return);
+
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
+		BT_ERR("Not allow to use AVRCP profile");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
