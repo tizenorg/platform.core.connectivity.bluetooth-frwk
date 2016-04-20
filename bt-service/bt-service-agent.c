@@ -46,6 +46,10 @@
 #include "bt-service-device.h"
 #include "bt-service-audio.h"
 
+#ifdef TIZEN_DPM_ENABLE
+#include "bt-service-dpm.h"
+#endif
+
 #define BT_APP_AUTHENTICATION_TIMEOUT		35
 #define BT_APP_AUTHORIZATION_TIMEOUT		15
 
@@ -389,6 +393,15 @@ static gboolean __pincode_request(GapAgentPrivate *agent, GDBusProxy *device)
 
 	BT_DBG("+");
 
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_dpm_get_bluetooth_pairing_state() == DPM_RESTRICTED) {
+		BT_ERR("Not allow to pair the device");
+		gap_agent_reply_confirmation(agent, GAP_AGENT_REJECT, NULL);
+		__bt_agent_release_memory();
+		return TRUE;
+	}
+#endif
+
 	reply_temp = __bt_service_getall(device, BT_DEVICE_INTERFACE);
 
 	if (reply_temp == NULL) {
@@ -487,6 +500,15 @@ static gboolean __passkey_request(GapAgentPrivate *agent, GDBusProxy *device)
 	GVariant *reply_temp = NULL;
 	GVariant *tmp_value;
 	BT_DBG("+");
+
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_dpm_get_bluetooth_pairing_state() == DPM_RESTRICTED) {
+		BT_ERR("Not allow to pair the device");
+		gap_agent_reply_confirmation(agent, GAP_AGENT_REJECT, NULL);
+		__bt_agent_release_memory();
+		return TRUE;
+	}
+#endif
 
 	reply_temp = __bt_service_getall(device, BT_DEVICE_INTERFACE);
 
@@ -618,6 +640,15 @@ static gboolean __confirm_request(GapAgentPrivate *agent, GDBusProxy *device,
 	GVariant *reply = NULL;
 	GVariant *tmp_value;
 	BT_DBG("+ passkey[%.6d]", passkey);
+
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_dpm_get_bluetooth_pairing_state() == DPM_RESTRICTED) {
+		BT_ERR("Not allow to pair the device");
+		gap_agent_reply_confirmation(agent, GAP_AGENT_REJECT, NULL);
+		__bt_agent_release_memory();
+		return TRUE;
+	}
+#endif
 
 	snprintf(str_passkey, sizeof(str_passkey), "%.6d", passkey);
 

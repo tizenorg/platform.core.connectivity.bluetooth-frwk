@@ -22,6 +22,10 @@
 #include "bt-request-sender.h"
 #include "bt-event-handler.h"
 
+#ifdef TIZEN_DPM_ENABLE
+#include "bt-dpm.h"
+#endif
+
 BT_EXPORT_API int bluetooth_network_activate_server()
 {
 	int result;
@@ -71,6 +75,48 @@ BT_EXPORT_API int bluetooth_network_connect(const bluetooth_device_address_t *de
 		BT_ERR("Don't have a privilege to use this API");
 		return BLUETOOTH_ERROR_PERMISSION_DEINED;
 	}
+
+#ifdef TIZEN_DPM_ENABLE
+	char *uuid = NULL;
+	if (_bt_check_dpm(BT_DPM_ADDRESS, (void *)device_address) == BT_DPM_RESTRICTED) {
+		BT_ERR("Blacklist device");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+
+	switch (role) {
+	case BLUETOOTH_NETWORK_PANU_ROLE:
+		uuid = g_strdup(BT_PAN_PANU_UUID);
+		break;
+	case BLUETOOTH_NETWORK_NAP_ROLE:
+		uuid = g_strdup(BT_PAN_NAP_UUID);
+		break;
+	case BLUETOOTH_NETWORK_GN_ROLE:
+		uuid = g_strdup(BT_PAN_GN_UUID);
+		break;
+	default:
+		break;
+	}
+
+	if (_bt_check_dpm(BT_DPM_UUID, uuid) == BT_DPM_RESTRICTED) {
+		BT_ERR("Blacklist uuid");
+		g_free(uuid);
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+
+	if (_bt_check_dpm(BT_DPM_DESKTOP, NULL) ==	BT_DPM_RESTRICTED) {
+		char address[BT_ADDRESS_STRING_SIZE] = { 0 };
+		bluetooth_device_class_t dev_class;
+
+		_bt_convert_addr_type_to_string(address, (unsigned char *)device_address->addr);
+		_bt_get_cod_by_address(address, &dev_class);
+
+		if (dev_class.major_class == BLUETOOTH_DEVICE_MAJOR_CLASS_COMPUTER) {
+			BT_ERR("Reject a authorization due to MDM Policy");
+			return BLUETOOTH_ERROR_ACCESS_DENIED;
+		}
+	}
+	g_free(uuid);
+#endif
 
 	user_info = _bt_get_user_data(BT_COMMON);
 	retv_if(user_info->cb == NULL, BLUETOOTH_ERROR_INTERNAL);
