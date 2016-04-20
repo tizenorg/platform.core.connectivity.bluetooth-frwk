@@ -24,7 +24,8 @@ bt-gatt-service.c
 bt-pbap.c
 bt-hid-device.c
 bt-gatt-client.c
-bt-ipsp.c)
+bt-ipsp.c
+bt-dpm.c)
 
 SET(HEADERS
 bluetooth-api.h

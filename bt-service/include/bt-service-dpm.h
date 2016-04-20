@@ -111,7 +111,7 @@ typedef enum dpm_profile {
 } dpm_profile_t;
 
 struct dpm_profile_val {
-		int value; //tells whether the profile is enabled or disabled
+		int value; /* tells whether the profile is enabled or disabled */
 };
 typedef struct dpm_profile_val dpm_profile_state_t;
 
@@ -121,20 +121,20 @@ dpm_result_t _bt_dpm_activate_bluetooth_device_restriction(dpm_status_t value);
 dpm_status_t _bt_dpm_is_bluetooth_device_restriction_active(void);
 dpm_result_t _bt_dpm_activate_bluetoooth_uuid_restriction(dpm_status_t value);
 dpm_status_t _bt_dpm_is_bluetooth_uuid_restriction_active(void);
-dpm_result_t _bt_dpm_add_bluetooth_devices_to_blacklist(char *device_address);
-dpm_result_t _bt_dpm_add_bluetooth_devices_to_whitelist(char *device_address);
-dpm_result_t _bt_dpm_add_bluetooth_uuids_to_blacklist(char *uuid);
-dpm_result_t _bt_dpm_add_bluetooth_uuids_to_whitelist(char *uuid);
+dpm_result_t _bt_dpm_add_bluetooth_devices_to_blacklist(bluetooth_device_address_t *bd_addr);
+dpm_result_t _bt_dpm_add_bluetooth_devices_to_whitelist(bluetooth_device_address_t *bd_addr);
+dpm_result_t _bt_dpm_add_bluetooth_uuids_to_blacklist(const char *uuid);
+dpm_result_t _bt_dpm_add_bluetooth_uuids_to_whitelist(const char *uuid);
 dpm_result_t _bt_dpm_set_allow_bluetooth_outgoing_call(dpm_status_t value);
 dpm_status_t _bt_dpm_get_allow_bluetooth_outgoing_call(void);
 dpm_result_t _bt_dpm_clear_bluetooth_devices_from_blacklist(void);
 dpm_result_t _bt_dpm_clear_bluetooth_devices_from_whitelist(void);
 dpm_result_t _bt_dpm_clear_bluetooth_uuids_from_blacklist(void);
 dpm_result_t _bt_dpm_clear_bluetooth_uuids_from_whitelist(void);
-GSList *_bt_dpm_get_bluetooth_devices_from_blacklist(void);
-GSList *_bt_dpm_get_bluetooth_devices_from_whitelist(void);
-GSList *_bt_dpm_get_bluetooth_uuids_from_blacklist(void);
-GSList *_bt_dpm_get_bluetooth_uuids_from_whitelist(void);
+dpm_result_t _bt_dpm_get_bluetooth_devices_from_blacklist(GArray **out_param1);
+dpm_result_t _bt_dpm_get_bluetooth_devices_from_whitelist(GArray **out_param1);
+dpm_result_t _bt_dpm_get_bluetooth_uuids_from_blacklist(GArray **out_param1);
+dpm_result_t _bt_dpm_get_bluetooth_uuids_from_whitelist(GArray **out_param1);
 dpm_status_t _bt_dpm_is_bluetooth_device_restriction_active(void);
 dpm_status_t _bt_dpm_is_bluetooth_uuid_restriction_active(void);
 dpm_status_t _bt_dpm_set_bluetooth_pairing_state(dpm_status_t value);
@@ -150,10 +150,11 @@ dpm_result_t _bt_dpm_clear_bluetooth_uuids_from_list(void);
 dpm_status_t _bt_dpm_set_bluetooth_limited_discoverable_state(dpm_status_t value);
 dpm_status_t _bt_dpm_get_bluetooth_limited_discoverable_state(void);
 dpm_status_t _bt_dpm_set_bluetooth_data_transfer_state(dpm_status_t value);
-dpm_result_t _bt_dpm_remove_bluetooth_devices_from_whitelist(GSList *device_addresses);
-dpm_result_t _bt_dpm_remove_bluetooth_devices_from_blacklist(GSList *device_addresses);
-dpm_result_t _bt_dpm_remove_bluetooth_uuids_from_whitelist(GSList *uuids);
-dpm_result_t _bt_dpm_remove_bluetooth_uuids_from_blacklist(GSList *uuids);
+dpm_status_t _bt_dpm_get_allow_bluetooth_data_transfer_state(void);
+dpm_result_t _bt_dpm_remove_bluetooth_devices_from_whitelist(bluetooth_device_address_t *bd_addr);
+dpm_result_t _bt_dpm_remove_bluetooth_devices_from_blacklist(bluetooth_device_address_t *bd_addr);
+dpm_result_t _bt_dpm_remove_bluetooth_uuids_from_whitelist(const char *uuids);
+dpm_result_t _bt_dpm_remove_bluetooth_uuids_from_blacklist(const char *uuids);
 
 #ifdef __cplusplus
 }
