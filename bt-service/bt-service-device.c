@@ -1832,6 +1832,8 @@ int _bt_connect_le_device(int request_id,
 		_bt_set_scan_parameters(&scan_params);
 	}
 
+	auto_connect = FALSE;
+
 	g_dbus_proxy_call(device_proxy, "ConnectLE",
 				 g_variant_new("(b)", auto_connect),
 				 G_DBUS_CALL_FLAGS_NONE,
