@@ -2498,8 +2498,16 @@ gboolean __bt_service_check_privilege(int function_name,
         case BT_AV_DISCONNECT:
         case BT_AV_SOURCE_CONNECT:
         case BT_AV_SOURCE_DISCONNECT:
+
+        case BT_AVRCP_CONTROL_INIT:
+        case BT_AVRCP_CONTROL_DEINIT:
         case BT_AVRCP_CONTROL_CONNECT:
         case BT_AVRCP_CONTROL_DISCONNECT:
+        case BT_AVRCP_HANDLE_CONTROL:
+        case BT_AVRCP_CONTROL_SET_PROPERTY:
+        case BT_AVRCP_CONTROL_GET_PROPERTY:
+        case BT_AVRCP_GET_TRACK_INFO:
+
         case BT_HF_CONNECT:
         case BT_HF_DISCONNECT:
 
@@ -2595,28 +2603,25 @@ gboolean __bt_service_check_privilege(int function_name,
         case BT_RFCOMM_LISTEN:
 
         case BT_AVRCP_SET_TRACK_INFO:
-        case BT_AVRCP_SET_PROPERTY:
         case BT_AVRCP_SET_PROPERTIES:
-        case BT_AVRCP_HANDLE_CONTROL:
-        case BT_AVRCP_CONTROL_SET_PROPERTY:
-        case BT_AVRCP_CONTROL_GET_PROPERTY:
-        case BT_AVRCP_GET_TRACK_INFO:
+        case BT_AVRCP_SET_PROPERTY:
+
 
         case BT_SET_CONTENT_PROTECT:
         case BT_BOND_DEVICE_BY_TYPE:
         case BT_SET_LE_PRIVACY:
         case BT_LE_CONN_UPDATE:
-	case BT_LE_READ_MAXIMUM_DATA_LENGTH:
-	case BT_LE_WRITE_HOST_SUGGESTED_DATA_LENGTH:
-	case BT_LE_READ_HOST_SUGGESTED_DATA_LENGTH:
-	case BT_LE_SET_DATA_LENGTH:
-	case BT_PBAP_CONNECT:
-	case BT_PBAP_DISCONNECT:
-	case BT_PBAP_GET_PHONEBOOK_SIZE:
-	case BT_PBAP_GET_PHONEBOOK:
-	case BT_PBAP_GET_LIST:
-	case BT_PBAP_PULL_VCARD:
-	case BT_PBAP_PHONEBOOK_SEARCH:
+		case BT_LE_READ_MAXIMUM_DATA_LENGTH:
+		case BT_LE_WRITE_HOST_SUGGESTED_DATA_LENGTH:
+		case BT_LE_READ_HOST_SUGGESTED_DATA_LENGTH:
+		case BT_LE_SET_DATA_LENGTH:
+		case BT_PBAP_CONNECT:
+		case BT_PBAP_DISCONNECT:
+		case BT_PBAP_GET_PHONEBOOK_SIZE:
+		case BT_PBAP_GET_PHONEBOOK:
+		case BT_PBAP_GET_LIST:
+		case BT_PBAP_PULL_VCARD:
+		case BT_PBAP_PHONEBOOK_SEARCH:
                 ret_val = cynara_check(p_cynara, client_creds, client_session, user_creds,
                                                                                  BT_PRIVILEGE_PLATFORM);
 

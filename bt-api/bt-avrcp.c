@@ -182,6 +182,12 @@ BT_EXPORT_API int bluetooth_media_control_init(media_cb_func_ptr callback_ptr,
 {
 	int ret;
 
+	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_AVRCP_CONTROL_INIT)
+			== BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have a privilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
+
 	/* Register AVRCP events */
 	ret = _bt_register_event(BT_AVRCP_CONTROL_EVENT,
 					(void *)callback_ptr, user_data);
@@ -200,6 +206,12 @@ BT_EXPORT_API int bluetooth_media_control_init(media_cb_func_ptr callback_ptr,
 BT_EXPORT_API int bluetooth_media_control_deinit(void)
 {
 	int ret;
+
+	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_AVRCP_CONTROL_DEINIT)
+			== BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have a privilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
 
 	ret = _bt_unregister_event(BT_AVRCP_CONTROL_EVENT);
 
@@ -300,6 +312,12 @@ BT_EXPORT_API int bluetooth_media_control_command(
 
 	BT_CHECK_ENABLED(return);
 
+	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_AVRCP_HANDLE_CONTROL)
+				== BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have a privilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
+
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use AVRCP profile");
@@ -327,6 +345,12 @@ BT_EXPORT_API int bluetooth_media_control_set_property(
 	int result;
 
 	BT_CHECK_ENABLED(return);
+
+	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_AVRCP_CONTROL_SET_PROPERTY)
+				== BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have a privilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
 
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
@@ -360,6 +384,12 @@ BT_EXPORT_API int bluetooth_media_control_get_property(
 	BT_CHECK_PARAMETER(value, return);
 	BT_CHECK_ENABLED(return);
 
+	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_AVRCP_CONTROL_GET_PROPERTY)
+				== BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have a privilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
+
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use AVRCP profile");
@@ -392,6 +422,12 @@ BT_EXPORT_API int bluetooth_media_control_get_track_info(
 
 	BT_CHECK_PARAMETER(metadata, return);
 	BT_CHECK_ENABLED(return);
+
+	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_AVRCP_GET_TRACK_INFO)
+				== BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have a privilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
 
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
