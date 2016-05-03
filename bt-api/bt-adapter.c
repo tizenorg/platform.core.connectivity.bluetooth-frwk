@@ -89,7 +89,7 @@ BT_EXPORT_API int bluetooth_enable_adapter(void)
 				BLUETOOTH_ERROR_DEVICE_ALREADY_ENABLED);
 
 #ifdef TIZEN_DPM_VCONF_ENABLE
-	retv_if(bluetooth_dpm_is_bluetooth_mode_allowed() == BLUETOOTH_DPM_RESULT_ACCESS_DENIED,
+	retv_if(bluetooth_dpm_is_mode_allowed() == BLUETOOTH_DPM_RESULT_ACCESS_DENIED,
 				BLUETOOTH_ERROR_PERMISSION_DEINED);
 #endif
 

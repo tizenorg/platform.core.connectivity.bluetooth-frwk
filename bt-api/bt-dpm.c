@@ -27,7 +27,7 @@
 #include "bt-dpm.h"
 
 #ifdef TIZEN_DPM_VCONF_ENABLE
-BT_EXPORT_API int bluetooth_dpm_is_bluetooth_mode_allowed(void)
+BT_EXPORT_API int bluetooth_dpm_is_mode_allowed(void)
 {
 	int value;
 	/* check VCONFKEY_BT_STATUS */
@@ -47,7 +47,7 @@ static bt_dpm_status_e _bt_check_dpm_allow_restriction(void)
 {
 	bt_dpm_allow_t mode;
 
-	bluetooth_dpm_get_allow_bluetooth_mode(&mode);
+	bluetooth_dpm_get_allow_mode(&mode);
 
 	return (mode == BLUETOOTH_DPM_BT_RESTRICTED) ? BT_DPM_RESTRICTED : BT_DPM_ALLOWED;
 }
@@ -57,7 +57,7 @@ static bt_dpm_status_e _bt_check_dpm_handsfree_only(void)
 {
 	bt_dpm_allow_t mode;
 
-	bluetooth_dpm_get_allow_bluetooth_mode(&mode);
+	bluetooth_dpm_get_allow_mode(&mode);
 
 	return (mode == BLUETOOTH_DPM_HANDSFREE_ONLY ? BT_DPM_RESTRICTED : BT_DPM_ALLOWED);
 }
@@ -66,7 +66,7 @@ static bt_dpm_status_e _bt_check_dpm_pairing_restriction(void)
 {
 	bt_dpm_status_t dpm_status = BLUETOOTH_DPM_ALLOWED;
 
-	bluetooth_dpm_get_bluetooth_pairing_state(&dpm_status);
+	bluetooth_dpm_get_pairing_state(&dpm_status);
 
 	return (dpm_status == BLUETOOTH_DPM_RESTRICTED ? BT_DPM_RESTRICTED : BT_DPM_ALLOWED);
 }
@@ -75,7 +75,7 @@ static bt_dpm_status_e _bt_check_dpm_desktop_connectivity_restriction(void)
 {
 	bt_dpm_status_t dpm_status = BLUETOOTH_DPM_ALLOWED;
 
-	bluetooth_dpm_get_bluetooth_desktop_connectivity_state(&dpm_status);
+	bluetooth_dpm_get_desktop_connectivity_state(&dpm_status);
 
 	return (dpm_status == BLUETOOTH_DPM_RESTRICTED ? BT_DPM_RESTRICTED : BT_DPM_ALLOWED);
 }
@@ -85,7 +85,7 @@ static bt_dpm_status_e _bt_check_dpm_visible_restriction(void)
 {
 	bt_dpm_status_t dpm_status = BLUETOOTH_DPM_ALLOWED;
 
-	bluetooth_dpm_get_bluetooth_desktop_connectivity_state(&dpm_status);
+	bluetooth_dpm_get_desktop_connectivity_state(&dpm_status);
 
 	return (dpm_status == BLUETOOTH_DPM_RESTRICTED ? BT_DPM_RESTRICTED : BT_DPM_ALLOWED);
 }
@@ -94,7 +94,7 @@ static bt_dpm_status_e _bt_check_dpm_limited_discoverable_mode(void)
 {
 	bt_dpm_status_t dpm_status = BLUETOOTH_DPM_ALLOWED;
 
-	bluetooth_dpm_get_bluetooth_limited_discoverable_state(&dpm_status);
+	bluetooth_dpm_get_limited_discoverable_state(&dpm_status);
 
 	return (dpm_status == BLUETOOTH_DPM_RESTRICTED ? BT_DPM_RESTRICTED : BT_DPM_ALLOWED);
 }
@@ -109,7 +109,7 @@ static bt_dpm_status_e _bt_check_dpm_blacklist_device(bluetooth_device_address_t
 	_bt_convert_addr_type_to_string(device_address,
 			(unsigned char *)address->addr);
 
-	ret = bluetooth_dpm_get_bluetooth_devices_from_blacklist(&dev_list);
+	ret = bluetooth_dpm_get_devices_from_blacklist(&dev_list);
 	if (ret == BLUETOOTH_DPM_RESULT_SUCCESS) {
 		int i = 0;
 		for (i = 0; i < dev_list.count; i++) {
@@ -136,7 +136,7 @@ static bt_dpm_status_e _bt_check_dpm_blacklist_uuid(char *uuid)
 	int ret = BLUETOOTH_DPM_RESULT_SUCCESS;
 	retv_if(!uuid, bt_dpm_status);
 
-	ret = bluetooth_dpm_get_bluetooth_uuids_from_blacklist(&uuid_list);
+	ret = bluetooth_dpm_get_uuids_from_blacklist(&uuid_list);
 	if (ret == BLUETOOTH_DPM_RESULT_SUCCESS) {
 		int i = 0;
 		for (i = 0; i < uuid_list.count; i++) {
@@ -151,7 +151,7 @@ static bt_dpm_status_e _bt_check_dpm_blacklist_uuid(char *uuid)
 
 	if (g_strcmp0(BT_OPP_UUID, uuid) == 0) {
 		bt_dpm_status_t dpm_status = BLUETOOTH_DPM_ALLOWED;
-		bluetooth_dpm_get_bluetooth_data_transfer_state(&dpm_status);
+		bluetooth_dpm_get_data_transfer_state(&dpm_status);
 		return (dpm_status == BLUETOOTH_DPM_RESTRICTED ? BT_DPM_RESTRICTED : BT_DPM_ALLOWED);
 	}
 
@@ -168,7 +168,7 @@ static bt_dpm_status_e _bt_check_dpm_blacklist_uuid(char *uuid)
 		dpm_profile = BLUETOOTH_DPM_POLICY_PBAP_PROFILE_STATE;
 
 	if (dpm_profile != BLUETOOTH_DPM_PROFILE_NONE) {
-		ret = bluetooth_dpm_get_bluetooth_profile_state(dpm_profile, &dpm_status);
+		ret = bluetooth_dpm_get_profile_state(dpm_profile, &dpm_status);
 		return (dpm_status == BLUETOOTH_DPM_RESTRICTED ? BT_DPM_RESTRICTED : BT_DPM_ALLOWED);
 	}
 	/* -- check DPM profile restriction -- */
@@ -187,7 +187,7 @@ static bt_dpm_status_e _bt_check_dpm_transfer_restriction(void)
 		return dpm_status;
 	}
 
-	bluetooth_dpm_get_bluetooth_data_transfer_state(&dpm_value);
+	bluetooth_dpm_get_data_transfer_state(&dpm_value);
 
 	return (dpm_value == BLUETOOTH_DPM_RESTRICTED ? BT_DPM_RESTRICTED : BT_DPM_ALLOWED);
 }
@@ -304,7 +304,7 @@ int _bt_check_dpm(int service, void *param)
 	return status;
 }
 
-BT_EXPORT_API int bluetooth_dpm_set_allow_bluetooth_mode(bt_dpm_allow_t value)
+BT_EXPORT_API int bluetooth_dpm_set_allow_mode(bt_dpm_allow_t value)
 {
 	int result =  BLUETOOTH_DPM_RESULT_SUCCESS;
 #ifdef TIZEN_DPM_VCONF_ENABLE
@@ -364,12 +364,12 @@ BT_EXPORT_API int bluetooth_dpm_set_allow_bluetooth_mode(bt_dpm_allow_t value)
 
 }
 
-BT_EXPORT_API int bluetooth_dpm_get_allow_bluetooth_mode(bt_dpm_allow_t *value)
+BT_EXPORT_API int bluetooth_dpm_get_allow_mode(bt_dpm_allow_t *value)
 {
 	int result;
 
 #ifdef TIZEN_DPM_VCONF_ENABLE
-	*value = bluetooth_dpm_is_bluetooth_mode_allowed();
+	*value = bluetooth_dpm_is_mode_allowed();
 	return BLUETOOTH_DPM_RESULT_SUCCESS;
 #else
 	BT_CHECK_ENABLED_ANY(return);
@@ -396,7 +396,7 @@ BT_EXPORT_API int bluetooth_dpm_get_allow_bluetooth_mode(bt_dpm_allow_t *value)
 }
 
 
-BT_EXPORT_API int bluetooth_dpm_activate_bluetooth_device_restriction(bt_dpm_status_t value)
+BT_EXPORT_API int bluetooth_dpm_activate_device_restriction(bt_dpm_status_t value)
 {
 	int result;
 
@@ -416,7 +416,7 @@ BT_EXPORT_API int bluetooth_dpm_activate_bluetooth_device_restriction(bt_dpm_sta
 }
 
 
-BT_EXPORT_API int bluetooth_dpm_is_bluetooth_device_restriction_active(bt_dpm_status_t *value)
+BT_EXPORT_API int bluetooth_dpm_is_device_restriction_active(bt_dpm_status_t *value)
 {
 	int result;
 
@@ -443,7 +443,7 @@ BT_EXPORT_API int bluetooth_dpm_is_bluetooth_device_restriction_active(bt_dpm_st
 }
 
 
-BT_EXPORT_API int bluetooth_dpm_activate_bluetoooth_uuid_restriction(bt_dpm_status_t value)
+BT_EXPORT_API int bluetooth_dpm_activate_uuid_restriction(bt_dpm_status_t value)
 {
 	int result;
 
@@ -463,7 +463,7 @@ BT_EXPORT_API int bluetooth_dpm_activate_bluetoooth_uuid_restriction(bt_dpm_stat
 }
 
 
-BT_EXPORT_API int bluetooth_dpm_is_bluetooth_uuid_restriction_active(bt_dpm_status_t *value)
+BT_EXPORT_API int bluetooth_dpm_is_uuid_restriction_active(bt_dpm_status_t *value)
 {
 	int result;
 
@@ -491,7 +491,7 @@ BT_EXPORT_API int bluetooth_dpm_is_bluetooth_uuid_restriction_active(bt_dpm_stat
 }
 
 
-BT_EXPORT_API int bluetooth_dpm_add_bluetooth_devices_to_blacklist(const bluetooth_device_address_t *device_address)
+BT_EXPORT_API int bluetooth_dpm_add_devices_to_blacklist(const bluetooth_device_address_t *device_address)
 {
 	int result;
 
@@ -513,7 +513,7 @@ BT_EXPORT_API int bluetooth_dpm_add_bluetooth_devices_to_blacklist(const bluetoo
 }
 
 
-BT_EXPORT_API int bluetooth_dpm_add_bluetooth_devices_to_whitelist(const bluetooth_device_address_t *device_address)
+BT_EXPORT_API int bluetooth_dpm_add_devices_to_whitelist(const bluetooth_device_address_t *device_address)
 {
 	int result;
 
@@ -535,7 +535,7 @@ BT_EXPORT_API int bluetooth_dpm_add_bluetooth_devices_to_whitelist(const bluetoo
 }
 
 
-BT_EXPORT_API int bluetooth_dpm_add_bluetooth_uuids_to_blacklist(const char *service_uuid)
+BT_EXPORT_API int bluetooth_dpm_add_uuids_to_blacklist(const char *service_uuid)
 {
 	int result;
 	char uuid[BLUETOOTH_UUID_STRING_MAX];
@@ -560,7 +560,7 @@ BT_EXPORT_API int bluetooth_dpm_add_bluetooth_uuids_to_blacklist(const char *ser
 }
 
 
-BT_EXPORT_API int bluetooth_dpm_add_bluetooth_uuids_to_whitelist(const char *service_uuid)
+BT_EXPORT_API int bluetooth_dpm_add_uuids_to_whitelist(const char *service_uuid)
 {
 	int result;
 	char uuid[BLUETOOTH_UUID_STRING_MAX];
@@ -583,7 +583,7 @@ BT_EXPORT_API int bluetooth_dpm_add_bluetooth_uuids_to_whitelist(const char *ser
 }
 
 
-BT_EXPORT_API int bluetooth_dpm_clear_bluetooth_devices_from_blacklist(void)
+BT_EXPORT_API int bluetooth_dpm_clear_devices_from_blacklist(void)
 {
 	int result;
 
@@ -601,7 +601,7 @@ BT_EXPORT_API int bluetooth_dpm_clear_bluetooth_devices_from_blacklist(void)
 }
 
 
-BT_EXPORT_API int bluetooth_dpm_clear_bluetooth_devices_from_whitelist(void)
+BT_EXPORT_API int bluetooth_dpm_clear_devices_from_whitelist(void)
 {
 	int result;
 
@@ -619,7 +619,7 @@ BT_EXPORT_API int bluetooth_dpm_clear_bluetooth_devices_from_whitelist(void)
 }
 
 
-BT_EXPORT_API int bluetooth_dpm_clear_bluetooth_uuids_from_blacklist(void)
+BT_EXPORT_API int bluetooth_dpm_clear_uuids_from_blacklist(void)
 {
 	int result;
 
@@ -637,7 +637,7 @@ BT_EXPORT_API int bluetooth_dpm_clear_bluetooth_uuids_from_blacklist(void)
 }
 
 
-BT_EXPORT_API int bluetooth_dpm_clear_bluetooth_uuids_from_whitelist(void)
+BT_EXPORT_API int bluetooth_dpm_clear_uuids_from_whitelist(void)
 {
 	int result;
 
@@ -689,7 +689,7 @@ static void _bluetooth_extract_dpm_uuid_info(int count,
 	}
 }
 
-BT_EXPORT_API int bluetooth_dpm_get_bluetooth_devices_from_blacklist(bt_dpm_device_list_t *device_list)
+BT_EXPORT_API int bluetooth_dpm_get_devices_from_blacklist(bt_dpm_device_list_t *device_list)
 {
 	int result;
 	bt_dpm_device_list_t *devices = NULL;
@@ -724,7 +724,7 @@ BT_EXPORT_API int bluetooth_dpm_get_bluetooth_devices_from_blacklist(bt_dpm_devi
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_get_bluetooth_devices_from_whitelist(bt_dpm_device_list_t *device_list)
+BT_EXPORT_API int bluetooth_dpm_get_devices_from_whitelist(bt_dpm_device_list_t *device_list)
 {
 	int result;
 	bt_dpm_device_list_t *devices = NULL;
@@ -759,7 +759,7 @@ BT_EXPORT_API int bluetooth_dpm_get_bluetooth_devices_from_whitelist(bt_dpm_devi
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_get_bluetooth_uuids_from_blacklist(bt_dpm_uuids_list_t *uuid_list)
+BT_EXPORT_API int bluetooth_dpm_get_uuids_from_blacklist(bt_dpm_uuids_list_t *uuid_list)
 {
 	int result;
 	bt_dpm_uuids_list_t *uuids;
@@ -793,7 +793,7 @@ BT_EXPORT_API int bluetooth_dpm_get_bluetooth_uuids_from_blacklist(bt_dpm_uuids_
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_get_bluetooth_uuids_from_whitelist(bt_dpm_uuids_list_t *uuid_list)
+BT_EXPORT_API int bluetooth_dpm_get_uuids_from_whitelist(bt_dpm_uuids_list_t *uuid_list)
 {
 	int result;
 	bt_dpm_uuids_list_t *uuids;
@@ -828,7 +828,7 @@ BT_EXPORT_API int bluetooth_dpm_get_bluetooth_uuids_from_whitelist(bt_dpm_uuids_
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_remove_bluetooth_device_from_whitelist(const bluetooth_device_address_t *device_address)
+BT_EXPORT_API int bluetooth_dpm_remove_device_from_whitelist(const bluetooth_device_address_t *device_address)
 {
 	int result;
 
@@ -848,7 +848,7 @@ BT_EXPORT_API int bluetooth_dpm_remove_bluetooth_device_from_whitelist(const blu
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_remove_bluetooth_device_from_blacklist(const bluetooth_device_address_t *device_address)
+BT_EXPORT_API int bluetooth_dpm_remove_device_from_blacklist(const bluetooth_device_address_t *device_address)
 {
 	int result;
 
@@ -868,7 +868,7 @@ BT_EXPORT_API int bluetooth_dpm_remove_bluetooth_device_from_blacklist(const blu
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_remove_bluetooth_uuid_from_whitelist(const char *service_uuid)
+BT_EXPORT_API int bluetooth_dpm_remove_uuid_from_whitelist(const char *service_uuid)
 {
 	int result;
 	char uuid[BLUETOOTH_UUID_STRING_MAX];
@@ -890,7 +890,7 @@ BT_EXPORT_API int bluetooth_dpm_remove_bluetooth_uuid_from_whitelist(const char 
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_remove_bluetooth_uuid_from_blacklist(const char *service_uuid)
+BT_EXPORT_API int bluetooth_dpm_remove_uuid_from_blacklist(const char *service_uuid)
 {
 	int result;
 	char uuid[BLUETOOTH_UUID_STRING_MAX];
@@ -913,7 +913,7 @@ BT_EXPORT_API int bluetooth_dpm_remove_bluetooth_uuid_from_blacklist(const char 
 
 }
 
-BT_EXPORT_API int bluetooth_dpm_set_allow_bluetooth_outgoing_call(bt_dpm_status_t value)
+BT_EXPORT_API int bluetooth_dpm_set_allow_outgoing_call(bt_dpm_status_t value)
 {
 	int result;
 
@@ -932,7 +932,7 @@ BT_EXPORT_API int bluetooth_dpm_set_allow_bluetooth_outgoing_call(bt_dpm_status_
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_get_allow_bluetooth_outgoing_call(bt_dpm_status_t *value)
+BT_EXPORT_API int bluetooth_dpm_get_allow_outgoing_call(bt_dpm_status_t *value)
 {
 	int result;
 
@@ -958,7 +958,7 @@ BT_EXPORT_API int bluetooth_dpm_get_allow_bluetooth_outgoing_call(bt_dpm_status_
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_set_bluetooth_pairing_state(bt_dpm_status_t value)
+BT_EXPORT_API int bluetooth_dpm_set_pairing_state(bt_dpm_status_t value)
 {
 	int result;
 
@@ -977,7 +977,7 @@ BT_EXPORT_API int bluetooth_dpm_set_bluetooth_pairing_state(bt_dpm_status_t valu
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_get_bluetooth_pairing_state(bt_dpm_status_t *value)
+BT_EXPORT_API int bluetooth_dpm_get_pairing_state(bt_dpm_status_t *value)
 {
 	int result;
 
@@ -1003,7 +1003,7 @@ BT_EXPORT_API int bluetooth_dpm_get_bluetooth_pairing_state(bt_dpm_status_t *val
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_set_bluetooth_profile_state(bt_dpm_profile_t profile, bt_dpm_status_t value)
+BT_EXPORT_API int bluetooth_dpm_set_profile_state(bt_dpm_profile_t profile, bt_dpm_status_t value)
 {
 	int result;
 
@@ -1023,7 +1023,7 @@ BT_EXPORT_API int bluetooth_dpm_set_bluetooth_profile_state(bt_dpm_profile_t pro
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_get_bluetooth_profile_state(bt_dpm_profile_t profile, bt_dpm_status_t *value)
+BT_EXPORT_API int bluetooth_dpm_get_profile_state(bt_dpm_profile_t profile, bt_dpm_status_t *value)
 {
 	int result;
 
@@ -1051,7 +1051,7 @@ BT_EXPORT_API int bluetooth_dpm_get_bluetooth_profile_state(bt_dpm_profile_t pro
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_set_bluetooth_desktop_connectivity_state(bt_dpm_status_t value)
+BT_EXPORT_API int bluetooth_dpm_set_desktop_connectivity_state(bt_dpm_status_t value)
 {
 	int result;
 
@@ -1070,7 +1070,7 @@ BT_EXPORT_API int bluetooth_dpm_set_bluetooth_desktop_connectivity_state(bt_dpm_
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_get_bluetooth_desktop_connectivity_state(bt_dpm_status_t *value)
+BT_EXPORT_API int bluetooth_dpm_get_desktop_connectivity_state(bt_dpm_status_t *value)
 {
 	int result;
 
@@ -1096,7 +1096,7 @@ BT_EXPORT_API int bluetooth_dpm_get_bluetooth_desktop_connectivity_state(bt_dpm_
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_set_bluetooth_discoverable_state(bt_dpm_status_t value)
+BT_EXPORT_API int bluetooth_dpm_set_discoverable_state(bt_dpm_status_t value)
 {
 	int result;
 
@@ -1115,7 +1115,7 @@ BT_EXPORT_API int bluetooth_dpm_set_bluetooth_discoverable_state(bt_dpm_status_t
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_get_bluetooth_discoverable_state(bt_dpm_status_t *value)
+BT_EXPORT_API int bluetooth_dpm_get_discoverable_state(bt_dpm_status_t *value)
 {
 	int result;
 
@@ -1141,7 +1141,7 @@ BT_EXPORT_API int bluetooth_dpm_get_bluetooth_discoverable_state(bt_dpm_status_t
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_set_bluetooth_limited_discoverable_state(bt_dpm_status_t value)
+BT_EXPORT_API int bluetooth_dpm_set_limited_discoverable_state(bt_dpm_status_t value)
 {
 	int result;
 
@@ -1160,7 +1160,7 @@ BT_EXPORT_API int bluetooth_dpm_set_bluetooth_limited_discoverable_state(bt_dpm_
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_get_bluetooth_limited_discoverable_state(bt_dpm_status_t *value)
+BT_EXPORT_API int bluetooth_dpm_get_limited_discoverable_state(bt_dpm_status_t *value)
 {
 	int result;
 
@@ -1188,7 +1188,7 @@ BT_EXPORT_API int bluetooth_dpm_get_bluetooth_limited_discoverable_state(bt_dpm_
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_set_bluetooth_data_transfer_state(bt_dpm_status_t value)
+BT_EXPORT_API int bluetooth_dpm_set_data_transfer_state(bt_dpm_status_t value)
 {
 	int result;
 
@@ -1207,7 +1207,7 @@ BT_EXPORT_API int bluetooth_dpm_set_bluetooth_data_transfer_state(bt_dpm_status_
 	return result;
 }
 
-BT_EXPORT_API int bluetooth_dpm_get_bluetooth_data_transfer_state(bt_dpm_status_t *value)
+BT_EXPORT_API int bluetooth_dpm_get_data_transfer_state(bt_dpm_status_t *value)
 {
 	int result;
 
