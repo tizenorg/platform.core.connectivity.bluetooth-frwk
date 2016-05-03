@@ -5771,7 +5771,7 @@ int bluetooth_set_manufacturer_data(const bluetooth_manufacturer_data_t *value);
 
 #ifdef TIZEN_DPM_VCONF_ENABLE
 /**
- * @fn int bluetooth_dpm_is_bluetooth_mode_allowed(void);
+ * @fn int bluetooth_dpm_is_bt_mode_allowed(void);
  *
  * @brief Checks Restriction for BT mode(BT allowed or not)
  *
@@ -5786,11 +5786,11 @@ int bluetooth_set_manufacturer_data(const bluetooth_manufacturer_data_t *value);
  *
  * @remark	None
  */
-int bluetooth_dpm_is_bluetooth_mode_allowed(void);
+int bluetooth_dpm_is_bt_mode_allowed(void);
 #endif
 
 /**
- * @fn int bluetooth_dpm_set_allow_bluetooth_mode(bt_dpm_allow_t value);
+ * @fn int bluetooth_dpm_set_allow_bt_mode(bt_dpm_allow_t value);
  *
  * @brief Sets Restriction for BT mode(BT allowed or not)
  *
@@ -5809,10 +5809,10 @@ int bluetooth_dpm_is_bluetooth_mode_allowed(void);
  *
  * @remark	None
  */
-int bluetooth_dpm_set_allow_bluetooth_mode(bt_dpm_allow_t value);
+int bluetooth_dpm_set_allow_bt_mode(bt_dpm_allow_t value);
 
 /**
- * @fn int bluetooth_dpm_get_allow_bluetooth_mode(bt_dpm_allow_t value);
+ * @fn int bluetooth_dpm_get_allow_bt_mode(bt_dpm_allow_t value);
  *
  * @brief Reads the Restriction for BT mode(BT allowed or not)
  *
@@ -5832,10 +5832,10 @@ int bluetooth_dpm_set_allow_bluetooth_mode(bt_dpm_allow_t value);
  *
  * @remark	None
  */
-int bluetooth_dpm_get_allow_bluetooth_mode(bt_dpm_allow_t *value);
+int bluetooth_dpm_get_allow_bt_mode(bt_dpm_allow_t *value);
 
 /**
- * @fn int bluetooth_dpm_activate_bluetooth_device_restriction(bt_dpm_status_t value);
+ * @fn int bluetooth_dpm_activate_device_restriction(bt_dpm_status_t value);
  *
  * @brief Sets the Restriction for device.
  *
@@ -5852,10 +5852,10 @@ int bluetooth_dpm_get_allow_bluetooth_mode(bt_dpm_allow_t *value);
  *
  * @remark	None
  */
-int bluetooth_dpm_activate_bluetooth_device_restriction(bt_dpm_status_t value);
+int bluetooth_dpm_activate_device_restriction(bt_dpm_status_t value);
 
 /**
- * @fn int bluetooth_dpm_is_bluetooth_device_restriction_active(bt_dpm_status_t *value);
+ * @fn int bluetooth_dpm_is_device_restriction_active(bt_dpm_status_t *value);
  *
  * @brief Reads the Restriction for device.
  *
@@ -5873,7 +5873,7 @@ int bluetooth_dpm_activate_bluetooth_device_restriction(bt_dpm_status_t value);
  *
  * @remark	None
  */
-int bluetooth_dpm_is_bluetooth_device_restriction_active(bt_dpm_status_t *value);
+int bluetooth_dpm_is_device_restriction_active(bt_dpm_status_t *value);
 
 /**
  * @fn int bluetooth_dpm_activate_bluetoooth_uuid_restriction(bt_dpm_status_t value);
@@ -5893,10 +5893,10 @@ int bluetooth_dpm_is_bluetooth_device_restriction_active(bt_dpm_status_t *value)
  *
  * @remark	None
  */
-int bluetooth_dpm_activate_bluetoooth_uuid_restriction(bt_dpm_status_t value);
+int bluetooth_dpm_activate_uuid_restriction(bt_dpm_status_t value);
 
 /**
- * @fn int bluetooth_dpm_is_bluetooth_uuid_restriction_active(bt_dpm_status_t *value);
+ * @fn int bluetooth_dpm_is_uuid_restriction_active(bt_dpm_status_t *value);
  *
  * @brief Reads the Restriction for uuid.
  *
@@ -5914,10 +5914,10 @@ int bluetooth_dpm_activate_bluetoooth_uuid_restriction(bt_dpm_status_t value);
  *
  * @remark	None
  */
-int bluetooth_dpm_is_bluetooth_uuid_restriction_active(bt_dpm_status_t *value);
+int bluetooth_dpm_is_uuid_restriction_active(bt_dpm_status_t *value);
 
 /**
- * @fn int bluetooth_dpm_add_bluetooth_devices_to_blacklist(const bluetooth_device_address_t *device_address);
+ * @fn int bluetooth_dpm_add_devices_to_blacklist(const bluetooth_device_address_t *device_address);
  *
  * @brief Adds the device to blacklist.
  *
@@ -5932,10 +5932,10 @@ int bluetooth_dpm_is_bluetooth_uuid_restriction_active(bt_dpm_status_t *value);
  *
  * @remark	None
  */
-int bluetooth_dpm_add_bluetooth_devices_to_blacklist(const bluetooth_device_address_t *device_address);
+int bluetooth_dpm_add_devices_to_blacklist(const bluetooth_device_address_t *device_address);
 
 /**
- * @fn int bluetooth_dpm_add_bluetooth_devices_to_whitelist(const bluetooth_device_address_t *device_address);
+ * @fn int bluetooth_dpm_add_devices_to_whitelist(const bluetooth_device_address_t *device_address);
  *
  * @brief Adds the device to whitelist.
  *
@@ -5950,10 +5950,10 @@ int bluetooth_dpm_add_bluetooth_devices_to_blacklist(const bluetooth_device_addr
  *
  * @remark	None
  */
-int bluetooth_dpm_add_bluetooth_devices_to_whitelist(const bluetooth_device_address_t *device_address);
+int bluetooth_dpm_add_devices_to_whitelist(const bluetooth_device_address_t *device_address);
 
 /**
- * @fn int bluetooth_dpm_add_bluetooth_uuids_to_blacklist(const char *service_uuid);
+ * @fn int bluetooth_dpm_add_uuids_to_blacklist(const char *service_uuid);
  *
  * @brief Adds the Service UUIDS to blacklist.
  *
@@ -5968,10 +5968,10 @@ int bluetooth_dpm_add_bluetooth_devices_to_whitelist(const bluetooth_device_addr
  *
  * @remark	None
  */
-int bluetooth_dpm_add_bluetooth_uuids_to_blacklist(const char *service_uuid);
+int bluetooth_dpm_add_uuids_to_blacklist(const char *service_uuid);
 
 /**
- * @fn int bluetooth_dpm_add_bluetooth_uuids_to_whitelist(const char *service_uuid);
+ * @fn int bluetooth_dpm_add_uuids_to_whitelist(const char *service_uuid);
  *
  * @brief Adds the Service UUIDS to whitelist.
  *
@@ -5986,10 +5986,10 @@ int bluetooth_dpm_add_bluetooth_uuids_to_blacklist(const char *service_uuid);
  *
  * @remark	None
  */
-int bluetooth_dpm_add_bluetooth_uuids_to_whitelist(const char *service_uuid);
+int bluetooth_dpm_add_uuids_to_whitelist(const char *service_uuid);
 
 /**
- * @fn int bluetooth_dpm_clear_bluetooth_devices_from_blacklist();
+ * @fn int bluetooth_dpm_clear_devices_from_blacklist();
  *
  * @brief Clears the devices from blacklist.
  *
@@ -6004,10 +6004,10 @@ int bluetooth_dpm_add_bluetooth_uuids_to_whitelist(const char *service_uuid);
  *
  * @remark	None
  */
-int bluetooth_dpm_clear_bluetooth_devices_from_blacklist(void);
+int bluetooth_dpm_clear_devices_from_blacklist(void);
 
 /**
- * @fn int bluetooth_dpm_clear_bluetooth_devices_from_whitelist();
+ * @fn int bluetooth_dpm_clear_devices_from_whitelist();
  *
  * @brief Clears the devices from whitelist.
  *
@@ -6022,10 +6022,10 @@ int bluetooth_dpm_clear_bluetooth_devices_from_blacklist(void);
  *
  * @remark	None
  */
-int bluetooth_dpm_clear_bluetooth_devices_from_whitelist(void);
+int bluetooth_dpm_clear_devices_from_whitelist(void);
 
 /**
- * @fn int bluetooth_dpm_clear_bluetooth_uuids_from_blacklist();
+ * @fn int bluetooth_dpm_clear_uuids_from_blacklist();
  *
  * @brief Clears the uuids from blacklist.
  *
@@ -6040,10 +6040,10 @@ int bluetooth_dpm_clear_bluetooth_devices_from_whitelist(void);
  *
  * @remark	None
  */
-int bluetooth_dpm_clear_bluetooth_uuids_from_blacklist(void);
+int bluetooth_dpm_clear_uuids_from_blacklist(void);
 
 /**
- * @fn int bluetooth_dpm_clear_bluetooth_uuids_from_whitelist();
+ * @fn int bluetooth_dpm_clear_uuids_from_whitelist();
  *
  * @brief Clears the uuids from whitelist.
  *
@@ -6058,10 +6058,10 @@ int bluetooth_dpm_clear_bluetooth_uuids_from_blacklist(void);
  *
  * @remark	None
  */
-int bluetooth_dpm_clear_bluetooth_uuids_from_whitelist(void);
+int bluetooth_dpm_clear_uuids_from_whitelist(void);
 
 /**
- * @fn int bluetooth_dpm_get_bluetooth_devices_from_blacklist(bt_dpm_device_list_t *device_list);
+ * @fn int bluetooth_dpm_get_devices_from_blacklist(bt_dpm_device_list_t *device_list);
  *
  * @brief reads the devices from blacklist.
  *
@@ -6076,10 +6076,10 @@ int bluetooth_dpm_clear_bluetooth_uuids_from_whitelist(void);
  *
  * @remark	None
  */
-int bluetooth_dpm_get_bluetooth_devices_from_blacklist(bt_dpm_device_list_t *device_list);
+int bluetooth_dpm_get_devices_from_blacklist(bt_dpm_device_list_t *device_list);
 
 /**
- * @fn int bluetooth_dpm_get_bluetooth_devices_from_whitelist(bt_dpm_device_list_t *device_list);
+ * @fn int bluetooth_dpm_get_devices_from_whitelist(bt_dpm_device_list_t *device_list);
  *
  * @brief reads the devices from whitelist.
  *
@@ -6094,10 +6094,10 @@ int bluetooth_dpm_get_bluetooth_devices_from_blacklist(bt_dpm_device_list_t *dev
  *
  * @remark	None
  */
-int bluetooth_dpm_get_bluetooth_devices_from_whitelist(bt_dpm_device_list_t *device_list);
+int bluetooth_dpm_get_devices_from_whitelist(bt_dpm_device_list_t *device_list);
 
 /**
- * @fn int bluetooth_dpm_get_bluetooth_uuids_from_blacklist(bt_dpm_uuids_list_t *uuid_list);
+ * @fn int bluetooth_dpm_get_uuids_from_blacklist(bt_dpm_uuids_list_t *uuid_list);
  *
  * @brief reads the uuids from blacklist.
  *
@@ -6112,10 +6112,10 @@ int bluetooth_dpm_get_bluetooth_devices_from_whitelist(bt_dpm_device_list_t *dev
  *
  * @remark	None
  */
-int bluetooth_dpm_get_bluetooth_uuids_from_blacklist(bt_dpm_uuids_list_t *uuid_list);
+int bluetooth_dpm_get_uuids_from_blacklist(bt_dpm_uuids_list_t *uuid_list);
 
 /**
- * @fn int bluetooth_dpm_get_bluetooth_uuids_from_whitelist(bt_dpm_uuids_list_t *uuid_list);
+ * @fn int bluetooth_dpm_get_uuids_from_whitelist(bt_dpm_uuids_list_t *uuid_list);
  *
  * @brief reads the uuids from whitelist.
  *
@@ -6130,10 +6130,10 @@ int bluetooth_dpm_get_bluetooth_uuids_from_blacklist(bt_dpm_uuids_list_t *uuid_l
  *
  * @remark	None
  */
-int bluetooth_dpm_get_bluetooth_uuids_from_whitelist(bt_dpm_uuids_list_t *uuid_list);
+int bluetooth_dpm_get_uuids_from_whitelist(bt_dpm_uuids_list_t *uuid_list);
 
 /**
- * @fn int bluetooth_dpm_remove_bluetooth_device_from_whitelist(const bluetooth_device_address_t *device_address);
+ * @fn int bluetooth_dpm_remove_device_from_whitelist(const bluetooth_device_address_t *device_address);
  *
  * @brief Removes the device from whitelist.
  *
@@ -6148,10 +6148,10 @@ int bluetooth_dpm_get_bluetooth_uuids_from_whitelist(bt_dpm_uuids_list_t *uuid_l
  *
  * @remark	None
  */
-int bluetooth_dpm_remove_bluetooth_device_from_whitelist(const bluetooth_device_address_t *device_address);
+int bluetooth_dpm_remove_device_from_whitelist(const bluetooth_device_address_t *device_address);
 
 /**
- * @fn int bluetooth_dpm_remove_bluetooth_device_from_blacklist(const bluetooth_device_address_t *device_address);
+ * @fn int bluetooth_dpm_remove_device_from_blacklist(const bluetooth_device_address_t *device_address);
  *
  * @brief Removes the device from blacklist.
  *
@@ -6166,10 +6166,10 @@ int bluetooth_dpm_remove_bluetooth_device_from_whitelist(const bluetooth_device_
  *
  * @remark	None
  */
-int bluetooth_dpm_remove_bluetooth_device_from_blacklist(const bluetooth_device_address_t *device_address);
+int bluetooth_dpm_remove_device_from_blacklist(const bluetooth_device_address_t *device_address);
 
 /**
- * @fn int bluetooth_dpm_remove_bluetooth_uuid_from_whitelist(const char *service_uuid);
+ * @fn int bluetooth_dpm_remove_uuid_from_whitelist(const char *service_uuid);
  *
  * @brief Removes the Service UUIDS from whitelist.
  *
@@ -6184,10 +6184,10 @@ int bluetooth_dpm_remove_bluetooth_device_from_blacklist(const bluetooth_device_
  *
  * @remark	None
  */
-int bluetooth_dpm_remove_bluetooth_uuid_from_whitelist(const char *service_uuid);
+int bluetooth_dpm_remove_uuid_from_whitelist(const char *service_uuid);
 
 /**
- * @fn int bluetooth_dpm_remove_bluetooth_uuid_from_blacklist(const char *service_uuid);
+ * @fn int bluetooth_dpm_remove_uuid_from_blacklist(const char *service_uuid);
  *
  * @brief Removes the Service UUIDS from blacklist.
  *
@@ -6202,10 +6202,10 @@ int bluetooth_dpm_remove_bluetooth_uuid_from_whitelist(const char *service_uuid)
  *
  * @remark	None
  */
-int bluetooth_dpm_remove_bluetooth_uuid_from_blacklist(const char *service_uuid);
+int bluetooth_dpm_remove_uuid_from_blacklist(const char *service_uuid);
 
 /**
- * @fn int bluetooth_dpm_set_allow_bluetooth_outgoing_call(bt_dpm_status_t value);
+ * @fn int bluetooth_dpm_set_allow_outgoing_call(bt_dpm_status_t value);
  *
  * @brief Sets the Restriction for outgoing call.
  *
@@ -6222,10 +6222,10 @@ int bluetooth_dpm_remove_bluetooth_uuid_from_blacklist(const char *service_uuid)
  *
  * @remark	None
  */
-int bluetooth_dpm_set_allow_bluetooth_outgoing_call(bt_dpm_status_t value);
+int bluetooth_dpm_set_allow_outgoing_call(bt_dpm_status_t value);
 
 /**
- * @fn int bluetooth_dpm_get_allow_bluetooth_outgoing_call(bt_dpm_status_t *value);
+ * @fn int bluetooth_dpm_get_allow_outgoing_call(bt_dpm_status_t *value);
  *
  * @brief Reads the Restriction for  outgoing call.
  *
@@ -6243,10 +6243,10 @@ int bluetooth_dpm_set_allow_bluetooth_outgoing_call(bt_dpm_status_t value);
  *
  * @remark	None
  */
-int bluetooth_dpm_get_allow_bluetooth_outgoing_call(bt_dpm_status_t *value);
+int bluetooth_dpm_get_allow_outgoing_call(bt_dpm_status_t *value);
 
 /**
- * @fn int bluetooth_dpm_set_bluetooth_pairing_state(bt_dpm_status_t value);
+ * @fn int bluetooth_dpm_set_pairing_state(bt_dpm_status_t value);
  *
  * @brief Sets the Restriction for Pairing.
  *
@@ -6263,10 +6263,10 @@ int bluetooth_dpm_get_allow_bluetooth_outgoing_call(bt_dpm_status_t *value);
  *
  * @remark	None
  */
-int bluetooth_dpm_set_bluetooth_pairing_state(bt_dpm_status_t value);
+int bluetooth_dpm_set_pairing_state(bt_dpm_status_t value);
 
 /**
- * @fn int bluetooth_dpm_get_bluetooth_pairing_state(bt_dpm_status_t *value);
+ * @fn int bluetooth_dpm_get_pairing_state(bt_dpm_status_t *value);
  *
  * @brief Reads the Restriction for Pairing
  *
@@ -6284,10 +6284,10 @@ int bluetooth_dpm_set_bluetooth_pairing_state(bt_dpm_status_t value);
  *
  * @remark	None
  */
-int bluetooth_dpm_get_bluetooth_pairing_state(bt_dpm_status_t *value);
+int bluetooth_dpm_get_pairing_state(bt_dpm_status_t *value);
 
 /**
- * @fnint bluetooth_dpm_set_bluetooth_profile_state(bt_dpm_profile_t profile, bt_dpm_status_t value);
+ * @fnint bluetooth_dpm_set_profile_state(bt_dpm_profile_t profile, bt_dpm_status_t value);
  *
  * @brief Sets the Restriction for using Profiles.
  *
@@ -6316,10 +6316,10 @@ int bluetooth_dpm_get_bluetooth_pairing_state(bt_dpm_status_t *value);
  *
  * @remark	None
  */
-int bluetooth_dpm_set_bluetooth_profile_state(bt_dpm_profile_t profile, bt_dpm_status_t value);
+int bluetooth_dpm_set_profile_state(bt_dpm_profile_t profile, bt_dpm_status_t value);
 
 /**
- * @fn int bluetooth_dpm_get_bluetooth_profile_state(bt_dpm_profile_t profile, bt_dpm_status_t *value);
+ * @fn int bluetooth_dpm_get_profile_state(bt_dpm_profile_t profile, bt_dpm_status_t *value);
  *
  * @brief Reads the Restriction for using Profiles.
  *
@@ -6348,10 +6348,10 @@ int bluetooth_dpm_set_bluetooth_profile_state(bt_dpm_profile_t profile, bt_dpm_s
  *
  * @remark	None
  */
-int bluetooth_dpm_get_bluetooth_profile_state(bt_dpm_profile_t profile, bt_dpm_status_t *value);
+int bluetooth_dpm_get_profile_state(bt_dpm_profile_t profile, bt_dpm_status_t *value);
 
 /**
- * @fn int bluetooth_dpm_set_bluetooth_desktop_connectivity_state(bt_dpm_status_t value);
+ * @fn int bluetooth_dpm_set_desktop_connectivity_state(bt_dpm_status_t value);
  *
  * @brief Sets the Restriction for Desktop Connectivity.
  *
@@ -6368,10 +6368,10 @@ int bluetooth_dpm_get_bluetooth_profile_state(bt_dpm_profile_t profile, bt_dpm_s
  *
  * @remark	None
  */
-int bluetooth_dpm_set_bluetooth_desktop_connectivity_state(bt_dpm_status_t value);
+int bluetooth_dpm_set_desktop_connectivity_state(bt_dpm_status_t value);
 
 /**
- * @fn int bluetooth_dpm_get_bluetooth_desktop_connectivity_state(bt_dpm_status_t *value);
+ * @fn int bluetooth_dpm_get_desktop_connectivity_state(bt_dpm_status_t *value);
  *
  * @brief Reads the Restriction for Desktop Connectivity.
  *
@@ -6389,10 +6389,10 @@ int bluetooth_dpm_set_bluetooth_desktop_connectivity_state(bt_dpm_status_t value
  *
  * @remark	None
  */
-int bluetooth_dpm_get_bluetooth_desktop_connectivity_state(bt_dpm_status_t *value);
+int bluetooth_dpm_get_desktop_connectivity_state(bt_dpm_status_t *value);
 
 /**
- * @fn int bluetooth_dpm_set_bluetooth_discoverable_state(bt_dpm_status_t value);
+ * @fn int bluetooth_dpm_set_discoverable_state(bt_dpm_status_t value);
  *
  * @brief Sets the Restriction for Discoverable state.
  *
@@ -6409,10 +6409,10 @@ int bluetooth_dpm_get_bluetooth_desktop_connectivity_state(bt_dpm_status_t *valu
  *
  * @remark	None
  */
-int bluetooth_dpm_set_bluetooth_discoverable_state(bt_dpm_status_t value);
+int bluetooth_dpm_set_discoverable_state(bt_dpm_status_t value);
 
 /**
- * @fn int bluetooth_dpm_get_bluetooth_discoverable_state(bt_dpm_status_t *value);
+ * @fn int bluetooth_dpm_get_discoverable_state(bt_dpm_status_t *value);
  *
  * @brief Reads the Restriction for Discoverable state.
  *
@@ -6430,10 +6430,10 @@ int bluetooth_dpm_set_bluetooth_discoverable_state(bt_dpm_status_t value);
  *
  * @remark	None
  */
-int bluetooth_dpm_get_bluetooth_discoverable_state(bt_dpm_status_t *value);
+int bluetooth_dpm_get_discoverable_state(bt_dpm_status_t *value);
 
 /**
- * @fn int bluetooth_dpm_set_bluetooth_limited_discoverable_state(bt_dpm_status_t value);
+ * @fn int bluetooth_dpm_set_limited_discoverable_state(bt_dpm_status_t value);
  *
  * @brief Sets the Restriction for linited discoverable state..
  *
@@ -6450,10 +6450,10 @@ int bluetooth_dpm_get_bluetooth_discoverable_state(bt_dpm_status_t *value);
  *
  * @remark	None
  */
-int bluetooth_dpm_set_bluetooth_limited_discoverable_state(bt_dpm_status_t value);
+int bluetooth_dpm_set_limited_discoverable_state(bt_dpm_status_t value);
 
 /**
- * @fn int bluetooth_dpm_get_bluetooth_limited_discoverable_state(bt_dpm_status_t *value);
+ * @fn int bluetooth_dpm_get_limited_discoverable_state(bt_dpm_status_t *value);
  *
  * @brief Reads the Restriction for limited discoverable state.
  *
@@ -6471,9 +6471,9 @@ int bluetooth_dpm_set_bluetooth_limited_discoverable_state(bt_dpm_status_t value
  *
  * @remark	None
  */
-int bluetooth_dpm_get_bluetooth_limited_discoverable_state(bt_dpm_status_t *value);
+int bluetooth_dpm_get_limited_discoverable_state(bt_dpm_status_t *value);
 /**
- * @fn int bluetooth_dpm_set_bluetooth_data_transfer_state(bt_dpm_status_t value);
+ * @fn int bluetooth_dpm_set_data_transfer_state(bt_dpm_status_t value);
  *
  * @brief Sets the Restriction for Data trasnfer.
  *
@@ -6490,11 +6490,11 @@ int bluetooth_dpm_get_bluetooth_limited_discoverable_state(bt_dpm_status_t *valu
  *
  * @remark	None
  */
-int bluetooth_dpm_set_bluetooth_data_transfer_state(bt_dpm_status_t value);
+int bluetooth_dpm_set_data_transfer_state(bt_dpm_status_t value);
 
 
 /**
- * @fn int bluetooth_dpm_get_bluetooth_data_transfer_state(bt_dpm_status_t *value);
+ * @fn int bluetooth_dpm_get_data_transfer_state(bt_dpm_status_t *value);
  *
  * @brief Reads the Restriction for Data trasnfer.
  *
@@ -6512,7 +6512,7 @@ int bluetooth_dpm_set_bluetooth_data_transfer_state(bt_dpm_status_t value);
  *
  * @remark	None
  */
-int bluetooth_dpm_get_bluetooth_data_transfer_state(bt_dpm_status_t *value);
+int bluetooth_dpm_get_data_transfer_state(bt_dpm_status_t *value);
 
 /**
  * @}
