@@ -2500,6 +2500,12 @@ gboolean __bt_service_check_privilege(int function_name,
         case BT_AV_SOURCE_DISCONNECT:
         case BT_AVRCP_CONTROL_CONNECT:
         case BT_AVRCP_CONTROL_DISCONNECT:
+        case BT_AVRCP_HANDLE_CONTROL:
+        case BT_AVRCP_SET_TRACK_INFO:
+        case BT_AVRCP_SET_PROPERTY:
+        case BT_AVRCP_SET_PROPERTIES:
+        case BT_AVRCP_CONTROL_SET_PROPERTY:
+
         case BT_HF_CONNECT:
         case BT_HF_DISCONNECT:
 
@@ -2594,11 +2600,6 @@ gboolean __bt_service_check_privilege(int function_name,
         case BT_RFCOMM_REJECT_CONNECTION:
         case BT_RFCOMM_LISTEN:
 
-        case BT_AVRCP_SET_TRACK_INFO:
-        case BT_AVRCP_SET_PROPERTY:
-        case BT_AVRCP_SET_PROPERTIES:
-        case BT_AVRCP_HANDLE_CONTROL:
-        case BT_AVRCP_CONTROL_SET_PROPERTY:
         case BT_AVRCP_CONTROL_GET_PROPERTY:
         case BT_AVRCP_GET_TRACK_INFO:
 
