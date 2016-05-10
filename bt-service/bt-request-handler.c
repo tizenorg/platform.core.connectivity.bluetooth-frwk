@@ -1512,6 +1512,14 @@ int __bt_bluez_request(int function_name,
 	case BT_GATT_SET_PROPERTY_REQUEST:
 	case BT_GATT_READ_CHARACTERISTIC:
 	case BT_GATT_DISCOVER_CHARACTERISTICS_DESCRIPTOR:
+
+	case BT_HID_DEVICE_ACTIVATE:
+	case BT_HID_DEVICE_DEACTIVATE:
+	case BT_HID_DEVICE_CONNECT:
+	case BT_HID_DEVICE_DISCONNECT:
+	case BT_HID_DEVICE_SEND_MOUSE_EVENT:
+	case BT_HID_DEVICE_SEND_KEY_EVENT:
+	case BT_HID_DEVICE_SEND_REPLY_TO_REPORT:
 		/* Just call to check the privilege */
 		break;
 #ifndef GATT_NO_RELAY
@@ -2511,6 +2519,14 @@ gboolean __bt_service_check_privilege(int function_name,
 
         case BT_HID_CONNECT:
         case BT_HID_DISCONNECT:
+
+        case BT_HID_DEVICE_ACTIVATE:
+        case BT_HID_DEVICE_DEACTIVATE:
+        case BT_HID_DEVICE_CONNECT:
+        case BT_HID_DEVICE_DISCONNECT:
+        case BT_HID_DEVICE_SEND_MOUSE_EVENT:
+        case BT_HID_DEVICE_SEND_KEY_EVENT:
+        case BT_HID_DEVICE_SEND_REPLY_TO_REPORT:
 
         case BT_CONNECT_LE:
         case BT_DISCONNECT_LE:
