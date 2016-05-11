@@ -226,6 +226,7 @@ extern "C" {
 /* Privilege */
 #define BT_PRIVILEGE_PUBLIC "http://tizen.org/privilege/bluetooth"
 #define BT_PRIVILEGE_PLATFORM "http://tizen.org/privilege/bluetooth.admin"
+#define MEDIASTORAGE_PRIVILEGE "http://tizen.org/privilege/mediastorage"
 
 /* BD Address type */
 #define BDADDR_BREDR           0x00

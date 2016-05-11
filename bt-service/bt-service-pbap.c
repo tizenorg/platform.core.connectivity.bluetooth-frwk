@@ -24,6 +24,7 @@
 #include <syspopup_caller.h>
 #endif
 #include <vconf.h>
+#include <storage.h>
 
 #include "bt-internal-types.h"
 #include "bt-service-common.h"
@@ -43,6 +44,9 @@
 
 #define	PBAP_NUM_OF_FIELDS_ENTRY 29
 #define	PBAP_FIELD_ALL (0xFFFFFFFFFFFFFFFFULL)
+
+#define PBAP_DEFAULT_DOWNLAOD_PATH "/opt/usr/media/Downloads"
+#define PBAP_DEFAULT_FILE_NAME "pb.vcf"
 
 char *FIELDS[] = {
 		"VERSION",
@@ -777,14 +781,17 @@ int __bt_pbap_call_get_phonebook(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 	BT_DBG("+");
 
 	int i;
+	int ret;
 	char *format_str = NULL;
 	char *fields_str = NULL;
 	char *order_str = NULL;
-	char *target_file = "/opt/usr/media/Downloads/pb.vcf";
+	char *download_path = NULL;
+	char *target_file = NULL;
 	bt_pbap_pull_parameters_t *app_param = pbap_data->app_param;
 	GVariantBuilder builder;
 	GVariantBuilder inner_builder;
 	GVariant *filters;
+
 
 	g_variant_builder_init (&builder, G_VARIANT_TYPE_ARRAY);
 	g_variant_builder_init (&inner_builder, G_VARIANT_TYPE_ARRAY);
@@ -841,6 +848,22 @@ int __bt_pbap_call_get_phonebook(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 // Add code for Fields
 //
 //****************************
+
+	ret = storage_get_directory(STORAGE_TYPE_INTERNAL,
+			STORAGE_DIRECTORY_DOWNLOADS, &download_path);
+
+	if (ret != STORAGE_ERROR_NONE) {
+		target_file = g_strdup_printf("%s/%s", PBAP_DEFAULT_DOWNLAOD_PATH,
+							PBAP_DEFAULT_FILE_NAME);
+	} else {
+		target_file = g_strdup_printf("%s/%s", download_path,
+					PBAP_DEFAULT_FILE_NAME);
+
+		if (download_path)
+			free(download_path);
+	}
+
+	DBG_SECURE("Target flie: %s", target_file);
 
 	g_dbus_proxy_call(proxy, "PullAll",
 			g_variant_new("(s@a{sv})", target_file, filters),
@@ -912,9 +935,11 @@ int __bt_pbap_call_get_vcard(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 	BT_DBG("+");
 
 	int i;
+	int ret;
 	char *format_str = NULL;
 	char *fields_str = NULL;
-	char *target_file = "/opt/usr/media/Downloads/pb.vcf";
+	char *target_file = NULL;
+	char *download_path = NULL;
 	char *vcard_handle = NULL;
 	char vcard[10] = { 0, };
 	GVariantBuilder builder;
@@ -965,6 +990,23 @@ int __bt_pbap_call_get_vcard(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 	BT_DBG("Handle: %s", vcard);
 	vcard_handle = g_strdup(vcard);
 	BT_DBG("vcard_handle: %s", vcard_handle);
+
+	ret = storage_get_directory(STORAGE_TYPE_INTERNAL,
+			STORAGE_DIRECTORY_DOWNLOADS, &download_path);
+
+	if (ret != STORAGE_ERROR_NONE) {
+		target_file = g_strdup_printf("%s/%s", PBAP_DEFAULT_DOWNLAOD_PATH,
+							PBAP_DEFAULT_FILE_NAME);
+	} else {
+		target_file = g_strdup_printf("%s/%s", download_path,
+					PBAP_DEFAULT_FILE_NAME);
+
+		if (download_path)
+			free(download_path);
+	}
+
+	DBG_SECURE("Target flie: %s", target_file);
+
 	GVariant *temp = g_variant_new("(ss@a{sv})", vcard_handle, target_file, filters);
 
 	g_dbus_proxy_call(proxy, "Pull",

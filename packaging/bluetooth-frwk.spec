@@ -56,6 +56,7 @@ BuildRequires:  cmake
 BuildRequires:  pkgconfig(cynara-client)
 BuildRequires:  pkgconfig(cynara-creds-gdbus)
 BuildRequires:  pkgconfig(libtzplatform-config)
+BuildRequires:  pkgconfig(storage)
 
 Requires(post): /usr/bin/vconftool
 Requires(post): /sbin/ldconfig

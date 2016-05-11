@@ -65,6 +65,7 @@ SET(PKG_MODULES
 	cynara-client
 	cynara-creds-gdbus
 	eventsystem
+	storage
 )
 
 IF("$ENV{CFLAGS}" MATCHES "-DTIZEN_NETWORK_TETHERING_ENABLE")
