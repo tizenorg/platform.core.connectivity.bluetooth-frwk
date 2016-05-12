@@ -28,6 +28,7 @@
 #include "bt-internal-types.h"
 
 #include "bt-service-common.h"
+#include "bt-service-adapter.h"
 #include "bt-service-dpm.h"
 
 static dpm_policy_t policy_table[DPM_POLICY_END] = {
@@ -522,6 +523,11 @@ dpm_status_t _bt_dpm_set_bluetooth_discoverable_state(dpm_status_t value)
 	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
 		return DPM_RESTRICTED;
 
+	if (value == DPM_RESTRICTED) {
+		/* Since Discoverable mode is restricted, stop the ongoing discoverable mode */
+		_bt_set_discoverable_mode(BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE, 0);
+	}
+
 	policy_table[DPM_POLICY_BLUETOOTH_DISCOVERABLE_STATE].value = value;
 
 	return DPM_RESULT_SUCCESS;
@@ -543,6 +549,11 @@ dpm_status_t _bt_dpm_set_bluetooth_limited_discoverable_state(dpm_status_t value
 
 	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_RESTRICTED)
 		return DPM_RESTRICTED;
+
+	if (value == DPM_RESTRICTED) {
+		/* Since Discoverable mode is restricted, stop the ongoing discoverable mode */
+		_bt_set_discoverable_mode(BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE, 0);
+	}
 
 	policy_table[DPM_POLICY_BLUETOOTH_LIMITED_DISCOVERABLE_STATE].value = value;
 
