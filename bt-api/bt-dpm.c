@@ -1105,6 +1105,11 @@ BT_EXPORT_API int bluetooth_dpm_set_discoverable_state(bt_dpm_status_t value)
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
+	if (value == BLUETOOTH_DPM_RESTRICTED) {
+		/* Since Discoverable mode is restricted, stop the ongoing discoverable mode */
+		bluetooth_set_discoverable_mode(BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE, 0);
+	}
+
 	g_array_append_vals(in_param1, &value, sizeof(int));
 
 	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_DPM_SET_DISCOVERABLE_STATE,
@@ -1149,6 +1154,11 @@ BT_EXPORT_API int bluetooth_dpm_set_limited_discoverable_state(bt_dpm_status_t v
 
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+
+	if (value == BLUETOOTH_DPM_RESTRICTED) {
+		/* Since Discoverable mode is restricted, stop the ongoing discoverable mode */
+		bluetooth_set_discoverable_mode(BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE, 0);
+	}
 
 	g_array_append_vals(in_param1, &value, sizeof(int));
 
