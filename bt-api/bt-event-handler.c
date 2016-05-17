@@ -2509,6 +2509,7 @@ static void __bt_event_data_free(void *data)
 
 	ret_if(cb_data == NULL);
 
+	g_object_unref(cb_data->conn);
 	g_free(cb_data);
 }
 
