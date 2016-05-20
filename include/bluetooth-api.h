@@ -1064,7 +1064,7 @@ typedef enum {
 	HTYPE_TRANS_SET_PROTOCOL,
 	HTYPE_TRANS_DATA,
 	HTYPE_TRANS_UNKNOWN
-}bt_hid_header_type_t;
+}bluetooth_hid_header_type_t;
 
 /**
  * HID Param type
@@ -1072,16 +1072,16 @@ typedef enum {
 typedef enum {
 	PTYPE_DATA_RTYPE_INPUT,
 	PTYPE_DATA_RTYPE_OUTPUT
-}bt_hid_param_type_t;
+}bluetooth_hid_param_type_t;
 
 /**
  * Stucture to hid receive data
  */
 typedef struct {
 	const char *address;
-	bt_hid_header_type_t type;
+	bluetooth_hid_header_type_t type;
 		/**< Header type containing */
-	bt_hid_param_type_t param;
+	bluetooth_hid_param_type_t param;
 		/**< Param type in header like INPUT Report or OutPut Report */
 	int buffer_size;/**< the length of the receive buffer */
 	char *buffer;
