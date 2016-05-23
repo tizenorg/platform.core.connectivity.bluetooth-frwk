@@ -364,7 +364,6 @@ void __bt_pbap_disconnect_cb(GDBusProxy *proxy,
 	char *address_string = user_data;
 	GError *error = NULL;
 	GVariant *value;
-	GVariant *signal = NULL;
 	int result = BLUETOOTH_ERROR_INTERNAL ;
 
 	BT_DBG("Address = %s", address_string);
@@ -394,10 +393,7 @@ void __bt_pbap_disconnect_cb(GDBusProxy *proxy,
 		selected_path.type = -1;
 	}
 
-	signal = g_variant_new("(is)", result, address_string);
-	_bt_send_event(BT_PBAP_CLIENT_EVENT,
-			BLUETOOTH_PBAP_DISCONNECTED,
-			signal);
+	/* PBAP disconnected event will be sent in event reciever */
 
 	g_free(address_string);
 	BT_DBG("-");
