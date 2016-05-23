@@ -1886,12 +1886,25 @@ void __bt_pbap_client_event_filter(GDBusConnection *connection,
 
 		_bt_convert_addr_string_to_type(connected.btaddr.addr,
 						address);
-		if (result == 0)
-			connected.connected = 1;
-		else
-			connected.connected = 0;
+
+		connected.connected = 1;
 
 		_bt_common_event_cb(BLUETOOTH_PBAP_CONNECTED,
+				result, &connected,
+				event_info->cb, event_info->user_data);
+	} else if (strcasecmp(signal_name, BT_PBAP_DISCONNECTED) == 0) {
+		bt_pbap_connected_t connected = { { { 0 }, }, };
+		char *address = NULL;
+
+		g_variant_get(parameters, "(is)", &result, &address);
+		BT_DBG("address: %s", address);
+
+		_bt_convert_addr_string_to_type(connected.btaddr.addr,
+						address);
+
+		connected.connected = 0;
+
+		_bt_common_event_cb(BLUETOOTH_PBAP_DISCONNECTED,
 				result, &connected,
 				event_info->cb, event_info->user_data);
 	} else if (strcasecmp(signal_name, BT_PBAP_DISCONNECTED) == 0) {
