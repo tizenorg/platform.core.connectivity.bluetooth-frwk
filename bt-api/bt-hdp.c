@@ -406,6 +406,8 @@ static void __bt_hdp_internal_handle_property_changed(GVariant *parameters)
 			break;
 		}
 	}
+	g_variant_iter_free(property_iter);
+
 	g_free(property);
 	g_variant_unref(value);
 	g_free(obj_main_channel_path);
@@ -532,6 +534,7 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 			app_handle = g_variant_dup_string (value, &len);
 		}
 	}
+	g_variant_iter_free(property_iter);
 
 	g_variant_unref(reply);
 	BT_DBG("QOS = %s, Device = %s, Apphandler = %s",

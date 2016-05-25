@@ -1052,6 +1052,7 @@ void _gap_agent_setup_dbus(GapAgentPrivate *agent, GAP_AGENT_FUNC_CB *func_cb,
 			ERR("Unable to connect to gdbus: %s", error->message);
 			g_clear_error(&error);
 		}
+		g_dbus_node_info_unref(node_info);
 		return;
 	}
 

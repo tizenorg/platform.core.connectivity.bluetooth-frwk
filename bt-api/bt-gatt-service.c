@@ -1325,6 +1325,8 @@ void get_service_cb(GObject *object, GAsyncResult *res, gpointer user_data)
 				BT_DBG("Descriptor %s", descriptor);
 			}
 		}
+		g_variant_iter_free(iter);
+
 		/* TODO: Store the service informationa and
 		 * Send respponse to CAPI layer. */
 

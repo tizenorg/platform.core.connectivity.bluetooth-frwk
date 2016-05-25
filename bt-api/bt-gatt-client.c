@@ -564,6 +564,8 @@ BT_EXPORT_API int bluetooth_gatt_get_characteristics_property(
 				BT_DBG("value of char = %d",char_value);
 				g_byte_array_append(gb_array, &char_value, 1);
 			}
+			g_variant_iter_free(char_value_iter);
+
 			if (gb_array->len != 0) {
 				characteristic->val = g_malloc0(gb_array->len *
 								sizeof(unsigned char));
@@ -586,6 +588,7 @@ BT_EXPORT_API int bluetooth_gatt_get_characteristics_property(
 			while (g_variant_iter_loop(char_desc_iter, "&o", &char_desc_handle)) {
 				g_ptr_array_add(gp_array, (gpointer)char_desc_handle);
 			}
+			g_variant_iter_free(char_desc_iter);
 			if (gp_array->len != 0) {
 				characteristic->char_desc_handle.count = gp_array->len;
 				characteristic->char_desc_handle.handle =
@@ -775,6 +778,7 @@ BT_EXPORT_API int bluetooth_gatt_get_char_descriptor_property(
 				BT_DBG("value of descriptor = %d",char_value);
 				g_byte_array_append(gb_array, &char_value, 1);
 			}
+			g_variant_iter_free(desc_value_iter);
 			if (gb_array->len != 0) {
 				descriptor->val = g_malloc0(gb_array->len *
 								sizeof(unsigned char));
@@ -1139,6 +1143,7 @@ static int __bluetooth_gatt_descriptor_iter(const char *char_handle,
 							&characteristic->description[i]);
 						BT_DBG("description = %s", characteristic->description);
 					}
+					g_variant_iter_free(desc_value_iter);
 					break;
 				case CLIENT_CONF :
 					BT_DBG(" CLIENT_CONF");

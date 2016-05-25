@@ -373,6 +373,8 @@ static int __bt_get_bonded_device_info(gchar *device_path,
 			while(g_variant_iter_loop(char_value_iter, "y",  &char_value)) {
 				g_byte_array_append(manufacturer_data, &char_value, 1);
 			}
+			g_variant_iter_free(char_value_iter);
+
 			if (manufacturer_data) {
 				if (manufacturer_data->len > 0) {
 					memcpy(dev_info->manufacturer_data.data, manufacturer_data->data,
@@ -381,6 +383,7 @@ static int __bt_get_bonded_device_info(gchar *device_path,
 			}
 		}
 	}
+	g_variant_iter_free(property_iter);
 
 	BT_DBG("trust: %d, paired: %d", trust, paired);
 
