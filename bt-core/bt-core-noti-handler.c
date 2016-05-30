@@ -40,9 +40,9 @@ static gboolean __bt_off_cause_conflict_check(void)
 	int ps_mode_value = 0;
 	gboolean ret = FALSE;
 
-	retv_if (vconf_get_int(BT_OFF_DUE_TO_FLIGHT_MODE,
+	retv_if(vconf_get_int(BT_OFF_DUE_TO_FLIGHT_MODE,
 					&flight_mode_value) != 0, FALSE);
-	retv_if (vconf_get_int(BT_OFF_DUE_TO_POWER_SAVING_MODE,
+	retv_if(vconf_get_int(BT_OFF_DUE_TO_POWER_SAVING_MODE,
 					&ps_mode_value) != 0, FALSE);
 
 	if (flight_mode_value == 1 || ps_mode_value > 0) {

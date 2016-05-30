@@ -66,7 +66,7 @@ extern "C" {
 		} \
 	} while (0)
 
-#define BT_FREE_PARAMS(IP1,IP2,IP3,IP4,OP) \
+#define BT_FREE_PARAMS(IP1, IP2, IP3, IP4, OP) \
 	do { \
 		if (IP1) \
 			g_array_free(IP1, TRUE); \
@@ -80,7 +80,7 @@ extern "C" {
 			g_array_free(OP, TRUE); \
 	} while (0)
 
-#define BT_ALLOC_PARAMS(IP1,IP2,IP3,IP4,OP ) \
+#define BT_ALLOC_PARAMS(IP1, IP2, IP3, IP4, OP) \
 	do { \
 	        IP1 = g_array_new(TRUE, TRUE, sizeof(gchar));	\
 	        IP2 = g_array_new(TRUE, TRUE, sizeof(gchar));	\

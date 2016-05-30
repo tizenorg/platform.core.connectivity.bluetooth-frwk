@@ -230,7 +230,7 @@ int _bt_disable_adapter(void)
 	if (__execute_command("/usr/etc/bluetooth/bt-stack-down.sh", NULL) < 0) {
 #endif
 		BT_ERR("running script failed");
-		__bt_core_set_status( BT_ACTIVATED);
+		__bt_core_set_status(BT_ACTIVATED);
 		return -1;
 	}
 
@@ -352,7 +352,7 @@ static gboolean __bt_core_check_the_adapter_path(GDBusConnection *conn)
 	GVariant *result = NULL;
 	char *adapter_path = NULL;
 
-	if(conn == NULL)
+	if (conn == NULL)
 		return FALSE;
 
 	manager_proxy =  g_dbus_proxy_new_sync(conn,
@@ -432,9 +432,9 @@ void _bt_core_update_status(void)
 
 		BT_INFO("bt_status = %d, bt_le_status = %d", bt_status, bt_le_status);
 
-		if(bt_status & VCONFKEY_BT_STATUS_ON)
+		if (bt_status & VCONFKEY_BT_STATUS_ON)
 			__bt_core_set_status(BT_ACTIVATED);
-		if(bt_le_status & VCONFKEY_BT_LE_STATUS_ON)
+		if (bt_le_status & VCONFKEY_BT_LE_STATUS_ON)
 			__bt_core_set_le_status(BT_ACTIVATED);
 	}
 }
@@ -791,8 +791,7 @@ void _bt_core_adapter_removed_cb(void)
 						EVT_VAL_BT_LE_OFF) != ES_R_OK)
 		BT_ERR("Fail to set value");
 
-	if (is_recovery_mode == TRUE)
-	{
+	if (is_recovery_mode == TRUE) {
 		if (timer_id < 0)
 			timer_id = g_timeout_add(2000, (GSourceFunc)__bt_core_recovery_cb, NULL);
 		return;
@@ -814,7 +813,7 @@ void _bt_core_adapter_removed_cb(void)
 	}
 	_bt_set_flightmode_request(FALSE);
 
-	if (flight_mode_value == 1 || power_saving_mode == 1){
+	if (flight_mode_value == 1 || power_saving_mode == 1) {
 		BT_DBG("Bt Core not terminated");
 		return;
 	}
