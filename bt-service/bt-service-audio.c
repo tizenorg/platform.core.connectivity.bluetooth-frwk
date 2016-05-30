@@ -661,8 +661,10 @@ int _bt_audio_connect(int request_id, int type,
 		if (__bt_device_support_uuid(address, BT_AUDIO_HSP)) {
 			uuid = HFP_HS_UUID;
 			func_data->pending = BT_PENDING_CONNECT;
+			type = BT_AUDIO_HSP;
 		} else if (__bt_device_support_uuid(address, BT_AUDIO_A2DP)) {
 			uuid = A2DP_SINK_UUID;
+			type = BT_AUDIO_A2DP;
 		} else {
 			BT_ERR("No audio role supported");
 			result = BLUETOOTH_ERROR_SERVICE_NOT_FOUND;
