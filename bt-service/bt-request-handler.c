@@ -2596,6 +2596,7 @@ gboolean __bt_service_check_privilege(int function_name,
 		case BT_PBAP_GET_LIST:
 		case BT_PBAP_PULL_VCARD:
 		case BT_PBAP_PHONEBOOK_SEARCH:
+
                 ret_val = cynara_check(p_cynara, client_creds, client_session, user_creds,
                                                                                  BT_PRIVILEGE_PUBLIC);
 
@@ -2645,10 +2646,15 @@ gboolean __bt_service_check_privilege(int function_name,
         case BT_BOND_DEVICE_BY_TYPE:
         case BT_SET_LE_PRIVACY:
         case BT_LE_CONN_UPDATE:
-	case BT_LE_READ_MAXIMUM_DATA_LENGTH:
-	case BT_LE_WRITE_HOST_SUGGESTED_DATA_LENGTH:
-	case BT_LE_READ_HOST_SUGGESTED_DATA_LENGTH:
-	case BT_LE_SET_DATA_LENGTH:
+        case BT_LE_READ_MAXIMUM_DATA_LENGTH:
+        case BT_LE_WRITE_HOST_SUGGESTED_DATA_LENGTH:
+        case BT_LE_READ_HOST_SUGGESTED_DATA_LENGTH:
+        case BT_LE_SET_DATA_LENGTH:
+
+        case BT_LE_IPSP_INIT:
+        case BT_LE_IPSP_DEINIT:
+        case BT_LE_IPSP_CONNECT:
+        case BT_LE_IPSP_DISCONNECT:
                 ret_val = cynara_check(p_cynara, client_creds, client_session, user_creds,
                                                                                  BT_PRIVILEGE_PLATFORM);
 
@@ -2684,7 +2690,6 @@ gboolean __bt_service_check_privilege(int function_name,
 
         case BT_OBEX_SERVER_ALLOCATE:
         case BT_OBEX_SERVER_DEALLOCATE:
-
                 /* Non-privilege control */
                 break;
         default:
