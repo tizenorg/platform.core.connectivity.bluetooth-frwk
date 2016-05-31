@@ -77,12 +77,12 @@ BT_EXPORT_API int bluetooth_hid_connect(hid_device_address_t *device_address)
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_ADDRESS, device_address) == BT_DPM_RESTRICTED) {
 		BT_ERR("Blacklist device");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 
 	if (_bt_check_dpm(BT_DPM_UUID, BT_HID_UUID) == BT_DPM_RESTRICTED) {
 		BT_ERR("Blacklist uuid");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 

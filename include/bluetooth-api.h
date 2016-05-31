@@ -165,6 +165,9 @@ extern "C" {
 #define BLUETOOTH_ERROR_NOT_INITIALIZED    ((int)BLUETOOTH_ERROR_BASE - 0x26)
 								/**< Not initialized */
 
+#define BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION    ((int)BLUETOOTH_ERROR_BASE - 0x27)
+								/**< Device Policy Restricted */
+
 /**
 * Device disconnect reason
 */
@@ -1538,7 +1541,7 @@ typedef enum {
 	BLUETOOTH_DPM_RESULT_ACCESS_DENIED = -4,			/**< DPM API result access denied. */
 	BLUETOOTH_DPM_RESULT_INVALID_PARAM = -3,			/**< DPM API result invalid parameter. */
 	BLUETOOTH_DPM_RESULT_NOT_SUPPORTED = -2,			/**< DPM API result not supported. */
-	BLUETOOTH_DPM_RESULT_FAIL 	 = -1,				/**< DPM API result fail. */
+	BLUETOOTH_DPM_RESULT_FAIL	 = -1,				/**< DPM API result fail. */
 	BLUETOOTH_DPM_RESULT_SUCCESS	 = 0,				/**< DPM API result success. */
 } bt_dpm_result_t;
 
@@ -1549,11 +1552,11 @@ typedef enum {
 typedef enum {
 	BLUETOOTH_DPM_STATUS_ERROR	= -1,
 
-	BLUETOOTH_DPM_ALLOWED 		= 0,	/**< DPM Policy status allowed. */
+	BLUETOOTH_DPM_ALLOWED		= 0,	/**< DPM Policy status allowed. */
 	BLUETOOTH_DPM_RESTRICTED		= 1,	/**< DPM Policy status restricted. */
 
 	BLUETOOTH_DPM_ENABLE			= 1,	/**< DPM Policy status enabled. */
-	BLUETOOTH_DPM_DISABLE 	= 0,	/**< DPM Policy status disabled. */
+	BLUETOOTH_DPM_DISABLE	= 0,	/**< DPM Policy status disabled. */
 
 	BLUETOOTH_DPM_FALSE			= 0,	/**< DPM Policy status false. */
 	BLUETOOTH_DPM_TRUE			= 1,	/**< DPM Policy status true. */

@@ -92,13 +92,13 @@ BT_EXPORT_API int bluetooth_audio_connect(bluetooth_device_address_t *remote_add
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_ADDRESS, (void *)remote_address) == BT_DPM_RESTRICTED) {
 		BT_ERR("Blacklist device");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 
 	if (_bt_check_dpm(BT_DPM_HSP, NULL) == BT_DPM_RESTRICTED &&
 		 _bt_check_dpm(BT_DPM_A2DP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use HSP / A2DP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	} else if (_bt_check_dpm(BT_DPM_HSP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use HSP profile");
 		service_function = BT_AV_CONNECT;
@@ -116,7 +116,7 @@ BT_EXPORT_API int bluetooth_audio_connect(bluetooth_device_address_t *remote_add
 
 		if (dev_class.major_class == BLUETOOTH_DEVICE_MAJOR_CLASS_COMPUTER) {
 			BT_ERR("Reject a authorization due to MDM Policy");
-			return BLUETOOTH_ERROR_ACCESS_DENIED;
+			return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 		}
 	}
 #endif
@@ -186,12 +186,12 @@ BT_EXPORT_API int bluetooth_ag_connect(bluetooth_device_address_t *remote_addres
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_ADDRESS, (void *)remote_address) == BT_DPM_RESTRICTED) {
 		BT_ERR("Blacklist device");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 
 	if (_bt_check_dpm(BT_DPM_HSP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use HSP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 
 	if (_bt_check_dpm(BT_DPM_DESKTOP, NULL) == BT_DPM_RESTRICTED) {
@@ -203,7 +203,7 @@ BT_EXPORT_API int bluetooth_ag_connect(bluetooth_device_address_t *remote_addres
 
 		if (dev_class.major_class == BLUETOOTH_DEVICE_MAJOR_CLASS_COMPUTER) {
 			BT_ERR("Reject a authorization due to MDM Policy");
-			return BLUETOOTH_ERROR_ACCESS_DENIED;
+			return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 		}
 	}
 #endif
@@ -273,12 +273,12 @@ BT_EXPORT_API int bluetooth_av_connect(bluetooth_device_address_t *remote_addres
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_ADDRESS, (void *)remote_address) == BT_DPM_RESTRICTED) {
 		BT_ERR("Blacklist device");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 
 	if (_bt_check_dpm(BT_DPM_A2DP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use A2DP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 
 	if (_bt_check_dpm(BT_DPM_DESKTOP, NULL) == BT_DPM_RESTRICTED) {
@@ -290,7 +290,7 @@ BT_EXPORT_API int bluetooth_av_connect(bluetooth_device_address_t *remote_addres
 
 		if (dev_class.major_class == BLUETOOTH_DEVICE_MAJOR_CLASS_COMPUTER) {
 			BT_ERR("Reject a authorization due to MDM Policy");
-			return BLUETOOTH_ERROR_ACCESS_DENIED;
+			return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 		}
 	}
 #endif
@@ -329,12 +329,12 @@ BT_EXPORT_API int bluetooth_av_source_connect(bluetooth_device_address_t *remote
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_ADDRESS, (void *)remote_address) == BT_DPM_RESTRICTED) {
 		BT_ERR("Blacklist device");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 
 	if (_bt_check_dpm(BT_DPM_A2DP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use A2DP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 
@@ -449,7 +449,7 @@ BT_EXPORT_API int bluetooth_ag_set_speaker_gain(unsigned int speaker_gain)
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_HSP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use HSP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 
