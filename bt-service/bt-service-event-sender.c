@@ -411,7 +411,7 @@ int _bt_send_event(int event_type, int event, GVariant *param)
 
 	msg1 = g_dbus_message_new_signal(path, BT_EVENT_SERVICE, signal);
 	g_dbus_message_set_body(msg1, param);
-	if (!g_dbus_connection_send_message(event_conn, msg1,G_DBUS_SEND_MESSAGE_FLAGS_NONE, 0, NULL)) {
+	if (!g_dbus_connection_send_message(event_conn, msg1, G_DBUS_SEND_MESSAGE_FLAGS_NONE, 0, NULL)) {
 		BT_ERR("Error while sending");
 	}
 

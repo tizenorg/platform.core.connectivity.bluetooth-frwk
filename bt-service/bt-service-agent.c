@@ -410,7 +410,7 @@ static gboolean __pincode_request(GapAgentPrivate *agent, GDBusProxy *device)
 		goto done;
 	}
 
-	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
+	g_variant_get(reply_temp, "(@a{sv})", &reply); /* Format of reply a{sv}*/
 
 	tmp_value = g_variant_lookup_value(reply, "Class", G_VARIANT_TYPE_UINT32);
 	g_variant_get(tmp_value, "u", &device_class);
@@ -518,9 +518,9 @@ static gboolean __passkey_request(GapAgentPrivate *agent, GDBusProxy *device)
 		goto done;
 	}
 
-	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
+	g_variant_get(reply_temp, "(@a{sv})", &reply); /* Format of reply a{sv}*/
 
-	tmp_value = g_variant_lookup_value (reply, "Address", G_VARIANT_TYPE_STRING);
+	tmp_value = g_variant_lookup_value(reply, "Address", G_VARIANT_TYPE_STRING);
 	g_variant_get(tmp_value, "s", &address);
 	G_VARIANT_UNREF(tmp_value);
 	if (!address) {
@@ -581,9 +581,9 @@ static gboolean __display_request(GapAgentPrivate *agent, GDBusProxy *device,
 		goto done;
 	}
 
-	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
+	g_variant_get(reply_temp, "(@a{sv})", &reply); /* Format of reply a{sv}*/
 
-	tmp_value = g_variant_lookup_value (reply, "Address", G_VARIANT_TYPE_STRING);
+	tmp_value = g_variant_lookup_value(reply, "Address", G_VARIANT_TYPE_STRING);
 	g_variant_get(tmp_value, "s", &address);
 	G_VARIANT_UNREF(tmp_value);
 	if (!address) {
@@ -661,9 +661,9 @@ static gboolean __confirm_request(GapAgentPrivate *agent, GDBusProxy *device,
 		goto done;
 	}
 
-	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
+	g_variant_get(reply_temp, "(@a{sv})", &reply); /* Format of reply a{sv}*/
 
-	tmp_value = g_variant_lookup_value (reply, "Address", G_VARIANT_TYPE_STRING);
+	tmp_value = g_variant_lookup_value(reply, "Address", G_VARIANT_TYPE_STRING);
 	g_variant_get(tmp_value, "s", &address);
 	G_VARIANT_UNREF(tmp_value);
 	if (!address) {
@@ -671,7 +671,7 @@ static gboolean __confirm_request(GapAgentPrivate *agent, GDBusProxy *device,
 		goto done;
 	}
 
-	tmp_value = g_variant_lookup_value (reply, "Name", G_VARIANT_TYPE_STRING);
+	tmp_value = g_variant_lookup_value(reply, "Name", G_VARIANT_TYPE_STRING);
 	g_variant_get(tmp_value, "s", &name);
 	G_VARIANT_UNREF(tmp_value);
 	if (!name)
@@ -865,9 +865,9 @@ fail:
 		goto done;
 	}
 
-	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
+	g_variant_get(reply_temp, "(@a{sv})", &reply); /* Format of reply a{sv}*/
 
-	tmp_value = g_variant_lookup_value (reply, "Address", G_VARIANT_TYPE_STRING);
+	tmp_value = g_variant_lookup_value(reply, "Address", G_VARIANT_TYPE_STRING);
 	g_variant_get(tmp_value, "s", &address);
 	G_VARIANT_UNREF(tmp_value);
 	if (!address) {

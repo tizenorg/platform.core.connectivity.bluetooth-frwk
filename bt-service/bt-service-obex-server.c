@@ -411,7 +411,7 @@ static gboolean __bt_authorize_cb(GDBusMethodInvocation *context,
 	char *device_name = NULL;
 	int result = BLUETOOTH_ERROR_NONE;
 	GDBusProxy *transfer_properties_proxy;
-	char * bdaddress = NULL;
+	char *bdaddress = NULL;
 	GVariant *ret;
 	GVariantIter *iter;
 	GVariant *param = NULL;

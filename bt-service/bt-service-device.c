@@ -218,7 +218,7 @@ static gboolean __bt_launch_unable_to_pairing_syspopup(int result)
 
 	bundle_add(b, "event-type", "unable-to-pairing");
 
-	if (result == BLUETOOTH_ERROR_TIMEOUT )
+	if (result == BLUETOOTH_ERROR_TIMEOUT)
 		bundle_add(b, "error", "timeout");
 	else if (result == BLUETOOTH_ERROR_AUTHENTICATION_FAILED)
 		bundle_add(b, "error", "authfailed");
@@ -389,7 +389,7 @@ bt_remote_dev_info_t *_bt_get_remote_device_info(char *address)
 		g_variant_get(result , "(@a{sv})", &value);
 		g_variant_unref(result);
 
-		tmp_value = g_variant_lookup_value (value, "Alias", G_VARIANT_TYPE_STRING);
+		tmp_value = g_variant_lookup_value(value, "Alias", G_VARIANT_TYPE_STRING);
 
 		g_variant_get(tmp_value, "s", &name);
 		g_variant_unref(tmp_value);
@@ -417,7 +417,7 @@ bt_remote_dev_info_t *_bt_get_remote_device_info(char *address)
 		dev_info->paired = tmp_value ? g_variant_get_boolean(tmp_value) : FALSE;
 		g_variant_unref(tmp_value);
 
-		BT_DBG("Paired %d", dev_info->paired );
+		BT_DBG("Paired %d", dev_info->paired);
 
 		tmp_value = g_variant_lookup_value(value, "RSSI", G_VARIANT_TYPE_INT32);
 		dev_info->rssi = tmp_value ? g_variant_get_int32(tmp_value) : 0;
@@ -622,7 +622,7 @@ static int __bt_cancel_and_bond(void)
 	int ret = BLUETOOTH_ERROR_NONE;
 
 	ret = _bt_agent_reply_cancellation();
-	if (ret != BLUETOOTH_ERROR_NONE){
+	if (ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Fail to call reply cancellation");
 		return ret;
 	}
@@ -754,7 +754,7 @@ static void __bt_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
 	GVariantBuilder *builder = NULL;
 	int i = 0;
 	builder = g_variant_builder_new(G_VARIANT_TYPE("as"));
-	for (i=0; i < remote_dev_info->uuid_count; i++) {
+	for (i = 0; i < remote_dev_info->uuid_count; i++) {
 		g_variant_builder_add(builder, "s",
 			remote_dev_info->uuids[i]);
 	}
@@ -938,7 +938,7 @@ int _bt_cancel_bonding(void)
 	retv_if(bonding_info == NULL, BLUETOOTH_ERROR_NOT_IN_OPERATION);
 
 	ret = _bt_agent_reply_cancellation();
-	if (ret != BLUETOOTH_ERROR_NONE){
+	if (ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Fail to call reply cancellation");
 		return ret;
 	}
@@ -1169,7 +1169,7 @@ static void __bt_discover_cb(GDBusProxy *proxy, GAsyncResult *res,
 
 event:
 	builder = g_variant_builder_new(G_VARIANT_TYPE("as"));
-	for (i=0; i < remote_dev_info->uuid_count; i++) {
+	for (i = 0; i < remote_dev_info->uuid_count; i++) {
 		g_variant_builder_add(builder, "s",
 			remote_dev_info->uuids[i]);
 	}
@@ -1404,7 +1404,7 @@ int _bt_set_authorization(bluetooth_device_address_t *device_address,
 	retv_if(device_proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	result = g_dbus_proxy_call_sync(device_proxy, "Get",
-				g_variant_new("(ss)", BT_DEVICE_INTERFACE, "Trusted" ),
+				g_variant_new("(ss)", BT_DEVICE_INTERFACE, "Trusted"),
 				G_DBUS_CALL_FLAGS_NONE,
 				-1,
 				NULL,
@@ -1427,7 +1427,7 @@ int _bt_set_authorization(bluetooth_device_address_t *device_address,
 	}
 
 	g_dbus_proxy_call_sync(device_proxy, "Set",
-				 g_variant_new("(ssv)", BT_DEVICE_INTERFACE, "Trusted", g_variant_new("b",authorize)),
+				 g_variant_new("(ssv)", BT_DEVICE_INTERFACE, "Trusted", g_variant_new("b", authorize)),
 				 G_DBUS_CALL_FLAGS_NONE,
 				 -1,
 				 NULL,
@@ -1491,14 +1491,14 @@ int _bt_is_gatt_connected(bluetooth_device_address_t *device_address,
 	g_variant_get(result , "(@a{sv})", &value);
 	g_variant_unref(result);
 
-	tmp_value = g_variant_lookup_value (value, "GattConnected", G_VARIANT_TYPE_BOOLEAN);
+	tmp_value = g_variant_lookup_value(value, "GattConnected", G_VARIANT_TYPE_BOOLEAN);
 
 	if (tmp_value == NULL) {
 		g_object_unref(device_proxy);
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	*is_connected = g_variant_get_boolean (tmp_value);
+	*is_connected = g_variant_get_boolean(tmp_value);
 
 	BT_DBG("gatt is connected : %d", *is_connected);
 	g_variant_unref(tmp_value);
@@ -1541,7 +1541,7 @@ int _bt_is_device_connected(bluetooth_device_address_t *device_address,
 
 	_bt_convert_addr_type_to_string(address, device_address->addr);
 
-	if(connection_type == BLUETOOTH_NAP_SERVER_SERVICE)	{
+	if (connection_type == BLUETOOTH_NAP_SERVER_SERVICE)	{
 		object_path = _bt_get_adapter_path();
 		device_proxy = g_dbus_proxy_new_sync(conn, G_DBUS_PROXY_FLAGS_NONE,
 									NULL, BT_BLUEZ_NAME,
@@ -1581,7 +1581,7 @@ int _bt_is_device_connected(bluetooth_device_address_t *device_address,
 			}
 			g_variant_unref(value);
 		}
-	} else if(connection_type == BLUETOOTH_NAP_SERVICE) {
+	} else if (connection_type == BLUETOOTH_NAP_SERVICE) {
 		return _bt_is_network_connected(_bt_get_net_conn(),
 						device_address->addr, is_connected);
 	} else {
@@ -1681,13 +1681,13 @@ int _bt_get_connected_link(bluetooth_device_address_t *device_address,
 	g_variant_get(result , "(@a{sv})", &value);
 	g_variant_unref(result);
 
-	tmp_value = g_variant_lookup_value (value, "Connected", G_VARIANT_TYPE_BOOLEAN);
+	tmp_value = g_variant_lookup_value(value, "Connected", G_VARIANT_TYPE_BOOLEAN);
 	if (tmp_value != NULL) {
 		g_object_unref(device_proxy);
 		g_variant_unref(value);
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
-	*connected = g_variant_get_boolean (tmp_value);
+	*connected = g_variant_get_boolean(tmp_value);
 	g_variant_unref(tmp_value);
 	g_variant_unref(value);
 	g_object_unref(device_proxy);
@@ -1708,7 +1708,7 @@ static void __bt_connect_le_device_cb(GDBusProxy *proxy, GAsyncResult *res,
 	g_dbus_proxy_call_finish(proxy, res, &err);
 
 	/* When cb datas of lescan are received, back to parameta values for Web TCT */
-	if ( _bt_is_set_scan_parameter() == FALSE) {
+	if (_bt_is_set_scan_parameter() == FALSE) {
 		bluetooth_le_scan_params_t scan_params;
 		BT_ERR("set parameter of lescan when receive cb data");
 		scan_params.type = BT_LE_ACTIVE_SCAN;
@@ -1823,7 +1823,7 @@ int _bt_connect_le_device(int request_id,
 	le_connection_info->device_proxy = device_proxy;
 
 /* The connection between Ble device and TM1 often fail. So It need to be set for Web TCT*/
-	if ( _bt_is_set_scan_parameter() == FALSE) {
+	if (_bt_is_set_scan_parameter() == FALSE) {
 		BT_ERR("set parameter of le scan when connect device");
 		bluetooth_le_scan_params_t scan_params;
 		scan_params.type = BT_LE_ACTIVE_SCAN;

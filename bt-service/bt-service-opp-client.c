@@ -255,7 +255,7 @@ gboolean _bt_obex_client_started(const char *transfer_path)
 	g_conn = _bt_get_session_gconn();
 	retv_if(g_conn == NULL, FALSE);
 	properties_proxy = g_dbus_proxy_new_sync(g_conn, G_DBUS_PROXY_FLAGS_NONE,
-						NULL,BT_OBEXD_DBUS_NAME,
+						NULL, BT_OBEXD_DBUS_NAME,
 						transfer_path, BT_PROPERTIES_INTERFACE,
 						NULL, &error);
 
@@ -495,7 +495,7 @@ static void __bt_send_file_cb(GDBusProxy *proxy,
 		gsize len = 0;
 		while (g_variant_iter_loop(iter, "{sv}", &key, &val)) {
 			if (g_strcmp0(key, "Name") == 0) {
-				transfer_name = g_variant_dup_string(val,&len);
+				transfer_name = g_variant_dup_string(val, &len);
 			} else if (g_strcmp0(key, "Filename") == 0) {
 				file_name = g_variant_dup_string(val, &len);
 			} else if (g_strcmp0(key, "Size") == 0) {
