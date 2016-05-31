@@ -392,7 +392,7 @@ BT_EXPORT_API int bluetooth_rfcomm_create_socket(const char *uuid)
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_SPP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use SPP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 
@@ -448,7 +448,7 @@ BT_EXPORT_API int bluetooth_rfcomm_create_socket_ex(const char *uuid, const char
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_SPP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use SPP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 
@@ -683,7 +683,7 @@ BT_EXPORT_API int bluetooth_rfcomm_listen_and_accept(int socket_fd, int max_pend
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_SPP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use SPP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 
@@ -742,7 +742,7 @@ BT_EXPORT_API int bluetooth_rfcomm_listen_and_accept_ex(const char *uuid, int ma
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_SPP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use SPP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 
@@ -785,7 +785,7 @@ BT_EXPORT_API int bluetooth_rfcomm_listen(int socket_fd, int max_pending_connect
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_SPP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use SPP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 
@@ -851,7 +851,7 @@ BT_EXPORT_API int bluetooth_rfcomm_accept_connection(int server_fd)
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_SPP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use SPP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 

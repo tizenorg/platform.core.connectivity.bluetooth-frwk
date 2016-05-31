@@ -80,7 +80,7 @@ BT_EXPORT_API int bluetooth_network_connect(const bluetooth_device_address_t *de
 	char *uuid = NULL;
 	if (_bt_check_dpm(BT_DPM_ADDRESS, (void *)device_address) == BT_DPM_RESTRICTED) {
 		BT_ERR("Blacklist device");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 
 	switch (role) {
@@ -100,10 +100,10 @@ BT_EXPORT_API int bluetooth_network_connect(const bluetooth_device_address_t *de
 	if (_bt_check_dpm(BT_DPM_UUID, uuid) == BT_DPM_RESTRICTED) {
 		BT_ERR("Blacklist uuid");
 		g_free(uuid);
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 
-	if (_bt_check_dpm(BT_DPM_DESKTOP, NULL) ==	BT_DPM_RESTRICTED) {
+	if (_bt_check_dpm(BT_DPM_DESKTOP, NULL) == BT_DPM_RESTRICTED) {
 		char address[BT_ADDRESS_STRING_SIZE] = { 0 };
 		bluetooth_device_class_t dev_class;
 
@@ -112,7 +112,7 @@ BT_EXPORT_API int bluetooth_network_connect(const bluetooth_device_address_t *de
 
 		if (dev_class.major_class == BLUETOOTH_DEVICE_MAJOR_CLASS_COMPUTER) {
 			BT_ERR("Reject a authorization due to MDM Policy");
-			return BLUETOOTH_ERROR_ACCESS_DENIED;
+			return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 		}
 	}
 	g_free(uuid);

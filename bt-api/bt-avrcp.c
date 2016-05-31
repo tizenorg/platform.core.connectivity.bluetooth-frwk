@@ -75,7 +75,7 @@ BT_EXPORT_API int bluetooth_media_player_change_property(
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use AVRCP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 
@@ -104,7 +104,7 @@ BT_EXPORT_API int bluetooth_media_player_set_properties(
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use AVRCP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 
@@ -133,7 +133,7 @@ BT_EXPORT_API int bluetooth_media_player_change_track(
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use AVRCP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 
@@ -231,12 +231,12 @@ BT_EXPORT_API int bluetooth_media_control_connect(
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_ADDRESS, remote_address) == BT_DPM_RESTRICTED) {
 		BT_ERR("Blacklist device");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 
 	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use AVRCP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 
@@ -303,7 +303,7 @@ BT_EXPORT_API int bluetooth_media_control_command(
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use AVRCP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 
@@ -331,7 +331,7 @@ BT_EXPORT_API int bluetooth_media_control_set_property(
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use AVRCP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 
@@ -363,7 +363,7 @@ BT_EXPORT_API int bluetooth_media_control_get_property(
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use AVRCP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 
@@ -396,7 +396,7 @@ BT_EXPORT_API int bluetooth_media_control_get_track_info(
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_AVRCP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to use AVRCP profile");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 
