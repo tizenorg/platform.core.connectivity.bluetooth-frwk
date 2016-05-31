@@ -80,12 +80,12 @@ BT_EXPORT_API int bluetooth_opc_push_files(bluetooth_device_address_t *remote_ad
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_ADDRESS, remote_address) == BT_DPM_RESTRICTED) {
 		BT_ERR("Blacklist device");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 
 	if (_bt_check_dpm(BT_DPM_OPP, NULL) == BT_DPM_RESTRICTED) {
 		BT_ERR("Not allow to send files");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 
 	if (_bt_check_dpm(BT_DPM_DESKTOP, NULL) == BT_DPM_RESTRICTED) {
@@ -97,7 +97,7 @@ BT_EXPORT_API int bluetooth_opc_push_files(bluetooth_device_address_t *remote_ad
 
 		if (dev_class.major_class == BLUETOOTH_DEVICE_MAJOR_CLASS_COMPUTER) {
 			BT_ERR("Reject a authorization due to MDM Policy");
-			return BLUETOOTH_ERROR_ACCESS_DENIED;
+			return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 		}
 	}
 #endif

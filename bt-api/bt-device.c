@@ -43,12 +43,12 @@ BT_EXPORT_API int bluetooth_bond_device(const bluetooth_device_address_t *device
 #ifdef TIZEN_DPM_ENABLE
 	if (_bt_check_dpm(BT_DPM_PAIRING, NULL) == BT_DPM_RESTRICTED) {
 			BT_ERR("Not allow to pair the device");
-			return BLUETOOTH_ERROR_ACCESS_DENIED;
+			return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 
 	if (_bt_check_dpm(BT_DPM_ADDRESS, (void *)device_address) == BT_DPM_RESTRICTED) {
 		BT_ERR("Blacklist device");
-		return BLUETOOTH_ERROR_ACCESS_DENIED;
+		return BLUETOOTH_ERROR_DEVICE_POLICY_RESTRICTION;
 	}
 #endif
 
