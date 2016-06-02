@@ -3,8 +3,8 @@ Description=Bluetooth service
 After=multi-user.target
 
 [Service]
-User=owner
-Group=users
+User=network_fw
+Group=network_fw
 Type=dbus
 BusName=org.projectx.bt
 ExecStart=/usr/bin/bt-service
