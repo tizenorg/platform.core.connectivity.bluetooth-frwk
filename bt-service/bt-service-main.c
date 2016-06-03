@@ -79,7 +79,7 @@ gboolean _bt_terminate_service(gpointer user_data)
 		BT_ERR("no bluetooth device info, so BT was disabled at previous session");
 	} else {
 		if (bt_status != VCONFKEY_BT_STATUS_OFF) {
-			if(vconf_set_int(VCONFKEY_BT_STATUS,
+			if (vconf_set_int(VCONFKEY_BT_STATUS,
 					VCONFKEY_BT_STATUS_OFF) != 0)
 				BT_ERR("Set vconf failed\n");
 
@@ -93,7 +93,7 @@ gboolean _bt_terminate_service(gpointer user_data)
 		BT_ERR("no bluetooth device info, so BT was disabled at previous session");
 	} else {
 		if (bt_status != VCONFKEY_BT_LE_STATUS_OFF) {
-			if(vconf_set_int(VCONFKEY_BT_LE_STATUS,
+			if (vconf_set_int(VCONFKEY_BT_LE_STATUS,
 					VCONFKEY_BT_LE_STATUS_OFF) != 0)
 				BT_ERR("Set vconf failed\n");
 			if (_bt_eventsystem_set_value(SYS_EVENT_BT_STATE, EVT_KEY_BT_LE_STATE,
@@ -205,7 +205,7 @@ static gboolean __bt_check_bt_service(void *data)
 		BT_DBG("State: %d, LE State: %d", status, le_status);
 
 		if ((status != BT_ACTIVATING && status != BT_ACTIVATED) &&
-				(le_status != BT_LE_ACTIVATING && le_status != BT_LE_ACTIVATED)){
+				(le_status != BT_LE_ACTIVATING && le_status != BT_LE_ACTIVATED)) {
 			_bt_terminate_service(NULL);
 		}
 	}

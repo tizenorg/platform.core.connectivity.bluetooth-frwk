@@ -316,7 +316,7 @@ gboolean gap_agent_reply_authorize(GapAgentPrivate *agent, const guint accept,
 		if (accept == GAP_AGENT_ACCEPT) {
 			g_dbus_method_invocation_return_value(priv->reply_context, NULL);
 		} else if (accept == GAP_AGENT_ACCEPT_ALWAYS) {
-			bluetooth_device_address_t addr = {{0,}};
+			bluetooth_device_address_t addr = { {0,} };
 			int result;
 
 			_bt_convert_addr_string_to_type(addr.addr,

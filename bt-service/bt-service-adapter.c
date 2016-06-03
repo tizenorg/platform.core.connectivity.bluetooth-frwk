@@ -189,7 +189,7 @@ static void __bt_visibility_alarm_create()
 
 	result = alarmmgr_add_alarm(ALARM_TYPE_VOLATILE, visible_timer.timeout,
 						0, NULL, &alarm_id);
-	if(result < 0) {
+	if (result < 0) {
 		BT_ERR("Failed to create alarm error = %d\n", result);
 	} else {
 		BT_DBG("Alarm created = %d\n", alarm_id);
@@ -346,9 +346,9 @@ static int __bt_get_bonded_device_info(gchar *device_path,
 	g_variant_get(result, "(a{sv})", &property_iter);
 
 	while (g_variant_iter_loop(property_iter, "{sv}", &key, &value)) {
-		if (!g_strcmp0(key,"Paired")) {
+		if (!g_strcmp0(key, "Paired")) {
 			paired = g_variant_get_boolean(value);
-		} else if(!g_strcmp0(key, "Address")) {
+		} else if (!g_strcmp0(key, "Address")) {
 			address = g_variant_get_string(value, NULL);
 		} else if (!g_strcmp0(key, "Alias")) {
 			name = g_variant_get_string(value, NULL);
@@ -370,9 +370,10 @@ static int __bt_get_bonded_device_info(gchar *device_path,
 		} else if (!g_strcmp0(key, "ManufacturerData")) {
 			manufacturer_data = g_byte_array_new();
 			g_variant_get(value, "ay", &char_value_iter);
-			while(g_variant_iter_loop(char_value_iter, "y",  &char_value)) {
+
+			while (g_variant_iter_loop(char_value_iter, "y",  &char_value))
 				g_byte_array_append(manufacturer_data, &char_value, 1);
-			}
+
 			g_variant_iter_free(char_value_iter);
 
 			if (manufacturer_data) {
@@ -548,7 +549,7 @@ static int __bt_set_enabled(void)
 #else
 #ifdef TIZEN_TV
 	if (_bt_set_discoverable_mode(
-		BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE, 0)!= BLUETOOTH_ERROR_NONE)
+		BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE, 0) != BLUETOOTH_ERROR_NONE)
 			BT_ERR("Fail to set discoverable mode");
 #endif
 #endif
@@ -593,7 +594,7 @@ void _bt_set_disabled(int result)
 		BT_DBG("Update vconf for BT normal Deactivation");
 
 		if (result == BLUETOOTH_ERROR_TIMEOUT)
-			if (vconf_set_int(BT_OFF_DUE_TO_TIMEOUT, 1) != 0 )
+			if (vconf_set_int(BT_OFF_DUE_TO_TIMEOUT, 1) != 0)
 				BT_ERR("Set vconf failed");
 
 		/* Update Bluetooth Status to notify other modules */
@@ -1792,8 +1793,8 @@ int _bt_is_service_used(char *service_uuid, gboolean *used)
 
 	g_variant_get(result, "(v)", &value);
 	g_variant_get(value, "as", &iter);
-	if(iter == NULL) {
-		BT_ERR("Failed to get UUIDs(%s)",service_uuid);
+	if (iter == NULL) {
+		BT_ERR("Failed to get UUIDs(%s)", service_uuid);
 		*used = FALSE;
 		g_variant_unref(result);
 		g_variant_unref(value);
@@ -2305,11 +2306,11 @@ static bluetooth_device_info_t *__bt_parse_device_info(GVariantIter *item_iter)
 			address = g_variant_get_string(value, NULL);
 			_bt_convert_addr_string_to_type(dev_info->device_address.addr,
 							address);
-		} else if(!g_strcmp0(key, "Class")) {
+		} else if (!g_strcmp0(key, "Class")) {
 			unsigned int cod;
 			cod = g_variant_get_uint32(value);
 			_bt_divide_device_class(&dev_info->device_class, cod);
-		} else if(!g_strcmp0(key, "Name")) {
+		} else if (!g_strcmp0(key, "Name")) {
 			const char *name = NULL;
 			name = g_variant_get_string(value, NULL);
 			/* If there is no Alias */
@@ -2317,7 +2318,7 @@ static bluetooth_device_info_t *__bt_parse_device_info(GVariantIter *item_iter)
 				g_strlcpy(dev_info->device_name.name, name,
 						BLUETOOTH_DEVICE_NAME_LENGTH_MAX+1);
 			}
-		} else if(!g_strcmp0(key, "Alias")) {
+		} else if (!g_strcmp0(key, "Alias")) {
 			const char *alias = NULL;
 			alias = g_variant_get_string(value, NULL);
 			/* Overwrite the name */
@@ -2364,9 +2365,10 @@ static bluetooth_device_info_t *__bt_parse_device_info(GVariantIter *item_iter)
 		} else if (strcasecmp(key, "ManufacturerData") == 0) {
 			manufacturer_data = g_byte_array_new();
 			g_variant_get(value, "ay", &char_value_iter);
-			while(g_variant_iter_loop(char_value_iter, "y",  &char_value)) {
+
+			while (g_variant_iter_loop(char_value_iter, "y",  &char_value))
 				g_byte_array_append(manufacturer_data, &char_value, 1);
-			}
+
 			if (manufacturer_data) {
 				if (manufacturer_data->len > 0) {
 					memcpy(dev_info->manufacturer_data.data, manufacturer_data->data, manufacturer_data->len);

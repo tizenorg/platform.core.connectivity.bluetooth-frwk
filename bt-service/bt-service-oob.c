@@ -76,10 +76,10 @@ int _bt_oob_read_local_data(bt_oob_data_t *local_oob_data)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	g_variant_get(reply ,"(@ay@ay)", &hash, &randomizer);
+	g_variant_get(reply, "(@ay@ay)", &hash, &randomizer);
 	g_variant_unref(reply);
 
-	if(hash != NULL){
+	if (hash != NULL) {
 		local_oob_data->hash_len = (unsigned int)g_variant_get_size(hash);
 		local_hash = (unsigned char *)g_variant_get_data(hash);
 	} else {
@@ -89,7 +89,7 @@ int _bt_oob_read_local_data(bt_oob_data_t *local_oob_data)
 
 	g_variant_unref(hash);
 
-	if(randomizer != NULL){
+	if (randomizer != NULL) {
 		local_oob_data->randomizer_len = (unsigned int)g_variant_get_size(randomizer);
 		local_randomizer = (unsigned char *)g_variant_get_data(randomizer);
 	} else {

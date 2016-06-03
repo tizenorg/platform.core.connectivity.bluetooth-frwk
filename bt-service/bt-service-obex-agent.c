@@ -382,7 +382,7 @@ void _bt_obex_agent_new(char *path)
 			return;
 		}
 	}
-	info = (bt_obex_agent_info *)malloc (sizeof(bt_obex_agent_info));
+	info = (bt_obex_agent_info *)malloc(sizeof(bt_obex_agent_info));
 	if (info) {
 		memset(info, 0, sizeof(bt_obex_agent_info));
 		info->path = g_strdup(path);
@@ -527,7 +527,7 @@ void _bt_obex_set_progress_cb(char *object_path,
 void _bt_obex_set_complete_cb(char *object_path,
 			bt_obex_complete_cb func, gpointer data)
 {
-	bt_obex_agent_info *info =__find_obex_agent_info(object_path);;
+	bt_obex_agent_info *info = __find_obex_agent_info(object_path);;
 
 	/* Fix : NULL_RETURNS */
 	if (info == NULL)

@@ -208,7 +208,7 @@ void _bt_pbap_obex_transfer_completed(const char *transfer_path, gboolean transf
 	signal = g_variant_new("(issi)", result,
 			transfer_info->remote_device,
 			transfer_info->filename, success);
-	switch(transfer_info->operation) {
+	switch (transfer_info->operation) {
 	case PULL_ALL: {
 		_bt_send_event(BT_PBAP_CLIENT_EVENT,
 					BLUETOOTH_PBAP_PHONEBOOK_PULL,
@@ -603,19 +603,19 @@ void __bt_pbap_get_vcard_list_cb(GDBusProxy *proxy,
 		GVariant *child = NULL;
 		GVariant *value1 = NULL;
 
-		g_variant_get(value ,"(@a(ss))", &value1); /* Format for value1 a(ss)*/
-		gsize items = g_variant_iter_init (&iter, value1);
+		g_variant_get(value, "(@a(ss))", &value1); /* Format for value1 a(ss)*/
+		gsize items = g_variant_iter_init(&iter, value1);
 		vcard_list = g_new0(char *, items + 1);
 
-		for (i = 0; (child = g_variant_iter_next_value (&iter)) != NULL; i++) {
-			g_variant_get(child ,"(&s&s)", &elname, &elval);
+		for (i = 0; (child = g_variant_iter_next_value(&iter)) != NULL; i++) {
+			g_variant_get(child, "(&s&s)", &elname, &elval);
 
 			memset(list_entry, 0, PBAP_VCARDLIST_MAXLENGTH);
 #if 0
-			g_snprintf (list_entry, PBAP_VCARDLIST_MAXLENGTH - 1,
+			g_snprintf(list_entry, PBAP_VCARDLIST_MAXLENGTH - 1,
 					"<card handle = \"%s\" name = \"%s\"/>", elname, elval);
 #else
-			g_snprintf (list_entry, PBAP_VCARDLIST_MAXLENGTH - 1,
+			g_snprintf(list_entry, PBAP_VCARDLIST_MAXLENGTH - 1,
 					"%s", elval);
 #endif
 			//If possible send as Array of <STRING, STRING>
@@ -630,7 +630,7 @@ void __bt_pbap_get_vcard_list_cb(GDBusProxy *proxy,
 	}
 
 	BT_DBG("Address = %s", address_string);
-	GVariant *temp = g_variant_new_strv((const gchar * const*)vcard_list, length);
+	GVariant *temp = g_variant_new_strv((const gchar*)vcard_list, length);
 	signal = g_variant_new("(isv)", result, address_string, temp);
 
 	_bt_send_event(BT_PBAP_CLIENT_EVENT,
@@ -671,7 +671,7 @@ void __bt_pbap_get_vcard_cb(GDBusProxy *proxy,
 	} else {
 		g_variant_get(value, "(o@a{sv})", &transfer, &properties);
 
-		if (g_variant_lookup (properties, "Filename", "s", &filename) == FALSE)
+		if (g_variant_lookup(properties, "Filename", "s", &filename) == FALSE)
 			filename = NULL;
 
 		BT_DBG("Transfer Path: %s", transfer);
@@ -723,15 +723,15 @@ void __bt_pbap_search_phonebook_cb(GDBusProxy *proxy,
 		GVariant *child = NULL;
 		GVariant *value1 = NULL;
 
-		g_variant_get(value ,"(@a(ss))", &value1);
-		gsize items = g_variant_iter_init (&iter, value1);
+		g_variant_get(value, "(@a(ss))", &value1);
+		gsize items = g_variant_iter_init(&iter, value1);
 		vcard_list = g_new0(char *, items + 1);
 
-		for (i = 0; (child = g_variant_iter_next_value (&iter)) != NULL; i++) {
+		for (i = 0; (child = g_variant_iter_next_value(&iter)) != NULL; i++) {
 			g_variant_get(child, "(&s&s)", &elname, &elval);
 
 			memset(list_entry, 0, PBAP_VCARDLIST_MAXLENGTH);
-			g_snprintf (list_entry, PBAP_VCARDLIST_MAXLENGTH - 1,
+			g_snprintf(list_entry, PBAP_VCARDLIST_MAXLENGTH - 1,
 					"<card handle = \"%s\" name = \"%s\"/>", elname, elval);
 			//If possible send as Array of <STRING, STRING>
 			BT_DBG("%s", list_entry);
@@ -747,7 +747,7 @@ void __bt_pbap_search_phonebook_cb(GDBusProxy *proxy,
 	BT_DBG("Address = %s", address_string);
 
 	signal = g_variant_new("(is@as)", result, address_string,
-			g_variant_new_strv((const gchar * const*)vcard_list, length));
+			g_variant_new_strv((const gchar *)vcard_list, length));
 
 	_bt_send_event(BT_PBAP_CLIENT_EVENT,
 				BLUETOOTH_PBAP_PHONEBOOK_SEARCH,
@@ -792,24 +792,24 @@ int __bt_pbap_call_get_phonebook(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 	GVariant *filters;
 
 
-	g_variant_builder_init (&builder, G_VARIANT_TYPE_ARRAY);
-	g_variant_builder_init (&inner_builder, G_VARIANT_TYPE_ARRAY);
+	g_variant_builder_init(&builder, G_VARIANT_TYPE_ARRAY);
+	g_variant_builder_init(&inner_builder, G_VARIANT_TYPE_ARRAY);
 
 	/* Add MaxlistCount*/
 	g_variant_builder_add(&builder, "{sv}", "MaxCount",
-					g_variant_new("u",app_param->maxlist));
+					g_variant_new("u", app_param->maxlist));
 
 	/* Add Order Filter only if other than Indexed (default)*/
 	if (app_param->order > 0) {
 		order_str = g_strdup(ORDER[app_param->order]);
 		g_variant_builder_add(&builder, "{sv}", "Order",
-				g_variant_new("s",order_str));
+				g_variant_new("s", order_str));
 	}
 
 	/* Add Offset Filter only if other than 0 (default)*/
 	if (app_param->offset > 0) {
 		g_variant_builder_add(&builder, "{sv}", "Offset",
-						g_variant_new("u",app_param->offset));
+						g_variant_new("u", app_param->offset));
 	}
 
 	/* Add Format Filter only if other than vCard 2.1 (default)*/
@@ -887,23 +887,23 @@ int __bt_pbap_call_get_vcards_list(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 
 	bt_pbap_list_parameters_t *app_param = pbap_data->app_param;
 
-	g_variant_builder_init (&builder, G_VARIANT_TYPE_ARRAY);
+	g_variant_builder_init(&builder, G_VARIANT_TYPE_ARRAY);
 
 	/* Add MaxlistCount*/
 	g_variant_builder_add(&builder, "{sv}", "MaxCount",
-					g_variant_new("u",app_param->maxlist));
+					g_variant_new("u", app_param->maxlist));
 
 	/* Add Order Filter only if other than Indexed (default)*/
 	if (app_param->order > 0) {
 		order_str = g_strdup(ORDER[app_param->order]);
 		g_variant_builder_add(&builder, "{sv}", "Order",
-				g_variant_new("s",order_str));
+				g_variant_new("s", order_str));
 	}
 
 	/* Add Offset Filter only if other than 0 (default)*/
 	if (app_param->offset > 0) {
 		g_variant_builder_add(&builder, "{sv}", "Offset",
-						g_variant_new("u",app_param->offset));
+						g_variant_new("u", app_param->offset));
 	}
 
 	filters = g_variant_builder_end(&builder);
@@ -946,8 +946,8 @@ int __bt_pbap_call_get_vcard(GDBusProxy *proxy, bt_pbap_data_t *pbap_data)
 	GVariant *filters;
 	bt_pbap_pull_vcard_parameters_t *app_param = pbap_data->app_param;
 
-	g_variant_builder_init (&builder, G_VARIANT_TYPE_ARRAY);
-	g_variant_builder_init (&inner_builder, G_VARIANT_TYPE_ARRAY);
+	g_variant_builder_init(&builder, G_VARIANT_TYPE_ARRAY);
+	g_variant_builder_init(&inner_builder, G_VARIANT_TYPE_ARRAY);
 
 	/* Add Format Filter only if other than vCard 2.1 (default)*/
 //	if (app_param->format > 0) {
@@ -1036,23 +1036,23 @@ int __bt_pbap_call_search_phonebook(GDBusProxy *proxy, bt_pbap_data_t *pbap_data
 	GVariantBuilder builder;
 	GVariant *filters;
 
-	g_variant_builder_init (&builder, G_VARIANT_TYPE_ARRAY);
+	g_variant_builder_init(&builder, G_VARIANT_TYPE_ARRAY);
 
 	/* Add MaxlistCount*/
 	g_variant_builder_add(&builder, "{sv}", "MaxCount",
-					g_variant_new("u",app_param->maxlist));
+					g_variant_new("u", app_param->maxlist));
 
 	/* Add Order Filter only if other than Indexed (default)*/
 	if (app_param->order > 0) {
 		order_str = g_strdup(ORDER[app_param->order]);
 		g_variant_builder_add(&builder, "{sv}", "Order",
-				g_variant_new("s",order_str));
+				g_variant_new("s", order_str));
 	}
 
 	/* Add Offset Filter only if other than 0 (default)*/
 	if (app_param->offset > 0) {
 		g_variant_builder_add(&builder, "{sv}", "Offset",
-						g_variant_new("u",app_param->offset));
+						g_variant_new("u", app_param->offset));
 	}
 
 	filters = g_variant_builder_end(&builder);

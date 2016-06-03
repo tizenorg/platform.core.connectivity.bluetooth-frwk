@@ -73,7 +73,7 @@ GDBusConnection *_bt_gdbus_get_system_gconn(void)
 
 	if (system_gconn == NULL) {
 		system_gconn = _bt_gdbus_init_system_gconn();
-	} else if (g_dbus_connection_is_closed(system_gconn)){
+	} else if (g_dbus_connection_is_closed(system_gconn)) {
 
 		local_system_gconn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
 
@@ -179,7 +179,7 @@ GDBusConnection *__bt_init_system_gconn(void)
 GDBusConnection *__bt_init_session_conn(void)
 {
 	if (session_conn == NULL)
-		session_conn =g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL);
+		session_conn = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL);
 
 	return session_conn;
 }
@@ -495,7 +495,7 @@ int _bt_copy_utf8_string(char *dest, const char *src, unsigned int length)
 		while (count > 0 && ((i + count) < length)) {
 			dest[i++] = *p;
 			p++;
-			count --;
+			count--;
 		}
 		p = next;
 	}
@@ -527,7 +527,7 @@ gboolean _bt_utf8_validate(char *name)
 int _bt_register_osp_server_in_agent(int type, char *uuid, char *path, int fd)
 {
 	BT_DBG("+");
-	if (!_bt_agent_register_osp_server( type, uuid, path, fd))
+	if (!_bt_agent_register_osp_server(type, uuid, path, fd))
 		return BLUETOOTH_ERROR_INTERNAL;
 
 	return BLUETOOTH_ERROR_NONE;
@@ -536,7 +536,7 @@ int _bt_register_osp_server_in_agent(int type, char *uuid, char *path, int fd)
 int _bt_unregister_osp_server_in_agent(int type, char *uuid)
 {
 	BT_DBG("+");
-	if (!_bt_agent_unregister_osp_server( type, uuid))
+	if (!_bt_agent_unregister_osp_server(type, uuid))
 		return BLUETOOTH_ERROR_INTERNAL;
 
 	return BLUETOOTH_ERROR_NONE;
@@ -637,7 +637,7 @@ char *_bt_get_device_object_path(char *address)
 
 char *_bt_get_profile_uuid128(bt_profile_type_t profile_type)
 {
-	switch(profile_type) {
+	switch (profile_type) {
 	case BT_PROFILE_CONN_RFCOMM:
 		return strdup(RFCOMM_UUID_STR);
 	case BT_PROFILE_CONN_A2DP:
@@ -742,7 +742,7 @@ char *_bt_convert_error_to_string(int error)
 
 char * _bt_convert_disc_reason_to_string(int reason)
 {
-	switch(reason) {
+	switch (reason) {
 	case 1:
 		return "Link loss";
 	case 2:

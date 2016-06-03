@@ -1978,7 +1978,7 @@ int __bt_obexd_request(int function_name,
 						  "org.freedesktop.DBus",
 						  NULL, &error_connection);
 
-		if(process_proxy == NULL)
+		if (process_proxy == NULL)
 			BT_DBG("Fail to get process_proxy");
 
 		if (error_connection) {

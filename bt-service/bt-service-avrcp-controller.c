@@ -379,7 +379,7 @@ int _bt_avrcp_control_get_property(int type, unsigned int *value)
 			case SHUFFLE:
 			case SCAN:
 			case STATUS:
-				name =(char *)g_variant_get_string(reply, NULL);
+				name = (char *)g_variant_get_string(reply, NULL);
 				*value = __bt_media_attrval_to_val(type, name);
 				BT_DBG("Type[%s] and Value[%s]", __bt_media_type_to_str(type), name);
 				break;
@@ -463,21 +463,21 @@ static int __bt_avrcp_control_parse_properties(
 	const char *key = NULL;
 
 	g_variant_iter_init(&iter, item);
-	while (g_variant_iter_loop(&iter, "{sv}", &key, &value)){
-		if (strcasecmp(key, "Title") == 0){
+	while (g_variant_iter_loop(&iter, "{sv}", &key, &value)) {
+		if (strcasecmp(key, "Title") == 0) {
 			value_string = (char *)g_variant_get_string(value, NULL);
 			BT_DBG("Value : %s ", value_string);
 			metadata->title = value_string;
 		} else if (strcasecmp(key, "Artist") == 0) {
-			value_string =(char *)g_variant_get_string(value, NULL);
+			value_string = (char *)g_variant_get_string(value, NULL);
 			BT_DBG("Value : %s ", value_string);
 			metadata->artist = value_string;
 		} else if (strcasecmp(key, "Album") == 0) {
-			value_string =(char *)g_variant_get_string(value, NULL);
+			value_string = (char *)g_variant_get_string(value, NULL);
 			BT_DBG("Value : %s ", value_string);
 			metadata->album = value_string;
 		} else if (strcasecmp(key, "Genre") == 0) {
-			value_string =(char *)g_variant_get_string(value, NULL);
+			value_string = (char *)g_variant_get_string(value, NULL);
 			BT_DBG("Value : %s ", value_string);
 			metadata->genre = value_string;
 		} else if (strcasecmp(key, "Duration") == 0) {
@@ -590,7 +590,7 @@ void _bt_handle_avrcp_control_event(GVariant *reply, const char *path)
 			(strcasecmp(property, "Repeat") == 0) ||
 			(strcasecmp(property, "Shuffle") == 0) ||
 			(strcasecmp(property, "Scan") == 0) ||
-			(strcasecmp(property, "Status") == 0)){
+			(strcasecmp(property, "Status") == 0)) {
 				const char *valstr;
 				unsigned int type, val;
 
@@ -621,7 +621,7 @@ void _bt_handle_avrcp_control_event(GVariant *reply, const char *path)
 
 			ret = __bt_avrcp_control_parse_properties(
 								&metadata, reply);
-			if (BLUETOOTH_ERROR_NONE != ret){
+			if (BLUETOOTH_ERROR_NONE != ret) {
 				/* Free key and value because of break unless free not required */
 				free((char *)property);
 				g_variant_unref(value);

@@ -544,19 +544,21 @@ static gboolean __bt_device_support_uuid(char *remote_address,
 				bt_audio_type_t type)
 {
 	GArray *dev_list = NULL;
-	int size,i,j;
+	int size;
+	int i;
+	int j;
 	bluetooth_device_info_t info;
 	char bond_address[BT_ADDRESS_STRING_SIZE] = { 0 };
 	gboolean ret = FALSE;
 
 	BT_DBG("+");
 
-	dev_list = g_array_new (FALSE, FALSE, sizeof(gchar));
+	dev_list = g_array_new(FALSE, FALSE, sizeof(gchar));
 
 	_bt_get_bonded_devices(&dev_list);
 	size = (dev_list->len) / sizeof(bluetooth_device_info_t);
 
-	for (i=0; i < size; i++) {
+	for (i = 0; i < size; i++) {
 		info = g_array_index(dev_list, bluetooth_device_info_t, i);
 		_bt_convert_addr_type_to_string(bond_address,
 				info.device_address.addr);

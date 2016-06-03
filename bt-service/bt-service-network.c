@@ -121,7 +121,7 @@ int _bt_is_network_connected(void *connection, unsigned char *address,
 	handle = __bt_get_net_profile(connection,
 				CONNECTION_ITERATOR_TYPE_CONNECTED,
 				address);
-	if(handle)
+	if (handle)
 		*is_connected = TRUE;
 	else
 		*is_connected = FALSE;

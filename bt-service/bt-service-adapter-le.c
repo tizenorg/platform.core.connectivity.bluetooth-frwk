@@ -147,7 +147,7 @@ static void __bt_send_foreach_event(gpointer data, gpointer user_data)
 	char *sender = data;
 	GVariant *param = user_data;
 
-	_bt_send_event_to_dest(sender, BT_DEVICE_EVENT,BLUETOOTH_EVENT_GATT_CHAR_VAL_CHANGED,
+	_bt_send_event_to_dest(sender, BT_DEVICE_EVENT, BLUETOOTH_EVENT_GATT_CHAR_VAL_CHANGED,
 					param);
 }
 #endif
@@ -190,7 +190,7 @@ void _bt_service_adapter_le_deinit(void)
 
 gboolean _bt_update_le_feature_support(const char *item, const char *value)
 {
-	if (item== NULL || value == NULL)
+	if (item == NULL || value == NULL)
 		return FALSE;
 
 	if (g_strcmp0(item, "adv_inst_max") == 0) {
@@ -458,7 +458,7 @@ int _bt_set_custom_advertising(const char *sender, int adv_handle,
 	adv_params.interval_min = params->interval_min;
 	adv_params.interval_max = params->interval_max;
 	adv_params.filter_policy = params->filter_policy;
-	adv_params.type= params->type;
+	adv_params.type = params->type;
 
 	if (ret)
 		g_variant_unref(ret);
@@ -1337,7 +1337,7 @@ int _bt_start_le_scan(const char *sender)
 	}
 
 	ret = g_dbus_proxy_call_sync(proxy, "StartLEDiscovery",
-				NULL,G_DBUS_CALL_FLAGS_NONE,
+				NULL, G_DBUS_CALL_FLAGS_NONE,
 				-1, NULL, &error);
 
 	if (error) {
@@ -1417,7 +1417,7 @@ int _bt_stop_le_scan(const char *sender)
 	}
 
 	ret = g_dbus_proxy_call_sync(proxy, "StopLEDiscovery",
-				NULL,G_DBUS_CALL_FLAGS_NONE,
+				NULL, G_DBUS_CALL_FLAGS_NONE,
 				-1, NULL, &error);
 	if (ret == NULL) {
 		BT_ERR("LE Scan stop failed");
@@ -1925,7 +1925,7 @@ int _bt_clear_white_list(void)
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	ret = g_dbus_proxy_call_sync(proxy, "ClearDeviceWhiteList",
-				NULL,G_DBUS_CALL_FLAGS_NONE,
+				NULL, G_DBUS_CALL_FLAGS_NONE,
 				-1, NULL, &error);
 
 	if (error) {
@@ -1957,7 +1957,7 @@ int _bt_initialize_ipsp(void)
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	ret = g_dbus_proxy_call_sync(proxy, "InitializeIpsp",
-				NULL,G_DBUS_CALL_FLAGS_NONE,
+				NULL, G_DBUS_CALL_FLAGS_NONE,
 				-1, NULL, &error);
 	if (error) {
 		BT_ERR("Initialize IPSP Failed :[%s]", error->message);
@@ -1988,7 +1988,7 @@ int _bt_deinitialize_ipsp(void)
 	retv_if(proxy == NULL, BLUETOOTH_ERROR_INTERNAL);
 
 	ret = g_dbus_proxy_call_sync(proxy, "DeinitializeIpsp",
-				NULL,G_DBUS_CALL_FLAGS_NONE,
+				NULL, G_DBUS_CALL_FLAGS_NONE,
 				-1, NULL, &error);
 	if (error) {
 		BT_ERR("De-Initialize IPSP Failed :[%s]", error->message);
@@ -2030,7 +2030,7 @@ int _bt_le_read_maximum_data_length(
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	g_variant_get(reply ,"(qqqq)", &max_tx_octets, &max_tx_time,
+	g_variant_get(reply, "(qqqq)", &max_tx_octets, &max_tx_time,
 				&max_rx_octets, &max_rx_time);
 
 	max_le_datalength->max_tx_octets = max_tx_octets;
@@ -2101,7 +2101,7 @@ int _bt_le_read_host_suggested_default_data_length(
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	g_variant_get(reply ,"(qq)", &def_tx_octets, &def_tx_time);
+	g_variant_get(reply, "(qq)", &def_tx_octets, &def_tx_time);
 
 	def_data_length->def_tx_octets = def_tx_octets;
 	def_data_length->def_tx_time = def_tx_time;

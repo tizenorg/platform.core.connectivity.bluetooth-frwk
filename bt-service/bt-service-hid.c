@@ -91,7 +91,7 @@ done:
 	}
 }
 
-static void __bt_hid_disconnect_cb(GDBusProxy *proxy,GAsyncResult *res,
+static void __bt_hid_disconnect_cb(GDBusProxy *proxy, GAsyncResult *res,
 					gpointer user_data)
 {
 	GError *g_error = NULL;

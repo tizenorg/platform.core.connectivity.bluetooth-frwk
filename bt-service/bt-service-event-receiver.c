@@ -97,7 +97,7 @@ static bt_le_adv_info_t *__bt_get_adv_ind_info(char *addr)
 	retv_if(!addr, NULL);
 	bt_le_adv_info_t *adv_info = NULL;
 	GList *current = g_list_first((GList *)p_adv_ind_list);
-	while(current && current->data) {
+	while (current && current->data) {
 		adv_info = (bt_le_adv_info_t *)current->data;
 		retv_if(adv_info && !g_strcmp0(adv_info->addr, addr), adv_info);
 		current = g_list_next(current);
@@ -122,7 +122,7 @@ static void __bt_del_adv_ind_info(char *addr)
 	ret_if(!p_adv_ind_list);
 	bt_le_adv_info_t *adv_info = NULL;
 	GList *current = g_list_first((GList *)p_adv_ind_list);
-	while(current && current->data) {
+	while (current && current->data) {
 		adv_info = (bt_le_adv_info_t *)current->data;
 		if (adv_info && !g_strcmp0(adv_info->addr, addr)) {
 			p_adv_ind_list = g_list_remove(p_adv_ind_list, adv_info);
@@ -172,7 +172,7 @@ static gboolean __bt_parse_device_properties(GVariant *item,
 		} else if (strcasecmp(key, "UUIDs") == 0) {
 			char **uuid_value;
 			gsize size = 0;
-			int i =0;
+			int i = 0;
 			size = g_variant_get_size(val);
 
 			if (size > 0) {
@@ -222,14 +222,14 @@ static gboolean __bt_parse_interface(GVariant *msg,
 	GVariant *optional_param;
 	GVariantIter iter;
 	GVariant *child;
-	char *interface_name= NULL;
+	char *interface_name = NULL;
 	GVariant *inner_iter = NULL;
 	g_variant_get(msg, "(&o@a{sa{sv}})",
 					&path, &optional_param);
 	g_variant_iter_init(&iter, optional_param);
 
 	while ((child = g_variant_iter_next_value(&iter))) {
-		g_variant_get(child,"{&s@a{sv}}", &interface_name, &inner_iter);
+		g_variant_get(child, "{&s@a{sv}}", &interface_name, &inner_iter);
 		if (g_strcmp0(interface_name, BT_DEVICE_INTERFACE) == 0) {
 			BT_DBG("Found a device: %s", path);
 			if (__bt_parse_device_properties(inner_iter,
@@ -342,7 +342,7 @@ void __bt_update_remote_cache_devinfo(const char *address, gboolean paired_statu
 
 	node = g_list_first(p_cache_list);
 
-	while (node != NULL){
+	while (node != NULL) {
 		cache_info = (bt_cache_info_t *)node->data;
 
 		if (cache_info == NULL) {
@@ -374,10 +374,10 @@ static void __bt_device_remote_connected_properties(
 	GVariant *param = NULL;
 	BT_DBG("+");
 
-	if (remote_dev_info->uuid_count > 0 ) {
-		for (i = 0; i<remote_dev_info->uuid_count; i++) {
+	if (remote_dev_info->uuid_count > 0) {
+		for (i = 0; i < remote_dev_info->uuid_count; i++) {
 			char *uuid = remote_dev_info->uuids[i];
-			if (strcasecmp(uuid, HID_UUID) == 0){
+			if (strcasecmp(uuid, HID_UUID) == 0) {
 				int event = BLUETOOTH_EVENT_NONE;
 
 				event = (connected == TRUE) ?
@@ -443,7 +443,7 @@ void _bt_handle_adapter_event(GVariant *msg, const char *member)
 
 		node = g_list_first(p_cache_list);
 
-		while (node != NULL){
+		while (node != NULL) {
 			cache_info = (bt_cache_info_t *)node->data;
 
 			if (cache_info == NULL) {
@@ -502,7 +502,7 @@ void _bt_handle_adapter_event(GVariant *msg, const char *member)
 		gboolean status = FALSE;
 		char *address = NULL;
 		int link_type;
-		g_variant_get(msg,"(sib)", &address, &link_type, &status);
+		g_variant_get(msg, "(sib)", &address, &link_type, &status);
 
 		BT_DBG("RSSI Enabled [%s %d]", address, status);
 		param = g_variant_new("(isib)", result,
@@ -517,7 +517,7 @@ void _bt_handle_adapter_event(GVariant *msg, const char *member)
 		int rssi_dbm;
 		int link_type;
 		char *address = NULL;
-		g_variant_get(msg,"(siii)", &address, &link_type, &alert_type, &rssi_dbm);
+		g_variant_get(msg, "(siii)", &address, &link_type, &alert_type, &rssi_dbm);
 
 		BT_DBG("RSSI Alert: [Address %s LinkType %d] [Type %d DBM %d]",
 				address, alert_type, rssi_dbm);
@@ -532,7 +532,7 @@ void _bt_handle_adapter_event(GVariant *msg, const char *member)
 		int rssi_dbm;
 		int link_type;
 		char *address = NULL;
-		g_variant_get(msg,"(sii)", &address, &link_type, &rssi_dbm);
+		g_variant_get(msg, "(sii)", &address, &link_type, &rssi_dbm);
 
 		BT_DBG("Raw RSSI: [Address %s] [Link Type %d][RSSI DBM %d]",
 				address, link_type, rssi_dbm);
@@ -562,8 +562,8 @@ static void __bt_adapter_property_changed_event(GVariant *msg, const char *path)
 	GError *err = NULL;
 	char *property = NULL;
 	GVariant *param = NULL;
-	g_variant_iter_init (&value_iter, msg);
-	while ((g_variant_iter_loop (&value_iter,"{sv}", &property, &val))) {
+	g_variant_iter_init(&value_iter, msg);
+	while ((g_variant_iter_loop(&value_iter, "{sv}", &property, &val))) {
 		BT_INFO("Property %s", property);
 
 		if (strcasecmp(property, "Discovering") == 0) {
@@ -719,7 +719,7 @@ static void __bt_adapter_property_changed_event(GVariant *msg, const char *path)
 			gboolean powered = FALSE;
 			int bt_state;
 
-			g_variant_get(val, "b" ,&powered);
+			g_variant_get(val, "b", &powered);
 			BT_DBG("Powered = %d", powered);
 			if (powered == FALSE) {
 #ifdef USB_BLUETOOTH
@@ -734,8 +734,7 @@ static void __bt_adapter_property_changed_event(GVariant *msg, const char *path)
 					bt_state != VCONFKEY_BT_LE_STATUS_OFF) {
 					_bt_set_le_disabled(BLUETOOTH_ERROR_NONE);
 				}
-			}
-			else {
+			} else {
 #ifdef USB_BLUETOOTH
 				_bt_handle_adapter_added();
 #endif
@@ -791,8 +790,8 @@ static void __bt_obex_property_changed_event(GVariant *msg, const char *path)
 	GVariantIter value_iter;
 	GVariant *child = NULL, *val = NULL;
 	char *property = NULL;
-	g_variant_iter_init (&value_iter, msg);
-	while ((child = g_variant_iter_next_value (&value_iter))) {
+	g_variant_iter_init(&value_iter, msg);
+	while ((child = g_variant_iter_next_value(&value_iter))) {
 		g_variant_get(child, "{sv}", &property, &val);
 
 		ret_if(property == NULL);
@@ -803,12 +802,12 @@ static void __bt_obex_property_changed_event(GVariant *msg, const char *path)
 			char  *status;
 			g_variant_get(val, "s", &status);
 
-			if (strcasecmp(status, "active") == 0){
+			if (strcasecmp(status, "active") == 0) {
 				_bt_obex_transfer_started(path);
 			} else if (strcasecmp(status, "complete") == 0) {
 				_bt_obex_transfer_completed(path, TRUE);
 				_bt_pbap_obex_transfer_completed(path, TRUE);
-			} else if (strcasecmp(status, "error") == 0){
+			} else if (strcasecmp(status, "error") == 0) {
 				_bt_obex_transfer_completed(path, FALSE);
 				_bt_pbap_obex_transfer_completed(path, FALSE);
 			}
@@ -817,7 +816,7 @@ static void __bt_obex_property_changed_event(GVariant *msg, const char *path)
 			static int transferred  = 0;
 			g_variant_get(val, "t", &transferred);
 
-			_bt_obex_transfer_progress(path,transferred);
+			_bt_obex_transfer_progress(path, transferred);
 		}
 		g_free(property);
 		g_variant_unref(val);
@@ -838,7 +837,7 @@ static void __bt_device_property_changed_event(GVariant *msg, const char *path)
 	char *address;
 	GVariant *param = NULL;
 	bt_remote_dev_info_t *remote_dev_info;
-	g_variant_iter_init (&value_iter, msg);
+	g_variant_iter_init(&value_iter, msg);
 	while ((g_variant_iter_loop(&value_iter, "{sv}", &property, &val))) {
 		BT_DBG("Property %s", property);
 		if (strcasecmp(property, "Connected") == 0) {
@@ -913,7 +912,7 @@ static void __bt_device_property_changed_event(GVariant *msg, const char *path)
 				GVariantBuilder *builder = NULL;
 				int i = 0;
 				builder = g_variant_builder_new(G_VARIANT_TYPE("as"));
-				for (i=0; i < remote_dev_info->uuid_count; i++) {
+				for (i = 0; i < remote_dev_info->uuid_count; i++) {
 					g_variant_builder_add(builder, "s",
 						remote_dev_info->uuids[i]);
 				}
@@ -990,7 +989,7 @@ static void __bt_device_property_changed_event(GVariant *msg, const char *path)
 				return;
 			}
 
-			if(paired == FALSE) {
+			if (paired == FALSE) {
 				BT_INFO("Unpaired: %s", address);
 				__bt_update_remote_cache_devinfo(address, FALSE);
 				param = g_variant_new("(is)", result, address);
@@ -1013,7 +1012,7 @@ static void __bt_device_property_changed_event(GVariant *msg, const char *path)
 				GVariantBuilder *builder = NULL;
 				int i = 0;
 				builder = g_variant_builder_new(G_VARIANT_TYPE("as"));
-				for (i=0; i < remote_dev_info->uuid_count; i++) {
+				for (i = 0; i < remote_dev_info->uuid_count; i++) {
 					g_variant_builder_add(builder, "s",
 						remote_dev_info->uuids[i]);
 				}
@@ -1131,8 +1130,8 @@ static void __bt_media_control_changed_event(GVariant *msg, const char *path)
 	GVariant *child = NULL;
 	bt_remote_dev_info_t *remote_dev_info;
 	GVariant *param = NULL;
-	g_variant_iter_init (&value_iter, msg);
-	while ((child = g_variant_iter_next_value (&value_iter))) {
+	g_variant_iter_init(&value_iter, msg);
+	while ((child = g_variant_iter_next_value(&value_iter))) {
 		g_variant_get(child, "{sv}", &property, &val);
 		BT_INFO("Property %s", property);
 		if (strcasecmp(property, "Connected") == 0) {
@@ -1176,13 +1175,13 @@ void _bt_handle_property_changed_event(GVariant *msg, const char *object_path)
 	char *interface_name = NULL;
 	GVariant *val = NULL;
 
-	g_variant_get(msg, "(&s@a{sv}@as)", &interface_name, &val,NULL);
+	g_variant_get(msg, "(&s@a{sv}@as)", &interface_name, &val, NULL);
 
 	if (strcasecmp(interface_name, BT_ADAPTER_INTERFACE) == 0) {
 		__bt_adapter_property_changed_event(val,
 					object_path);
 	} else if (strcasecmp(interface_name, BT_DEVICE_INTERFACE) == 0) {
-		__bt_device_property_changed_event(val,object_path);
+		__bt_device_property_changed_event(val, object_path);
 	} else if (strcasecmp(interface_name, BT_OBEX_TRANSFER_INTERFACE) == 0) {
 		BT_DBG("BT_OBEX_TRANSFER_INTERFACE");
 		__bt_obex_property_changed_event(val,
@@ -1212,8 +1211,8 @@ void __bt_opc_property_changed_event(GVariant *msg,
 	GVariant *val = NULL;
 	GVariant *child = NULL;
 
-	g_variant_iter_init (&value_iter, msg);
-	while ((child = g_variant_iter_next_value (&value_iter))) {
+	g_variant_iter_init(&value_iter, msg);
+	while ((child = g_variant_iter_next_value(&value_iter))) {
 		g_variant_get(child, "{sv}", &property, &val);
 		ret_if(property == NULL);
 
@@ -1222,11 +1221,11 @@ void __bt_opc_property_changed_event(GVariant *msg,
 			g_variant_get(val, "s", &status);
 			BT_DBG("Status is %s", status);
 
-			if(strcasecmp(status, "active") == 0){
+			if (strcasecmp(status, "active") == 0) {
 				_bt_obex_client_started(path);
-			}else if (strcasecmp(status, "complete") == 0) {
+			} else if (strcasecmp(status, "complete") == 0) {
 				_bt_obex_client_completed(path, TRUE);
-			}else if (strcasecmp(status, "error") == 0){
+			} else if (strcasecmp(status, "error") == 0) {
 				_bt_obex_client_completed(path, FALSE);
 			}
 			g_free(status);
@@ -1269,8 +1268,8 @@ void _bt_handle_input_event(GVariant *msg, const char *path)
 	GVariant *child = NULL, *val = NULL;
 	bt_remote_dev_info_t *remote_dev_info;
 	GVariant *param = NULL;
-	g_variant_iter_init (&value_iter, msg);
-	while ((child = g_variant_iter_next_value (&value_iter))) {
+	g_variant_iter_init(&value_iter, msg);
+	while ((child = g_variant_iter_next_value(&value_iter))) {
 		g_variant_get(child, "{sv}", &property, &val);
 
 		ret_if(property == NULL);
@@ -1375,7 +1374,7 @@ void _bt_handle_network_client_event(GVariant *msg,
 	GVariant *val = NULL;
 	GVariantIter value_iter;
 	GVariant *param = NULL;
-	g_variant_iter_init (&value_iter, msg);
+	g_variant_iter_init(&value_iter, msg);
 	while ((g_variant_iter_loop(&value_iter, "{sv}", &property, &val))) {
 		if (strcasecmp(property, "Connected") == 0) {
 			int event = BLUETOOTH_EVENT_NONE;
@@ -1418,7 +1417,7 @@ void __bt_gatt_char_property_changed_event(GVariant *msg,
 	GVariant *val = NULL;
 	int result = BLUETOOTH_ERROR_NONE;
 	GVariant *param = NULL;
-	g_variant_iter_init (&value_iter, msg);
+	g_variant_iter_init(&value_iter, msg);
 	char_handle = g_strdup(path);
 	while ((g_variant_iter_loop(&value_iter, "{sv}", &property, &val))) {
 		BT_INFO("Property %s", property);
@@ -1435,13 +1434,13 @@ void __bt_gatt_char_property_changed_event(GVariant *msg,
 		} else if (strcasecmp(property, "ChangedValue") == 0) {
 			int len = 0;
 			GByteArray *gp_byte_array = NULL;
-			BT_INFO("Type '%s'\n", g_variant_get_type_string (val));
+			BT_INFO("Type '%s'\n", g_variant_get_type_string(val));
 
 			if (val) {
 				gp_byte_array = g_byte_array_new();
 				len = g_variant_get_size(val);
 				BT_DBG("Len = %d", len);
-				g_byte_array_append (gp_byte_array,
+				g_byte_array_append(gp_byte_array,
 					(const guint8 *) g_variant_get_data(val), len);
 				if (gp_byte_array->len != 0) {
 					GVariant *byte_array = NULL;
@@ -1565,7 +1564,7 @@ void _bt_handle_device_event(GVariant *msg, const char *member, const char *path
 			GVariantBuilder *builder = NULL;
 			int i = 0;
 			builder = g_variant_builder_new(G_VARIANT_TYPE("as"));
-			for (i=0; i < remote_dev_info->uuid_count; i++) {
+			for (i = 0; i < remote_dev_info->uuid_count; i++) {
 				g_variant_builder_add(builder, "s",
 					remote_dev_info->uuids[i]);
 			}
@@ -1619,7 +1618,7 @@ void _bt_handle_device_event(GVariant *msg, const char *member, const char *path
 				GVariantBuilder *builder = NULL;
 				int i = 0;
 				builder = g_variant_builder_new(G_VARIANT_TYPE("as"));
-				for (i=0; i < remote_dev_info->uuid_count; i++) {
+				for (i = 0; i < remote_dev_info->uuid_count; i++) {
 					g_variant_builder_add(builder, "s",
 						remote_dev_info->uuids[i]);
 				}
@@ -1708,7 +1707,7 @@ void _bt_handle_device_event(GVariant *msg, const char *member, const char *path
 		 */
 		_bt_obex_check_pending_transfer(address);
 		_bt_opp_client_is_sending(&sending);
-		if(sending == TRUE)
+		if (sending == TRUE)
 			_bt_opp_client_check_pending_transfer(address);
 		param = g_variant_new("(isy)", result, address, addr_type);
 		_bt_send_event(BT_DEVICE_EVENT,
@@ -2162,8 +2161,8 @@ void _bt_handle_sink_event(GVariant *msg, const char *path)
 	GVariant *child = NULL;
 	GVariant *val = NULL;
 	GVariant *param = NULL;
-	g_variant_iter_init (&value_iter, msg);
-	while ((child = g_variant_iter_next_value (&value_iter))) {
+	g_variant_iter_init(&value_iter, msg);
+	while ((child = g_variant_iter_next_value(&value_iter))) {
 
 		g_variant_get(child, "{sv}", &property, &val);
 
@@ -2220,7 +2219,7 @@ void _bt_handle_sink_event(GVariant *msg, const char *path)
 								wait_list->out_param1);
 				}
 				g_free(address);
-			}else if (strcasecmp(value, "Connected") == 0) {
+			} else if (strcasecmp(value, "Connected") == 0) {
 				char *address;
 				char connected_address[BT_ADDRESS_STRING_SIZE + 1];
 				bluetooth_device_address_t device_address;
@@ -2317,7 +2316,7 @@ static void __bt_devices_list_free(void)
 
 	node = g_list_first(p_cache_list);
 
-	while (node != NULL){
+	while (node != NULL) {
 		cache_info = (bt_cache_info_t *)node->data;
 		p_cache_list = g_list_remove(p_cache_list, cache_info);
 		__bt_free_cache_info(cache_info);
@@ -2330,13 +2329,13 @@ static int __bt_parse_event(GVariant *msg)
 {
 	GVariantIter iter;
 	GVariant *child;
-	char *interface_name= NULL;
+	char *interface_name = NULL;
 	GVariant *inner_iter = NULL;
 
 	g_variant_iter_init(&iter, msg);
 
 	while ((child = g_variant_iter_next_value(&iter))) {
-		g_variant_get(child,"{&s@a{sv}}", &interface_name, &inner_iter);
+		g_variant_get(child, "{&s@a{sv}}", &interface_name, &inner_iter);
 		if (g_strcmp0(interface_name,
 				BT_DEVICE_INTERFACE) == 0) {
 			g_variant_unref(inner_iter);
@@ -2385,8 +2384,7 @@ static  void __bt_manager_event_filter(GDBusConnection *connection,
 #else
 			_bt_handle_adapter_added();
 #endif
-		}
-		else {
+		} else {
 			bt_event = __bt_parse_event(value);
 			if (bt_event == BT_DEVICE_EVENT) {
 				bt_cache_info_t *cache_info;
@@ -2448,7 +2446,7 @@ static  void __bt_manager_event_filter(GDBusConnection *connection,
 				GVariantBuilder *builder = NULL;
 				int i = 0;
 				builder = g_variant_builder_new(G_VARIANT_TYPE("as"));
-				for (i=0; i < dev_info->uuid_count; i++) {
+				for (i = 0; i < dev_info->uuid_count; i++) {
 					g_variant_builder_add(builder, "s",
 						dev_info->uuids[i]);
 				}
@@ -2585,7 +2583,7 @@ static gboolean __bt_is_obexd_event(GVariant *msg, const char *interface)
 	if (g_strcmp0(interface, BT_PROPERTIES_INTERFACE) == 0) {
 		char *interface_name = NULL;
 
-		g_variant_get(msg,"(&s@a{sv}@as)", &interface_name, NULL, NULL);
+		g_variant_get(msg, "(&s@a{sv}@as)", &interface_name, NULL, NULL);
 		retv_if(interface_name == NULL, FALSE);
 
 		if (strcasecmp(interface_name, BT_OBEX_TRANSFER_INTERFACE) == 0) {
@@ -2677,7 +2675,7 @@ static gboolean __bt_is_obexd_client_event(GVariant *msg, const char *interface)
 	if (g_strcmp0(interface, BT_PROPERTIES_INTERFACE) == 0) {
 		char *interface_name = NULL;
 
-		g_variant_get(msg,"(&s@a{sv}@as)", &interface_name, NULL, NULL);
+		g_variant_get(msg, "(&s@a{sv}@as)", &interface_name, NULL, NULL);
 
 		retv_if(interface_name == NULL, FALSE);
 
@@ -2705,22 +2703,21 @@ static  void __bt_opc_event_filter(GDBusConnection *connection,
 	char *obj_path = NULL;
 	if (strcasecmp(member, "InterfacesAdded") == 0) {
 		BT_DBG("InterfacesAdded");
-	}else if (strcasecmp(member, "InterfacesRemoved") == 0) {
+	} else if (strcasecmp(member, "InterfacesRemoved") == 0) {
 
 		if (__bt_get_object_path(parameters, &obj_path)) {
 			BT_ERR("Fail to get the path");
 			return;
 		}
 
-		BT_DBG("object_path =%s",obj_path);
+		BT_DBG("object_path = %s", obj_path);
 
 		if (strncmp(obj_path, BT_SESSION_BASEPATH_CLIENT,
 				strlen(BT_SESSION_BASEPATH_CLIENT)) != 0
 				|| strstr(obj_path, "transfer") == NULL) {
 			g_free(obj_path);
 			return;
-		}
-		else if (strncmp(obj_path, BT_SESSION_BASEPATH_CLIENT,
+		} else if (strncmp(obj_path, BT_SESSION_BASEPATH_CLIENT,
 				strlen(BT_SESSION_BASEPATH_CLIENT)) == 0) {
 			BT_DBG("Going to call opc disconnected");
 			_bt_opc_disconnected(obj_path);
@@ -2728,7 +2725,7 @@ static  void __bt_opc_event_filter(GDBusConnection *connection,
 
 		_bt_sending_files();
 		g_free(obj_path);
-	}else if (__bt_is_obexd_client_event(parameters, interface_name) == TRUE){
+	} else if (__bt_is_obexd_client_event(parameters, interface_name) == TRUE) {
 		char *path = (char *)object_path;
 		BT_INFO("object_path %s", path);
 		if (strncmp(path, BT_SESSION_BASEPATH_CLIENT,

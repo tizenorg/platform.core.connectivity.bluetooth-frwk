@@ -81,8 +81,7 @@ extern "C" {
 
 #define BT_CHECK_PARAMETER(arg, func) \
 	do { \
-		if (arg == NULL) \
-		{ \
+		if (arg == NULL) { \
 			BT_ERR("%s is NULL", #arg); \
 			func BLUETOOTH_ERROR_INVALID_PARAM; \
 		} \
@@ -255,16 +254,16 @@ typedef enum {
 } bt_le_device_info_type_t;
 
 typedef enum {
-	BT_PROFILE_CONN_RFCOMM= 0x01,
-	BT_PROFILE_CONN_A2DP= 0x02,
-	BT_PROFILE_CONN_HSP= 0x04,
-	BT_PROFILE_CONN_HID= 0x08,
-	BT_PROFILE_CONN_NAP= 0x10,
-	BT_PROFILE_CONN_HFG= 0x20,
-	BT_PROFILE_CONN_GATT= 0x40,
+	BT_PROFILE_CONN_RFCOMM = 0x01,
+	BT_PROFILE_CONN_A2DP = 0x02,
+	BT_PROFILE_CONN_HSP = 0x04,
+	BT_PROFILE_CONN_HID = 0x08,
+	BT_PROFILE_CONN_NAP = 0x10,
+	BT_PROFILE_CONN_HFG = 0x20,
+	BT_PROFILE_CONN_GATT = 0x40,
 	BT_PROGILE_CONN_NAP = 0x80,
-	BT_PROFILE_CONN_A2DP_SINK= 0x100,
-	BT_PROFILE_CONN_ALL= 0xffffffff,
+	BT_PROFILE_CONN_A2DP_SINK = 0x100,
+	BT_PROFILE_CONN_ALL = 0xffffffff,
 } bt_profile_type_t;
 
 typedef struct {

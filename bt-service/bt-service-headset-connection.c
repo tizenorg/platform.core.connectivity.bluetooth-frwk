@@ -123,15 +123,16 @@ gboolean connect_remote_media_audio(gpointer user_data)
 void _bt_get_bluetooth_device_info(char *remote_address, bluetooth_device_info_t *device)
 {
 	GArray *dev_list = NULL;
-	int size,i=0;
+	int size = 0;
+	int i = 0;
 	bluetooth_device_info_t info;
 	char bond_address[BT_ADDRESS_STRING_SIZE] = { 0 };
-	dev_list = g_array_new (FALSE, FALSE, sizeof(gchar));
+	dev_list = g_array_new(FALSE, FALSE, sizeof(gchar));
 	if (device == NULL)
 		return;
 	_bt_get_bonded_devices(&dev_list);
 	size = (dev_list->len) / sizeof(bluetooth_device_info_t);
-	for (i=0; i < size; i++) {
+	for (i = 0; i < size; i++) {
 		info = g_array_index(dev_list, bluetooth_device_info_t, i);
 		_bt_convert_addr_type_to_string(bond_address, info.device_address.addr);
 		if (strcmp(bond_address, remote_address) == 0) {
@@ -164,14 +165,16 @@ void _bt_headset_add_timer_function(int connection_type, bluetooth_device_info_t
 void _bt_start_timer_for_connection(char *remote_address, int connection_type)
 {
 	GArray *dev_list = NULL;
-	int size,i=0,j;
+	int size;
+	int i;
+	int j;
 	bluetooth_device_info_t info;
 	char bond_address[BT_ADDRESS_STRING_SIZE] = { 0 };
-	dev_list = g_array_new (FALSE, FALSE, sizeof(gchar));
+	dev_list = g_array_new(FALSE, FALSE, sizeof(gchar));
 	_bt_get_bonded_devices(&dev_list);
 	size = (dev_list->len) / sizeof(bluetooth_device_info_t);
 
-	for (i=0; i < size; i++) {
+	for (i = 0; i < size; i++) {
 		info = g_array_index(dev_list, bluetooth_device_info_t, i);
 		j = 0;
 		_bt_convert_addr_type_to_string(bond_address,
@@ -214,8 +217,7 @@ void __bt_connection_manager_set_state(char *remote_address, int event)
 				info->dev_info.device_address.addr);
 		BT_INFO("Adding HFP Connected device to list");
 		p_connection_list = g_list_append(p_connection_list, info);
-	}
-	else if (event == BLUETOOTH_EVENT_AG_DISCONNECTED) {
+	} else if (event == BLUETOOTH_EVENT_AG_DISCONNECTED) {
 		/* Delete coresponding node */
 		BT_INFO("Deleting HFP Connected device from list");
 		GList *list = NULL;

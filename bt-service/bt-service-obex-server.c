@@ -317,7 +317,7 @@ static GDBusProxy *__bt_get_transfer_properties_proxy(const char *transfer_path)
 	retv_if(conn == NULL, NULL);
 
 	proxy = g_dbus_proxy_new_sync(conn, G_DBUS_PROXY_FLAGS_NONE,
-					NULL,BT_OBEX_SERVICE_NAME,
+					NULL, BT_OBEX_SERVICE_NAME,
 					transfer_path,
 					BT_PROPERTIES_INTERFACE,
 					NULL, &err);
@@ -455,7 +455,7 @@ static gboolean __bt_authorize_cb(GDBusMethodInvocation *context,
 	agent_info.auth_info->transfer_path = g_strdup(path);
 
 #ifdef TIZEN_DPM_ENABLE
-	if(_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_HANDSFREE_ONLY) {
+	if (_bt_dpm_get_allow_bluetooth_mode() == DPM_BT_HANDSFREE_ONLY) {
 		/* Free auth info in next function */
 		_bt_obex_server_reject_authorize();
 		return FALSE;
@@ -468,7 +468,7 @@ static gboolean __bt_authorize_cb(GDBusMethodInvocation *context,
 		gsize len = 0;
 		while (g_variant_iter_loop(iter, "{sv}", &key, &val)) {
 			if (g_strcmp0(key, "Name") == 0) {
-				agent_info.auth_info->filename = g_variant_dup_string(val,&len);
+				agent_info.auth_info->filename = g_variant_dup_string(val, &len);
 			} else if (g_strcmp0(key, "Address") == 0) {
 				bdaddress = g_variant_dup_string(val, &len);
 			} else if (g_strcmp0(key, "Size") == 0) {
@@ -876,7 +876,7 @@ int _bt_obex_server_accept_authorize(const char *filename, gboolean is_native)
 		snprintf(file_path, sizeof(file_path), "%s", filename);
 
 	g_dbus_method_invocation_return_value(agent_info.auth_info->reply_context,
-		g_variant_new("(s)",&file_path));
+		g_variant_new("(s)", &file_path));
 	agent_info.auth_info->reply_context = NULL;
 	agent_info.auth_info->file_path = g_strdup(file_path);
 

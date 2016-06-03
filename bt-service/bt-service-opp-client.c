@@ -527,7 +527,7 @@ void _bt_sending_files(void)
 
 	if (sending_info == NULL)
 		return;
-	if (file_offset < sending_info->file_count){
+	if (file_offset < sending_info->file_count) {
 		/* Get the session bus. */
 		g_conn = _bt_get_session_gconn();
 		ret_if(g_conn == NULL);
@@ -559,7 +559,7 @@ void _bt_sending_files(void)
 		}
 
 		g_free(mimetype);
-	}else{
+	} else {
 		file_offset = 0;
 		__bt_sending_release();
 	}
@@ -592,9 +592,9 @@ static void __bt_create_session_cb(GDBusProxy *proxy,
 		g_clear_error(&error);
 
 		result = BLUETOOTH_ERROR_INTERNAL;
-	}else{
+	} else {
 		BT_DBG("Session created");
-		if(sending_info != NULL)
+		if (sending_info != NULL)
 			sending_info->session_path = g_strdup(session_path);
 	}
 	g_free(session_path);
@@ -615,7 +615,7 @@ static void __bt_create_session_cb(GDBusProxy *proxy,
 
 		__bt_free_sending_info(sending_info);
 		sending_info = NULL;
-	}else {
+	} else {
 		BT_DBG("Calling sending_files");
 		_bt_sending_files();
 	}

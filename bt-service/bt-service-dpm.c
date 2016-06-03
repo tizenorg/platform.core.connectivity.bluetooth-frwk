@@ -32,19 +32,19 @@
 #include "bt-service-dpm.h"
 
 static dpm_policy_t policy_table[DPM_POLICY_END] = {
-	[DPM_POLICY_ALLOW_BLUETOOTH] = {{DPM_BT_ERROR}},
-	[DPM_POLICY_BLUETOOTH_DEVICE_RESTRICTION] = {{DPM_STATUS_ERROR}},
-	[DPM_POLICY_BLUETOOTH_UUID_RESTRICTION] = {{DPM_STATUS_ERROR}},
-	[DPM_POLICY_BLUETOOTH_DEVICES_WHITELIST] = {{NULL}},
-	[DPM_POLICY_BLUETOOTH_DEVICES_BLACKLIST] = {{NULL}},
-	[DPM_POLICY_BLUETOOTH_UUIDS_WHITELIST] = {{NULL}},
-	[DPM_POLICY_BLUETOOTH_UUIDS_BLACKLIST] = {{NULL}},
-	[DPM_POLICY_ALLOW_BLUETOOTH_OUTGOING_CALL] = {{DPM_STATUS_ERROR}},
-	[DPM_POLICY_BLUETOOTH_PAIRING_STATE] = {{DPM_STATUS_ERROR}},
-	[DPM_POLICY_BLUETOOTH_DESKTOP_CONNECTIVITY_STATE] = {{DPM_STATUS_ERROR}},
-	[DPM_POLICY_BLUETOOTH_DISCOVERABLE_STATE] = {{DPM_STATUS_ERROR}},
-	[DPM_POLICY_BLUETOOTH_LIMITED_DISCOVERABLE_STATE] = {{DPM_STATUS_ERROR}},
-	[DPM_POLICY_BLUETOOTH_DATA_TRANSFER_STATE] = {{DPM_STATUS_ERROR}},
+	[DPM_POLICY_ALLOW_BLUETOOTH] = { {DPM_BT_ERROR} },
+	[DPM_POLICY_BLUETOOTH_DEVICE_RESTRICTION] = { {DPM_STATUS_ERROR} },
+	[DPM_POLICY_BLUETOOTH_UUID_RESTRICTION] = { {DPM_STATUS_ERROR} },
+	[DPM_POLICY_BLUETOOTH_DEVICES_WHITELIST] = { {NULL} },
+	[DPM_POLICY_BLUETOOTH_DEVICES_BLACKLIST] = { {NULL} },
+	[DPM_POLICY_BLUETOOTH_UUIDS_WHITELIST] = { {NULL} },
+	[DPM_POLICY_BLUETOOTH_UUIDS_BLACKLIST] = { {NULL} },
+	[DPM_POLICY_ALLOW_BLUETOOTH_OUTGOING_CALL] = { {DPM_STATUS_ERROR} },
+	[DPM_POLICY_BLUETOOTH_PAIRING_STATE] = { {DPM_STATUS_ERROR} },
+	[DPM_POLICY_BLUETOOTH_DESKTOP_CONNECTIVITY_STATE] = { {DPM_STATUS_ERROR} },
+	[DPM_POLICY_BLUETOOTH_DISCOVERABLE_STATE] = { {DPM_STATUS_ERROR} },
+	[DPM_POLICY_BLUETOOTH_LIMITED_DISCOVERABLE_STATE] = { {DPM_STATUS_ERROR} },
+	[DPM_POLICY_BLUETOOTH_DATA_TRANSFER_STATE] = { {DPM_STATUS_ERROR} },
 };
 
 
@@ -276,7 +276,7 @@ dpm_result_t _bt_dpm_add_bluetooth_uuids_to_blacklist(const char *uuid)
 dpm_result_t _bt_dpm_get_bluetooth_uuids_from_blacklist(GArray **out_param1)
 {
 	dpm_result_t ret = DPM_RESULT_FAIL;
-	bt_dpm_uuids_list_t uuids_list = {0, {{0}, }};
+	bt_dpm_uuids_list_t uuids_list = {0, { {0}, } };
 	GSList *list = policy_table[DPM_POLICY_BLUETOOTH_UUIDS_BLACKLIST].list;
 	int i = 0;
 
@@ -322,7 +322,7 @@ dpm_result_t _bt_dpm_add_bluetooth_uuids_to_whitelist(const char *uuid)
 dpm_result_t _bt_dpm_get_bluetooth_uuids_from_whitelist(GArray **out_param1)
 {
 	dpm_result_t ret = DPM_RESULT_FAIL;
-	bt_dpm_uuids_list_t uuids_list = {0, {{0}, }};
+	bt_dpm_uuids_list_t uuids_list = {0, { {0}, } };
 	GSList *list = policy_table[DPM_POLICY_BLUETOOTH_UUIDS_WHITELIST].list;
 	int i = 0;
 
@@ -683,9 +683,8 @@ dpm_result_t _bt_dpm_clear_bluetooth_uuids_from_list(void)
 		return DPM_RESULT_ACCESS_DENIED;
 
 	err = _bt_dpm_clear_bluetooth_uuids_from_blacklist();
-	if (!err){
+	if (!err)
 		err = _bt_dpm_clear_bluetooth_uuids_from_blacklist();
-	}
 
 	return err;
 }
@@ -699,9 +698,8 @@ dpm_result_t _bt_dpm_clear_bluetooth_devices_from_list(void)
 		return DPM_RESULT_ACCESS_DENIED;
 
 	err = _bt_dpm_clear_bluetooth_devices_from_blacklist();
-	if (!err){
+	if (!err)
 		err = _bt_dpm_clear_bluetooth_devices_from_blacklist();
-	}
 
 	return err;
 }
