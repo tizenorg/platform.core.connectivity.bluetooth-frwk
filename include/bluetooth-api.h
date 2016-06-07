@@ -188,8 +188,7 @@ typedef struct {
 /**
  * This is Bluetooth device address type
  */
-typedef enum
-{
+typedef enum {
 	BLUETOOTH_DEVICE_PUBLIC_ADDRESS = 0x00,
 	BLUETOOTH_DEVICE_RANDOM_ADDRESS
 } bluetooth_device_address_type_t;
@@ -340,8 +339,7 @@ typedef enum {
 	BLUETOOTH_ADV_CONNECTABLE_DIRECT_LOW = 0x04, /* ADV_DIRECT_IND, low duty cycle */
 } bluetooth_advertising_type_t;
 
-typedef enum
-{
+typedef enum {
 	BLUETOOTH_GATT_PERMISSION_READ = 0x01,
 	BLUETOOTH_GATT_PERMISSION_WRITE = 0x02,
 	BLUETOOTH_GATT_PERMISSION_ENCRYPT_READ = 0x04,
@@ -350,8 +348,7 @@ typedef enum
 	BLUETOOTH_GATT_PERMISSION_ENCRYPT_AUTHENTICATED_WRITE = 0x20,
 } bt_gatt_permission_t;
 
-typedef enum
-{
+typedef enum {
 	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_BROADCAST = 0x01,
 	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ = 0x02,
 	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE_NO_RESPONSE = 0x04,
@@ -366,7 +363,7 @@ typedef enum
 	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_ENCRYPT_AUTHENTICATED_READ = 0x800,
 	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_ENCRYPT_AUTHENTICATED_WRITE = 0x1000,
 	BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_EXTENDED_PROPS = 0xffff,
-}bt_gatt_characteristic_property_t;
+} bt_gatt_characteristic_property_t;
 
 /**
 * Remote device request types for attributes
@@ -1064,7 +1061,7 @@ typedef enum {
 	HTYPE_TRANS_SET_PROTOCOL,
 	HTYPE_TRANS_DATA,
 	HTYPE_TRANS_UNKNOWN
-}bt_hid_header_type_t;
+} bt_hid_header_type_t;
 
 /**
  * HID Param type
@@ -1072,7 +1069,7 @@ typedef enum {
 typedef enum {
 	PTYPE_DATA_RTYPE_INPUT,
 	PTYPE_DATA_RTYPE_OUTPUT
-}bt_hid_param_type_t;
+} bt_hid_param_type_t;
 
 /**
  * Stucture to hid receive data
@@ -1134,7 +1131,7 @@ typedef enum {
 	HDP_QOS_RELIABLE,
 	HDP_QOS_STREAMING,
 	HDP_QOS_ANY
-}bt_hdp_qos_type_t;
+} bt_hdp_qos_type_t;
 
 /**
  * HDP Role types
@@ -1142,7 +1139,7 @@ typedef enum {
 typedef enum {
 	HDP_ROLE_SOURCE = 0x0,
 	HDP_ROLE_SINK
-}bt_hdp_role_type_t;
+} bt_hdp_role_type_t;
 
 
 /**
@@ -1179,7 +1176,7 @@ typedef struct {
 	char *filename;
 	unsigned long size;
 	int percentage;
-}bt_opc_transfer_info_t;
+} bt_opc_transfer_info_t;
 
 /* Obex Server transfer type */
 #define TRANSFER_PUT "PUT"
