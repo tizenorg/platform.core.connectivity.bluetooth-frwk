@@ -396,12 +396,12 @@ static void __bt_hdp_internal_handle_property_changed(GVariant *parameters)
 
 	BT_DBG("+*******Signal - PropertyChanged*******\n");
 
-	g_variant_get (parameters, "(a{sv})", &property_iter);
+	g_variant_get(parameters, "(a{sv})", &property_iter);
 
 	while (g_variant_iter_loop(property_iter, "{sv}", &property, &value)) {
 		if (g_strcmp0("MainChannel", property) == 0) {
 			BT_INFO("Property MainChannel received");
-			obj_main_channel_path = g_variant_dup_string (value, &len);
+			obj_main_channel_path = g_variant_dup_string(value, &len);
 			BT_DBG("Main Channel  Path = %s", obj_main_channel_path);
 			break;
 		}
@@ -455,7 +455,7 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	reply = g_dbus_proxy_call_with_unix_fd_list_sync (proxy,
+	reply = g_dbus_proxy_call_with_unix_fd_list_sync(proxy,
                                                    "Acquire",
                                                    NULL,
                                                    G_DBUS_CALL_FLAGS_NONE,
@@ -478,7 +478,7 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	g_variant_get (reply, "(h)", &index);
+	g_variant_get(reply, "(h)", &index);
 	fd = g_unix_fd_list_get(out_fd_list, index, NULL);
 
 	g_variant_unref(reply);
@@ -521,17 +521,17 @@ static int __bt_hdp_internal_acquire_fd(const char *path)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	g_variant_get (reply, "(a{sv})", &property_iter);
+	g_variant_get(reply, "(a{sv})", &property_iter);
 
 	while (g_variant_iter_loop(property_iter, "{sv}", &property, &value)) {
 		BT_DBG("String received = %s\n", property);
 
 		if (g_strcmp0("Type", property) == 0) {
-			type_qos = g_variant_dup_string (value, &len);
+			type_qos = g_variant_dup_string(value, &len);
 		} else if (g_strcmp0("Device", property) == 0) {
-			device = g_variant_dup_string (value, &len);
+			device = g_variant_dup_string(value, &len);
 		} else if (g_strcmp0("Application", property) == 0) {
-			app_handle = g_variant_dup_string (value, &len);
+			app_handle = g_variant_dup_string(value, &len);
 		}
 	}
 	g_variant_iter_free(property_iter);

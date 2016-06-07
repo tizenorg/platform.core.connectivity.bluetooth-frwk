@@ -231,7 +231,7 @@ static int __bt_call_list_add(bt_hf_call_list_s *list, char * number,
 	retv_if(call_status == NULL, BLUETOOTH_ERROR_MEMORY_ALLOCATION);
 
 	call_status->number = g_strdup(number);
-	call_status->direction= dir;
+	call_status->direction = dir;
 	call_status->status = status;
 	call_status->mpart = mpart;
 	call_status->idx = idx;
@@ -1974,7 +1974,7 @@ void __bt_pbap_client_event_filter(GDBusConnection *connection,
 		BT_DBG("address: %s", address);
 		BT_DBG("result: %d", result);
 		BT_DBG("count: %d", count);
-		for(i = 0; i < count; i++)
+		for (i = 0; i < count; i++)
 			BT_DBG("%s", list[i]);
 		BT_DBG("success: %d", success);
 
@@ -2022,7 +2022,7 @@ void __bt_pbap_client_event_filter(GDBusConnection *connection,
 		list = (gchar **)g_variant_get_strv(string_var, &count);
 		success = !result;
 		BT_DBG("address: %s", address);
-		for(i = 0; i < count; i++)
+		for (i = 0; i < count; i++)
 			BT_DBG("%s", list[i]);
 		BT_DBG("success: %d", success);
 
@@ -2108,7 +2108,7 @@ void __bt_rfcomm_client_event_filter(GDBusConnection *connection,
 		g_variant_get(parameters, "(in@ay)", &result, &socket_fd,
 								&byte_var);
 
-		buffer_len = g_variant_get_size( byte_var);
+		buffer_len = g_variant_get_size(byte_var);
 		buffer = (char *) g_variant_get_data(byte_var);
 
 		data_r.socket_fd = socket_fd;
@@ -2223,7 +2223,7 @@ void __bt_rfcomm_server_event_filter(GDBusConnection *connection,
 		g_variant_get(parameters, "(in@ay)", &result,
 						&socket_fd, &byte_var);
 
-		buffer_len = g_variant_get_size( byte_var);
+		buffer_len = g_variant_get_size(byte_var);
 		buffer = (char *) g_variant_get_data(byte_var);
 
 		data_r.socket_fd = socket_fd;
@@ -2260,7 +2260,7 @@ void __bt_hf_agent_event_filter(GDBusConnection *connection,
 
 	ret_if(signal_name == NULL);
 
-	BT_DBG("%s",signal_name);
+	BT_DBG("%s", signal_name);
 	if (strcasecmp(signal_name, "Connected") == 0) {
 		char *address = NULL;
 
@@ -2332,9 +2332,9 @@ void __bt_hf_agent_event_filter(GDBusConnection *connection,
 
 		g_variant_get(parameters, "(i@a(siiii))", &call_count,
 								&var_data);
-		BT_DBG("call count : %d",call_count);
+		BT_DBG("call count : %d", call_count);
 
-		if (var_data){
+		if (var_data) {
 			GVariantIter *iter = NULL;
 			__bt_call_list_create(&handle);
 
@@ -2343,7 +2343,7 @@ void __bt_hf_agent_event_filter(GDBusConnection *connection,
 						&dir, &status, &mpart, &idx)) {
 				BT_DBG("call number:%s, dir:%d, status : %d",
 							number, dir, status);
-				BT_DBG("call mpart : %d, idx : %d",mpart, idx);
+				BT_DBG("call mpart : %d, idx : %d", mpart, idx);
 				__bt_call_list_add(handle, number, dir,
 							status, mpart, idx);
 			}
@@ -2357,7 +2357,7 @@ void __bt_hf_agent_event_filter(GDBusConnection *connection,
 					result, handle,
 					event_info->cb, event_info->user_data);
 		} else {
-			BT_ERR(" Mismatch in call count : %d",call_count);
+			BT_ERR(" Mismatch in call count : %d", call_count);
 		}
 
 		__bt_call_list_destroy(handle);

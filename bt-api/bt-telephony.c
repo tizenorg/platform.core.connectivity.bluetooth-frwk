@@ -93,8 +93,7 @@ static const gchar bt_telephony_introspection_xml[] =
 
 #define BT_TELEPHONY_CHECK_ENABLED() \
 	do { \
-		if (bluetooth_check_adapter() == BLUETOOTH_ADAPTER_DISABLED) \
-		{ \
+		if (bluetooth_check_adapter() == BLUETOOTH_ADAPTER_DISABLED) { \
 			BT_ERR("BT is not enabled"); \
 			return BLUETOOTH_TELEPHONY_ERROR_NOT_ENABLED; \
 		} \
@@ -103,8 +102,7 @@ static const gchar bt_telephony_introspection_xml[] =
 static gboolean is_initialized = FALSE;
 #define BT_TELEPHONY_CHECK_INITIALIZED() \
 	do { \
-		if (is_initialized == FALSE) \
-		{ \
+		if (is_initialized == FALSE) { \
 			BT_ERR("Bluetooth telephony not initilized"); \
 			return BLUETOOTH_TELEPHONY_ERROR_NOT_INITIALIZED; \
 		} \

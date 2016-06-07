@@ -223,7 +223,7 @@ BT_EXPORT_API int bluetooth_unregister_all_scan_filters(void)
 #ifdef TIZEN_WEARABLE
 gboolean __bluetooth_is_privileged_process(void)
 {
-	FILE *fp= NULL;
+	FILE *fp = NULL;
 	char path[30] = {0, };
 	char buf[256] = {0, };
 

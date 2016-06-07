@@ -508,7 +508,7 @@ static int __bt_hf_agent_read_call_list(GVariant *reply,
 
 	g_variant_get(reply, "(i@a(siiii))", &call_count, &var_temp);
 
-	if(call_count <= 0) {
+	if (call_count <= 0) {
 		*call_list = NULL;
 		return BLUETOOTH_ERROR_NOT_FOUND;
 	}
@@ -521,7 +521,7 @@ static int __bt_hf_agent_read_call_list(GVariant *reply,
 	(*call_list)->count = call_count;
 
 	g_variant_iter_init(&iter, var_temp);
-	while(g_variant_iter_loop(&iter, "(siiii)", &num, &dir, &status, &mpart, &idx)){
+	while (g_variant_iter_loop(&iter, "(siiii)", &num, &dir, &status, &mpart, &idx)) {
 		bt_hf_call_status_info_t *call_info;
 
 		call_info = g_malloc0(sizeof(bt_hf_call_status_info_t));
@@ -531,7 +531,7 @@ static int __bt_hf_agent_read_call_list(GVariant *reply,
 		call_info->number = g_strdup(num);
 		call_info->direction = dir;
 		call_info->status = status;
-		call_info->mpart= mpart;
+		call_info->mpart = mpart;
 		call_info->idx = idx;
 
 		(*call_list)->list = g_list_append((*call_list)->list,
@@ -576,7 +576,7 @@ BT_EXPORT_API int bluetooth_hf_deinit(void)
 	int ret;
 
 	ret = _bt_unregister_event(BT_HF_AGENT_EVENT);
-	if (ret != BLUETOOTH_ERROR_NONE )
+	if (ret != BLUETOOTH_ERROR_NONE)
 		BT_ERR("_bt_unregister_event failed");
 
 	_bt_set_user_data(BT_HF, NULL, NULL);
@@ -1104,7 +1104,7 @@ BT_EXPORT_API int bluetooth_hf_is_connected(gboolean *hf_connected)
 	g_variant_get(reply, "(b)", &hf_connected_from_bt_agent);
 	*hf_connected = hf_connected_from_bt_agent;
 
-	BT_DBG("%s", *hf_connected ? "Connected":"Disconnected");
+	BT_DBG("%s", *hf_connected ? "Connected" : "Disconnected");
 
 	g_variant_unref(reply);
 	return BLUETOOTH_ERROR_NONE;

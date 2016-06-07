@@ -314,7 +314,7 @@ static rfcomm_info_t *__register_method()
 	return info;
 }
 
-static rfcomm_info_t *__register_method_2(const char *path,const char *bus_name)
+static rfcomm_info_t *__register_method_2(const char *path, const char *bus_name)
 {
 	rfcomm_info_t *info;
 	int object_id;
@@ -494,7 +494,7 @@ BT_EXPORT_API int bluetooth_rfcomm_remove_socket(int socket_fd)
 	if (info == NULL)
 		return BLUETOOTH_ERROR_INVALID_PARAM;
 
-	_bt_unregister_osp_server_in_agent(BT_RFCOMM_SERVER,info->uuid);
+	_bt_unregister_osp_server_in_agent(BT_RFCOMM_SERVER, info->uuid);
 	_bt_unregister_profile(info->path);
 
 	rfcomm_nodes = g_slist_remove(rfcomm_nodes, info);
@@ -579,7 +579,7 @@ BT_EXPORT_API int bluetooth_rfcomm_server_disconnect(int socket_fd)
 
 	_bt_convert_addr_type_to_string(address, info->addr.addr);
 	BT_DBG("Address %s", address);
-	_bt_disconnect_profile(address, info->uuid, NULL,NULL);
+	_bt_disconnect_profile(address, info->uuid, NULL, NULL);
 
 	info->disconnect_idle_id = g_idle_add((GSourceFunc)
 							__rfcomm_server_disconnect, info);

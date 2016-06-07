@@ -75,10 +75,10 @@ typedef struct {
 	guint disconnect_idle_id;
 } hid_connected_device_info_t;
 
-struct reports{
+struct reports {
 	guint8 type;
 	guint8 rep_data[20];
-}__attribute__((__packed__));
+} __attribute__((__packed__));
 
 static hid_info_t *hid_info = NULL;
 
@@ -98,7 +98,7 @@ static hid_connected_device_info_t *__find_hid_info_with_address(const char *rem
 {
 	GSList *l;
 
-	for ( l = hid_info->device_list; l != NULL; l = l->next) {
+	for (l = hid_info->device_list; l != NULL; l = l->next) {
 		hid_connected_device_info_t *info = l->data;
 		if (g_strcmp0((const char *)info->address, (const char *)remote_addr) == 0)
 			return info;
@@ -116,7 +116,7 @@ static void __hid_connected_cb(hid_connected_device_info_t *info,
 		conn_info.socket_fd = info->intr_fd;
 	else
 		conn_info.socket_fd = info->ctrl_fd;
-	_bt_convert_addr_string_to_type (conn_info.device_addr.addr , info->address);
+	_bt_convert_addr_string_to_type(conn_info.device_addr.addr, info->address);
 
 	BT_INFO_C("Connected [HID Device]");
 	_bt_common_event_cb(BLUETOOTH_HID_DEVICE_CONNECTED,
@@ -165,7 +165,7 @@ static gboolean __hid_disconnect(hid_connected_device_info_t *info)
 
 	memset(&disconn_info, 0x00, sizeof(bluetooth_hid_request_t));
 	disconn_info.socket_fd = fd;
-	_bt_convert_addr_string_to_type (disconn_info.device_addr.addr , info->address);
+	_bt_convert_addr_string_to_type(disconn_info.device_addr.addr, info->address);
 	_bt_common_event_cb(BLUETOOTH_HID_DEVICE_DISCONNECTED,
 			BLUETOOTH_ERROR_NONE, &disconn_info,
 			event_info->cb, event_info->user_data);
@@ -253,15 +253,14 @@ static gboolean __received_cb(GIOChannel *chan, GIOCondition cond,
 			case BT_HIDP_TRANSACTION_DATA:
 				BT_INFO("TRANS DATA");
 				data.type = HTYPE_TRANS_DATA;
-				if ( param & BT_HIDP_DATA_IN_RTYPE) {
+				if (param & BT_HIDP_DATA_IN_RTYPE) {
 					BT_INFO("Input Report");
 					data.param = PTYPE_DATA_RTYPE_INPUT;
 					data.buffer_size = len;
 					data.buffer = (char *) malloc(sizeof(char) * len);
 					if (data.buffer)
 						memcpy(data.buffer, buffer, len);
-				}
-				else {
+				} else {
 					BT_INFO("Out Report");
 					data.param = PTYPE_DATA_RTYPE_OUTPUT;
 					data.buffer_size = len;
@@ -689,9 +688,9 @@ BT_EXPORT_API int bluetooth_hid_device_reply_to_report(const char *remote_addr,
 	}
 
 	BT_INFO("htype %d ptype %d", htype, ptype);
-	switch(htype) {
+	switch (htype) {
 		case HTYPE_TRANS_GET_REPORT: {
-			switch(ptype) {
+			switch (ptype) {
 				case PTYPE_DATA_RTYPE_INPUT: {
 					output_report.type = BT_HIDP_TRANSACTION_DATA |
 							BT_HIDP_DATA_IN_RTYPE;

@@ -29,8 +29,7 @@
 static char is_pbap_initialized = FALSE;
 
 #define BT_CHECK_PBAP_INITIALIZED(func) \
-	if (is_pbap_initialized == FALSE) \
-	{ \
+	if (is_pbap_initialized == FALSE) { \
 		BT_ERR("BT PBAP Client is not initiatized"); \
 		func BLUETOOTH_ERROR_NOT_INITIALIZED; \
 	} \

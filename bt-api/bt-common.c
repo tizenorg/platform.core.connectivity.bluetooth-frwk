@@ -61,13 +61,13 @@ GDBusConnection *g_bus_get_private_conn(void)
 	address = g_dbus_address_get_for_bus_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
 	if (address == NULL) {
 		if (error) {
-			BT_ERR ("Failed to get bus address: %s", error->message);
+			BT_ERR("Failed to get bus address: %s", error->message);
 			g_clear_error(&error);
 		}
 		return NULL;
 	}
 
-	private_gconn = g_dbus_connection_new_for_address_sync (address,
+	private_gconn = g_dbus_connection_new_for_address_sync(address,
 				G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT |
 				G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION,
 				NULL, /* GDBusAuthObserver */
@@ -102,7 +102,7 @@ GDBusConnection *_bt_gdbus_get_system_gconn(void)
 
 	if (system_gconn == NULL) {
 		system_gconn = _bt_gdbus_init_system_gconn();
-	} else if (g_dbus_connection_is_closed(system_gconn)){
+	} else if (g_dbus_connection_is_closed(system_gconn)) {
 		system_gconn = g_bus_get_private_conn();
 	}
 
@@ -269,7 +269,7 @@ int _bt_copy_utf8_string(char *dest, const char *src, unsigned int length)
 		while (count > 0 && ((i + count) < length)) {
 			dest[i++] = *p;
 			p++;
-			count --;
+			count--;
 		}
 		p = next;
 	}
@@ -609,7 +609,7 @@ fail:
 	return adapter_proxy;
 }
 
-int _bt_register_new_conn_ex(const char *path, const char *bus_name,bt_new_connection_cb cb)
+int _bt_register_new_conn_ex(const char *path, const char *bus_name, bt_new_connection_cb cb)
 {
 	GDBusConnection *gconn;
 	int id;
@@ -1070,7 +1070,7 @@ int _bt_discover_service_uuids(char *address, char *remote_uuid)
 	GError *err = NULL;
 	char **uuid_value = NULL;
 	gsize size = 0;
-	int i =0;
+	int i = 0;
 	GVariant *value = NULL;
 	GVariant *ret = NULL;
 	int result = BLUETOOTH_ERROR_INTERNAL;
@@ -1535,7 +1535,7 @@ GVariant *_bt_get_managed_objects(void)
 		return NULL;
 	}
 
-	result = g_dbus_proxy_call_sync (manager_proxy,
+	result = g_dbus_proxy_call_sync(manager_proxy,
 			"GetManagedObjects", NULL,
 			G_DBUS_CALL_FLAGS_NONE, -1,
 			NULL, &error);

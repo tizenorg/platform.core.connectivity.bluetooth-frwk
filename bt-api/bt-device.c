@@ -77,11 +77,11 @@ BT_EXPORT_API int bluetooth_bond_device_by_type(
 	bt_user_info_t *user_info;
 
 	BT_CHECK_PARAMETER(device_address, return);
-	if(conn_type == BLUETOOTH_DEV_CONN_BREDR)
+	if (conn_type == BLUETOOTH_DEV_CONN_BREDR) {
 		BT_CHECK_ENABLED(return);
-	else if(conn_type == BLUETOOTH_DEV_CONN_LE)
+	} else if (conn_type == BLUETOOTH_DEV_CONN_LE) {
 		BT_CHECK_ENABLED_LE(return);
-	else if(conn_type == BLUETOOTH_DEV_CONN_DEFAULT) {
+	} else if (conn_type == BLUETOOTH_DEV_CONN_DEFAULT) {
 		BT_CHECK_ENABLED(return);
 		BT_CHECK_ENABLED_LE(return);
 	}

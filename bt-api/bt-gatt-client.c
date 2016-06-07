@@ -41,7 +41,7 @@ typedef enum {
 	CLIENT_CONF,
 	SERVER_CONF,
 	CHAR_FORMAT
-}char_descriptor_type_t;
+} char_descriptor_type_t;
 
 BT_EXPORT_API int bluetooth_gatt_free_service_property(bt_gatt_service_property_t *svc_pty)
 {
@@ -172,10 +172,9 @@ BT_EXPORT_API int bluetooth_gatt_get_service_property(const char *service_handle
 	memset(service, 0, sizeof(bt_gatt_service_property_t));
 
 	while (g_variant_iter_loop(property_iter, "{sv}", &key, &value)) {
-		if (!g_strcmp0(key,"UUID")) {
-			service->uuid = g_variant_dup_string(value,&len);
-
-		} else if(!g_strcmp0(key, "Primary")) {
+		if (!g_strcmp0(key, "UUID")) {
+			service->uuid = g_variant_dup_string(value, &len);
+		} else if (!g_strcmp0(key, "Primary")) {
 			service->primary = g_variant_get_boolean(value);
 
 		} else if (!g_strcmp0(key, "Includes")) {
@@ -397,7 +396,7 @@ static void __bluetooth_internal_get_char_cb(GDBusProxy *proxy,
 	g_variant_get(char_value, "ao", &char_iter);
 
 	gp_array = g_ptr_array_new();
-	while(g_variant_iter_loop(char_iter, "&o",  &char_handle));
+	while (g_variant_iter_loop(char_iter, "&o",  &char_handle));
 		g_ptr_array_add(gp_array, (gpointer)char_handle);
 
 	if (gp_array->len != 0) {
@@ -466,25 +465,25 @@ static int __get_permission_flag(char *permission)
 
 	retv_if(permission == NULL, ret);
 
-	BT_DBG("permission = %s",permission);
+	BT_DBG("permission = %s", permission);
 
-	if (!g_strcmp0(permission,"broadcast")) {
+	if (!g_strcmp0(permission, "broadcast")) {
 		ret = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_BROADCAST;
-	} else if (!g_strcmp0(permission,"read")) {
+	} else if (!g_strcmp0(permission, "read")) {
 		ret = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ;
-	} else if (!g_strcmp0(permission,"write-without-response")) {
+	} else if (!g_strcmp0(permission, "write-without-response")) {
 		ret = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE_NO_RESPONSE;
-	} else if (!g_strcmp0(permission,"write")) {
+	} else if (!g_strcmp0(permission, "write")) {
 		ret = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE;
-	} else if (!g_strcmp0(permission,"notify")) {
+	} else if (!g_strcmp0(permission, "notify")) {
 		ret = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_NOTIFY;
-	} else if (!g_strcmp0(permission,"indicate")) {
+	} else if (!g_strcmp0(permission, "indicate")) {
 		ret = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_INDICATE;
-	} else if (!g_strcmp0(permission,"authenticated-signed-writes")) {
+	} else if (!g_strcmp0(permission, "authenticated-signed-writes")) {
 		ret = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_SIGNED_WRITE;
-	} else if (!g_strcmp0(permission,"reliable-write")) {
+	} else if (!g_strcmp0(permission, "reliable-write")) {
 		ret = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_EXTENDED_PROPS;
-	} else if (!g_strcmp0(permission,"writable-auxiliaries")) {
+	} else if (!g_strcmp0(permission, "writable-auxiliaries")) {
 		ret = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_EXTENDED_PROPS;
 	}
 
@@ -554,14 +553,14 @@ BT_EXPORT_API int bluetooth_gatt_get_characteristics_property(
 
 	while (g_variant_iter_loop(property_iter, "{sv}", &key, &value)) {
 		BT_DBG("property");
-		if (!g_strcmp0(key,"UUID")) {
-			characteristic->uuid = g_variant_dup_string(value,&len);
-			BT_DBG("UUID of the char = %s",characteristic->uuid);
-		} else if(!g_strcmp0(key, "Value")) {
+		if (!g_strcmp0(key, "UUID")) {
+			characteristic->uuid = g_variant_dup_string(value, &len);
+			BT_DBG("UUID of the char = %s", characteristic->uuid);
+		} else if (!g_strcmp0(key, "Value")) {
 			gb_array = g_byte_array_new();
 			g_variant_get(value, "ay", &char_value_iter);
-			while(g_variant_iter_loop(char_value_iter, "y",  &char_value)) {
-				BT_DBG("value of char = %d",char_value);
+			while (g_variant_iter_loop(char_value_iter, "y",  &char_value)) {
+				BT_DBG("value of char = %d", char_value);
 				g_byte_array_append(gb_array, &char_value, 1);
 			}
 			g_variant_iter_free(char_value_iter);
@@ -573,13 +572,13 @@ BT_EXPORT_API int bluetooth_gatt_get_characteristics_property(
 			}
 			characteristic->val_len = gb_array->len;
 			g_byte_array_free(gb_array, TRUE);
-		} else if(!g_strcmp0(key, "Flags")) {
+		} else if (!g_strcmp0(key, "Flags")) {
 			g_variant_get(value, "as", &char_perm_iter);
 			characteristic->permission = 0x00;
 			while (g_variant_iter_loop(char_perm_iter, "s", &permission)) {
-				BT_DBG("permission = %s",permission);
+				BT_DBG("permission = %s", permission);
 				characteristic->permission |= __get_permission_flag(permission);
-				BT_DBG("permission check = %d",characteristic->permission);
+				BT_DBG("permission check = %d", characteristic->permission);
 			}
 			g_variant_iter_free(char_perm_iter);
 		} else if (!g_strcmp0(key, "Descriptors")) {
@@ -768,14 +767,14 @@ BT_EXPORT_API int bluetooth_gatt_get_char_descriptor_property(
 
 	while (g_variant_iter_loop(property_iter, "{sv}", &key, &value)) {
 		BT_DBG("property");
-		if (!g_strcmp0(key,"UUID")) {
-			descriptor->uuid = g_variant_dup_string(value,&len);
-			BT_DBG("UUID of the char_desc = %s",descriptor->uuid);
-		} else if(!g_strcmp0(key, "Value")) {
+		if (!g_strcmp0(key, "UUID")) {
+			descriptor->uuid = g_variant_dup_string(value, &len);
+			BT_DBG("UUID of the char_desc = %s", descriptor->uuid);
+		} else if (!g_strcmp0(key, "Value")) {
 			gb_array = g_byte_array_new();
 			g_variant_get(value, "ay", &desc_value_iter);
-			while(g_variant_iter_loop(desc_value_iter, "y",  &char_value)) {
-				BT_DBG("value of descriptor = %d",char_value);
+			while (g_variant_iter_loop(desc_value_iter, "y",  &char_value)) {
+				BT_DBG("value of descriptor = %d", char_value);
 				g_byte_array_append(gb_array, &char_value, 1);
 			}
 			g_variant_iter_free(desc_value_iter);
@@ -1098,7 +1097,7 @@ static int __bluetooth_gatt_descriptor_iter(const char *char_handle,
 	}
 	g_variant_get(result, "(a{sv})", &property_iter);
 	while (g_variant_iter_loop(property_iter, "{sv}", &key, &value)) {
-		if (!g_strcmp0(key,"UUID")) {
+		if (!g_strcmp0(key, "UUID")) {
 			uuid = g_variant_get_string(value, &len);
 			if (g_strcmp0(uuid, GATT_USER_DESC_UUID) == 0) {
 				BT_DBG("GATT_USER_DESC_UUID");
@@ -1116,42 +1115,43 @@ static int __bluetooth_gatt_descriptor_iter(const char *char_handle,
 				BT_DBG("descriptor uuid = %s", uuid);
 			}
 		} else if (!g_strcmp0(key, "Value")) {
-			switch(desc_type) {
-				case CHAR_FORMAT :
-					BT_DBG("Format descriptor");
-					g_variant_get(value, "(yyqyq)",
-							&(characteristic->format.format),
-							&(characteristic->format.exponent),
-							&(characteristic->format.unit),
-							&(characteristic->format.name_space),
-							&(characteristic->format.description));
-					break;
-				case USER_DESC:
-					BT_DBG("User descriptor");
-					g_variant_get(value, "ay", &desc_value_iter);
-					len = g_variant_get_size((GVariant *)desc_value_iter);
+			switch (desc_type) {
+			case CHAR_FORMAT:
+				BT_DBG("Format descriptor");
+				g_variant_get(value, "(yyqyq)",
+						&(characteristic->format.format),
+						&(characteristic->format.exponent),
+						&(characteristic->format.unit),
+						&(characteristic->format.name_space),
+						&(characteristic->format.description));
+				break;
+			case USER_DESC:
+				BT_DBG("User descriptor");
+				g_variant_get(value, "ay", &desc_value_iter);
+				len = g_variant_get_size((GVariant *)desc_value_iter);
 
-					if (len > 0) {
-						characteristic->description = (char *)g_malloc0(len + 1);
-						if (!characteristic->description) {
-							ret = BLUETOOTH_ERROR_OUT_OF_MEMORY;
-							goto done;
-						}
+				if (len > 0) {
+					characteristic->description = (char *)g_malloc0(len + 1);
+					if (!characteristic->description) {
+						ret = BLUETOOTH_ERROR_OUT_OF_MEMORY;
+						goto done;
 					}
-					for (i = 0; i < len; i++) {
-						g_variant_iter_loop(desc_value_iter, "y",
-							&characteristic->description[i]);
-						BT_DBG("description = %s", characteristic->description);
-					}
-					g_variant_iter_free(desc_value_iter);
-					break;
-				case CLIENT_CONF :
-					BT_DBG(" CLIENT_CONF");
-					break;
-				case SERVER_CONF :
-					BT_DBG(" SERVER_CONF");
-					break;
-				default:break;
+				}
+				for (i = 0; i < len; i++) {
+					g_variant_iter_loop(desc_value_iter, "y",
+						&characteristic->description[i]);
+					BT_DBG("description = %s", characteristic->description);
+				}
+				g_variant_iter_free(desc_value_iter);
+				break;
+			case CLIENT_CONF:
+				BT_DBG(" CLIENT_CONF");
+				break;
+			case SERVER_CONF:
+				BT_DBG(" SERVER_CONF");
+				break;
+			default:
+				break;
 			}
 		}
 	}
@@ -1204,12 +1204,12 @@ static void bluetooth_gatt_get_char_desc_cb(GDBusProxy *proxy,
 	g_variant_get(value, "(v)", &char_value);
 	g_variant_get(char_value, "ao", &char_iter);
 
-	while(g_variant_iter_loop(char_iter, "&o",  &char_handle)) {
-		BT_DBG("object path of descriptor = %s",char_handle);
-		if(char_handle) {
-				ret = __bluetooth_gatt_descriptor_iter(char_handle,
-							&characteristic);
-				BT_DBG("Descriptor read status [%d]",ret);
+	while (g_variant_iter_loop(char_iter, "&o",  &char_handle)) {
+		BT_DBG("object path of descriptor = %s", char_handle);
+		if (char_handle) {
+			ret = __bluetooth_gatt_descriptor_iter(char_handle,
+						&characteristic);
+			BT_DBG("Descriptor read status [%d]", ret);
 		}
 	}
 
@@ -1295,13 +1295,12 @@ static void __bluetooth_internal_read_desc_cb(GObject *source_object,
 	gp_byte_array = g_byte_array_new();
 	g_variant_get(value, "(ay)", &iter);
 
-	while(g_variant_iter_loop(iter, "y",  &g_byte)) {
+	while (g_variant_iter_loop(iter, "y",  &g_byte))
 		g_byte_array_append(gp_byte_array, &g_byte, 1);
-	}
 
 	if (gp_byte_array->len != 0) {
-		char_value.val_len = (unsigned int )gp_byte_array->len;
-		char_value.description= (char *)gp_byte_array->data;
+		char_value.val_len = (unsigned int)gp_byte_array->len;
+		char_value.description = (char *)gp_byte_array->data;
 	}
 
 	if (user_info) {
@@ -1376,7 +1375,7 @@ static void __bluetooth_internal_write_desc_cb(GObject *source_object,
 				user_info->cb, user_info->user_data);
 	}
 
-	if(value)
+	if (value)
 		g_variant_unref(value);
 
 	BT_DBG("-");

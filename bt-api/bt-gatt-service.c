@@ -246,7 +246,7 @@ static int __bt_send_event_to_hps(int event, GVariant *var)
 
 	msg = g_dbus_message_new_signal(BT_HPS_OBJECT_PATH, BT_HPS_INTERFACE_NAME, PROPERTIES_CHANGED);
 	g_dbus_message_set_body(msg, parameters);
-	if (!g_dbus_connection_send_message(g_conn, msg,G_DBUS_SEND_MESSAGE_FLAGS_NONE, 0, NULL)) {
+	if (!g_dbus_connection_send_message(g_conn, msg, G_DBUS_SEND_MESSAGE_FLAGS_NONE, 0, NULL)) {
 		if (error != NULL) {
 			BT_ERR("D-Bus API failure: errCode[%x], \
 					message[%s]",
@@ -385,7 +385,7 @@ static void __bt_gatt_manager_method_call(GDBusConnection *connection,
 				/*Value*/
 				builder1 = g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
 
-				if(char_info->char_value != NULL) {
+				if (char_info->char_value != NULL) {
 					for (i = 0; i < char_info->value_length; i++) {
 						g_variant_builder_add(builder1, "y",
 							char_info->char_value[i]);
@@ -480,7 +480,7 @@ static void __bt_gatt_manager_method_call(GDBusConnection *connection,
 					/*Value*/
 					builder1 = g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
 
-					if(desc_info->desc_value != NULL) {
+					if (desc_info->desc_value != NULL) {
 						for (i = 0; i < desc_info->value_length; i++) {
 							g_variant_builder_add(builder1, "y",
 								desc_info->desc_value[i]);
@@ -629,7 +629,7 @@ static void __bt_gatt_char_method_call(GDBusConnection *connection,
 			req_info = g_new0(struct gatt_req_info, 1);
 			req_info->attr_path = g_strdup(object_path);
 			req_info->svc_path = g_strdup(read_req.service_handle);
-			req_info->request_id= req_id;
+			req_info->request_id = req_id;
 			req_info->offset = offset;
 			req_info->context = invocation;
 			gatt_requests = g_slist_append(gatt_requests, req_info);
@@ -713,7 +713,7 @@ static void __bt_gatt_char_method_call(GDBusConnection *connection,
 		req_info = g_new0(struct gatt_req_info, 1);
 		req_info->attr_path = g_strdup(object_path);
 		req_info->svc_path = g_strdup(value_change.service_handle);
-		req_info->request_id= req_id;
+		req_info->request_id = req_id;
 		req_info->offset = offset;
 		req_info->context = invocation;
 		gatt_requests = g_slist_append(gatt_requests, req_info);
@@ -854,7 +854,7 @@ static void __bt_gatt_desc_method_call(GDBusConnection *connection,
 			req_info = g_new0(struct gatt_req_info, 1);
 			req_info->attr_path = g_strdup(object_path);
 			req_info->svc_path = g_strdup(read_req.service_handle);
-			req_info->request_id= req_id;
+			req_info->request_id = req_id;
 			req_info->offset = offset;
 			req_info->context = invocation;
 			gatt_requests = g_slist_append(gatt_requests, req_info);
@@ -927,7 +927,7 @@ static void __bt_gatt_desc_method_call(GDBusConnection *connection,
 		req_info = g_new0(struct gatt_req_info, 1);
 		req_info->attr_path = g_strdup(object_path);
 		req_info->svc_path = g_strdup(value_change.service_handle);
-		req_info->request_id= req_id;
+		req_info->request_id = req_id;
 		req_info->offset = offset;
 		req_info->context = invocation;
 		gatt_requests = g_slist_append(gatt_requests, req_info);
@@ -951,13 +951,13 @@ gboolean __bt_gatt_emit_interface_removed(gchar *object_path, gchar *interface)
 	GVariantBuilder *array_builder;
 
 	array_builder = g_variant_builder_new(G_VARIANT_TYPE_ARRAY);
-	g_variant_builder_init(array_builder, G_VARIANT_TYPE ("as"));
+	g_variant_builder_init(array_builder, G_VARIANT_TYPE("as"));
 	g_variant_builder_add(array_builder, "s", interface);
 
 	ret = g_dbus_connection_emit_signal(g_conn, NULL, "/",
 					"org.freedesktop.Dbus.Objectmanager",
 					"InterfacesRemoved",
-					g_variant_new ("(oas)",
+					g_variant_new("(oas)",
 					object_path, array_builder),
 					&error);
 
@@ -1308,7 +1308,7 @@ void get_service_cb(GObject *object, GAsyncResult *res, gpointer user_data)
 		}
 	} else {
 		char *char_cmp = NULL;
-		g_variant_get (result, "(a{sv})", &iter);
+		g_variant_get(result, "(a{sv})", &iter);
 		char_cmp = g_strdup_printf("Characteristic%d", n_char);
 
 		while (g_variant_iter_loop(iter, "{sv}", &key, &value)) {
@@ -2073,8 +2073,7 @@ BT_EXPORT_API int bluetooth_gatt_delete_services(void)
 			}
 		}
 		BT_DBG(" All services removed successfully.\n ");
-	}
-	else {
+	} else {
 		BT_DBG(" There are no registered services.\n ");
 	}
 
@@ -2275,7 +2274,7 @@ BT_EXPORT_API int bluetooth_gatt_send_response(int request_id, guint req_type,
 		if (req_type == BLUETOOTH_GATT_ATT_REQUEST_TYPE_READ) {
 			int i;
 			GVariantBuilder *inner_builder = NULL;
-			inner_builder = g_variant_builder_new(G_VARIANT_TYPE ("ay"));
+			inner_builder = g_variant_builder_new(G_VARIANT_TYPE("ay"));
 			if (value_length > 0 && value != NULL) {
 				for (i = 0; i < value_length; i++)
 					g_variant_builder_add(inner_builder, "y", value[i]);

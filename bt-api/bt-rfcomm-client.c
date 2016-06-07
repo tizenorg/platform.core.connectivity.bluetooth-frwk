@@ -158,9 +158,9 @@ static rfcomm_conn_info_t *__get_conn_info_from_fd(rfcomm_cb_data_t *info,
 {
 	GSList *l;
 	rfcomm_conn_info_t *device_node = NULL;
-	for(l = info->rfcomm_conns; l != NULL; l = l->next) {
+	for (l = info->rfcomm_conns; l != NULL; l = l->next) {
 		device_node = l->data;
-		if ( device_node && device_node->fd == fd)
+		if (device_node && device_node->fd == fd)
 			return device_node;
 	}
 	return NULL;
@@ -264,7 +264,7 @@ static void _bt_rfcomm_disconnect_conn_info(rfcomm_conn_info_t *conn_info,
 			BLUETOOTH_ERROR_NONE, &disconn_info,
 			event_info->cb, event_info->user_data);
 
-	if(conn_info) {
+	if (conn_info) {
 		BT_DBG("List is present deleting it");
 		__rfcomm_remove_conn_info_t(info, conn_info->bt_addr);
 	}
@@ -437,7 +437,7 @@ int new_connection(const char *path, int fd, bluetooth_device_address_t *addr)
 
 	g_io_channel_unref(data_io);
 
-	__client_connected_cb(info, address,BLUETOOTH_ERROR_NONE);
+	__client_connected_cb(info, address, BLUETOOTH_ERROR_NONE);
 
 	return 0;
 }
@@ -709,10 +709,10 @@ BT_EXPORT_API int bluetooth_rfcomm_client_is_connected(const bluetooth_device_ad
 		client_info = l->data;
 		if (client_info == NULL)
 			continue;
-		for(conn_list = client_info->rfcomm_conns;
+		for (conn_list = client_info->rfcomm_conns;
 			conn_list != NULL; conn_list = conn_list->next) {
 			conn_info = conn_list->data;
-			if(conn_info == NULL)
+			if (conn_info == NULL)
 				continue;
 
 			if (g_strcmp0(address, conn_info->bt_addr) == 0) {
@@ -791,7 +791,7 @@ BT_EXPORT_API int bluetooth_rfcomm_disconnect(int socket_fd)
 	conn_info->disconnected = TRUE;
 	close(socket_fd);
 	BT_INFO("conn_info %s", conn_info->bt_addr);
-	_bt_disconnect_profile(conn_info->bt_addr, info->uuid, NULL,NULL);
+	_bt_disconnect_profile(conn_info->bt_addr, info->uuid, NULL, NULL);
 	if (info->idle_id == 0)
 		info->idle_id = g_idle_add(__rfcomm_client_disconnect, info);
 

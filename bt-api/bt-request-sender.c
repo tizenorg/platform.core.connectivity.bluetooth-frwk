@@ -159,8 +159,8 @@ static void __bt_get_event_info(int service_function, GArray *output,
 	case BT_AV_SOURCE_DISCONNECT:
 		*event_type = BT_A2DP_SOURCE_EVENT;
 		*event = BLUETOOTH_EVENT_AV_SOURCE_DISCONNECTED;
-		ret_if (output == NULL);
-		*param_data = &g_array_index (output, char, 0);
+		ret_if(output == NULL);
+		*param_data = &g_array_index(output, char, 0);
 		break;
 	case BT_HF_CONNECT:
 		*event_type = BT_HF_AGENT_EVENT;

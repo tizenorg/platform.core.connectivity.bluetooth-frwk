@@ -100,7 +100,7 @@ extern "C" {
 	GArray *in_param4 = NULL; \
 	GArray *out_param = NULL;
 
-#define BT_FREE_PARAMS(IP1,IP2,IP3,IP4,OP) \
+#define BT_FREE_PARAMS(IP1, IP2, IP3, IP4, OP) \
 	do { \
 		if (IP1) \
 			g_array_free(IP1, TRUE); \
@@ -114,7 +114,7 @@ extern "C" {
 			g_array_free(OP, TRUE); \
 	} while (0)
 
-#define BT_ALLOC_PARAMS(IP1,IP2,IP3,IP4,OP ) \
+#define BT_ALLOC_PARAMS(IP1, IP2, IP3, IP4, OP) \
 	do { \
 	        IP1 = g_array_new(TRUE, TRUE, sizeof(gchar));	\
 	        IP2 = g_array_new(TRUE, TRUE, sizeof(gchar));	\
@@ -126,7 +126,7 @@ extern "C" {
 	GArray *in_param = NULL; \
 	GArray *out_param = NULL;
 
-#define BT_FREE_AGENT_PARAMS(IP,OP) \
+#define BT_FREE_AGENT_PARAMS(IP, OP) \
 	do { \
 		if (IP) \
 			g_array_free(IP, TRUE); \
@@ -134,15 +134,14 @@ extern "C" {
 			g_array_free(OP, TRUE); \
 	} while (0)
 
-#define BT_ALLOC_AGENT_PARAMS(IP,OP) \
+#define BT_ALLOC_AGENT_PARAMS(IP, OP) \
 	do { \
 	        IP = g_array_new(FALSE, FALSE, sizeof(gchar));	\
 	} while (0)
 
 #define BT_CHECK_PARAMETER(arg, func) \
 	do { \
-		if (arg == NULL) \
-		{ \
+		if (arg == NULL) { \
 			BT_ERR("%s is NULL", #arg); \
 			func BLUETOOTH_ERROR_INVALID_PARAM; \
 		} \
@@ -150,8 +149,7 @@ extern "C" {
 
 #define BT_CHECK_ENABLED(func) \
 	do { \
-		if (bluetooth_check_adapter() == BLUETOOTH_ADAPTER_DISABLED) \
-		{ \
+		if (bluetooth_check_adapter() == BLUETOOTH_ADAPTER_DISABLED) { \
 			BT_ERR("BT BREDR is not enabled"); \
 			func BLUETOOTH_ERROR_DEVICE_NOT_ENABLED; \
 		} \
@@ -159,8 +157,7 @@ extern "C" {
 
 #define BT_CHECK_ENABLED_LE(func) \
 	do { \
-		if (bluetooth_check_adapter_le() == BLUETOOTH_ADAPTER_LE_DISABLED) \
-		{ \
+		if (bluetooth_check_adapter_le() == BLUETOOTH_ADAPTER_LE_DISABLED) { \
 			BT_ERR("BT LE is not enabled"); \
 			func BLUETOOTH_ERROR_DEVICE_NOT_ENABLED; \
 		} \
@@ -169,8 +166,7 @@ extern "C" {
 #define BT_CHECK_ENABLED_ANY(func) \
 	do { \
 		if (bluetooth_check_adapter() == BLUETOOTH_ADAPTER_DISABLED && \
-			bluetooth_check_adapter_le() == BLUETOOTH_ADAPTER_LE_DISABLED) \
-		{ \
+			bluetooth_check_adapter_le() == BLUETOOTH_ADAPTER_LE_DISABLED) { \
 			BT_ERR("BT is not enabled"); \
 			func BLUETOOTH_ERROR_DEVICE_NOT_ENABLED; \
 		} \
@@ -324,7 +320,7 @@ void _bt_unregister_gdbus(int object_id);
 typedef int (*bt_new_connection_cb) (const char *path, int fd,
 					bluetooth_device_address_t *address);
 int _bt_register_new_conn(const char *path, bt_new_connection_cb cb);
-int _bt_register_new_conn_ex(const char *path, const char *bus_name,bt_new_connection_cb cb);
+int _bt_register_new_conn_ex(const char *path, const char *bus_name, bt_new_connection_cb cb);
 void _bt_swap_addr(unsigned char *dst, const unsigned char *src);
 
 void _bt_device_path_to_address(const char *device_path, char *device_address);

@@ -256,7 +256,7 @@ int _bt_check_dpm(int service, void *param)
 
 	switch (service) {
 	case BT_DPM_HF_ONLY:
-		status= _bt_check_dpm_handsfree_only();
+		status = _bt_check_dpm_handsfree_only();
 		break;
 
 	case BT_DPM_PAIRING:
@@ -299,7 +299,7 @@ int _bt_check_dpm(int service, void *param)
 	if (status == BT_DPM_RESTRICTED)
 		BT_INFO("Service [%d], DPM permission denied", service);
 	else if (status == BT_DPM_NO_SERVICE)
-		BT_DBG("DPM no service [%d]",status);
+		BT_DBG("DPM no service [%d]", status);
 
 	return status;
 }
