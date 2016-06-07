@@ -23,6 +23,7 @@
 #include<stdint.h>
 
 #include "bt-common.h"
+#include "bt-internal-types.h"
 
 #define NUMBER_OF_FLAGS	10
 
@@ -2020,6 +2021,12 @@ int bluetooth_gatt_get_service(const char *svc_uuid)
 BT_EXPORT_API int bluetooth_gatt_register_service(
 			const char *svc_path)
 {
+	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_GATT_REGISTER_SERVICE)
+			== BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have aprivilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
+
 	register_pending_cnt++;
 
 	if (__bt_gatt_get_service_state(svc_path)) {
@@ -2035,6 +2042,12 @@ BT_EXPORT_API int bluetooth_gatt_register_service(
 BT_EXPORT_API int bluetooth_gatt_register_application(void)
 {
 	GDBusProxy *proxy = NULL;
+
+	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_GATT_REGISTER_APPLICATION)
+			== BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have aprivilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
 
 	proxy = __bt_gatt_gdbus_get_manager_proxy("org.bluez",
 					"/org/bluez/hci0", GATT_MNGR_INTERFACE);
@@ -2249,6 +2262,12 @@ BT_EXPORT_API int bluetooth_gatt_send_response(int request_id, guint req_type,
 					int resp_state, int offset, char *value, int value_length)
 {
 	struct gatt_req_info *req_info = NULL;
+
+	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_GATT_SEND_RESPONSE)
+			== BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have aprivilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
 
 	req_info = __bt_gatt_find_request_info(request_id);
 
