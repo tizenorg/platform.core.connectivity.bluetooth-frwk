@@ -2586,6 +2586,9 @@ gboolean __bt_service_check_privilege(int function_name,
         case BT_GATT_SET_PROPERTY_REQUEST:
         case BT_GATT_READ_CHARACTERISTIC:
         case BT_GATT_DISCOVER_CHARACTERISTICS_DESCRIPTOR:
+        case BT_GATT_REGISTER_APPLICATION:
+        case BT_GATT_REGISTER_SERVICE:
+        case BT_GATT_SEND_RESPONSE:
 		case BT_PBAP_CONNECT:
 		case BT_PBAP_DISCONNECT:
 		case BT_PBAP_GET_PHONEBOOK_SIZE:
