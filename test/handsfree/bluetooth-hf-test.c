@@ -101,14 +101,7 @@ void tc_usage_print(void)
 }
 void bt_event_callback(int event, bluetooth_event_param_t *param, void *user_data)
 {
-	GMainLoop *main_loop = (GMainLoop*) user_data;
 
-	switch(event)
-	{
-		// Code for each event
-		default:
-			break;
-	}
 }
 
 void hf_event_handler(int event, void *data, void *user_data)
@@ -185,7 +178,7 @@ void hf_event_handler(int event, void *data, void *user_data)
 						call_list->count);
 		bluetooth_hf_get_call_list(call_list->list, call_info);
 
-		for (i= 0; i < call_list->count; i++) {
+		for (i = 0; i < call_list->count; i++) {
 			TC_PRT("Phone Number : %s ", call_info[i]->number);
 			TC_PRT("Direction (in -1, out 0 : %d ", call_info[i]->direction);
 			TC_PRT("Call status : %d ", call_info[i]->status);
@@ -419,7 +412,7 @@ int test_input_callback(void *data)
 			bt_hf_call_list_s * call_list = NULL;
 			bt_hf_call_status_info_t **call_info = NULL;
 			bluetooth_hf_request_call_list(&call_list);
-			if(call_list == NULL) {
+			if (call_list == NULL) {
 				TC_PRT("call_list is NULL");
 				break;
 			}
@@ -428,7 +421,7 @@ int test_input_callback(void *data)
 						call_list->count);
 			bluetooth_hf_get_call_list(call_list->list, call_info);
 
-			for (i= 0; i < call_list->count; i++) {
+			for (i = 0; i < call_list->count; i++) {
 				TC_PRT("Phone Number : %s ", call_info[i]->number);
 				TC_PRT("Direction (in -1, out 0 : %d ", call_info[i]->direction);
 				TC_PRT("Call status : %d ", call_info[i]->status);

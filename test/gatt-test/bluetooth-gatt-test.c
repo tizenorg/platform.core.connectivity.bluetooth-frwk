@@ -41,14 +41,12 @@
 
 GMainLoop *main_loop = NULL;
 
-typedef struct
-{
+typedef struct {
 	const char *tc_name;
 	int tc_code;
 } tc_table_t;
 
-tc_table_t tc_table[] =
-{
+tc_table_t tc_table[] = {
 	{"Send alert to remote le device"		, 1},
 	{"Set Link loss alert"		, 2},
 
@@ -59,7 +57,7 @@ tc_table_t tc_table[] =
 };
 
 #define tc_result(success, tc_index) \
-	TC_PRT("Test case [%d - %s] %s", tc_table[tc_index].tc_code, tc_table[tc_index].tc_name, ((success == TC_PASS)?"Success":"Failed"));
+	TC_PRT("Test case [%d - %s] %s", tc_table[tc_index].tc_code, tc_table[tc_index].tc_name, ((success == TC_PASS) ? "Success" : "Failed"));
 
 char *g_alert_char_handle = NULL;
 guint8 g_alert_level = 0;
@@ -233,7 +231,7 @@ void startup()
 void cleanup()
 {
 	TC_PRT("bluetooth framework TC cleanup");
-	if ( main_loop != NULL)
+	if (main_loop != NULL)
 		g_main_loop_unref(main_loop);
 }
 
@@ -272,7 +270,7 @@ void bt_event_callback(int event, bluetooth_event_param_t* param,
 {
 	TC_PRT(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
 	TC_PRT("bt event callback 0x%04x", event);
-	switch(event) {
+	switch (event) {
 	case BLUETOOTH_EVENT_GATT_GET_CHAR_FROM_UUID:
 	{
 		TC_PRT("BLUETOOTH_EVENT_GATT_GET_CHAR_FROM_UUID");
@@ -304,7 +302,7 @@ static gboolean key_event_cb(GIOChannel *chan, GIOCondition cond, gpointer data)
 		printf("IO Channel read error");
 		return FALSE;
 	}
-	printf("%s\n",buf);
+	printf("%s\n", buf);
 	tc_usage_print();
 
 	test_id = atoi(buf);

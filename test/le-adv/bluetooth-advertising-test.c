@@ -42,29 +42,27 @@
 
 GMainLoop *main_loop = NULL;
 
-typedef struct
-{
+typedef struct {
 	const char *tc_name;
 	int tc_code;
 } tc_table_t;
 
-tc_table_t tc_table[] =
-{
+tc_table_t tc_table[] = {
 	{"SetAdvertising ON"		, 1},
 	{"SetAdvertising OFF"		, 2},
 	{"SetCustomAdvertising ON, filter 0x03"		, 3},
 	{"SetCustomAdvertising ON, filter 0x00"		, 4},
 	{"SetAdvertisingData"		, 5},
-	{"SetScanParameters"		,6},
-	{"SetScanResponseData"	,7},
-	{"Start LE Scan"		,8},
-	{"Stop LE Scan"		,9},
-	{"IsAdvertising"	,10},
-	{"Add White List"	,11},
-	{"Remove White List"	,12},
-	{"Clear White List"	,13},
-	{"Set Connectable ON"	,14},
-	{"Set Connectable OFF"	,15},
+	{"SetScanParameters"		, 6},
+	{"SetScanResponseData"	, 7},
+	{"Start LE Scan"		, 8},
+	{"Stop LE Scan"		, 9},
+	{"IsAdvertising"	, 10},
+	{"Add White List"	, 11},
+	{"Remove White List"	, 12},
+	{"Clear White List"	, 13},
+	{"Set Connectable ON"	, 14},
+	{"Set Connectable OFF"	, 15},
 
 	/* -----------------------------------------*/
 	{"Finish"					, 0x00ff},
@@ -73,7 +71,7 @@ tc_table_t tc_table[] =
 };
 
 #define tc_result(success, tc_index) \
-	TC_PRT("Test case [%d - %s] %s", tc_table[tc_index].tc_code, tc_table[tc_index].tc_name, ((success == TC_PASS)?"Success":"Failed"));
+	TC_PRT("Test case [%d - %s] %s", tc_table[tc_index].tc_code, tc_table[tc_index].tc_name, ((success == TC_PASS) ? "Success" : "Failed"));
 
 
 void tc_usage_print(void)
@@ -175,7 +173,7 @@ int test_input_callback(void *data)
 		break;
 	}
 	case 11: {
-		bluetooth_device_address_t device_address={{0x00,0x19,0x0E,0x11,0x56,0x06}};
+		bluetooth_device_address_t device_address = { {0x00, 0x19, 0x0E, 0x11, 0x56, 0x06} };
 
 		TC_PRT("Add White List");
 
@@ -186,7 +184,7 @@ int test_input_callback(void *data)
 		break;
 	}
 	case 12: {
-		bluetooth_device_address_t device_address={{0x00,0x19,0x0E,0x11,0x56,0x06}};
+		bluetooth_device_address_t device_address = { {0x00, 0x19, 0x0E, 0x11, 0x56, 0x06} };
 
 		TC_PRT("Remove White List");
 
@@ -244,7 +242,7 @@ void startup()
 void cleanup()
 {
 	TC_PRT("bluetooth framework TC cleanup");
-	if ( main_loop != NULL)
+	if (main_loop != NULL)
 		g_main_loop_unref(main_loop);
 }
 
@@ -253,7 +251,7 @@ void bt_event_callback(int event, bluetooth_event_param_t* param,
 {
 	TC_PRT(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
 	TC_PRT("bt event callback 0x%04x", event);
-	switch(event) {
+	switch (event) {
 	case BLUETOOTH_EVENT_DISCOVERY_STARTED:
 		TC_PRT("BLUETOOTH_EVENT_DISCOVERY_STARTED, result [0x%04x]", param->result);
 		break;
@@ -332,7 +330,7 @@ static gboolean key_event_cb(GIOChannel *chan, GIOCondition cond, gpointer data)
 		printf("IO Channel read error");
 		return FALSE;
 	}
-	printf("%s\n",buf);
+	printf("%s\n", buf);
 	tc_usage_print();
 
 	test_id = atoi(buf);
