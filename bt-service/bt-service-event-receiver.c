@@ -1131,7 +1131,7 @@ static void __bt_device_property_changed_event(GVariant *msg, const char *path)
 
 			/* Send event to application */
 			_bt_send_event(BT_DEVICE_EVENT,
-					BLUETOOTH_EVENT_IPSP_BT_INTERFACE_INFO,
+					BLUETOOTH_EVENT_IPSP_INTERFACE_INFO,
 					param);
 			g_free(address);
 		}
