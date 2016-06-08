@@ -648,8 +648,8 @@ BT_EXPORT_API int bluetooth_hid_device_send_key_event(const char *remote_addr,
 }
 
 BT_EXPORT_API int bluetooth_hid_device_reply_to_report(const char *remote_addr,
-				bt_hid_header_type_t htype,
-				bt_hid_param_type_t ptype,
+				bluetooth_hid_header_type_t htype,
+				bluetooth_hid_param_type_t ptype,
 				const char *data,
 				unsigned int data_len)
 {
