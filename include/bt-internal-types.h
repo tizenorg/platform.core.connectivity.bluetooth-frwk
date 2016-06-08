@@ -489,7 +489,7 @@ typedef struct {
 #define BT_IPSP_INITIALIZED "IpspInitStateChanged"
 #define BT_IPSP_CONNECTED "IpspConnected"
 #define BT_IPSP_DISCONNECTED "IpspDisconnected"
-#define BT_IPSP_BT_INTERFACE_INFO "IpspBtInterfaceInfo"
+#define BT_IPSP_INTERFACE_INFO "IpspBtInterfaceInfo"
 #define BT_LE_DATA_LENGTH_CHANGED "LEDataLengthChanged"
 
 #ifdef __cplusplus
