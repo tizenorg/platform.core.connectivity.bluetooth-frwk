@@ -133,7 +133,7 @@ export CFLAGS="$CFLAGS -DTIZEN_NETWORK_TETHERING_ENABLE -DTIZEN_BT_FLIGHTMODE_EN
 %endif
 
 %if "%{?profile}" == "wearable"
-export CFLAGS="$CFLAGS -DTIZEN_WEARABLE"
+export CFLAGS="$CFLAGS -DTIZEN_WEARABLE -DTIZEN_BT_FLIGHTMODE_ENABLED"
 %define _servicefile packaging/bluetooth-frwk-wearable.service
 %define _servicedir multi-user.target.wants
 %endif

@@ -719,7 +719,7 @@ int _bt_enable_core(void)
 	return BLUETOOTH_ERROR_NONE;
 }
 
-#if defined(TIZEN_TELEPHONY_ENABLED) || (!defined(TIZEN_WEARABLE) && defined(ENABLE_TIZEN_2_4))
+#if defined(TIZEN_BT_FLIGHTMODE_ENABLED) || (!defined(TIZEN_WEARABLE) && defined(ENABLE_TIZEN_2_4))
 static void __bt_service_flight_ps_mode_cb(keynode_t *node, void *data)
 {
 	gboolean flight_mode = FALSE;
@@ -753,7 +753,7 @@ void _bt_service_register_vconf_handler(void)
 {
 	BT_DBG("+");
 
-#ifdef TIZEN_TELEPHONY_ENABLED
+#ifdef TIZEN_BT_FLIGHTMODE_ENABLED
 	if (vconf_notify_key_changed(VCONFKEY_TELEPHONY_FLIGHT_MODE,
 			(vconf_callback_fn)__bt_service_flight_ps_mode_cb, NULL) < 0)
 		BT_ERR("Unable to register key handler");
@@ -774,7 +774,7 @@ void _bt_service_unregister_vconf_handler(void)
 {
 	BT_DBG("+");
 
-#ifdef TIZEN_TELEPHONY_ENABLED
+#ifdef TIZEN_BT_FLIGHTMODE_ENABLED
 	vconf_ignore_key_changed(VCONFKEY_TELEPHONY_FLIGHT_MODE,
 			(vconf_callback_fn)__bt_service_flight_ps_mode_cb);
 #endif
