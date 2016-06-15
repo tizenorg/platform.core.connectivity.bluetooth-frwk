@@ -181,7 +181,7 @@ int _bt_oob_add_remote_data(
 
 	/* Call AddRemoteData Method*/
 	reply = g_dbus_proxy_call_sync(proxy, "AddRemoteData",
-			g_variant_new("s@ay@ay", dev_addr, hash, randomizer),
+			g_variant_new("(s@ay@ay)", dev_addr, hash, randomizer),
 			G_DBUS_CALL_FLAGS_NONE, -1,
 			NULL, &err);
 	g_object_unref(proxy);
