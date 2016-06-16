@@ -242,7 +242,7 @@ int _bt_oob_remove_remote_data(
 
 	/* Call RemoveRemoteData Method*/
 	reply = g_dbus_proxy_call_sync(proxy, "RemoveRemoteData",
-			g_variant_new("s", dev_addr),
+			g_variant_new("(s)", dev_addr),
 			G_DBUS_CALL_FLAGS_NONE, -1,
 			NULL, &err);
 	g_object_unref(proxy);
