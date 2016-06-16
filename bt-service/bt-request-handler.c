@@ -2537,6 +2537,8 @@ gboolean __bt_service_check_privilege(int function_name,
         case BT_HDP_CONNECT:
         case BT_HDP_DISCONNECT:
         case BT_HDP_SEND_DATA:
+        case BT_HDP_REGISTER_SINK_APP:
+        case BT_HDP_UNREGISTER_SINK_APP:
 
         case BT_DPM_SET_ALLOW_BT_MODE:
         case BT_DPM_GET_ALLOW_BT_MODE:

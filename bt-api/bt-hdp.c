@@ -120,6 +120,12 @@ BT_EXPORT_API int bluetooth_hdp_activate(unsigned short data_type,
 		return BLUETOOTH_ERROR_INVALID_PARAM;
 	}
 
+	if (_bt_check_privilege(BT_BLUEZ_SERVICE, BT_HDP_REGISTER_SINK_APP)
+	     == BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have a privilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
+
 	result = __bt_hdp_internal_create_application(data_type, role,
 						channel_type, app_handle);
 
@@ -699,6 +705,12 @@ BT_EXPORT_API int bluetooth_hdp_deactivate(const char *app_handle)
 
 	BT_CHECK_ENABLED(return);
 	BT_CHECK_PARAMETER(app_handle, return);
+
+	if (_bt_check_privilege(BT_BLUEZ_SERVICE, BT_HDP_UNREGISTER_SINK_APP)
+	     == BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have a privilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	}
 
 	return __bt_hdp_internal_destroy_application(app_handle);
 }
