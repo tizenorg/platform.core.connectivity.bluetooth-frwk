@@ -1,0 +1,46 @@
+/*
+ * Copyright (c) 2011 Samsung Electronics Co., Ltd All Rights Reserved
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *		http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+#include <glib.h>
+#include <dlog.h>
+#include <string.h>
+
+#include "bluetooth-api.h"
+#include "bt-internal-types.h"
+#include "bt-service-common.h"
+#include "bt-service-avrcp.h"
+#include "bt-service-event.h"
+#include "bt-service-util.h"
+
+int _bt_avrcp_set_track_info(media_metadata_attributes_t *meta_data)
+{
+	retv_if(meta_data == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	return BLUETOOTH_ERROR_NOT_SUPPORT;
+}
+
+int _bt_avrcp_set_properties(media_player_settings_t *properties)
+{
+	retv_if(properties == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	return BLUETOOTH_ERROR_NOT_SUPPORT;
+}
+
+int _bt_avrcp_set_property(int type, unsigned int value)
+{
+	return BLUETOOTH_ERROR_NOT_SUPPORT;
+}

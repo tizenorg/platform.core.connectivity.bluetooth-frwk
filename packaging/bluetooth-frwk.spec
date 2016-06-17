@@ -154,6 +154,12 @@ export LDFLAGS="$CFLAGS -pie"
 export CFLAGS="$CFLAGS -DRFCOMM_DIRECT"
 export LDFLAGS="$CFLAGS -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs"
 
+%if "%{?_with_emulator}" == "1"
+export CFLAGS="$CFLAGS -DEMUL"
+export CXXFLAGS="$CXXFLAGS -DEMUL"
+export FFLAGS="$FFLAGS -DEMUL"
+%endif
+
 cmake . -DCMAKE_INSTALL_PREFIX=/usr \
 -DCMAKE_LIB_DIR=%{_libdir} \
 -DTZ_SYS_USER_GROUP=%TZ_SYS_USER_GROUP \
