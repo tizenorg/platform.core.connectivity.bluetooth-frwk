@@ -60,14 +60,17 @@ static int __bt_fill_device_list(GArray *out_param2, GPtrArray **dev_list)
 
 BT_EXPORT_API int bluetooth_check_adapter(void)
 {
-	int ret;
 	int value;
+
+#ifndef EMUL
+	int ret;
 
 	ret = _bt_get_adapter_path(_bt_gdbus_get_system_gconn(), NULL);
 
 	if (ret != BLUETOOTH_ERROR_NONE) {
 		return BLUETOOTH_ADAPTER_DISABLED;
 	}
+#endif
 
 	/* check VCONFKEY_BT_STATUS */
 	if (vconf_get_int(VCONFKEY_BT_STATUS, &value) != 0) {

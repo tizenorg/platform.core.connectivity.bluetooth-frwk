@@ -1,0 +1,25 @@
+<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+    <policy group="system">
+        <allow own="org.projectx.bt"/>
+        <allow own="org.projectx.bt_event"/>
+        <allow own="org.projectx.bluetooth.share"/>
+        <allow own="org.bluez.ag_agent"/>
+	 <allow own="org.tizen.csd.Call.Instance"/>
+    </policy>
+    <policy group="root">
+        <allow own="org.projectx.bt"/>
+        <allow own="org.projectx.bt_event"/>
+        <allow own="org.projectx.bluetooth.share"/>
+        <allow own="org.bluez.ag_agent"/>
+	 <allow own="org.tizen.csd.Call.Instance"/>
+    </policy>
+    <policy at_console="true">
+        <allow send_destination="org.projectx.bt"/>
+    </policy>
+    <policy context="default">
+        <allow send_destination="org.projectx.bt"/>
+    </policy>
+</busconfig>
+
