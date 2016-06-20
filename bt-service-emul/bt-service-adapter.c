@@ -25,6 +25,7 @@
 
 #include "bt-service-common.h"
 #include "bt-service-event.h"
+#include "bt-service-event-manager.h"
 #include "bt-service-adapter.h"
 #include "bt-service-util.h"
 #include "bt-service-main.h"
@@ -50,10 +51,13 @@ static uint status_reg_id;
 
 static char *g_local_name;
 static gboolean g_is_discoverable;
+static int found_cnt;
 
 #define BT_DISABLE_TIME 500 /* 500 ms */
 #define BT_DEFAULT_NAME "Tizen Emulator"
 
+static gboolean __bt_adapter_enable_cb(gpointer user_data);
+static gboolean __bt_adapter_disable_cb(gpointer user_data);
 
 static gboolean __bt_timeout_handler(gpointer user_data)
 {
@@ -504,7 +508,7 @@ static void __bt_state_event_handler(const char *event_name, bundle *data, void 
 #endif
 }
 
-void _bt_handle_adapter_added(void)
+static gboolean __bt_adapter_enable_cb(gpointer user_data)
 {
 	BT_DBG("+");
 	bt_status_t status;
@@ -549,9 +553,13 @@ void _bt_handle_adapter_added(void)
 			(eventsystem_handler)__bt_state_event_handler, NULL) != ES_R_OK) {
 		BT_ERR("Fail to register system event");
 	}
+
+	_bt_delete_event_timer(BT_EVENT_TIMER_ENABLE);
+
+	return FALSE;
 }
 
-void _bt_handle_adapter_removed(void)
+static gboolean __bt_adapter_disable_cb(gpointer user_data)
 {
 	int ret;
 
@@ -579,6 +587,128 @@ void _bt_handle_adapter_removed(void)
 		BT_ERR("Fail to unregister system event");
 	}
 
+	_bt_delete_event_timer(BT_EVENT_TIMER_DISABLE);
+
+	return FALSE;
+}
+
+static gboolean __bt_adapter_device_found_cb(gpointer user_data)
+{
+	int i = 0;
+	int result = BLUETOOTH_ERROR_NONE;
+	GVariant *param = NULL;
+	GVariant *uuids = NULL;
+	GVariant *manufacturer_data = NULL;
+	GVariantBuilder *builder = NULL;
+	bt_remote_dev_info_t *dev_info;
+
+	BT_DBG("+");
+
+	BT_DBG("found count: %d", found_cnt);
+
+	if (found_cnt >= _bt_get_sample_device_number()) {
+		BT_DBG("Finish creating devices");
+		goto done;
+	}
+
+	BT_DBG("[%d] device found", found_cnt);
+
+	dev_info = _bt_get_sample_device(found_cnt);
+	if (dev_info == NULL) {
+		BT_DBG("Fail to get the sample device");
+		goto done;
+	}
+
+	builder = g_variant_builder_new(G_VARIANT_TYPE("as"));
+	for (i = 0; i < dev_info->uuid_count; i++) {
+		g_variant_builder_add(builder, "s",
+			dev_info->uuids[i]);
+	}
+	uuids = g_variant_new("as", builder);
+	g_variant_builder_unref(builder);
+
+	manufacturer_data = g_variant_new_from_data(
+				G_VARIANT_TYPE_BYTESTRING,
+				dev_info->manufacturer_data,
+				dev_info->manufacturer_data_len,
+				TRUE, NULL, NULL);
+
+	param = g_variant_new("(isunsbub@asn@ay)", result,
+				dev_info->address,
+				dev_info->class,
+				dev_info->rssi,
+				dev_info->name,
+				dev_info->paired,
+				dev_info->connected,
+				dev_info->trust,
+				uuids,
+				dev_info->manufacturer_data_len,
+				manufacturer_data);
+
+	_bt_send_event(BT_ADAPTER_EVENT,
+		BLUETOOTH_EVENT_REMOTE_DEVICE_FOUND,
+		 param);
+
+	_bt_free_device_info(dev_info);
+
+	found_cnt++;
+
+	return TRUE;
+done:
+	_bt_delete_event_timer(BT_EVENT_TIMER_FOUND_DEVICE);
+
+	param = g_variant_new("(i)", result);
+
+	_bt_send_event(BT_ADAPTER_EVENT,
+		BLUETOOTH_EVENT_DISCOVERY_FINISHED,
+		param);
+
+	is_discovering = FALSE;
+	found_cnt = 0;
+
+	return FALSE;
+}
+
+static gboolean __bt_adapter_start_discovery_cb(gpointer user_data)
+{
+	int result = BLUETOOTH_ERROR_NONE;
+	GVariant *param = NULL;
+
+	BT_DBG("Discovery started");
+
+	param = g_variant_new("(i)", result);
+
+	_bt_send_event(BT_ADAPTER_EVENT,
+		BLUETOOTH_EVENT_DISCOVERY_STARTED,
+		param);
+
+	_bt_delete_event_timer(BT_EVENT_TIMER_START_DISCOVERY);
+
+	found_cnt = 0;
+
+	_bt_create_event_timer(BT_EVENT_TIMER_FOUND_DEVICE, 500,
+				__bt_adapter_device_found_cb, NULL);
+
+	return FALSE;
+}
+
+static gboolean __bt_adapter_stop_discovery_cb(gpointer user_data)
+{
+	int result = BLUETOOTH_ERROR_NONE;
+	GVariant *param = NULL;
+
+	BT_DBG("Discovery stopped");
+
+	param = g_variant_new("(i)", result);
+
+	_bt_send_event(BT_ADAPTER_EVENT,
+		BLUETOOTH_EVENT_DISCOVERY_FINISHED,
+		param);
+
+	_bt_delete_event_timer(BT_EVENT_TIMER_FOUND_DEVICE);
+	_bt_delete_event_timer(BT_EVENT_TIMER_STOP_DISCOVERY);
+
+	return FALSE;
 }
 
 static gboolean __bt_enable_timeout_cb(gpointer user_data)
@@ -662,9 +792,10 @@ int _bt_enable_adapter(void)
 		return BLUETOOTH_ERROR_DEVICE_BUSY;
 	}
 
-	_bt_adapter_set_status(BT_ADAPTER_ENABLED);
+	_bt_adapter_set_status(BT_ACTIVATING);
 
-	__bt_set_enabled();
+	_bt_create_event_timer(BT_EVENT_TIMER_ENABLE, 2000,
+					__bt_adapter_enable_cb, NULL);
 
 	return BLUETOOTH_ERROR_NONE;
 }
@@ -688,7 +819,10 @@ int _bt_disable_adapter(void)
 		timer_id = 0;
 	}
 
-	_bt_handle_adapter_removed();
+	_bt_adapter_set_status(BT_DEACTIVATING);
+
+	_bt_create_event_timer(BT_EVENT_TIMER_DISABLE, 1000,
+					__bt_adapter_disable_cb, NULL);
 
 	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
@@ -706,7 +840,8 @@ int _bt_reset_adapter(void)
 		timer_id = 0;
 	}
 
-	_bt_set_disabled(BLUETOOTH_ERROR_NONE);
+	_bt_create_event_timer(BT_EVENT_TIMER_DISABLE, 1000,
+				__bt_adapter_disable_cb, NULL);
 
 	return BLUETOOTH_ERROR_NONE;
 }
@@ -882,21 +1017,38 @@ int _bt_start_discovery(void)
 
 int _bt_start_custom_discovery(bt_discovery_role_type_t role)
 {
+	BT_DBG("+");
+
+	if (_bt_is_discovering() == TRUE) {
+		BT_ERR("BT is already in discovering");
+		return BLUETOOTH_ERROR_IN_PROGRESS;
+	}
+
 	is_discovering = TRUE;
 	cancel_by_user = FALSE;
 
-	/* Need to implement the timer and event for this API */
+	_bt_create_event_timer(BT_EVENT_TIMER_START_DISCOVERY, 100,
+					__bt_adapter_start_discovery_cb, NULL);
 
 	return BLUETOOTH_ERROR_NONE;
-
 }
 
 int _bt_cancel_discovery(void)
 {
+	if (_bt_is_discovering() == FALSE) {
+		BT_ERR("BT is not in discovering");
+		return BLUETOOTH_ERROR_NOT_IN_OPERATION;
+	}
+
 	is_discovering = FALSE;
 	cancel_by_user = TRUE;
+	found_cnt = 0;
 
-	/* Need to implement the event for this API */
+	_bt_delete_event_timer(BT_EVENT_TIMER_START_DISCOVERY);
+	_bt_delete_event_timer(BT_EVENT_TIMER_FOUND_DEVICE);
+
+	_bt_create_event_timer(BT_EVENT_TIMER_STOP_DISCOVERY, 100,
+					__bt_adapter_stop_discovery_cb, NULL);
 
 	return BLUETOOTH_ERROR_NONE;
 }
@@ -961,4 +1113,3 @@ int _bt_set_manufacturer_data(bluetooth_manufacturer_data_t *m_data)
 
 	return BLUETOOTH_ERROR_NOT_SUPPORT;
 }
-
