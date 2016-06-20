@@ -5,7 +5,7 @@ SET(SRCS
 marshal.c
 bt-service-main.c
 bt-service-event-sender.c
-bt-service-event-generator.c
+bt-service-event-manager.c
 bt-service-common.c
 bt-service-util.c
 bt-service-adapter.c
