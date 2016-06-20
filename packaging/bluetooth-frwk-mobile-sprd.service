@@ -5,6 +5,7 @@ After=multi-user.target
 [Service]
 User=owner
 Group=users
+SupplementaryGroups=priv_mediastorage
 Type=dbus
 BusName=org.projectx.bt
 ExecStart=/usr/bin/bt-service
