@@ -291,8 +291,8 @@ static int __bt_get_bonded_device_info(gchar *device_path,
 {
 	GError *error = NULL;
 	GDBusProxy *device_proxy;
-	const gchar *address = NULL;
-	const gchar *name = NULL;
+	gchar *address = NULL;
+	gchar *name = NULL;
 	unsigned int cod = 0;
 	gint rssi = 0;
 	gboolean trust = FALSE;
@@ -349,12 +349,12 @@ static int __bt_get_bonded_device_info(gchar *device_path,
 		if (!g_strcmp0(key, "Paired")) {
 			paired = g_variant_get_boolean(value);
 		} else if (!g_strcmp0(key, "Address")) {
-			address = g_variant_get_string(value, NULL);
+			g_variant_get(value, "s", &address);
 		} else if (!g_strcmp0(key, "Alias")) {
-			name = g_variant_get_string(value, NULL);
+			g_variant_get(value, "s", &name);
 		} else if (!g_strcmp0(key, "Name")) {
 			if (!name)
-				name = g_variant_get_string(value, NULL);
+				g_variant_get(value, "s", &name);
 		} else if (!g_strcmp0(key, "Class")) {
 			cod = g_variant_get_uint32(value);
 		} else if (!g_strcmp0(key, "Connected")) {
@@ -407,6 +407,8 @@ static int __bt_get_bonded_device_info(gchar *device_path,
 	dev_info->paired = paired;
 	dev_info->connected = connected;
 	ret = BLUETOOTH_ERROR_NONE;
+	g_free(address);
+	g_free(name);
 
 	return ret;
 }
