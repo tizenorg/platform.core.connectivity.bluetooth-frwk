@@ -19,6 +19,10 @@ Requires: syspopup
 %if "%{?profile}" != "mobile"
 Requires: bluetooth-tools
 %endif
+
+%define bt_hal ENABLED
+%define bt_bluez_hal ENABLED
+
 BuildRequires:  pkgconfig(aul)
 BuildRequires:  pkgconfig(dbus-glib-1)
 BuildRequires:  pkgconfig(dlog)
@@ -158,6 +162,18 @@ export LDFLAGS="$CFLAGS -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-
 export CFLAGS="$CFLAGS -DEMUL"
 export CXXFLAGS="$CXXFLAGS -DEMUL"
 export FFLAGS="$FFLAGS -DEMUL"
+%endif
+
+%if %{bt_hal} == ENABLED
+export BT_INCLUDE_OAL=ENABLED
+%if %{bt_bluez_hal} == ENABLED
+export BT_INCLUDE_OAL_BLUEZ=ENABLED
+export CFLAGS="$CFLAGS -DTIZEN_BT_INCLUDE_OAL_BLUEZ"
+%else
+export BT_INCLUDE_OAL_BLUEZ=DISABLED
+%endif
+%else
+export BT_INCLUDE_OAL=DISABLED
 %endif
 
 cmake . -DCMAKE_INSTALL_PREFIX=/usr \
