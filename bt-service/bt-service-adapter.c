@@ -391,6 +391,8 @@ static int __bt_get_bonded_device_info(gchar *device_path,
 	g_variant_unref(result);
 
 	if ((paired == FALSE) && (trust == FALSE)) {
+		g_free(address);
+		g_free(name);
 		return BLUETOOTH_ERROR_NOT_PAIRED;
 	}
 
