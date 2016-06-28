@@ -75,6 +75,8 @@ typedef enum {
 	OBEX_MAS = (1 << 8),
 } bluetooth_obex_connection_type_t;
 
+
+/* Forward Declarations */
 void _bt_handle_property_changed_event(GVariant *msg, const char *object_path);
 void _bt_opc_property_changed_event(GVariant *msg, char *path);
 int _bt_register_service_event(GDBusConnection *g_conn, int event_type);
@@ -84,6 +86,11 @@ void _bt_handle_network_client_event(GVariant *msg_iter,
 				const char *path);
 void __bt_gatt_char_property_changed_event(GVariant *msg_iter,
 				const char *path);
+static gboolean __bt_discovery_finished_cb(gpointer user_data);
+static gboolean __bt_le_discovery_finished_cb(gpointer user_data);
+
+
+
 
 static void __bt_free_bt_le_adv_info_t(bt_le_adv_info_t *adv_info)
 {
@@ -287,7 +294,7 @@ void __bt_set_device_values(gboolean connected, int state)
 	}
 }
 
-gboolean _bt_discovery_finished_cb(gpointer user_data)
+static gboolean __bt_discovery_finished_cb(gpointer user_data)
 {
 	int result = BLUETOOTH_ERROR_NONE;
 	event_id = 0;
@@ -595,7 +602,7 @@ static void __bt_adapter_property_changed_event(GVariant *msg, const char *path)
 				}
 
 				event_id = g_timeout_add(BT_DISCOVERY_FINISHED_DELAY,
-				  (GSourceFunc)_bt_discovery_finished_cb, NULL);
+				  (GSourceFunc)__bt_discovery_finished_cb, NULL);
 			}
 		} else if (strcasecmp(property, "LEDiscovering") == 0) {
 			gboolean le_discovering = FALSE;
