@@ -3,7 +3,7 @@
 %define _varlibdir /opt/var/lib
 
 Name:       bluetooth-frwk
-Summary:    Bluetooth framework for BlueZ and Obexd. This package is Bluetooth framework based on BlueZ and Obexd stack.
+Summary:    Bluetooth framework for BlueZ and Obexd.
 Version:    0.2.151
 Release:    1
 Group:      Network & Connectivity/Bluetooth
@@ -91,7 +91,7 @@ This package is Bluetooth Service daemon to manage BT services.
 
 %package httpproxy
 Summary:    Bluetooth HTTP Proxy Service daemon
-Group:      TO_BE/FILLED
+Group:      Network & Connectivity/Bluetooth
 Requires:   %{name} = %{version}-%{release}
 
 %description httpproxy
@@ -112,6 +112,16 @@ Requires:   %{name} = %{version}-%{release}
 
 %description test
 This package is Bluetooth test application.
+
+%if %{bt_hal} == ENABLED
+%package oal
+Summary:    Bluetooth OAL
+Group:      Network & Connectivity/Bluetooth
+Requires:   %{name} = %{version}-%{release}
+
+%description oal
+This package is BT stack common interface.
+%endif
 
 %prep
 %setup -q
@@ -212,6 +222,11 @@ install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk-servic
 install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk-httpproxy
 install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk-devel
 
+
+%if %{bt_hal} == ENABLED
+install -m 0644 bt-oal/bluez_hal/libbluetooth.default.so.1.0.0  %{buildroot}%{_libdir}/bluetooth.default.so
+%endif
+
 #mkdir -p %{buildroot}%{_libdir}/systemd/user
 #install -m 0644 packaging/bluetooth-frwk-tv.service %{buildroot}%{_libdir}/systemd/user
 mkdir -p %{buildroot}%{_unitdir}/%{_servicedir}
@@ -284,6 +299,10 @@ sed -i 's/%TZ_SYS_DEFAULT_USER/app/' %{buildroot}%{_datadir}/dbus-1/system-servi
 %defattr(-, root, root)
 %{_datadir}/dbus-1/system-services/org.projectx.bt.service
 %{_bindir}/bt-service
+%if %{bt_hal} == ENABLED
+%{_libdir}/bluetooth.default.so
+%{_libdir}/libbluetooth.default.so*
+%endif
 #%{_libdir}/systemd/user/bluetooth-frwk-tv.service
 %{_unitdir}/%{_servicedir}/bluetooth-frwk.service
 %{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-service.conf
@@ -295,6 +314,8 @@ sed -i 's/%TZ_SYS_DEFAULT_USER/app/' %{buildroot}%{_datadir}/dbus-1/system-servi
 #%attr(0666,-,-) %{_varlibdir}/bluetooth/auto-pair-blacklist
 #%attr(0666,-,-) %{_prefix}/etc/bluetooth/stack_info
 #%{_dumpdir}/bluetooth_log_dump.sh
+
+
 %{_datadir}/license/bluetooth-frwk-service
 %if %{with bluetooth_frwk_libnotify} || %{with bluetooth_frwk_libnotification}
 %{_datadir}/icons/default/bt-icon.png
@@ -321,3 +342,8 @@ sed -i 's/%TZ_SYS_DEFAULT_USER/app/' %{buildroot}%{_datadir}/dbus-1/system-servi
 %{_bindir}/bluetooth-frwk-test
 %{_bindir}/bluetooth-gatt-test
 %{_bindir}/bluetooth-advertising-test
+
+%if %{bt_hal} == ENABLED
+%files oal
+%{_libdir}/libbt-oal.so*
+%endif
