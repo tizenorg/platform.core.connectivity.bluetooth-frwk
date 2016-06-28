@@ -28,13 +28,27 @@
 #include "bt-service-event.h"
 #include "bt-service-util.h"
 
+#include "bt-service-core-adapter.h"
+
+/* OAL headers */
+#include <oal-event.h>
+#include <oal-manager.h>
+
 static GMainLoop *main_loop;
 static gboolean terminated = FALSE;
 
 gboolean _bt_terminate_service(gpointer user_data)
 {
-	/* TODO*/
-        return FALSE;
+	BT_INFO("+");
+	if (main_loop != NULL) {
+		g_main_loop_quit(main_loop);
+	} else {
+		BT_DBG("main_loop == NULL");
+	}
+
+	terminated = TRUE;
+	BT_INFO("-");
+	return FALSE;
 }
 
 gboolean _bt_reliable_terminate_service(gpointer user_data)
@@ -57,14 +71,6 @@ static void __bt_release_service(void)
 static void __bt_sigterm_handler(int signo, siginfo_t *info, void *data)
 {
 	/* TODO*/
-}
-
-static int __bt_service_load_hal_lib(void)
-{
-	int ret = BLUETOOTH_ERROR_NONE;
-	BT_INFO("+");
-	/* TODO: Pass oal event receiver handler */
-	return  ret;
 }
 
 int main(void)
@@ -104,10 +110,10 @@ int main(void)
 
         _bt_init_request_list();
 
-	/* BT HAL library Load */
-	BT_ERR("Attempt to load BT HAL lib");
-	if (__bt_service_load_hal_lib() != BLUETOOTH_ERROR_NONE) {
-		BT_ERR("Fail to initialize BT HAL");
+
+	/* BT Stack Init */
+	if (_bt_stack_init() != BLUETOOTH_ERROR_NONE) {
+		BT_ERR("Fail to init BT Stack");
 		return 0;
 	}
 

@@ -27,6 +27,11 @@
 #include "bt-service-common.h"
 #include "bt-service-util.h"
 
+#include "bt-service-core-adapter.h"
+
+/* For maintaining Application Sync API call requests */
+GSList *invocation_list = NULL;
+
 static GDBusConnection *bt_service_conn;
 static guint owner_id = 0;
 cynara *p_cynara;
@@ -102,26 +107,62 @@ gboolean __bt_service_check_privilege(int function_name,
 					const char *unique_name);
 
 /* Function definitions*/
-static void __bt_fill_garray_from_variant(GVariant *var, GArray *param)
+GSList *_bt_get_invocation_list(void)
 {
-	char *data;
-	int size;
-
-	size = g_variant_get_size(var);
-	if (size > 0) {
-		data = (char *)g_variant_get_data(var);
-		if (data)
-			param = g_array_append_vals(param, data, size);
-
-	}
+        return invocation_list;
 }
 
-static void __bt_service_get_parameters(GVariant *in_param,
-		void *value, int size)
+void _bt_free_info_from_invocation_list(invocation_info_t *req_info)
 {
-	void *buf = NULL;
-	buf = (void *)g_variant_get_data(in_param);
-	memcpy(value, buf, size);
+	GSList *l;
+	invocation_info_t *info;
+
+	for (l = invocation_list; l != NULL; l = g_slist_next(l)) {
+		info = l->data;
+		if (info == NULL)
+			continue;
+
+		/* No two same sync requests from same application can exist */
+		if ((strcasecmp(info->sender, req_info->sender) == 0) &&
+				req_info->service_function == info->service_function) {
+
+			invocation_list = g_slist_remove(invocation_list, req_info);
+			g_free(req_info);
+			break;
+		}
+	}
+
+}
+
+/*TODO:Following function will be used in subsequent patch, so ignore warning for now */
+static gboolean __bt_is_sync_function(int service_function)
+{
+	/*TODO: Keep adding sync methods with expect replies from bluetooth service */
+	if (service_function == BT_GET_LOCAL_ADDRESS
+			|| service_function == BT_GET_LOCAL_NAME
+			|| service_function == BT_GET_LOCAL_VERSION
+			|| service_function == BT_GET_BONDED_DEVICES
+			|| service_function == BT_GET_BONDED_DEVICE
+			|| service_function == BT_IS_SERVICE_USED)
+		return TRUE;
+	else
+		return FALSE;
+}
+
+void _bt_save_invocation_context(GDBusMethodInvocation *invocation, int result,
+                                                char *sender, int service_function,
+                                                gpointer invocation_data)
+{
+	BT_DBG("Saving the invocation context: service_function [%d]", service_function);
+	invocation_info_t *info;
+	info = g_malloc0(sizeof(invocation_info_t));
+	info->context = invocation;
+	info->result = result;
+	info->sender = sender;
+	info->service_function = service_function;
+	info->user_data = invocation_data;
+	invocation_list = g_slist_append(invocation_list, info);
+
 }
 
 static void __bt_service_method(GDBusConnection *connection,
@@ -301,14 +342,35 @@ int __bt_bluez_request(int function_name,
 		GArray **out_param1)
 {
 	int result = BLUETOOTH_ERROR_NONE;
+	char *sender = NULL;
 
 	switch (function_name) {
-	case BT_ENABLE_ADAPTER:
-		/*TODO*/
+	case BT_ENABLE_ADAPTER: {
+		result = _bt_enable_adapter();
+		/* Save invocation */
+		if (result == BLUETOOTH_ERROR_NONE) {
+			BT_DBG("_bt_enable_adapter scheduled successfully! save invocation context");
+			sender = (char*)g_dbus_method_invocation_get_sender(context);
+			_bt_save_invocation_context(context, result, sender,
+					function_name, NULL);
+		}
 		break;
-	case BT_DISABLE_ADAPTER:
-		/*TODO*/
-		break;
+	}
+	case BT_DISABLE_ADAPTER: {
+		 result = _bt_disable_adapter();
+		 /* Save invocation */
+		 if (result == BLUETOOTH_ERROR_NONE) {
+			 BT_DBG("_bt_disable_adapter scheduled successfully! save invocation context");
+			 sender = (char*)g_dbus_method_invocation_get_sender(context);
+			 _bt_save_invocation_context(context, result, sender,
+					 function_name, NULL);
+		 }
+		 break;
+	 }
+	default:
+	 BT_INFO("UnSupported function [%d]", function_name);
+	 result = BLUETOOTH_ERROR_NOT_SUPPORT;
+	 break;
 	}
 
 	return result;
@@ -830,3 +892,15 @@ void _bt_service_cynara_deinit(void)
         conf = NULL;
 }
 
+void _bt_service_method_return(GDBusMethodInvocation *invocation,
+                                GArray *out_param, int result)
+{
+	GVariant *out_var;
+	BT_DBG("+");
+	out_var = g_variant_new_from_data((const GVariantType *)"ay",
+			out_param->data, out_param->len, TRUE, NULL, NULL);
+
+	g_dbus_method_invocation_return_value(invocation,
+			g_variant_new("(iv)", result, out_var));
+	BT_DBG("-");
+}
