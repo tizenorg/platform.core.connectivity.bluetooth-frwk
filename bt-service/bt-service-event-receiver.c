@@ -749,10 +749,12 @@ static void __bt_adapter_property_changed_event(GVariant *msg, const char *path)
 			_bt_send_event(BT_ADAPTER_EVENT,
 				BLUETOOTH_EVENT_CONNECTABLE_CHANGED,
 				param);
+#if 0
 			if (_bt_adapter_get_status() == BT_DEACTIVATING &&
 			_bt_adapter_get_le_status() == BT_LE_ACTIVATED &&
 			connectable == 0)
 			_bt_set_disabled(BLUETOOTH_ERROR_NONE);
+#endif
 		} else if (strcasecmp(property, "SupportedLEFeatures") == 0) {
 			char *name = NULL;
 			char *value = NULL;

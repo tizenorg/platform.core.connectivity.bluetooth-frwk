@@ -437,36 +437,14 @@ void __bt_adapter_event_filter(GDBusConnection *connection,
 				event_info->cb, event_info->user_data);
 	} else if (strcasecmp(signal_name, BT_DISABLED) == 0) {
 		BT_INFO("BT_DISABLED");
-		int flight_mode_value = 0;
-		int ps_mode_value = 0;
 
-		if (vconf_get_int(BT_OFF_DUE_TO_FLIGHT_MODE,
-						&flight_mode_value) != 0)
-			BT_ERR("Fail to get the flight_mode_deactivated value");
+		/* Wait for the termining time of bt-service  */
+		if (disable_timer_id > 0)
+			g_source_remove(disable_timer_id);
 
-		if (vconf_get_int(BT_OFF_DUE_TO_POWER_SAVING_MODE,
-							&ps_mode_value) != 0)
-			BT_ERR("Fail to get the ps_mode_deactivated value");
-
-		if (flight_mode_value == 1 || ps_mode_value > 0) {
-			BT_INFO("Flight mode deactivation");
-			if (disable_timer_id > 0)
-				g_source_remove(disable_timer_id);
-
-			disable_timer_id = g_timeout_add(BT_RELIABLE_DISABLE_TIME,
-					(GSourceFunc)__bt_reliable_disable_cb,
-					event_info);
-		} else {
-			is_adapter_enabled = FALSE;
-
-			_bt_common_event_cb(BLUETOOTH_EVENT_DISABLED,
-					result, NULL,
-					event_info->cb, event_info->user_data);
-		}
-
-		_bt_common_event_cb(BLUETOOTH_EVENT_DISABLED,
-				result, NULL,
-				event_info->cb, event_info->user_data);
+		disable_timer_id = g_timeout_add(BT_RELIABLE_DISABLE_TIME,
+				(GSourceFunc)__bt_reliable_disable_cb,
+				event_info);
 	} else if (strcasecmp(signal_name, BT_DISCOVERABLE_MODE_CHANGED) == 0) {
 		int mode = 0;
 
