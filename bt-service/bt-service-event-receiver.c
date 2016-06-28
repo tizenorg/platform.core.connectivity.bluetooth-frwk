@@ -2145,8 +2145,11 @@ void _bt_handle_headset_event(GVariant *msg, const char *path)
 
 		_bt_convert_device_path_to_address(path, address);
 
-		g_variant_get(value, "i", &spkr_gain);
-		param = g_variant_new("(isq)", result, address, spkr_gain);
+		spkr_gain = g_variant_get_uint16(value);
+
+		BT_DBG("spkr_gain: %d", spkr_gain);
+
+		param = g_variant_new("(i&sq)", result, address, spkr_gain);
 		_bt_send_event(BT_HEADSET_EVENT, BLUETOOTH_EVENT_AG_SPEAKER_GAIN,
 			param);
 
@@ -2159,8 +2162,9 @@ void _bt_handle_headset_event(GVariant *msg, const char *path)
 
 		_bt_convert_device_path_to_address(path, address);
 
-		g_variant_get(value, "i", &mic_gain);
-		param = g_variant_new("(isq)", result, address, mic_gain);
+		mic_gain = g_variant_get_uint16(value);
+
+		param = g_variant_new("(i&sq)", result, address, mic_gain);
 		_bt_send_event(BT_HEADSET_EVENT, BLUETOOTH_EVENT_AG_MIC_GAIN,
 			param);
 		g_free(address);
