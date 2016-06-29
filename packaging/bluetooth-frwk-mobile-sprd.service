@@ -8,6 +8,7 @@ Group=users
 SupplementaryGroups=priv_mediastorage priv_externalstorage
 Type=dbus
 BusName=org.projectx.bt
+SmackProcessLabel=User
 ExecStart=/usr/bin/bt-service
 KillMode=process
 Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/5001/dbus/user_bus_socket
