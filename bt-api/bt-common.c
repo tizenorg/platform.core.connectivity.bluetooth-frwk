@@ -49,6 +49,8 @@ static GDBusConnection *system_gdbus_conn = NULL;
 static guint bus_id;
 
 static GDBusConnection *system_gconn = NULL;
+static GDBusConnection *session_gconn = NULL;
+
 
 #define DBUS_TIMEOUT 20 * 1000 /* 20 Seconds */
 
@@ -59,6 +61,38 @@ GDBusConnection *g_bus_get_private_conn(void)
 	GDBusConnection *private_gconn = NULL;
 
 	address = g_dbus_address_get_for_bus_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
+	if (address == NULL) {
+		if (error) {
+			BT_ERR("Failed to get bus address: %s", error->message);
+			g_clear_error(&error);
+		}
+		return NULL;
+	}
+
+	private_gconn = g_dbus_connection_new_for_address_sync(address,
+				G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT |
+				G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION,
+				NULL, /* GDBusAuthObserver */
+				NULL,
+				&error);
+	if (!private_gconn) {
+		if (error) {
+			BT_ERR("Unable to connect to dbus: %s", error->message);
+			g_clear_error(&error);
+		}
+		return NULL;
+	}
+
+	return private_gconn;
+}
+
+GDBusConnection *g_bus_get_private_session_conn(void)
+{
+	GError *error = NULL;
+	char *address;
+	GDBusConnection *private_gconn = NULL;
+
+	address = g_dbus_address_get_for_bus_sync(G_BUS_TYPE_SESSION, NULL, &error);
 	if (address == NULL) {
 		if (error) {
 			BT_ERR("Failed to get bus address: %s", error->message);
@@ -96,6 +130,18 @@ GDBusConnection *_bt_gdbus_init_system_gconn(void)
 	return system_gconn;
 }
 
+GDBusConnection *_bt_gdbus_init_session_gconn(void)
+{
+	dbus_threads_init_default();
+
+	if (session_gconn != NULL)
+		return session_gconn;
+
+	session_gconn = g_bus_get_private_session_conn();
+
+	return session_gconn;
+}
+
 GDBusConnection *_bt_gdbus_get_system_gconn(void)
 {
 
@@ -108,6 +154,20 @@ GDBusConnection *_bt_gdbus_get_system_gconn(void)
 
 	return system_gconn;
 }
+
+GDBusConnection *_bt_gdbus_get_session_gconn(void)
+{
+
+
+	if (session_gconn == NULL) {
+		session_gconn = _bt_gdbus_init_session_gconn();
+	} else if (g_dbus_connection_is_closed(session_gconn)) {
+		session_gconn = g_bus_get_private_session_conn();
+	}
+
+	return session_gconn;
+}
+
 
 void _bt_print_device_address_t(const bluetooth_device_address_t *addr)
 {
@@ -1659,6 +1719,11 @@ BT_EXPORT_API int bluetooth_unregister_callback(void)
 	if (system_gconn) {
 		g_object_unref(system_gconn);
 		system_gconn = NULL;
+	}
+
+	if (session_gconn) {
+		g_object_unref(session_gconn);
+		session_gconn = NULL;
 	}
 	return BLUETOOTH_ERROR_NONE;
 }
