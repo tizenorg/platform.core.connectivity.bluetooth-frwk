@@ -4,13 +4,10 @@ After=dbus.socket dbus.service
 Requires=dbus.socket
 
 [Service]
-User=owner
-Group=users
 Type=dbus
 BusName=org.projectx.bt
 ExecStart=/usr/bin/bt-service
 KillMode=process
-Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/5001/dbus/user_bus_socket
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
