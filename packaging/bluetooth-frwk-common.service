@@ -7,6 +7,7 @@ User=owner
 Group=users
 Type=dbus
 BusName=org.projectx.bt
+SmackProcessLabel=User
 ExecStart=/usr/bin/bt-service
 Restart=always
 RestartSec=1
