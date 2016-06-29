@@ -133,7 +133,7 @@ ELSE(LIBNOTIFY_SUPPORT)
 ENDIF(LIBNOTIFY_SUPPORT)
 
 #CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service.in ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service)
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service DESTINATION share/dbus-1/services)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service DESTINATION share/dbus-1/system-services)
 INSTALL(TARGETS ${PROJECT_NAME} DESTINATION bin)
 
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/auto-pair-blacklist DESTINATION /opt/var/lib/bluetooth/)
@@ -147,7 +147,7 @@ ELSE ()
 	INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/mobile/stack_info DESTINATION /usr/etc/bluetooth/)
 ENDIF (TIZEN_WEARABLE)
 
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service.conf DESTINATION /etc/dbus-1/session.d)
+INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service.conf DESTINATION /etc/dbus-1/system.d)
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 

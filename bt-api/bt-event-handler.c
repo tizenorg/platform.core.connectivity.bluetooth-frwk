@@ -2616,7 +2616,7 @@ int _bt_register_event(int event_type, void *event_cb, void *user_data)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	connection_type = _bt_gdbus_get_session_gconn();
+	connection_type = _bt_gdbus_get_system_gconn();
 	if (connection_type == NULL)
 		return BLUETOOTH_ERROR_INTERNAL;
 
@@ -2657,7 +2657,7 @@ int _bt_unregister_event(int event_type)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	connection_type = _bt_gdbus_get_session_gconn();
+	connection_type = _bt_gdbus_get_system_gconn();
 
 	event_list = g_slist_remove(event_list, (void *)cb_data);
 
@@ -2705,7 +2705,7 @@ void _bt_register_name_owner_changed(void)
 {
 	GDBusConnection *connection_type;
 
-	connection_type = _bt_gdbus_get_session_gconn();
+	connection_type = _bt_gdbus_get_system_gconn();
 	if (connection_type == NULL) {
 		BT_ERR("Unable to get the bus");
 		return;
@@ -2720,7 +2720,7 @@ void _bt_unregister_name_owner_changed(void)
 {
 	GDBusConnection *connection_type;
 
-	connection_type = _bt_gdbus_get_session_gconn();
+	connection_type = _bt_gdbus_get_system_gconn();
 	if (connection_type != NULL && owner_sig_id != -1) {
 		g_dbus_connection_signal_unsubscribe(connection_type,
 							owner_sig_id);

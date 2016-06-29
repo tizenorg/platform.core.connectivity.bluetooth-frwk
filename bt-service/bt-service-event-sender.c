@@ -530,7 +530,7 @@ int _bt_init_service_event_sender(void)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
-	conn = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &err);
+	conn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &err);
 	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
 	if (conn == NULL) {
 		BT_ERR("conn == NULL");
