@@ -2741,10 +2741,10 @@ int _bt_service_register(void)
 	GError *err = NULL;
 	int result;
 
-	conn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &err);
+	conn = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &err);
 	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	owner_id = g_bus_own_name(G_BUS_TYPE_SYSTEM,
+	owner_id = g_bus_own_name(G_BUS_TYPE_SESSION,
 				BT_SERVICE_NAME,
 				G_BUS_NAME_OWNER_FLAGS_NONE,
 				NULL, NULL, NULL,

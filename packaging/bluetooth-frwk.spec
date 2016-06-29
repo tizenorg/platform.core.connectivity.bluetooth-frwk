@@ -129,7 +129,7 @@ export CFLAGS="$CFLAGS -DTIZEN_NETWORK_TETHERING_ENABLE -DTIZEN_BT_FLIGHTMODE_EN
 %else
 %define _servicefile packaging/bluetooth-frwk-mobile.service
 %endif
-%define _servicedir multi-user.target.wants
+%define _servicedir default.target.wants
 %endif
 
 %if "%{?profile}" == "wearable"
@@ -198,9 +198,9 @@ install -D -m 0644 LICENSE %{buildroot}%{_datadir}/license/bluetooth-frwk-devel
 
 #mkdir -p %{buildroot}%{_libdir}/systemd/user
 #install -m 0644 packaging/bluetooth-frwk-tv.service %{buildroot}%{_libdir}/systemd/user
-mkdir -p %{buildroot}%{_unitdir}/%{_servicedir}
-install -m 0644 %{_servicefile} %{buildroot}%{_unitdir}/bluetooth-frwk.service
-ln -s ../bluetooth-frwk.service %{buildroot}%{_unitdir}/%{_servicedir}/bluetooth-frwk.service
+mkdir -p %{buildroot}/usr/lib/systemd/user/%{_servicedir}
+install -m 0644 %{_servicefile} %{buildroot}/usr/lib/systemd/user/bluetooth-frwk.service
+ln -s ../bluetooth-frwk.service %{buildroot}/usr/lib/systemd/user/%{_servicedir}/bluetooth-frwk.service
 
 %if %{with bluetooth_frwk_libnotify} || %{with bluetooth_frwk_libnotification}
 mkdir -p %{buildroot}%{_datadir}/icons/default
@@ -247,8 +247,8 @@ sed -i 's/%TZ_SYS_DEFAULT_USER/app/' %{buildroot}%{_datadir}/dbus-1/system-servi
 %defattr(-, root, root)
 %{_libdir}/libbluetooth-api.so.*
 %{_datadir}/license/bluetooth-frwk
-%{_unitdir}/%{_servicedir}/bluetooth-frwk.service
-%{_unitdir}/bluetooth-frwk.service
+/usr/lib/systemd/user/%{_servicedir}/bluetooth-frwk.service
+/usr/lib/systemd/user/bluetooth-frwk.service
 
 %files devel
 %defattr(-, root, root)
@@ -266,11 +266,11 @@ sed -i 's/%TZ_SYS_DEFAULT_USER/app/' %{buildroot}%{_datadir}/dbus-1/system-servi
 %files service
 %manifest %{name}.manifest
 %defattr(-, root, root)
-%{_datadir}/dbus-1/system-services/org.projectx.bt.service
+%{_datadir}/dbus-1/services/org.projectx.bt.service
 %{_bindir}/bt-service
 #%{_libdir}/systemd/user/bluetooth-frwk-tv.service
-%{_unitdir}/%{_servicedir}/bluetooth-frwk.service
-%{_sysconfdir}/dbus-1/system.d/bluetooth-frwk-service.conf
+/usr/lib/systemd/user/%{_servicedir}/bluetooth-frwk.service
+%{_sysconfdir}/dbus-1/session.d/bluetooth-frwk-service.conf
 %{_bindir}/bluetooth-frwk-test
 #%{_bindir}/bluetooth-gatt-test
 #%{_bindir}/bluetooth-advertising-test

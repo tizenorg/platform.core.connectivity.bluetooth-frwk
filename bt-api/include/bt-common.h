@@ -341,6 +341,11 @@ GDBusConnection *_bt_gdbus_init_system_gconn(void);
 
 GDBusConnection *_bt_gdbus_get_system_gconn(void);
 
+GDBusConnection *_bt_gdbus_init_session_gconn(void);
+
+GDBusConnection *_bt_gdbus_get_session_gconn(void);
+
+
 GVariant *_bt_get_managed_objects(void);
 
 void _bt_convert_device_path_to_address(const char *device_path,

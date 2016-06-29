@@ -2657,6 +2657,8 @@ gboolean __bt_service_check_privilege(int function_name,
         case BT_LE_IPSP_DEINIT:
         case BT_LE_IPSP_CONNECT:
         case BT_LE_IPSP_DISCONNECT:
+        case BT_PASSKEY_REPLY:
+        case BT_PASSKEY_CONFIRMATION_REPLY:
                 ret_val = cynara_check(p_cynara, client_creds, client_session, user_creds,
                                                                                  BT_PRIVILEGE_PLATFORM);
 
@@ -2763,10 +2765,10 @@ int _bt_service_register(void)
 	GError *err = NULL;
 	int result;
 
-	conn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &err);
+	conn = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &err);
 	retv_if(conn == NULL, BLUETOOTH_ERROR_INTERNAL);
 
-	owner_id = g_bus_own_name(G_BUS_TYPE_SYSTEM,
+	owner_id = g_bus_own_name(G_BUS_TYPE_SESSION,
 				BT_SERVICE_NAME,
 				G_BUS_NAME_OWNER_FLAGS_NONE,
 				NULL, NULL, NULL,
