@@ -67,6 +67,8 @@ void _bt_service_oal_event_receiver(int event_type, gpointer event_data)
 	switch(event_type) {
 	case OAL_EVENT_OAL_INITIALISED_SUCCESS:
 	case OAL_EVENT_OAL_INITIALISED_FAILED:
+	case OAL_EVENT_ADAPTER_ENABLED:
+        case OAL_EVENT_ADAPTER_DISABLED:
 		if (adapter_cb)
 			adapter_cb(event_type, event_data);
 		break;

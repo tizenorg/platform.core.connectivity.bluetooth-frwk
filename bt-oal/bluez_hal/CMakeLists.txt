@@ -3,6 +3,10 @@ PROJECT(bluetooth.default C)
 
 SET(SRCS
 ./src/bt-hal-bluetooth.c
+./src/bt-hal-adapter-dbus-handler.c
+./src/bt-hal-dbus-common-utils.c
+./src/bt-hal-event-receiver.c
+./src/bt-hal-utils.c
 )
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
