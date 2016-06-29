@@ -27,6 +27,24 @@
 extern "C" {
 #endif
 
+typedef enum {
+        ADAPTER_DISCOVERY_STOPPED,
+        ADAPTER_DISCOVERY_STARTED,
+        ADAPTER_DISCOVERY_STARTING,
+        ADAPTER_DISCOVERY_STOPPING,
+} bt_adapter_discovery_state_t;
+
+typedef enum {
+	BT_DEACTIVATED,
+	BT_ACTIVATED,
+	BT_ACTIVATING,
+	BT_DEACTIVATING,
+} bt_status_t;
+
+int _bt_enable_adapter(void);
+
+int _bt_disable_adapter(void);
+
 int _bt_stack_init(void);
 
 #ifdef __cplusplus

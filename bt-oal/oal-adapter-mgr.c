@@ -40,11 +40,16 @@ const char * status2string(bt_status_t status);
 oal_status_t convert_to_oal_status(bt_status_t status);
 void parse_device_properties(int num_properties, bt_property_t *properties,
 		remote_device_t *dev_info, ble_adv_data_t * adv_info);
+static gboolean retry_enable_adapter(gpointer data);
 oal_status_t oal_mgr_init_internal(void);
+
+
+/* Callback registered with Stack */
+static void cb_adapter_state_change(bt_state_t status);
 
 static bt_callbacks_t callbacks = {
 	sizeof(callbacks),
-	NULL, /* adapter_state_changed_callback */
+	cb_adapter_state_change,
 	NULL, /* adapter_properties_callback */
 	NULL, /* remote_device_properties_callback */
 	NULL, /* device_found_callback */
@@ -86,3 +91,57 @@ void adapter_mgr_cleanup(void)
 	BT_DBG();
 }
 
+oal_status_t adapter_enable(void)
+{
+	int ret = BT_STATUS_SUCCESS;
+
+	API_TRACE();
+	CHECK_OAL_INITIALIZED();
+	if (OAL_STATUS_SUCCESS != hw_is_module_ready()) {
+		g_timeout_add(200, retry_enable_adapter, NULL);
+		return OAL_STATUS_PENDING;
+	}
+
+	ret = blued_api->enable();
+
+	if (ret != BT_STATUS_SUCCESS) {
+		BT_ERR("Enable failed: [%s]", status2string(ret));
+		return convert_to_oal_status(ret);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
+oal_status_t adapter_disable(void)
+{
+	int ret;
+
+	API_TRACE();
+
+	CHECK_OAL_INITIALIZED();
+
+	ret = blued_api->disable();
+
+	if (ret != BT_STATUS_SUCCESS) {
+		BT_ERR("Disable failed: [%s]", status2string(ret));
+		return convert_to_oal_status(ret);
+	}
+	return OAL_STATUS_SUCCESS;
+}
+
+/* Callbacks from Stack */
+static void cb_adapter_state_change(bt_state_t status)
+{
+	BT_DBG("+");
+	oal_event_t event;
+
+	event = (BT_STATE_ON == status)?OAL_EVENT_ADAPTER_ENABLED:OAL_EVENT_ADAPTER_DISABLED;
+
+	send_event(event, NULL);
+}
+
+static gboolean retry_enable_adapter(gpointer data)
+{
+	adapter_enable();
+	return FALSE;
+}

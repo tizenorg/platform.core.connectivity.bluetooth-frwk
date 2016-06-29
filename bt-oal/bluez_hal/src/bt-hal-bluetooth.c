@@ -30,6 +30,8 @@
 #include "bt-hal-msg.h"
 #include "bt-hal-utils.h"
 
+#include <bt-hal-adapter-dbus-handler.h>
+
 #define enum_prop_to_hal(prop, hal_prop, type) do { \
 	static type e; \
 	prop.val = &e; \
@@ -39,6 +41,13 @@
 
 static const bt_callbacks_t *bt_hal_cbacks = NULL;
 
+
+/* Forward declarations */
+static void __bt_adapter_props_to_hal(bt_property_t *send_props, struct hal_property *prop, uint8_t num_props, uint16_t len);
+static void __bt_hal_handle_adapter_state_changed(void *buf, uint16_t len);
+static void __bt_hal_handle_adapter_property_changed(void *buf, uint16_t len);
+static void __bt_hal_handle_stack_messages(int message, void *buf, uint16_t len);
+
 static bool interface_ready(void)
 {
 	return bt_hal_cbacks != NULL;
@@ -46,6 +55,7 @@ static bool interface_ready(void)
 
 static int init(bt_callbacks_t *callbacks)
 {
+	int ret;
 	DBG("HAL library Initialization..");
 
 	if (interface_ready())
@@ -53,6 +63,14 @@ static int init(bt_callbacks_t *callbacks)
 	else {
 		bt_hal_cbacks = callbacks;
 		DBG("Store HAL stack msg handler callback");
+		_bt_hal_dbus_store_stack_msg_cb(__bt_hal_handle_stack_messages);
+		ret = _bt_hal_initialize_event_receiver(__bt_hal_handle_stack_messages);
+
+		if (ret == BT_STATUS_SUCCESS)
+			return BT_STATUS_SUCCESS;
+		else
+			return BT_STATUS_FAIL;
+
 	}
 	return BT_STATUS_SUCCESS;
 }
@@ -60,13 +78,13 @@ static int init(bt_callbacks_t *callbacks)
 /* Enable Adapter */
 static int enable(void)
 {
-	return BT_STATUS_UNSUPPORTED;
+	return _bt_hal_dbus_enable_adapter();
 }
 
 /* Disable Adapter */
 static int disable(void)
 {
-	return BT_STATUS_UNSUPPORTED;
+	return _bt_hal_dbus_disable_adapter();
 }
 
 static void cleanup(void)
@@ -312,3 +330,82 @@ struct hw_module_t HAL_MODULE_INFO_SYM = {
 	.author = "Intel Corporation",
 	.methods = &bluetooth_module_methods
 };
+
+static void __bt_hal_handle_adapter_state_changed(void *buf, uint16_t len)
+{
+	struct hal_ev_adapter_state_changed *ev = buf;
+
+	DBG("Adapter State: %d", ev->state);
+
+	if (bt_hal_cbacks->adapter_state_changed_cb)
+		bt_hal_cbacks->adapter_state_changed_cb(ev->state);
+}
+
+static void __bt_adapter_props_to_hal(bt_property_t *send_props, struct hal_property *prop,
+		uint8_t num_props, uint16_t len)
+{
+	void *buf = prop;
+	uint8_t i;
+
+	for (i = 0; i < num_props; i++) {
+		if (sizeof(*prop) + prop->len > len) {
+			ERR("invalid adapter properties(%zu > %u), cant process further properties!!!",
+					sizeof(*prop) + prop->len, len);
+			return;
+		}
+
+		send_props[i].type = prop->type;
+
+		switch (prop->type) {
+			/* TODO: Add Adapter Properties */
+			default:
+				send_props[i].len = prop->len;
+				send_props[i].val = prop->val;
+				break;
+		}
+
+		DBG("prop[%d]: %s", i, btproperty2str(&send_props[i]));
+
+		len -= sizeof(*prop) + prop->len;
+		buf += sizeof(*prop) + prop->len;
+		prop = buf;
+	}
+
+	if (!len)
+		return;
+}
+
+static void __bt_hal_handle_adapter_property_changed(void *buf, uint16_t len)
+{
+	struct hal_ev_adapter_props_changed *ev = (struct hal_ev_adapter_props_changed *)buf;
+	bt_property_t props[ev->num_props];
+	DBG("+");
+
+	if (!bt_hal_cbacks->adapter_properties_cb)
+		return;
+
+	len -= sizeof(*ev);
+	__bt_adapter_props_to_hal(props, ev->props, ev->num_props, len);
+
+	if (bt_hal_cbacks->adapter_properties_cb)
+		bt_hal_cbacks->adapter_properties_cb(ev->status, ev->num_props, props);
+}
+
+static void __bt_hal_handle_stack_messages(int message, void *buf, uint16_t len)
+{
+	DBG("+");
+	switch(message) {
+		case HAL_EV_ADAPTER_STATE_CHANGED:
+			DBG("Event: HAL_EV_ADAPTER_STATE_CHANGED");
+			__bt_hal_handle_adapter_state_changed(buf, len);
+			break;
+		case HAL_EV_ADAPTER_PROPS_CHANGED:
+			DBG("Event: HAL_EV_ADAPTER_PROPS_CHANGED");
+			__bt_hal_handle_adapter_property_changed(buf, len);
+			break;
+		default:
+			DBG("Event Currently not handled!!");
+			break;
+	}
+	DBG("-");
+}

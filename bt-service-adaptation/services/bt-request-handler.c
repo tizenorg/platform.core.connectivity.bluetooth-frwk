@@ -342,8 +342,31 @@ int __bt_bluez_request(int function_name,
 		GArray **out_param1)
 {
 	int result = BLUETOOTH_ERROR_NONE;
+	char *sender = NULL;
 
 	switch (function_name) {
+	case BT_ENABLE_ADAPTER: {
+		result = _bt_enable_adapter();
+		/* Save invocation */
+		if (result == BLUETOOTH_ERROR_NONE) {
+			BT_DBG("_bt_enable_adapter scheduled successfully! save invocation context");
+			sender = (char*)g_dbus_method_invocation_get_sender(context);
+			_bt_save_invocation_context(context, result, sender,
+					function_name, NULL);
+		}
+		break;
+	}
+	case BT_DISABLE_ADAPTER: {
+		 result = _bt_disable_adapter();
+		 /* Save invocation */
+		 if (result == BLUETOOTH_ERROR_NONE) {
+			 BT_DBG("_bt_disable_adapter scheduled successfully! save invocation context");
+			 sender = (char*)g_dbus_method_invocation_get_sender(context);
+			 _bt_save_invocation_context(context, result, sender,
+					 function_name, NULL);
+		 }
+		 break;
+	 }
 	default:
 	 BT_INFO("UnSupported function [%d]", function_name);
 	 result = BLUETOOTH_ERROR_NOT_SUPPORT;
