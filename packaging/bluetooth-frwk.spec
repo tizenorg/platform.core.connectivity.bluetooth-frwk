@@ -3,7 +3,7 @@
 %define _varlibdir /opt/var/lib
 
 Name:       bluetooth-frwk
-Summary:    Bluetooth framework for BlueZ and Obexd. This package is Bluetooth framework based on BlueZ and Obexd stack.
+Summary:    Bluetooth framework for BlueZ and Obexd.
 Version:    0.2.151
 Release:    1
 Group:      Network & Connectivity/Bluetooth
@@ -91,7 +91,7 @@ This package is Bluetooth Service daemon to manage BT services.
 
 %package httpproxy
 Summary:    Bluetooth HTTP Proxy Service daemon
-Group:      TO_BE/FILLED
+Group:      Network & Connectivity/Bluetooth
 Requires:   %{name} = %{version}-%{release}
 
 %description httpproxy
@@ -112,6 +112,16 @@ Requires:   %{name} = %{version}-%{release}
 
 %description test
 This package is Bluetooth test application.
+
+%if %{bt_hal} == ENABLED
+%package oal
+Summary:    Bluetooth OAL
+Group:      Network & Connectivity/Bluetooth
+Requires:   %{name} = %{version}-%{release}
+
+%description oal
+This package is BT stack common interface.
+%endif
 
 %prep
 %setup -q
@@ -295,6 +305,8 @@ sed -i 's/%TZ_SYS_DEFAULT_USER/app/' %{buildroot}%{_datadir}/dbus-1/system-servi
 #%attr(0666,-,-) %{_varlibdir}/bluetooth/auto-pair-blacklist
 #%attr(0666,-,-) %{_prefix}/etc/bluetooth/stack_info
 #%{_dumpdir}/bluetooth_log_dump.sh
+
+
 %{_datadir}/license/bluetooth-frwk-service
 %if %{with bluetooth_frwk_libnotify} || %{with bluetooth_frwk_libnotification}
 %{_datadir}/icons/default/bt-icon.png
@@ -321,3 +333,9 @@ sed -i 's/%TZ_SYS_DEFAULT_USER/app/' %{buildroot}%{_datadir}/dbus-1/system-servi
 %{_bindir}/bluetooth-frwk-test
 %{_bindir}/bluetooth-gatt-test
 %{_bindir}/bluetooth-advertising-test
+
+%if %{bt_hal} == ENABLED
+%files oal
+%{_libdir}/libbt-oal.so*
+%{_libdir}/libbluetooth.default.so*
+%endif

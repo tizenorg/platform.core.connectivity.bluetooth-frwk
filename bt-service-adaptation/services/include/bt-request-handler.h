@@ -32,6 +32,24 @@ extern "C" {
 #define BT_SERVICE_NAME "org.projectx.bt"
 #define BT_SERVICE_PATH "/org/projectx/bt_service"
 
+/* Invocation information structure for API's
++   expecting replies from bluetooth service */
+typedef struct {
+        char * sender;
+        int service_function;
+        GDBusMethodInvocation *context;
+        int result;
+        gpointer user_data;
+} invocation_info_t;
+
+GSList *_bt_get_invocation_list(void);
+
+void _bt_save_invocation_context(GDBusMethodInvocation *invocation, int result,
+                char *sender, int service_function,
+                gpointer invocation_data);
+
+void _bt_free_info_from_invocation_list(invocation_info_t *req_info);
+
 int _bt_service_register(void);
 
 void _bt_service_unregister(void);
@@ -40,6 +58,8 @@ int _bt_service_cynara_init(void);
 
 void _bt_service_cynara_deinit(void);
 
+void _bt_service_method_return(GDBusMethodInvocation *invocation,
+		GArray *out_param, int result);
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

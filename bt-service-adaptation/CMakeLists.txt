@@ -1,8 +1,6 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 PROJECT(bt-service C)
 
-#ADD_SUBDIRECTORY(hal_lib)
-
 #Include Source files for bluetooth service common files only
 SET(SRCS
 marshal.c
@@ -11,19 +9,9 @@ marshal.c
 ./services/bt-service-event-sender.c
 ./services/bt-service-util.c
 ./services/bt-request-handler.c
+./services/adapter/bt-service-core-adapter.c
+./services/bt-service-event-receiver.c
 )
-
-IF(LIBNOTIFY_SUPPORT)
-LIST(APPEND SRCS
-bt-popup.c
-)
-ENDIF(LIBNOTIFY_SUPPORT)
-
-IF(LIBNOTIFICATION_SUPPORT)
-LIST(APPEND SRCS
-bt-service-agent-notification.c
-)
-ENDIF(LIBNOTIFICATION_SUPPORT)
 
 IF("${CMAKE_BUILD_TYPE}" STREQUAL "")
         SET(CMAKE_BUILD_TYPE "Release")
@@ -32,6 +20,9 @@ MESSAGE("Build type: ${CMAKE_BUILD_TYPE}")
 
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/services/include)
+
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../bt-oal/include)
+LINK_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../bt-oal)
 
 SET(PKG_MODULES
         vconf
@@ -81,12 +72,6 @@ EXEC_PROGRAM("${MARSHALTOOL}" ARGS "--prefix=marshal ${CMAKE_CURRENT_SOURCE_DIR}
 EXEC_PROGRAM("${MARSHALTOOL}" ARGS "--prefix=marshal ${CMAKE_CURRENT_SOURCE_DIR}/marshal.list --body > ${CMAKE_CURRENT_SOURCE_DIR}/marshal.c")
 
 FIND_PROGRAM(DBUS_BINDING_TOOL NAMES dbus-binding-tool)
-#EXEC_PROGRAM("${DBUS_BINDING_TOOL}" ARGS "--prefix=bt ${CMAKE_CURRENT_SOURCE_DIR}/bt-request-service.xml --mode=glib-server --output=${CMAKE_CURRENT_SOURCE_DIR}/include/bt-service-method.h")
-#EXEC_PROGRAM("${DBUS_BINDING_TOOL}" ARGS "--prefix=bt_obex_agent ${CMAKE_CURRENT_SOURCE_DIR}/bt-service-obex-agent.xml --mode=glib-server --output=${CMAKE_CURRENT_SOURCE_DIR}/include/bt-obex-agent-method.h")
-
-#EXEC_PROGRAM("${DBUS_BINDING_TOOL}" ARGS "--prefix=gap_agent ${CMAKE_CURRENT_SOURCE_DIR}/bt-service-gap-agent1.xml --mode=glib-server --output=${CMAKE_CURRENT_SOURCE_DIR}/include/bt-gap-agent-method.h")
-
-#EXEC_PROGRAM("${DBUS_BINDING_TOOL}" ARGS "--prefix=bt_media_agent ${CMAKE_CURRENT_SOURCE_DIR}/bt-service-media-agent.xml --mode=glib-server --output=${CMAKE_CURRENT_SOURCE_DIR}/include/bt-media-agent-method.h")
 
 ADD_DEFINITIONS("-DPREFIX=\"${CMAKE_INSTALL_PREFIX}\"")
 ADD_DEFINITIONS("-DVENDOR=\"${APP_VENDOR}\"")
@@ -105,17 +90,8 @@ ENDIF(LIBNOTIFY_SUPPORT OR LIBNOTIFICATION_SUPPORT)
 SET(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed -pie")
 
 ADD_EXECUTABLE(${PROJECT_NAME} ${SRCS})
-TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS})
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS} -lbt-oal)
 
-# to permit usage of bluetooth_cancel_bonding in bt-popup.c. This build bluetooth-api first.
-IF(LIBNOTIFY_SUPPORT)
-        ADD_DEPENDENCIES(${PROJECT_NAME} bluetooth-api)
-        TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS} bluetooth-api)
-ELSE(LIBNOTIFY_SUPPORT)
-        TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${service_pkgs_LDFLAGS})
-ENDIF(LIBNOTIFY_SUPPORT)
-
-#CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service.in ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.projectx.bt.service DESTINATION share/dbus-1/system-services)
 INSTALL(TARGETS ${PROJECT_NAME} DESTINATION bin)
 
@@ -131,5 +107,7 @@ ELSE ()
 ENDIF (TIZEN_WEARABLE)
 
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth-frwk-service.conf DESTINATION /etc/dbus-1/system.d)
+
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} -ldl)
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
