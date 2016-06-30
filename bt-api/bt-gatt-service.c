@@ -21,6 +21,7 @@
 #include<stdlib.h>
 #include<unistd.h>
 #include<stdint.h>
+#include<stdbool.h>
 
 #include "bt-common.h"
 #include "bt-internal-types.h"
@@ -34,6 +35,7 @@ static gboolean new_service = FALSE;
 static gboolean new_char = FALSE;
 static int serv_id = 1;
 static int register_pending_cnt = 0;
+static bool is_server_started = false;
 
 /* Introspection data for the service we are exporting */
 static const gchar service_introspection_xml[] =
@@ -1397,24 +1399,31 @@ BT_EXPORT_API int bluetooth_gatt_unregister_application(void)
 {
 	GDBusProxy *proxy = NULL;
 
-	proxy = __bt_gatt_gdbus_get_manager_proxy("org.bluez",
-					"/org/bluez/hci0", GATT_MNGR_INTERFACE);
+	if (is_server_started)
+	{
+		proxy = __bt_gatt_gdbus_get_manager_proxy("org.bluez",
+				"/org/bluez/hci0", GATT_MNGR_INTERFACE);
 
-	if (proxy == NULL || app_path == NULL)
-		return BLUETOOTH_ERROR_INTERNAL;
+		if (proxy == NULL || app_path == NULL)
+			return BLUETOOTH_ERROR_INTERNAL;
 
-	BT_INFO("UnregisterApplication");
+		BT_INFO("UnregisterApplication");
 
-	/* Async Call to Unregister Service */
-	g_dbus_proxy_call(proxy,
+		/* Async Call to Unregister Service */
+		g_dbus_proxy_call(proxy,
 				"UnregisterApplication",
 				g_variant_new("(o)",
-				app_path),
+					app_path),
 				G_DBUS_CALL_FLAGS_NONE, -1,
 				NULL,
 				(GAsyncReadyCallback) unregister_application_cb,
 				NULL);
 
+		is_server_started = false;
+		return BLUETOOTH_ERROR_NONE;
+	}
+
+	BT_INFO("GATT server not started");
 	return BLUETOOTH_ERROR_NONE;
 }
 
@@ -2043,27 +2052,36 @@ BT_EXPORT_API int bluetooth_gatt_register_application(void)
 {
 	GDBusProxy *proxy = NULL;
 
-	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_GATT_REGISTER_APPLICATION)
-			== BLUETOOTH_ERROR_PERMISSION_DEINED) {
-		BT_ERR("Don't have aprivilege to use this API");
-		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	if (!is_server_started) {
+
+		if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_GATT_REGISTER_APPLICATION)
+				== BLUETOOTH_ERROR_PERMISSION_DEINED) {
+			BT_ERR("Don't have aprivilege to use this API");
+			return BLUETOOTH_ERROR_PERMISSION_DEINED;
+		}
+
+		proxy = __bt_gatt_gdbus_get_manager_proxy("org.bluez",
+				"/org/bluez/hci0", GATT_MNGR_INTERFACE);
+		if (proxy == NULL || app_path == NULL)
+			return BLUETOOTH_ERROR_INTERNAL;
+
+		BT_INFO("RegisterApplication");
+
+		g_dbus_proxy_call(proxy,
+				"RegisterApplication",
+				g_variant_new("(oa{sv})",
+					app_path, NULL),
+				G_DBUS_CALL_FLAGS_NONE, -1,
+				NULL,
+				(GAsyncReadyCallback) register_application_cb,
+				NULL);
+
+		is_server_started = true;
+
+		return BLUETOOTH_ERROR_NONE;
 	}
 
-	proxy = __bt_gatt_gdbus_get_manager_proxy("org.bluez",
-					"/org/bluez/hci0", GATT_MNGR_INTERFACE);
-	if (proxy == NULL || app_path == NULL)
-		return BLUETOOTH_ERROR_INTERNAL;
-
-	BT_INFO("RegisterApplication");
-
-	g_dbus_proxy_call(proxy,
-			"RegisterApplication",
-			g_variant_new("(oa{sv})",
-			app_path, NULL),
-			G_DBUS_CALL_FLAGS_NONE, -1,
-			NULL,
-			(GAsyncReadyCallback) register_application_cb,
-			NULL);
+	BT_INFO("Already RegisterApplication");
 
 	return BLUETOOTH_ERROR_NONE;
 }
