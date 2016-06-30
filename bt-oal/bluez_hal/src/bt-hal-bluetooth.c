@@ -99,7 +99,7 @@ static int get_adapter_properties(void)
 
 static int get_adapter_property(bt_property_type_t type)
 {
-	return BT_STATUS_UNSUPPORTED;
+	return _bt_hal_dbus_get_adapter_property(type);
 }
 
 static int set_adapter_property(const bt_property_t *property)

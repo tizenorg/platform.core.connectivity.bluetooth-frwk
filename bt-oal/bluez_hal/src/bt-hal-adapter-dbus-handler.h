@@ -42,6 +42,8 @@ int _bt_hal_dbus_enable_adapter(void);
 
 int _bt_hal_dbus_disable_adapter(void);
 
+int _bt_hal_dbus_get_adapter_property(bt_property_type_t type);
+
 int _bt_hal_dbus_get_adapter_properties(void);
 
 #ifdef __cplusplus
