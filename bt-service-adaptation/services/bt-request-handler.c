@@ -275,12 +275,20 @@ static void __bt_service_method(GDBusConnection *connection,
 			/* Return result */
 			if (service_type == BT_CHECK_PRIVILEGE ||
 					service_function != BT_OPP_PUSH_FILES) {
-				out_var = g_variant_new_from_data((const GVariantType *)"ay",
-						out_param1->data, out_param1->len,
-						TRUE, NULL, NULL);
+				if (!__bt_is_sync_function(service_function)) {
+					out_var = g_variant_new_from_data((const GVariantType *)"ay",
+							out_param1->data, out_param1->len,
+							TRUE, NULL, NULL);
 
-				GVariant *temp = g_variant_new("(iv)", result, out_var);
-				g_dbus_method_invocation_return_value(invocation, temp);
+					GVariant *temp = g_variant_new("(iv)", result, out_var);
+					g_dbus_method_invocation_return_value(invocation, temp);
+				} else {
+					/*
+					 * API expects return value from Bluetooth stack, so just save
+					 * the invocation and invoke it when we get response from stack.
+					 */
+					BT_INFO("Invocation context will be saved in service_function");
+				}
 
 				g_array_free(out_param1, TRUE);
 				out_param1 = NULL;
@@ -357,20 +365,59 @@ int __bt_bluez_request(int function_name,
 		break;
 	}
 	case BT_DISABLE_ADAPTER: {
-		 result = _bt_disable_adapter();
-		 /* Save invocation */
-		 if (result == BLUETOOTH_ERROR_NONE) {
-			 BT_DBG("_bt_disable_adapter scheduled successfully! save invocation context");
-			 sender = (char*)g_dbus_method_invocation_get_sender(context);
-			 _bt_save_invocation_context(context, result, sender,
-					 function_name, NULL);
-		 }
-		 break;
-	 }
+		result = _bt_disable_adapter();
+		/* Save invocation */
+		if (result == BLUETOOTH_ERROR_NONE) {
+			BT_DBG("_bt_disable_adapter scheduled successfully! save invocation context");
+			sender = (char*)g_dbus_method_invocation_get_sender(context);
+			_bt_save_invocation_context(context, result, sender,
+					function_name, NULL);
+		}
+		break;
+	}
+	case BT_GET_LOCAL_ADDRESS: {
+		result = _bt_get_local_address();
+
+		/* Save invocation */
+		if (result == BLUETOOTH_ERROR_NONE) {
+			sender = (char*)g_dbus_method_invocation_get_sender(context);
+			_bt_save_invocation_context(context, result, sender,
+					function_name, NULL);
+		}
+		break;
+	}
+	case BT_GET_LOCAL_VERSION: {
+		result = _bt_get_local_version();
+
+		/* Save invocation */
+		if (result == BLUETOOTH_ERROR_NONE) {
+			sender = (char*)g_dbus_method_invocation_get_sender(context);
+			_bt_save_invocation_context(context, result, sender,
+					function_name, NULL);
+		}
+		break;
+	}
+	case BT_GET_LOCAL_NAME: {
+		result = _bt_get_local_name();
+
+		/* Save invocation */
+		if (result == BLUETOOTH_ERROR_NONE) {
+			sender = (char*)g_dbus_method_invocation_get_sender(context);
+			_bt_save_invocation_context(context, result, sender,
+					function_name, NULL);
+		}
+		break;
+	}
+	case BT_GET_DISCOVERABLE_MODE: {
+		int discoverable_mode = BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE;
+		result = _bt_get_discoverable_mode(&discoverable_mode);
+		g_array_append_vals(*out_param1, &discoverable_mode, sizeof(int));
+		break;
+	}
 	default:
-	 BT_INFO("UnSupported function [%d]", function_name);
-	 result = BLUETOOTH_ERROR_NOT_SUPPORT;
-	 break;
+		BT_INFO("UnSupported function [%d]", function_name);
+		result = BLUETOOTH_ERROR_NOT_SUPPORT;
+		break;
 	}
 
 	return result;

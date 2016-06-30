@@ -34,7 +34,7 @@
 
 typedef struct {
 	int event;
-	unsigned int size;
+	gsize size;
 	gpointer event_data;
 } event_t;
 

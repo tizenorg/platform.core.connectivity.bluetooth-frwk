@@ -35,6 +35,12 @@
 
 static const bt_interface_t * blued_api;
 
+static bt_address_t local_address;
+static char local_name[BT_DEVICE_NAME_LENGTH_MAX + 1] = {'O', 'A', 'L', 0};
+static char local_version[BT_VERSION_STR_LEN_MAX + 1];
+static bt_scan_mode_t scan_mode = BT_SCAN_MODE_NONE;
+static int discoverable_timeout = 0;
+
 /* Forward declarations */
 const char * status2string(bt_status_t status);
 oal_status_t convert_to_oal_status(bt_status_t status);
@@ -46,11 +52,13 @@ oal_status_t oal_mgr_init_internal(void);
 
 /* Callback registered with Stack */
 static void cb_adapter_state_change(bt_state_t status);
+static void cb_adapter_properties (bt_status_t status,
+		int num_properties, bt_property_t *properties);
 
 static bt_callbacks_t callbacks = {
 	sizeof(callbacks),
 	cb_adapter_state_change,
-	NULL, /* adapter_properties_callback */
+	cb_adapter_properties,
 	NULL, /* remote_device_properties_callback */
 	NULL, /* device_found_callback */
 	NULL, /* discovery_state_changed_callback */
@@ -144,4 +152,234 @@ static gboolean retry_enable_adapter(gpointer data)
 {
 	adapter_enable();
 	return FALSE;
+}
+
+oal_status_t adapter_get_address(void)
+{
+	int ret;
+
+	CHECK_OAL_INITIALIZED();
+
+	API_TRACE();
+
+	ret = blued_api->get_adapter_property(BT_PROPERTY_BDADDR);
+	if (ret != BT_STATUS_SUCCESS) {
+		BT_ERR("get_adapter_property failed: [%s]", status2string(ret));
+		return convert_to_oal_status(ret);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
+oal_status_t adapter_get_version(void)
+{
+	int ret;
+
+	CHECK_OAL_INITIALIZED();
+
+	API_TRACE();
+
+	ret = blued_api->get_adapter_property(BT_PROPERTY_VERSION);
+	if (ret != BT_STATUS_SUCCESS) {
+		BT_ERR("get_adapter_property failed: [%s]", status2string(ret));
+		return convert_to_oal_status(ret);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
+oal_status_t adapter_get_name(void)
+{
+	int ret;
+
+	CHECK_OAL_INITIALIZED();
+
+	API_TRACE();
+
+	ret = blued_api->get_adapter_property(BT_PROPERTY_BDNAME);
+	if (ret != BT_STATUS_SUCCESS) {
+		BT_ERR("get_adapter_property failed: [%s]", status2string(ret));
+		return convert_to_oal_status(ret);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
+oal_status_t adapter_is_discoverable(int *p_discoverable)
+{
+	OAL_CHECK_PARAMETER(p_discoverable, return);
+
+	*p_discoverable = (scan_mode == BT_SCAN_MODE_CONNECTABLE_DISCOVERABLE);
+
+	API_TRACE("%d", *p_discoverable);
+
+	return OAL_STATUS_SUCCESS;
+}
+
+oal_status_t adapter_is_connectable(int *p_connectable)
+{
+	OAL_CHECK_PARAMETER(p_connectable, return);
+
+	*p_connectable = (scan_mode == BT_SCAN_MODE_CONNECTABLE_DISCOVERABLE)
+		||(scan_mode == BT_SCAN_MODE_CONNECTABLE);
+
+	API_TRACE("%d", *p_connectable);
+
+	return OAL_STATUS_SUCCESS;
+}
+
+oal_status_t adapter_get_discoverable_timeout(int *p_timeout)
+{
+	API_TRACE("%d", discoverable_timeout);
+
+	*p_timeout = discoverable_timeout;
+
+	return OAL_STATUS_SUCCESS;
+}
+
+static void cb_adapter_properties (bt_status_t status,
+                                               int num_properties,
+                                               bt_property_t *properties)
+{
+	int i;
+
+	BT_DBG("status: %d, count: %d", status, num_properties);
+
+	if (status != BT_STATUS_SUCCESS) {
+		if (num_properties == 1) {
+			BT_ERR("Adapter Prop failed: status: [%s], count: %d, prop: %d",
+				status2string(status), num_properties, properties[num_properties-1].type);
+		} else {
+			BT_ERR("Adapter Prop failed: status: [%s], count: %d", status2string(status), num_properties);
+		}
+		return;
+	}
+
+	for (i = 0; i < num_properties; i++) {
+		BT_DBG("prop type %d, len %d", properties[i].type, properties[i].len);
+		switch (properties[i].type) {
+		case BT_PROPERTY_VERSION: {
+			g_strlcpy(local_version, properties[i].val, BT_VERSION_STR_LEN_MAX);
+			local_version[properties[i].len] = '\0';
+
+			BT_DBG("Version: %s", local_version);
+			/* Send event to application */
+			if (num_properties == 1) {
+				char *adapter_ver = g_strdup(local_version);
+
+				/* Application has requested this property SET/GET hence send EVENT */
+				send_event(OAL_EVENT_ADAPTER_PROPERTY_VERSION, adapter_ver, strlen(adapter_ver));
+			}
+			break;
+		}
+		case BT_PROPERTY_BDNAME: {
+			g_strlcpy(local_name, properties[i].val, BT_DEVICE_NAME_LENGTH_MAX);
+			local_name[properties[i].len] = '\0';
+
+			BT_DBG("Name: %s", local_name);
+			/* Send event to application */
+			if (num_properties == 1) {
+				char * adap_name = g_strdup(local_name);
+
+				/* Application has requested this property SET/GET hence send EVENT */
+				send_event(OAL_EVENT_ADAPTER_PROPERTY_NAME, adap_name, strlen(adap_name));
+			}
+			break;
+		}
+		case BT_PROPERTY_BDADDR: {
+			bt_bdaddr_t * addr;
+
+			addr =  properties[i].val;
+			memcpy(local_address.addr, addr->address, 6);
+			if (num_properties == 1) {
+				/* Application has requested this property SET/GET hence send EVENT */
+				send_event(OAL_EVENT_ADAPTER_PROPERTY_ADDRESS,
+						g_memdup(&local_address, sizeof(local_address)),
+						sizeof(local_address));
+			}
+			break;
+		}
+		case BT_PROPERTY_UUIDS: {
+			int num_uuid;
+
+			num_uuid = properties[i].len/sizeof(bt_uuid_t);
+
+			BT_DBG("num_uuid: %d", num_uuid);
+
+			/* Send event to application */
+			if (num_properties == 1) {
+				event_adapter_services_t *uuids_event;
+
+				uuids_event = g_malloc(sizeof(event_adapter_services_t) + properties[i].len);
+				memcpy(uuids_event->service_list, properties[i].val, properties[i].len);
+				uuids_event->num = num_uuid;
+
+				/* Application has requested this property SET/GET hence send EVENT */
+				send_event(OAL_EVENT_ADAPTER_PROPERTY_SERVICES,
+						uuids_event, (num_uuid * sizeof(bt_uuid_t)));
+			}
+			break;
+		}
+		case BT_PROPERTY_ADAPTER_SCAN_MODE: {
+			bt_scan_mode_t cur_mode = *((bt_scan_mode_t *)properties[i].val);
+
+			BT_INFO("Scan mode (%d)", cur_mode);
+
+			scan_mode = cur_mode;
+
+			/* Send event to application */
+			if (num_properties == 1) {
+				oal_event_t event = OAL_EVENT_ADAPTER_MODE_NON_CONNECTABLE;
+
+				if (BT_SCAN_MODE_CONNECTABLE == cur_mode)
+					event = OAL_EVENT_ADAPTER_MODE_CONNECTABLE;
+				else if (BT_SCAN_MODE_CONNECTABLE_DISCOVERABLE == cur_mode)
+					event = OAL_EVENT_ADAPTER_MODE_DISCOVERABLE;
+
+				/* Application has requested this property SET/GET hence send EVENT */
+				send_event(event, NULL, 0);
+			}
+			break;
+		}
+		case BT_PROPERTY_ADAPTER_DISCOVERY_TIMEOUT: {
+			int timeout;
+
+			timeout = *((uint32_t*)properties[i].val);
+
+			BT_INFO("Discoverability timeout: %d", timeout);
+			discoverable_timeout = timeout;
+
+			send_event(OAL_EVENT_ADAPTER_MODE_DISCOVERABLE_TIMEOUT,
+					g_memdup(properties[i].val, sizeof(uint32_t)),
+					sizeof(uint32_t));
+			break;
+		}
+		case BT_PROPERTY_ADAPTER_BONDED_DEVICES: {
+			int j;
+			int num_bonded;
+			bt_bdaddr_t *bonded_addr_list;
+			event_device_list_t *event_data;
+
+			num_bonded = properties[i].len/sizeof(bt_bdaddr_t);
+			BT_DBG("num_bonded %d", num_bonded);
+
+			if (num_properties > 1)	/* No explicit req for this prop, ignore */
+				break;
+
+			bonded_addr_list = properties[i].val;
+			event_data = g_malloc(sizeof(event_device_list_t) + num_bonded*sizeof(bt_address_t));
+			event_data->num = num_bonded;
+
+			for (j = 0; j < num_bonded; j++)
+				memcpy(event_data->devices[j].addr, bonded_addr_list[j].address, 6);
+
+			send_event(OAL_EVENT_ADAPTER_BONDED_DEVICE_LIST,
+					event_data, (num_bonded * sizeof(bt_bdaddr_t)));
+			break;
+		}
+		default:
+			BT_WARN("Unhandled property: %d", properties[i].type);
+			break;
+		}
+	}
 }

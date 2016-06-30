@@ -65,6 +65,57 @@ oal_status_t adapter_enable(void);
  */
 oal_status_t adapter_disable(void);
 
+/**
+ * @brief Get local BT chip address
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see OAL_EVENT_ADAPTER_PROPERTY_ADDRESS
+ */
+oal_status_t adapter_get_address(void);
+
+/**
+ * @brief Get local BT version
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see OAL_EVENT_ADAPTER_PROPERTY_VERSION
+ */
+oal_status_t adapter_get_version(void);
+
+/**
+ * @brief Get local BT chip name
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see OAL_EVENT_ADAPTER_PROPERTY_NAME
+ */
+oal_status_t adapter_get_name(void);
+
+/**
+ * @brief Sets output variable to TRUE if adapter is discoverable & connectable.
+ */
+oal_status_t adapter_is_discoverable(int *p_discoverable);
+
+/**
+ * @brief Sets output variable to TRUE if adapter is either discoverable or connectable.
+ */
+oal_status_t adapter_is_connectable(int *p_connectable);
+
+/**
+ * @brief Sets output variable to value of current discoverable timeout.
+ */
+oal_status_t adapter_get_discoverable_timeout(int *p_timeout);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

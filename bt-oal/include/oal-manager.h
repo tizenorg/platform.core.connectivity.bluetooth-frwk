@@ -28,6 +28,8 @@
 extern "C" {
 #endif
 
+#define BT_VERSION_STR_LEN_MAX       30 /**< This specifies maximum adapter version string length */
+
 #define BT_DEVICE_NAME_LENGTH_MAX       248 /**< This specifies maximum device name length */
 
 #define BT_ADDRESS_BYTES_NUM            6 /**< This specifies bluetooth device address length */

@@ -104,25 +104,170 @@ int _bt_disable_adapter(void)
 	return __bt_adapter_state_handle_request(FALSE);
 }
 
+int _bt_get_local_address(void)
+{
+	int result;
+
+	BT_DBG("+");
+
+	result =  adapter_get_address();
+	if (result != OAL_STATUS_SUCCESS) {
+		BT_ERR("adapter_get_address failed: %d", result);
+		result = BLUETOOTH_ERROR_INTERNAL;
+	} else
+		result = BLUETOOTH_ERROR_NONE;
+
+	BT_DBG("-");
+	return result;
+}
+
+int _bt_get_local_version(void)
+{
+	int result;
+	BT_DBG("+");
+
+	result =  adapter_get_version();
+	if (result != OAL_STATUS_SUCCESS) {
+		BT_ERR("adapter_get_address failed: %d", result);
+		result = BLUETOOTH_ERROR_INTERNAL;
+	} else
+		result = BLUETOOTH_ERROR_NONE;
+
+	BT_DBG("-");
+	return result;
+}
+
+int _bt_get_local_name(void)
+{
+	int result;
+
+	BT_DBG("+");
+
+	result =  adapter_get_name();
+	if (result != OAL_STATUS_SUCCESS) {
+		BT_ERR("adapter_get_name failed: %d", result);
+		result = BLUETOOTH_ERROR_INTERNAL;
+	} else
+		result = BLUETOOTH_ERROR_NONE;
+
+	BT_DBG("-");
+	return result;
+}
+
+int _bt_get_discoverable_mode(int *mode)
+{
+	int scan_mode = 0;
+	int timeout = 0;
+
+	BT_DBG("+");
+
+	retv_if(NULL == mode, BLUETOOTH_ERROR_INVALID_PARAM);
+
+	adapter_is_discoverable(&scan_mode);
+	if (TRUE == scan_mode) {
+		adapter_get_discoverable_timeout(&timeout);
+		if (timeout > 0)
+			*mode = BLUETOOTH_DISCOVERABLE_MODE_TIME_LIMITED_DISCOVERABLE;
+		else
+			*mode = BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE;
+	} else {
+		adapter_is_connectable(&scan_mode);
+		if(scan_mode == TRUE)
+			*mode = BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE;
+		else {
+			/*
+			 * TODO: NON CONNECTABLE is not defined in bluetooth_discoverable_mode_t.
+			 * After adding BLUETOOTH_DISCOVERABLE_MODE_NON_CONNECTABLE, set mode as
+			 * BLUETOOTH_DISCOVERABLE_MODE_NON_CONNECTABLE. Until then return error.
+			 */
+			return BLUETOOTH_ERROR_INTERNAL;
+		}
+	}
+
+	BT_DBG("-");
+	return BLUETOOTH_ERROR_NONE;
+}
+
 static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 {
-        BT_DBG("");
+        BT_DBG("+");
 
-        switch(event_type) {
-        case OAL_EVENT_OAL_INITIALISED_SUCCESS:
-        case OAL_EVENT_OAL_INITIALISED_FAILED:
-                __bt_handle_oal_initialisation(event_type);
-                break;
+	switch(event_type) {
+	case OAL_EVENT_OAL_INITIALISED_SUCCESS:
+	case OAL_EVENT_OAL_INITIALISED_FAILED:
+		__bt_handle_oal_initialisation(event_type);
+		break;
 	case OAL_EVENT_ADAPTER_ENABLED:
-                __bt_adapter_state_change_callback(BT_ACTIVATED);
-                break;
-        case OAL_EVENT_ADAPTER_DISABLED:
-                __bt_adapter_state_change_callback(BT_DEACTIVATED);
-                break;
+		__bt_adapter_state_change_callback(BT_ACTIVATED);
+		break;
+	case OAL_EVENT_ADAPTER_DISABLED:
+		__bt_adapter_state_change_callback(BT_DEACTIVATED);
+		break;
+	case OAL_EVENT_ADAPTER_PROPERTY_ADDRESS: {
+		bt_address_t *bd_addr = event_data;
+		bluetooth_device_address_t local_address;
+
+		/* Copy data */
+		memcpy(local_address.addr, bd_addr->addr, BT_ADDRESS_LENGTH_MAX);
+		BT_DBG("Adapter address: [%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X]",
+				local_address.addr[0], local_address.addr[1], local_address.addr[2],
+				local_address.addr[3], local_address.addr[4], local_address.addr[5]);
+
+		__bt_adapter_handle_pending_requests(BT_GET_LOCAL_ADDRESS,
+				(void *) &local_address, sizeof(bluetooth_device_address_t));
+		break;
+	}
+	case OAL_EVENT_ADAPTER_PROPERTY_NAME: {
+		char *name = event_data;
+		bluetooth_device_name_t local_name;
+
+		memset(&local_name, 0x00, sizeof(bluetooth_device_name_t));
+		/* Copy data */
+		g_strlcpy(local_name.name,
+				(const gchar *)name, BLUETOOTH_DEVICE_NAME_LENGTH_MAX);
+		BT_DBG("Adapter Name: %s", local_name.name);
+
+		__bt_adapter_handle_pending_requests(BT_GET_LOCAL_NAME,
+				(void *) &local_name, sizeof(bluetooth_device_name_t));
+		break;
+	}
+	case OAL_EVENT_ADAPTER_PROPERTY_VERSION: {
+		char *ver = event_data;
+		bluetooth_version_t local_version;
+
+		memset(&local_version, 0x00, sizeof(bluetooth_version_t));
+		g_strlcpy(local_version.version,
+				(const gchar *)ver, BLUETOOTH_VERSION_LENGTH_MAX);
+		BT_DBG("BT Version: %s", local_version.version);
+
+		__bt_adapter_handle_pending_requests(BT_GET_LOCAL_VERSION,
+				(void *) &local_version, sizeof(bluetooth_version_t));
+		break;
+	}
+	case OAL_EVENT_ADAPTER_MODE_NON_CONNECTABLE: {
+		BT_INFO("Adapter discoverable mode: BLUETOOTH_DISCOVERABLE_MODE_NON_CONNECTABLE");
+		break;
+	}
+	case OAL_EVENT_ADAPTER_MODE_CONNECTABLE: {
+		BT_INFO("Adapter discoverable mode: BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE");
+		break;
+	}
+	case OAL_EVENT_ADAPTER_MODE_DISCOVERABLE: {
+		BT_INFO("Adapter discoverable mode: BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE");
+		break;
+	}
+	case OAL_EVENT_ADAPTER_MODE_DISCOVERABLE_TIMEOUT: {
+		int *timeout = event_data;
+
+		BT_INFO("Discoverable timeout: [%d]", *timeout);
+		break;
+	}
 	default:
 		BT_ERR("Unhandled event..");
 		break;
 	}
+
+	BT_DBG("-");
 }
 
 /* OAL post initialization handler */
@@ -170,15 +315,19 @@ static void __bt_adapter_handle_pending_requests(int service_function, void *use
 		out_param = g_array_new(FALSE, FALSE, sizeof(gchar));
 
 		switch(service_function) {
-			case BT_ENABLE_ADAPTER:
-			case BT_DISABLE_ADAPTER:
-			{
-				gboolean done = TRUE;
-				g_array_append_vals(out_param, &done, sizeof(gboolean));
-				break;
-			}
-			default:
-				BT_ERR("Unknown service function[%d]", service_function);
+		case BT_ENABLE_ADAPTER:
+		case BT_DISABLE_ADAPTER: {
+			gboolean done = TRUE;
+			g_array_append_vals(out_param, &done, sizeof(gboolean));
+			break;
+		}
+		case BT_GET_LOCAL_NAME:
+		case BT_GET_LOCAL_ADDRESS:
+		case BT_GET_LOCAL_VERSION:
+			g_array_append_vals(out_param, user_data, size);
+			break;
+		default:
+			BT_ERR("Unknown service function[%d]", service_function);
 		}
 
 		_bt_service_method_return(req_info->context, out_param, req_info->result);

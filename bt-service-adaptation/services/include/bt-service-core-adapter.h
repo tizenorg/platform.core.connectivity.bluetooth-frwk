@@ -47,6 +47,14 @@ int _bt_disable_adapter(void);
 
 int _bt_stack_init(void);
 
+int _bt_get_local_address(void);
+
+int _bt_get_local_version(void);
+
+int _bt_get_local_name(void);
+
+int _bt_get_discoverable_mode(int *mode);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

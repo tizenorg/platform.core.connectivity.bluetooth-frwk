@@ -64,11 +64,19 @@ void _bt_service_oal_event_receiver(int event_type, gpointer event_data, gsize l
 {
 	BT_INFO("event_type: [%d], data size: [%d]", event_type, len);
 
-	switch(event_type) {
+	switch (event_type) {
 	case OAL_EVENT_OAL_INITIALISED_SUCCESS:
 	case OAL_EVENT_OAL_INITIALISED_FAILED:
 	case OAL_EVENT_ADAPTER_ENABLED:
-        case OAL_EVENT_ADAPTER_DISABLED:
+	case OAL_EVENT_ADAPTER_DISABLED:
+	case OAL_EVENT_ADAPTER_PROPERTY_ADDRESS:
+	case OAL_EVENT_ADAPTER_PROPERTY_NAME:
+	case OAL_EVENT_ADAPTER_PROPERTY_VERSION:
+	case OAL_EVENT_ADAPTER_PROPERTY_SERVICES:
+	case OAL_EVENT_ADAPTER_MODE_NON_CONNECTABLE:
+	case OAL_EVENT_ADAPTER_MODE_CONNECTABLE:
+	case OAL_EVENT_ADAPTER_MODE_DISCOVERABLE:
+	case OAL_EVENT_ADAPTER_MODE_DISCOVERABLE_TIMEOUT:
 		if (adapter_cb)
 			adapter_cb(event_type, event_data);
 		break;
