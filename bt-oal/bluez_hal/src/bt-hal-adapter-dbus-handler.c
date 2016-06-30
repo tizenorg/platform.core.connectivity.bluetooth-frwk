@@ -183,3 +183,284 @@ int _bt_hal_dbus_disable_adapter(void)
 	g_variant_unref(result);
 	return BT_STATUS_SUCCESS;
 }
+
+static void ___bt_fill_le_supported_features(const char *item,
+		const char *value, uint8_t *le_features)
+{
+	DBG("+");
+
+	if (g_strcmp0(item, "adv_inst_max") == 0) {
+		le_features[1] = atoi(value);
+	} else if (g_strcmp0(item, "rpa_offloading") == 0) {
+		le_features[2] = atoi(value);
+	} else if (g_strcmp0(item, "max_filter") == 0) {
+		le_features[4] = atoi(value);
+	} else {
+		DBG("No registered item");
+	}
+
+	/*
+	 * TODO: Need to check these usages for Bluez Case. In Bluedroid case,
+	 * these are used, so just setting all to 0
+	 */
+	le_features[3] = 0; /* Adapter MAX IRK List Size */
+	/* lo byte */
+	le_features[5] = 0; /* Adapter Scan result storage size */
+	/* hi byte */
+	le_features[6] = 0;
+	le_features[7] = 0; /* Adapter Activity energy info supported */
+
+	DBG("-");
+}
+
+static gboolean __bt_adapter_all_properties_cb(gpointer user_data)
+{
+	GVariant *result = user_data;
+	GVariantIter *property_iter;
+	const gchar *key;
+	GVariant *value;
+
+	/* Buffer and propety count management */
+	uint8_t buf[BT_MAX_PROPERTY_BUF_SIZE];
+	struct hal_ev_adapter_props_changed *ev = (void*) buf;
+	size_t size = 0;
+	gchar *address = NULL;
+	gchar *name = NULL;
+	unsigned int cod = 0;
+	gboolean discoverable;
+	gboolean connectable;
+	unsigned int scan_mode = BT_SCAN_MODE_NONE;
+	unsigned int disc_timeout;
+	gchar *version;
+	gboolean is_discovering;
+	gboolean is_le_discovering;
+	gboolean ipsp_initialized;
+	gboolean powered;
+	gboolean pairable;
+	unsigned int pairable_timeout;
+	gboolean scan_mode_property_update = FALSE;
+
+	DBG("+");
+
+	memset(buf, 0, sizeof(buf));
+	size = sizeof(*ev);
+	ev->num_props = 0;
+	ev->status = BT_STATUS_SUCCESS;
+
+	DBG("@@Start parsing properties");
+	g_variant_get(result, "(a{sv})", &property_iter);
+	while (g_variant_iter_loop(property_iter, "{sv}", &key, &value)) {
+		if(!g_strcmp0(key, "Address")) {
+			uint8_t bdaddr[6];
+
+			address = (gchar *) g_variant_get_string(value, NULL);
+			DBG("Address [%s]", address);
+			_bt_convert_addr_string_to_type(bdaddr, address);
+			size += __bt_insert_hal_properties(buf + size,
+					HAL_PROP_ADAPTER_ADDR, sizeof(bdaddr), bdaddr);
+			ev->num_props++;
+			g_free(address);
+		} else if (!g_strcmp0(key, "Alias")) {
+			name = (gchar *) g_variant_get_string(value, NULL);
+			DBG("Alias [%s]@@@", name);
+			size += __bt_insert_hal_properties(buf + size,
+					HAL_PROP_ADAPTER_NAME, strlen(name) + 1, name);
+			ev->num_props++;
+			g_free(name);
+		} else if (!g_strcmp0(key, "Class")) {
+			cod = g_variant_get_uint32(value);
+			DBG("Class [%d]", cod);
+			size += __bt_insert_hal_properties(buf + size,
+					HAL_PROP_ADAPTER_CLASS, sizeof(unsigned int), &cod);
+			ev->num_props++;
+		} else if (!g_strcmp0(key, "Discoverable")) {
+			discoverable = g_variant_get_boolean(value);
+			DBG("Discoverable [%d]", discoverable);
+			if (discoverable)
+				scan_mode = BT_SCAN_MODE_CONNECTABLE_DISCOVERABLE;
+			scan_mode_property_update = TRUE;
+		} else if (!g_strcmp0(key, "DiscoverableTimeout")) {
+			disc_timeout = g_variant_get_uint32(value);
+			DBG("Discoverable Timeout [%d]", disc_timeout);
+			size += __bt_insert_hal_properties(buf + size,
+					HAL_PROP_ADAPTER_DISC_TIMEOUT, sizeof(unsigned int), &disc_timeout);
+			ev->num_props++;
+		} else if (!g_strcmp0(key, "Connectable")) {
+			connectable = g_variant_get_boolean(value);
+			DBG("Connectable [%d]", connectable);
+			if (scan_mode == BT_SCAN_MODE_NONE)
+				scan_mode = BT_SCAN_MODE_CONNECTABLE;
+			scan_mode_property_update = TRUE;
+		} else if (!g_strcmp0(key, "Version")) {
+			version = (gchar *) g_variant_get_string(value, NULL);
+			DBG("Version [%s]", version);
+			size += __bt_insert_hal_properties(buf + size,
+					HAL_PROP_ADAPTER_VERSION, strlen(version) + 1, version);
+			ev->num_props++;
+		} else if (!g_strcmp0(key, "Name")) {
+			name = (gchar *) g_variant_get_string(value, NULL);
+			DBG("Name [%s]", name);
+			size += __bt_insert_hal_properties(buf + size,
+					HAL_PROP_ADAPTER_NAME, strlen(name) + 1, name);
+			ev->num_props++;
+			g_free(name);
+		} else if (!g_strcmp0(key, "Powered")) {
+			powered = g_variant_get_boolean(value);
+			DBG("Powered = [%d]", powered);
+		} else if (!g_strcmp0(key, "Pairable")) {
+			pairable = g_variant_get_boolean(value);
+			DBG("Pairable [%d]", pairable);
+			size += __bt_insert_hal_properties(buf + size,
+					HAL_PROP_ADAPTER_PAIRABLE, sizeof(gboolean), &pairable);
+			ev->num_props++;
+		} else if (!g_strcmp0(key, "PairableTimeout")) {
+			pairable_timeout = g_variant_get_uint32(value);
+			DBG("Pairable Timeout = [%d]", pairable_timeout);
+			size += __bt_insert_hal_properties(buf + size,
+					HAL_PROP_ADAPTER_PAIRABLE_TIMEOUT, sizeof(unsigned int), &pairable_timeout);
+			ev->num_props++;
+		} else if (!g_strcmp0(key, "UUIDs")) {
+			char **uuid_value;
+			int uuid_count = 0;
+			gsize size1 = 0;
+			int i =0;
+			size1 = g_variant_get_size(value);
+			int num_props_tmp = ev->num_props;
+			if (size1 > 0) {
+				uuid_value = (char **)g_variant_get_strv(value, &size1);
+				for (i = 0; uuid_value[i] != NULL; i++)
+					uuid_count++;
+				/* UUID collection */
+				uint8_t uuids[HAL_UUID_LEN * uuid_count];
+				for (i = 0; uuid_value[i] != NULL; i++) {
+					char *uuid_str = NULL;
+					uint8_t uuid[HAL_UUID_LEN];
+					uuid_str = g_strdup(uuid_value[i]);
+					DBG("UUID string [%s]\n", uuid_str);
+					_bt_convert_uuid_string_to_type(uuid, uuid_str);
+					memcpy(uuids + i * HAL_UUID_LEN, uuid, HAL_UUID_LEN);
+				}
+				size += __bt_insert_hal_properties(buf + size, HAL_PROP_ADAPTER_UUIDS,
+						(HAL_UUID_LEN * uuid_count),
+						uuids);
+				ev->num_props = num_props_tmp + 1;
+				g_free(uuid_value);
+			}
+		} else if (!g_strcmp0(key, "Discovering")) {
+			is_discovering = g_variant_get_boolean(value);
+			DBG("Discovering = [%d]", is_discovering);
+		} else if (!g_strcmp0(key, "LEDiscovering")) {
+			is_le_discovering = g_variant_get_boolean(value);
+			DBG("LE Discovering = [%d]", is_le_discovering);
+		} else if (!g_strcmp0(key, "Modalias")) {
+			char *modalias = NULL;
+			g_variant_get(value, "s", &modalias);
+			DBG("Adapter ModAlias [%s]", modalias);
+			size += __bt_insert_hal_properties(buf + size,
+					HAL_PROP_ADAPTER_MODALIAS, strlen(modalias) + 1, modalias);
+			ev->num_props++;
+			g_free(modalias);
+		} else if (!g_strcmp0(key, "SupportedLEFeatures")) {
+			DBG("LE Supported features");
+			char *name = NULL;
+			char *val = NULL;
+			GVariantIter *iter = NULL;
+			uint8_t le_features[8];
+			gboolean le_features_present = FALSE;
+
+			g_variant_get(value, "as", &iter);
+			if (iter) {
+				while (g_variant_iter_loop(iter, "s", &name)) {
+					DBG("name = %s", name);
+					g_variant_iter_loop(iter, "s", &val);
+					DBG("Value = %s", val);
+					___bt_fill_le_supported_features(name, val, le_features);
+					le_features_present = TRUE;
+				}
+				g_variant_iter_free(iter);
+
+				if (le_features_present) {
+					size += __bt_insert_hal_properties(buf + size,
+							HAL_PROP_ADAPTER_LOCAL_LE_FEAT, sizeof(le_features), le_features);
+					ev->num_props++;
+				} else {
+					DBG("le supported features values are NOT provided by Stack");
+				}
+			}
+		} else if (!g_strcmp0(key, "IpspInitStateChanged")) {
+			g_variant_get(value, "b" ,&ipsp_initialized);
+			DBG("IPSP Initialized = %d", ipsp_initialized);
+			size += __bt_insert_hal_properties(buf + size,
+					HAL_PROP_ADAPTER_IPSP_INITIALIZED, sizeof(gboolean), &ipsp_initialized);
+			ev->num_props++;
+		} else {
+			ERR("Unhandled Property:[%s]", key);
+		}
+	}
+
+	if (scan_mode_property_update) {
+		size += __bt_insert_hal_properties(buf + size,
+				HAL_PROP_ADAPTER_SCAN_MODE, sizeof(int), &scan_mode);
+		ev->num_props++;
+	}
+
+	if (size > 2) {
+		DBG("Send Adapter properties changed event to HAL user,"
+			" Num Prop [%d] total size [%d]", ev->num_props, size);
+		event_cb(HAL_EV_ADAPTER_PROPS_CHANGED, (void*) buf, size);
+	}
+
+	g_variant_unref(result);
+	return FALSE;
+}
+
+static int __bt_hal_dbus_get_all_adapter_properties(void)
+{
+	GDBusProxy *proxy;
+	GVariant *result;
+	GError *error = NULL;
+
+	DBG("+");
+
+	proxy = _bt_get_adapter_properties_proxy();
+	if (!proxy) {
+		DBG("Adapter Properties proxy get failed!!!");
+		return BT_STATUS_FAIL;
+	}
+
+	result = g_dbus_proxy_call_sync(proxy,
+			"GetAll",
+			g_variant_new("(s)", BT_ADAPTER_INTERFACE),
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			&error);
+
+	if (!result) {
+		if (error != NULL) {
+			ERR("Failed to get all adapter properties (Error: %s)", error->message);
+			g_clear_error(&error);
+		} else
+			ERR("Failed to get all adapter properties");
+		return BT_STATUS_FAIL;
+	}
+
+	DBG("Got All properties from Bluez Stack!!, time to start parsing");
+	/*
+	 * As we need to provide async callback to user from HAL, simply schedule a
+	 * callback method which will carry actual result
+	 */
+	g_idle_add(__bt_adapter_all_properties_cb, (gpointer)result);
+
+	DBG("-");
+	return BT_STATUS_SUCCESS;
+}
+
+int _bt_hal_dbus_get_adapter_properties(void)
+{
+	DBG("+");
+
+	return __bt_hal_dbus_get_all_adapter_properties();
+
+	DBG("-");
+}

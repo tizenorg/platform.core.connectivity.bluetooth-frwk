@@ -38,8 +38,7 @@
 #define HAL_PROP_ADAPTER_BONDED_DEVICES         0x08
 #define HAL_PROP_ADAPTER_DISC_TIMEOUT           0x09
 
-#define HAL_PROP_ADAPTER_VERSION		0x17
-#define HAL_PROP_ADAPTER_LOCAL_LE_FEAT          0x1c
+#define HAL_PROP_ADAPTER_LOCAL_LE_FEAT          0x15
 
 #define HAL_PROP_DEVICE_NAME                    0x01
 #define HAL_PROP_DEVICE_ADDR                    0x02
@@ -58,11 +57,22 @@ struct hal_prop_device_service_rec {
         uint8_t name[];
 } __attribute__((packed));
 
-#define HAL_PROP_DEVICE_FRIENDLY_NAME            0x0b
-#define HAL_PROP_DEVICE_RSSI                     0x0c
-#define HAL_PROP_DEVICE_DID_INFO                 0x0d
-#define HAL_PROP_DEVICE_VERSION_INFO             0x0e
-#define HAL_PROP_DEVICE_INFO                     0x0f
+#define HAL_PROP_DEVICE_FRIENDLY_NAME            0x0a
+#define HAL_PROP_DEVICE_RSSI                     0x0b
+#define HAL_PROP_DEVICE_VERSION_INFO             0x0c
+/*
+ * Tizen specific HAL Adapter and Device property types.
+ * These properties have to added to HAL bt_property_type_t enums
+ */
+#define HAL_PROP_DEVICE_PAIRED                  0x0d
+#define HAL_PROP_DEVICE_CONNECTED               0x0e
+#define HAL_PROP_DEVICE_TRUSTED                 0x0f
+#define HAL_PROP_ADAPTER_PAIRABLE               0x10
+#define HAL_PROP_ADAPTER_PAIRABLE_TIMEOUT       0x11
+#define HAL_PROP_ADAPTER_VERSION		0x12
+#define HAL_PROP_ADAPTER_IPSP_INITIALIZED	0x13
+#define HAL_PROP_ADAPTER_MODALIAS		0x14
+
 struct hal_prop_device_info {
         uint8_t version;
         uint16_t sub_version;

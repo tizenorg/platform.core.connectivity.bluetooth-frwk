@@ -402,11 +402,9 @@ void _bt_convert_uuid_string_to_type(unsigned char *uuid,
 			temp[1] = device_uuid[i+ 1];
 			sscanf((char*)temp, "%hhx", temp1);  //hexadecimal scanf format for uint8_t
 			uuid[k] = temp1[0];
-			DBG("UUID[%d] = 0x%x", k, uuid[k]);
 			i = i + 2;
 			k++;
 		}
-
 	}
 }
 
