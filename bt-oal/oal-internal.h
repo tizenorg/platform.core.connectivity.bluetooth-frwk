@@ -63,9 +63,9 @@ extern "C" {
 #define API_TRACE(fmt, args...) {LOG_(LOG_ID_SYSTEM, DLOG_INFO, "OAL_API", GREEN(fmt), ##args); \
 			LOG_(LOG_ID_MAIN, DLOG_INFO, LOG_TAG, GREEN("[OAL_API]"fmt), ##args);}
 
-#define send_event_trace(e,d,a, fmt, args...) do {\
+#define send_event_trace(e, d, l, a, fmt, args...) do {\
 									bdstr_t bdstr;\
-									send_event_no_trace(e, d); \
+									send_event_no_trace(e, d, l); \
 									LOG_(LOG_ID_SYSTEM, DLOG_INFO, "OAL_EVENT", GREEN(fmt" [%s] %s"), ##args, bdt_bd2str(a, &bdstr), str_event[event]); \
 									LOG_(LOG_ID_MAIN, DLOG_INFO, LOG_TAG, GREEN("[OAL_EVENT]"fmt" [%s] %s"), ##args, bdt_bd2str(a, &bdstr), str_event[event]);\
 									} while(0)
@@ -119,11 +119,11 @@ oal_status_t adapter_mgr_init(const bt_interface_t * stack_if);
 
 /* Event Manager */
 /* Use this when Address is to be printed */
-void send_event_bda_trace(oal_event_t event, gpointer event_data, bt_address_t *address);
+void send_event_bda_trace(oal_event_t event, gpointer event_data, gsize len, bt_address_t *address);
 
 /* Use this when no address printing is required */
 #define _bt_dispatch_event send_event
-void send_event(oal_event_t event, gpointer event_data);
+void send_event(oal_event_t event, gpointer event_data, gsize len);
 void _bt_event_dispatcher_init(oal_event_callback cb);
 
 #ifdef __cplusplus

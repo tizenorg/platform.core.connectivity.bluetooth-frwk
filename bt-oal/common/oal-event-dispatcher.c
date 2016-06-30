@@ -34,6 +34,7 @@
 
 typedef struct {
 	int event;
+	unsigned int size;
 	gpointer event_data;
 } event_t;
 
@@ -80,7 +81,7 @@ static gboolean dispatch_idle (gpointer user_data)
 	if (!event_handler_cb) {
 		BT_ERR("Upstream handler not registered");
 	} else
-		(*event_handler_cb) (event_info->event, event_info->event_data);
+		(*event_handler_cb) (event_info->event, event_info->event_data, event_info->size);
 
 	BT_DBG("-");
 	return G_SOURCE_REMOVE;
@@ -109,7 +110,7 @@ void _bt_event_dispatcher_init(oal_event_callback cb)
 	g_thread_new ("OALEventScheduler", __event_handler_loop, NULL);
 }
 
-void send_event_no_trace(oal_event_t event, gpointer event_data)
+void send_event_no_trace(oal_event_t event, gpointer event_data, gsize len)
 {
 	event_t *event_info;
 
@@ -117,6 +118,7 @@ void send_event_no_trace(oal_event_t event, gpointer event_data)
 	 * between threads. */
 	event_info = g_slice_new0 (event_t);
 	event_info->event = event;
+	event_info->size = len;
 	event_info->event_data = event_data;
 	/* Invoke the function. */
 
@@ -131,13 +133,13 @@ void send_event_no_trace(oal_event_t event, gpointer event_data)
 				(GDestroyNotify) event_data_free);
 }
 
-void send_event_bda_trace(oal_event_t event, gpointer event_data, bt_address_t *address)
+void send_event_bda_trace(oal_event_t event, gpointer event_data, gsize len, bt_address_t *address)
 {
-	send_event_no_trace(event, event_data);
+	send_event_no_trace(event, event_data, len);
 }
 
-void send_event(oal_event_t event, gpointer event_data)
+void send_event(oal_event_t event, gpointer event_data, gsize len)
 {
-	send_event_bda_trace(event, event_data, NULL);
+	send_event_bda_trace(event, event_data, len, NULL);
 }
 #undef _OAL_EVENT_DISPATCHER_C_

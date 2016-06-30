@@ -71,7 +71,7 @@ oal_status_t adapter_mgr_init(const bt_interface_t * stack_if)
 
 	ret = blued_api->init(&callbacks);
 
-	if(ret != BT_STATUS_SUCCESS) {
+	if (ret != BT_STATUS_SUCCESS) {
 		BT_ERR("Adapter callback registration failed: [%s]", status2string(ret));
 		blued_api->cleanup();
 		return convert_to_oal_status(ret);
@@ -137,7 +137,7 @@ static void cb_adapter_state_change(bt_state_t status)
 
 	event = (BT_STATE_ON == status)?OAL_EVENT_ADAPTER_ENABLED:OAL_EVENT_ADAPTER_DISABLED;
 
-	send_event(event, NULL);
+	send_event(event, NULL, 0);
 }
 
 static gboolean retry_enable_adapter(gpointer data)

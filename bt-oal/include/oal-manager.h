@@ -42,7 +42,7 @@ extern "C" {
 
 #define BLUETOOTH_UUID_STRING_MAX       50
 
-typedef void (*oal_event_callback)(int event, gpointer event_data);
+typedef void (*oal_event_callback)(int event, gpointer event_data, gsize size);
 
 typedef struct {
 	unsigned char addr[BT_ADDRESS_BYTES_NUM];

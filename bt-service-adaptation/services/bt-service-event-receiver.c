@@ -60,9 +60,9 @@ void _bt_service_unregister_event_handler_callback(bt_service_module_t module)
 	}
 }
 
-void _bt_service_oal_event_receiver(int event_type, gpointer event_data)
+void _bt_service_oal_event_receiver(int event_type, gpointer event_data, gsize len)
 {
-	BT_INFO("event_type: [%d]", event_type);
+	BT_INFO("event_type: [%d], data size: [%d]", event_type, len);
 
 	switch(event_type) {
 	case OAL_EVENT_OAL_INITIALISED_SUCCESS:

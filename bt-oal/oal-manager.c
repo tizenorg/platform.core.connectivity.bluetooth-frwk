@@ -103,9 +103,9 @@ gboolean oal_lib_init(gpointer data)
 		} else {
 			ret = oal_mgr_init_internal();
 			if(OAL_STATUS_SUCCESS == ret)
-				send_event(OAL_EVENT_OAL_INITIALISED_SUCCESS, NULL);
+				send_event(OAL_EVENT_OAL_INITIALISED_SUCCESS, NULL, 0);
 			else
-				send_event(OAL_EVENT_OAL_INITIALISED_FAILED, NULL);
+				send_event(OAL_EVENT_OAL_INITIALISED_FAILED, NULL, 0);
 		}
 	} else {
 		BT_DBG("Chip Not Yet Ready, try again...");

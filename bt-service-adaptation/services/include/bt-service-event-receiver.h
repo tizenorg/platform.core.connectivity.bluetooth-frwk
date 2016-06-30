@@ -32,7 +32,7 @@ typedef enum {
 	BT_ADAPTER_MODULE,
 } bt_service_module_t;
 
-void _bt_service_oal_event_receiver(int event_type, gpointer event_data);
+void _bt_service_oal_event_receiver(int event_type, gpointer event_data, gsize len);
 void _bt_service_register_event_handler_callback(
 	bt_service_module_t module, _bt_service_event_handler_callback cb);
 void _bt_service_unregister_event_handler_callback(bt_service_module_t module);
