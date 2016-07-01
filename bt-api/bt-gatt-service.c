@@ -29,6 +29,7 @@
 #define NUMBER_OF_FLAGS	10
 
 GDBusConnection *g_conn;
+GDBusNodeInfo *obj_info;
 guint owner_id;
 guint manager_id;
 static gboolean new_service = FALSE;
@@ -1005,18 +1006,22 @@ static GDBusNodeInfo *__bt_gatt_create_method_node_info(
 				const gchar *introspection_data)
 {
 	GError *err = NULL;
-	GDBusNodeInfo *node_info = NULL;
 
 	if (introspection_data == NULL)
 		return NULL;
 
-	node_info = g_dbus_node_info_new_for_xml(introspection_data, &err);
+	if (obj_info == NULL) {
+		BT_DBG("Create new node info");
+		obj_info = g_dbus_node_info_new_for_xml(introspection_data, &err);
 
-	if (err) {
-		BT_ERR("Unable to create node: %s", err->message);
-		g_clear_error(&err);
+		if (err) {
+			BT_ERR("Unable to create node: %s", err->message);
+			g_clear_error(&err);
+			return NULL;
+		}
 	}
-	return node_info;
+
+	return obj_info;
 }
 
 static struct gatt_service_info *__bt_gatt_find_gatt_service_info(
@@ -1457,13 +1462,20 @@ static GDBusConnection *__bt_gatt_get_gdbus_connection(void)
 BT_EXPORT_API int bluetooth_gatt_init(void)
 {
 	GDBusConnection *conn;
-	GDBusNodeInfo *obj_info;
 	GError *error = NULL;
+	GDBusNodeInfo *node_info = NULL;
 
-	owner_id = g_bus_own_name(G_BUS_TYPE_SYSTEM,
-				BT_GATT_SERVICE_NAME,
-				G_BUS_NAME_OWNER_FLAGS_NONE,
-				NULL, NULL, NULL, NULL, NULL);
+	if (app_path != NULL) {
+		BT_ERR("app path already exists! initialized");
+		return BLUETOOTH_ERROR_ALREADY_INITIALIZED;
+	}
+
+	if (owner_id == 0) {
+		owner_id = g_bus_own_name(G_BUS_TYPE_SYSTEM,
+					BT_GATT_SERVICE_NAME,
+					G_BUS_NAME_OWNER_FLAGS_NONE,
+					NULL, NULL, NULL, NULL, NULL);
+	}
 
 	BT_DBG("owner_id is [%d]", owner_id);
 	app_path = g_strdup_printf("/com/%d", getpid());
@@ -1473,30 +1485,45 @@ BT_EXPORT_API int bluetooth_gatt_init(void)
 	conn = __bt_gatt_get_gdbus_connection();
 	if (!conn) {
 		BT_ERR("Unable to get connection");
-		return BLUETOOTH_ERROR_INTERNAL;
+		goto failed;
 	}
 
 	/* Register ObjectManager interface */
-	obj_info = __bt_gatt_create_method_node_info(
+	node_info = __bt_gatt_create_method_node_info(
 					manager_introspection_xml);
 
-	if (obj_info == NULL) {
+	if (node_info == NULL) {
 		BT_ERR("failed to get node info");
-		return BLUETOOTH_ERROR_INTERNAL;
+		goto failed;
 	}
 
 	manager_id = g_dbus_connection_register_object(g_conn, app_path,
-						obj_info->interfaces[0],
+						node_info->interfaces[0],
 						&manager_interface_vtable,
 						NULL, NULL, &error);
 
 	if (manager_id == 0) {
 		BT_ERR("failed to register: %s", error->message);
 		g_error_free(error);
-		return BLUETOOTH_ERROR_INTERNAL;
+		goto failed;
 	}
 
 	return BLUETOOTH_ERROR_NONE;
+
+failed:
+	if (obj_info)
+		g_dbus_node_info_unref(obj_info);
+
+	if (owner_id)
+		g_bus_unown_name(owner_id);
+
+	g_free(app_path);
+
+	obj_info = NULL;
+	app_path = NULL;
+	owner_id = 0;
+
+	return BLUETOOTH_ERROR_INTERNAL;
 }
 
 BT_EXPORT_API int bluetooth_gatt_deinit()
@@ -1504,28 +1531,35 @@ BT_EXPORT_API int bluetooth_gatt_deinit()
 	int ret = BLUETOOTH_ERROR_NONE;
 	/* Unown gdbus bus */
 	if (owner_id) {
-
 		/* remove/unregister all services */
 		BT_DBG("removing all registered gatt service\n");
 		bluetooth_gatt_delete_services();
 
-		g_bus_unown_name(owner_id);
-
 		/* unregister the exported interface for object manager */
 		g_dbus_connection_unregister_object(g_conn,
 					manager_id);
+
+		ret = bluetooth_gatt_unregister_application();
+		if (ret != BLUETOOTH_ERROR_NONE)
+			BT_ERR("Fail to unregister application\n");
+
+		g_bus_unown_name(owner_id);
+		owner_id = 0;
+
+		g_free(app_path);
+		app_path = NULL;
 
 		BT_DBG("Gatt service deinitialized \n");
 
 		g_slist_free(gatt_services);
 		gatt_services = NULL;
 
-		ret = bluetooth_gatt_unregister_application();
-
-		if (ret == BLUETOOTH_ERROR_NONE) {
-			g_free(app_path);
-			app_path = NULL;
-		}
+		/* Temperary block under codes to avoid TC blocking issue.
+		    But we should unref node info in later. */
+#if 0
+		g_dbus_node_info_unref(obj_info);
+		obj_info = NULL;
+#endif
 
 		return ret;
 	}
