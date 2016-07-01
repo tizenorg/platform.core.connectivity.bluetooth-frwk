@@ -16,6 +16,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <glib.h>
 #include <dlog.h>
@@ -32,9 +33,12 @@
 #include <net_connection.h>
 #include <bundle.h>
 #include <eventsystem.h>
+#include <arpa/inet.h>
 
 #include "bluetooth-api.h"
 #include "bt-service-common.h"
+
+#include <oal-manager.h>
 
 static GDBusConnection *system_conn;
 static GDBusConnection *session_conn;
@@ -819,4 +823,81 @@ int _bt_byte_arr_cmp_with_mask(const char *data1, const char *data2,
 			return (int)(a - b);
 		}
 	return 0;
+}
+
+void _bt_copy_remote_dev(bt_remote_dev_info_t * dev_info, remote_device_t * oal_device)
+{
+	int i;
+	BT_INFO("+");
+
+	dev_info->address = g_new0(char, BT_ADDRESS_STRING_SIZE);
+	_bt_convert_addr_type_to_string(dev_info->address, oal_device->address.addr);
+	BT_INFO("Address [%s]", dev_info->address);
+
+	if(strlen(oal_device->name)== 0)
+		dev_info->name = NULL;
+	else {
+		dev_info->name = g_strdup(oal_device->name);
+		_bt_truncate_non_utf8_chars(dev_info->name);
+		BT_INFO("Name [%s]", dev_info->name);
+	}
+
+	dev_info->class = oal_device->cod;
+	BT_INFO("COD [%d]", dev_info->class);
+	dev_info->paired = oal_device->is_bonded;
+	BT_INFO("Is Bonded [%d]", dev_info->paired);
+	dev_info->connected = oal_device->is_connected;
+	BT_INFO("iS Connected [%d]", dev_info->connected);
+	dev_info->rssi = oal_device->rssi;
+	BT_INFO("RSSI [%d]", dev_info->rssi);
+	dev_info->addr_type = oal_device->type;
+	dev_info->uuid_count = oal_device->uuid_count;
+	BT_INFO("UUID Count [%d]", dev_info->uuid_count);
+	dev_info->trust = oal_device->is_trusted;
+
+	if (dev_info->uuid_count > 0)
+		dev_info->uuids = g_new0(char *, dev_info->uuid_count);
+
+	/* Fill Remote Device Service List list */
+	for (i=0; i < dev_info->uuid_count; i++) {
+		dev_info->uuids[i] = g_malloc0(BLUETOOTH_UUID_STRING_MAX);
+		_bt_uuid_to_string((service_uuid_t *)&oal_device->uuid[i].uuid, dev_info->uuids[i]);
+		BT_DBG("UUID size=%d value=%s", sizeof(dev_info->uuids[i]), dev_info->uuids[i]);
+	}
+
+	BT_INFO("-");
+}
+
+void _bt_uuid_to_string(service_uuid_t *p_uuid, char *str)
+{
+    uint32_t uuid0, uuid4;
+    uint16_t uuid1, uuid2, uuid3, uuid5;
+
+    memcpy(&uuid0, &(p_uuid->uuid[0]), 4);
+    memcpy(&uuid1, &(p_uuid->uuid[4]), 2);
+    memcpy(&uuid2, &(p_uuid->uuid[6]), 2);
+    memcpy(&uuid3, &(p_uuid->uuid[8]), 2);
+    memcpy(&uuid4, &(p_uuid->uuid[10]), 4);
+    memcpy(&uuid5, &(p_uuid->uuid[14]), 2);
+
+    snprintf((char *)str, BLUETOOTH_UUID_STRING_MAX, "%.8x-%.4x-%.4x-%.4x-%.8x%.4x",
+            ntohl(uuid0), ntohs(uuid1),
+            ntohs(uuid2), ntohs(uuid3),
+            ntohl(uuid4), ntohs(uuid5));
+    return;
+}
+
+/* Trim string at first non-utf8 char */
+void _bt_truncate_non_utf8_chars(char * str)
+{
+	guint i=0;
+	const char *ptr = NULL;
+
+	if (strlen(str) != 0) {
+		if (!g_utf8_validate(str, -1, &ptr)) {
+			while(*(str + i) != *ptr)
+				i++;
+			*(str + i) = '\0';
+		}
+	}
 }

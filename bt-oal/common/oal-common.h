@@ -29,10 +29,13 @@
 extern "C" {
 #endif
 void parse_device_properties(int num_properties, bt_property_t *properties,
-						remote_device_t *dev_info, ble_adv_data_t * adv_info);
+				remote_device_t *dev_info, ble_adv_data_t * adv_info,
+				gsize *size);
 oal_status_t convert_to_oal_status(bt_status_t status);
 
 const char * status2string(bt_status_t status);
+
+int check_duplicate_uuid(oal_uuid_t *table, oal_uuid_t toMatch, int table_len);
 
 #ifdef __cplusplus
 }

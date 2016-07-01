@@ -43,14 +43,24 @@ extern "C" {
 typedef char bdstr_t[18];
 
 /* Common/util functions */
-char *bdt_bd2str(const bt_address_t *bdaddr, bdstr_t *bdstr);
+char* bdt_bd2str(const bt_address_t *bdaddr, bdstr_t *bdstr);
+char* bdaddr_2_str(const bt_bdaddr_t *bd_addr);
 void string_to_uuid(char *str, service_uuid_t *p_uuid);
 void uuid_to_string(service_uuid_t *p_uuid, char *str);
 void oal_print_device_address_t(const bt_address_t *addr);
 void oal_convert_addr_string_to_type(unsigned char *addr, const char *address);
 int oal_is_address_zero(unsigned char *addr1);
+void print_bt_properties(int num_properties, bt_property_t *properties);
+
 void convert_str_2_hex(char out[],char in[]);
 void convert_hex_2_str(char * hex, int len, char * str_out);
+char* convert_bt_property_2_str(const bt_property_t *property);
+char* convert_property_type_2_str(bt_property_type_t prop_type);
+char* convert_scan_mode_2_str(bt_scan_mode_t scan_mode);
+char* convert_device_type_2_str(bt_device_type_t device_type);
+char* convert_bdaddr_2_str(const bt_bdaddr_t *bd_addr, char *buf);
+
+void local_le_feat_2_string(char *str, const bt_local_le_features_t *f);
 
 #ifdef __cplusplus
 }

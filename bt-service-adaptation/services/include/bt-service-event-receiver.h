@@ -30,6 +30,7 @@ typedef void (*_bt_service_event_handler_callback) (int event_type, gpointer eve
 
 typedef enum {
 	BT_ADAPTER_MODULE,
+	BT_DEVICE_MODULE,
 } bt_service_module_t;
 
 void _bt_service_oal_event_receiver(int event_type, gpointer event_data, gsize len);

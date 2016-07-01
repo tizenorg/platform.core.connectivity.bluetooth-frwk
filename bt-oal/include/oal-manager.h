@@ -108,6 +108,7 @@ typedef struct {
 	device_type_t type;
 	int uuid_count;
 	oal_uuid_t uuid[BT_MAX_SERVICES_FOR_DEVICE];
+	int is_trusted;
 } remote_device_t;
 
 /**

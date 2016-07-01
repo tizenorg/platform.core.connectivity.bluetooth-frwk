@@ -25,6 +25,7 @@
 #include <gio/gio.h>
 
 #include "bluetooth-api.h"
+#include <oal-manager.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -377,6 +378,12 @@ int _bt_set_non_blocking_tty(int sk);
 void _bt_deinit_bluez_proxy(void);
 
 int _bt_eventsystem_set_value(const char *event, const char *key, const char *value);
+
+void _bt_copy_remote_dev(bt_remote_dev_info_t * dev_info, remote_device_t * oal_device);
+
+void _bt_uuid_to_string(service_uuid_t *p_uuid, char *str);
+
+void _bt_truncate_non_utf8_chars(char * str);
 
 #ifdef __cplusplus
 }

@@ -34,6 +34,7 @@
 #include "bt-service-event-receiver.h"
 
 _bt_service_event_handler_callback adapter_cb;
+_bt_service_event_handler_callback device_cb;
 
 void _bt_service_register_event_handler_callback(
 		bt_service_module_t module, _bt_service_event_handler_callback cb)
@@ -43,6 +44,10 @@ void _bt_service_register_event_handler_callback(
 		BT_INFO("Register BT_ADAPTER_MODULE Callback");
 		adapter_cb = cb;
 		break;
+	case BT_DEVICE_MODULE:
+                BT_INFO("Register BT_DEVICE_MODULE Callback");
+                device_cb = cb;
+                break;
 	default:
 		BT_INFO("Unknown module");
 	}
@@ -77,8 +82,14 @@ void _bt_service_oal_event_receiver(int event_type, gpointer event_data, gsize l
 	case OAL_EVENT_ADAPTER_MODE_CONNECTABLE:
 	case OAL_EVENT_ADAPTER_MODE_DISCOVERABLE:
 	case OAL_EVENT_ADAPTER_MODE_DISCOVERABLE_TIMEOUT:
+	case OAL_EVENT_ADAPTER_INQUIRY_STARTED:
+	case OAL_EVENT_ADAPTER_INQUIRY_FINISHED:
+        case OAL_EVENT_ADAPTER_INQUIRY_RESULT_BREDR_ONLY:
+        case OAL_EVENT_ADAPTER_INQUIRY_RESULT_BLE:
 		if (adapter_cb)
 			adapter_cb(event_type, event_data);
+		if (device_cb)
+                        device_cb(event_type, event_data);
 		break;
 	default:
 		BT_ERR("Unhandled Event: %d", event_type);

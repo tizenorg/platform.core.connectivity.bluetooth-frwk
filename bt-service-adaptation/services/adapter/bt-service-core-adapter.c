@@ -35,6 +35,7 @@
 #include "bt-service-util.h"
 #include "bt-service-main.h"
 #include "bt-service-core-adapter.h"
+#include "bt-service-core-device.h"
 #include "bt-service-event-receiver.h"
 #include "bt-request-handler.h"
 #include "bt-service-event.h"
@@ -68,7 +69,8 @@ static void __bt_adapter_state_set_status(bt_status_t status);
 static void __bt_adapter_update_discovery_status(bt_adapter_discovery_state_t status);
 static void __bt_adapter_state_change_callback(int bt_status);
 static int __bt_adapter_state_handle_request(gboolean enable);
-
+static int __bt_adapter_state_discovery_request(gboolean enable);
+static void __bt_adapter_discovery_state_change_callback(int bt_discovery_status);
 
 /* Initialize BT stack (Initialize OAL layer) */
 int _bt_stack_init(void)
@@ -102,6 +104,26 @@ int _bt_enable_adapter(void)
 int _bt_disable_adapter(void)
 {
 	return __bt_adapter_state_handle_request(FALSE);
+}
+
+
+int _bt_start_discovery(void)
+{
+	return __bt_adapter_state_discovery_request(TRUE);
+}
+
+int _bt_cancel_discovery(void)
+{
+	return __bt_adapter_state_discovery_request(FALSE);
+}
+
+gboolean _bt_is_discovering(void)
+{
+	if (adapter_discovery_state == ADAPTER_DISCOVERY_STARTED
+			|| adapter_discovery_state == ADAPTER_DISCOVERY_STARTING)
+		return TRUE;
+	else
+		return FALSE;
 }
 
 int _bt_get_local_address(void)
@@ -220,6 +242,12 @@ static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 		break;
 	case OAL_EVENT_ADAPTER_DISABLED:
 		__bt_adapter_state_change_callback(BT_DEACTIVATED);
+		break;
+	case OAL_EVENT_ADAPTER_INQUIRY_STARTED:
+		__bt_adapter_discovery_state_change_callback(ADAPTER_DISCOVERY_STARTED);
+		break;
+        case OAL_EVENT_ADAPTER_INQUIRY_FINISHED:
+		 __bt_adapter_discovery_state_change_callback(ADAPTER_DISCOVERY_STOPPED);
 		break;
 	case OAL_EVENT_ADAPTER_PROPERTY_ADDRESS: {
 		bt_address_t *bd_addr = event_data;
@@ -597,8 +625,121 @@ static int __bt_adapter_state_handle_request(gboolean enable)
 		/* Adapter enable request is successful, setup event handlers */
 		_bt_service_register_event_handler_callback(
 				BT_ADAPTER_MODULE, __bt_adapter_event_handler);
-		/*TODO Set Device Core Callbacks*/
+		_bt_device_state_handle_callback_set_request();
 	}
 	return result;
 }
 
+static int __bt_adapter_state_discovery_request(gboolean enable)
+{
+	int result = BLUETOOTH_ERROR_NONE;
+
+	BT_DBG("+");
+	switch (adapter_discovery_state) {
+	case ADAPTER_DISCOVERY_STARTED: {
+		BT_INFO("Adapter is currently in discovery started state, state [%d]",
+				adapter_discovery_state);
+		if (enable) {
+			return BLUETOOTH_ERROR_IN_PROGRESS;
+		} else {
+			result = adapter_stop_inquiry();
+			if (result != OAL_STATUS_SUCCESS) {
+				BT_ERR("Discover stop failed: %d", result);
+				result = BLUETOOTH_ERROR_INTERNAL;
+			} else {
+				BT_ERR("Stop Discovery Triggered successfully");
+				__bt_adapter_update_discovery_status(ADAPTER_DISCOVERY_STOPPING);
+				result = BLUETOOTH_ERROR_NONE;
+			}
+		}
+		break;
+	}
+	case ADAPTER_DISCOVERY_STARTING: {
+		BT_INFO("Adapter is currently in discovery starting state, state [%d]",
+				adapter_discovery_state);
+		if (enable) {
+			return BLUETOOTH_ERROR_IN_PROGRESS;
+		} else {
+			result = adapter_stop_inquiry();
+			if (result != OAL_STATUS_SUCCESS) {
+				BT_ERR("Discover stop failed: %d", result);
+				result = BLUETOOTH_ERROR_INTERNAL;
+			} else {
+				BT_ERR("Stop Discovery Triggered successfully");
+				__bt_adapter_update_discovery_status(ADAPTER_DISCOVERY_STOPPING);
+				result = BLUETOOTH_ERROR_NONE;
+			}
+		}
+		break;
+	}
+	case ADAPTER_DISCOVERY_STOPPED: {
+		BT_INFO("Adapter is currently in discovery stopped state, state [%d]",
+				adapter_discovery_state);
+		if (!enable)
+			return BLUETOOTH_ERROR_NOT_IN_OPERATION;
+		else {
+			result = adapter_start_inquiry();
+		if (result != OAL_STATUS_SUCCESS) {
+				BT_ERR("Start Discovery failed: %d", result);
+				result = BLUETOOTH_ERROR_INTERNAL;
+			} else {
+				BT_ERR("Start Discovery Triggered successfully");
+			__bt_adapter_update_discovery_status(ADAPTER_DISCOVERY_STARTING);
+				result = BLUETOOTH_ERROR_NONE;
+			}
+		}
+		break;
+	}
+	case ADAPTER_DISCOVERY_STOPPING: {
+		BT_INFO("Adapter is currently in discovery stopping state, state [%d]",
+				adapter_discovery_state);
+		if (!enable)
+			return BLUETOOTH_ERROR_NOT_IN_OPERATION;
+		else {
+			result = adapter_start_inquiry();
+			if (result != OAL_STATUS_SUCCESS) {
+				BT_ERR("Start Discovery failed: %d", result);
+				result = BLUETOOTH_ERROR_INTERNAL;
+			} else {
+				BT_ERR("Start Discovery Triggered successfully");
+			__bt_adapter_update_discovery_status(ADAPTER_DISCOVERY_STARTING);
+				result = BLUETOOTH_ERROR_NONE;
+			}
+		}
+		break;
+	}
+	}
+
+	BT_DBG("-");
+	return result;
+}
+
+static void __bt_adapter_discovery_state_change_callback(int bt_discovery_status)
+{
+	BT_INFO("__bt_adapter_discovery_state_change_callback: status [%d]", bt_discovery_status);
+	GVariant *param = NULL;
+	int result = BLUETOOTH_ERROR_NONE;
+
+	switch (bt_discovery_status) {
+	case ADAPTER_DISCOVERY_STOPPED:
+	{
+		__bt_adapter_update_discovery_status(bt_discovery_status);
+		param = g_variant_new("(i)", result);
+		_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_DISCOVERY_FINISHED,
+				param);
+		break;
+	}
+	case ADAPTER_DISCOVERY_STARTED:
+	{
+		__bt_adapter_update_discovery_status(bt_discovery_status);
+		param = g_variant_new("(i)", result);
+		_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_DISCOVERY_STARTED,
+				param);
+		break;
+	}
+	default:
+		BT_ERR("Incorrect Bluetooth adapter Discovery state changed status");
+	}
+}

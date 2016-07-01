@@ -48,6 +48,7 @@
 /* Global variables and structures */
 static GDBusConnection *manager_conn;
 static handle_stack_msg event_cb = NULL;
+static guint event_id;
 
 /* Forward declarations */
 int __bt_hal_register_service_event(GDBusConnection *g_conn, int event_type);
@@ -62,7 +63,23 @@ static  void __bt_hal_manager_event_filter(GDBusConnection *connection, const gc
 static int __bt_hal_register_manager_subscribe_signal(GDBusConnection *conn, int subscribe);
 int __bt_hal_register_service_event(GDBusConnection *g_conn, int event_type);
 static int __bt_hal_initialize_manager_receiver(void);
+static gboolean __bt_parse_interface(GVariant *msg);
+static void __bt_handle_device_event(GVariant *value, GVariant *parameters);
+static gboolean __bt_parse_device_properties(GVariant *item);
+static gboolean __bt_discovery_finished_cb(gpointer user_data);
 
+
+static gboolean __bt_discovery_finished_cb(gpointer user_data)
+{
+	event_id = 0;
+	DBG("+");
+	struct hal_ev_discovery_state_changed ev;
+	ev.state = HAL_DISCOVERY_STATE_STOPPED;
+	event_cb(HAL_EV_DISCOVERY_STATE_CHANGED, &ev, sizeof(ev));
+	DBG("-");
+
+	return FALSE;
+}
 
 static int __bt_hal_parse_event(GVariant *msg)
 {
@@ -128,6 +145,8 @@ static void __bt_hal_adapter_property_changed_event(GVariant *msg)
 {
 	GVariantIter value_iter;
 	GVariant *value = NULL;
+	GDBusProxy *adapter_proxy;
+	GError *err = NULL;
 	char *key = NULL;
 	g_variant_iter_init (&value_iter, msg);
 
@@ -148,6 +167,8 @@ static void __bt_hal_adapter_property_changed_event(GVariant *msg)
 	gboolean pairable;
 	unsigned int pairable_timeout;
 	gboolean scan_mode_property_update = FALSE;
+	gboolean is_discovering;
+        gboolean is_le_discovering;
 
 	memset(buf, 0, sizeof(buf));
 	size = sizeof(*ev);
@@ -262,7 +283,57 @@ static void __bt_hal_adapter_property_changed_event(GVariant *msg)
 				g_free(uuid_value);
 			}
 		} else if (!g_strcmp0(key, "Discovering")) {
+			is_discovering = g_variant_get_boolean(value);
+			DBG("##Discovering = [%d]", is_discovering);
+
+			if (is_discovering == FALSE) {
+				DBG("###### Adapter Has stopped Discovering ######");
+				/* In Tizen Bluez, this actually does not mean Discovery is stopped
+				   in Bluez. Tizen Bluez sends this event after a certain timeout,
+				   Therefore, we must forecefully call StopDiscovery to stop discovery in BlueZ */
+				if (event_id > 0)
+					continue;
+
+				adapter_proxy = _bt_get_adapter_proxy();
+
+				if (adapter_proxy == NULL)
+					continue;
+
+				/* Need to stop searching */
+				DBG("Event though Bluez reported DIscovering stopped, we force stop Discovery ");
+				g_dbus_proxy_call_sync(adapter_proxy, "StopDiscovery",
+						NULL,
+						G_DBUS_CALL_FLAGS_NONE,
+						DBUS_TIMEOUT, NULL,
+						&err);
+				if (err) {
+					ERR("Dbus Error : %s", err->message);
+
+					/* This error is thrown by Bluez, as Discovery is already stopped.
+					   Discovery is stopped if user cancels on going discovery.
+					   In order to maintain correct state of Bluetooth Discovery state,
+					   simply send Discovery stopped event to HAL user */
+					struct hal_ev_discovery_state_changed ev;
+					ev.state = HAL_DISCOVERY_STATE_STOPPED;
+					event_cb(HAL_EV_DISCOVERY_STATE_CHANGED, &ev, sizeof(ev));
+					g_clear_error(&err);
+					continue;
+
+				} else {
+					event_id = g_timeout_add(BT_HAL_DISCOVERY_FINISHED_DELAY,
+							(GSourceFunc)__bt_discovery_finished_cb, NULL);
+				}
+
+			} else {
+				DBG("###### Adapter Has started Discovering ######");
+				struct hal_ev_discovery_state_changed ev;
+				ev.state = HAL_DISCOVERY_STATE_STARTED;
+				event_cb(HAL_EV_DISCOVERY_STATE_CHANGED, &ev, sizeof(ev));
+			}
+
 		} else if (!g_strcmp0(key, "LEDiscovering")) {
+			is_le_discovering = g_variant_get_boolean(value);
+			DBG("##LE Discovering = [%d]", is_le_discovering);
 		} else if (!g_strcmp0(key, "Modalias")) {
 			char *modalias = NULL;
 			g_variant_get(value, "s", &modalias);
@@ -290,6 +361,138 @@ static void __bt_hal_adapter_property_changed_event(GVariant *msg)
 	}
 	g_variant_unref(value);
 	DBG("-");
+}
+
+static gboolean __bt_parse_device_properties(GVariant *item)
+{
+	GVariantIter iter;
+	gchar *key;
+	GVariant *val;
+	gsize len = 0;
+	if (!item)
+		return FALSE;
+	DBG("+");
+
+	/* Buffer and propety count management */
+	uint8_t buf[BT_HAL_MAX_PROPERTY_BUF_SIZE];
+	struct hal_ev_device_found *ev = (void *) buf;
+	size_t size = 0;
+	memset(buf, 0, sizeof(buf));
+	size = sizeof(*ev);
+	ev->num_props = 0;
+
+	g_variant_iter_init(&iter, item);
+	while (g_variant_iter_loop(&iter, "{sv}", &key, &val)) {
+
+		if (strcasecmp(key, "Address") == 0)  {
+
+			char * address = NULL;
+			address = g_variant_dup_string(val, &len);
+			uint8_t bdaddr[6];
+			_bt_convert_addr_string_to_type(bdaddr, address);
+
+			size += __bt_insert_hal_properties(buf + size, HAL_PROP_DEVICE_ADDR,
+					sizeof(bdaddr), bdaddr);
+
+			ev->num_props++;
+			DBG("Device address [%s] property Num [%d]",address, ev->num_props);
+
+		} else if (strcasecmp(key, "Class") == 0) {
+			unsigned int class = g_variant_get_uint32(val);
+			size += __bt_insert_hal_properties(buf + size, HAL_PROP_DEVICE_CLASS,
+					sizeof(unsigned int), &class);
+			ev->num_props++;
+			DBG("Device class [%d] Property num [%d]", class, ev->num_props);
+		} else if (strcasecmp(key, "name") == 0) {
+			char *name = g_variant_dup_string(val, &len);
+			size += __bt_insert_hal_properties(buf + size, HAL_PROP_DEVICE_NAME,
+					strlen(name) + 1, name);
+			ev->num_props++;
+			DBG("Device Name [%s] Property num [%d]", name, ev->num_props);
+		} else if (strcasecmp(key, "Connected") == 0) {
+			unsigned int connected = g_variant_get_uint32(val);
+
+			size += __bt_insert_hal_properties(buf + size, HAL_PROP_DEVICE_CONNECTED,
+					sizeof(unsigned int), &connected);
+			ev->num_props++;
+			DBG("Device connected [%u] Property num [%d]", connected,  ev->num_props);
+		} else if (strcasecmp(key, "paired") == 0) {
+			gboolean paired = g_variant_get_boolean(val);
+			size += __bt_insert_hal_properties(buf + size, HAL_PROP_DEVICE_PAIRED,
+					sizeof(gboolean), &paired);
+			ev->num_props++;
+			DBG("Device Paired [%d] Property num [%d]", paired, ev->num_props);
+		} else if (strcasecmp(key, "Trusted") == 0) {
+			gboolean trust = g_variant_get_boolean(val);
+			size += __bt_insert_hal_properties(buf + size, HAL_PROP_DEVICE_TRUSTED,
+					sizeof(gboolean), &trust);
+			ev->num_props++;
+			DBG("Device trusted [%d] Property num [%d]", trust, ev->num_props);
+		} else if (strcasecmp(key, "RSSI") == 0) {
+			int rssi = g_variant_get_int16(val);
+			size += __bt_insert_hal_properties(buf + size, HAL_PROP_DEVICE_RSSI,
+					sizeof(int), &rssi);
+			ev->num_props++;
+			DBG("Device RSSI [%d] Property num [%d]", rssi, ev->num_props);
+		} else if (strcasecmp(key, "LastAddrType") == 0) {
+			/* TODO: To be handled later*/
+		} else if (strcasecmp(key, "UUIDs") == 0) {
+			char **uuid_value;
+			int uuid_count = 0;
+			gsize size1 = 0;
+			int i =0;
+			int z;
+			size1 = g_variant_get_size(val);
+			DBG("UUID count from size  [%d]\n", size1);
+			int num_props_tmp = ev->num_props;
+
+			if (size1 > 0) {
+				uuid_value = (char **)g_variant_get_strv(val, &size1);
+				for (i = 0; uuid_value[i] != NULL; i++)
+					uuid_count++;
+				DBG("UUID count [%d]\n", uuid_count);
+				/* UUID collection */
+				uint8_t uuids[BT_HAL_STACK_UUID_SIZE * uuid_count];
+
+				for (i = 0; uuid_value[i] != NULL; i++) {
+
+					char *uuid_str = NULL;
+					uint8_t uuid[BT_HAL_STACK_UUID_SIZE];
+					memset(uuid, 0x00, BT_HAL_STACK_UUID_SIZE);
+
+					DBG("UUID string from Bluez [%s]\n", uuid_value[i]);
+					uuid_str = g_strdup(uuid_value[i]);
+					DBG("UUID string [%s]\n", uuid_str);
+					_bt_convert_uuid_string_to_type(uuid, uuid_str);
+					for(z=0; z < 16; z++)
+						DBG("[0x%x]", uuid[z]);
+
+					memcpy(uuids+i*BT_HAL_STACK_UUID_SIZE, uuid, BT_HAL_STACK_UUID_SIZE);
+					g_free(uuid_str);
+				}
+
+				size += __bt_insert_hal_properties(buf + size, HAL_PROP_DEVICE_UUIDS,
+						(BT_HAL_STACK_UUID_SIZE * uuid_count),
+						uuids);
+				ev->num_props = num_props_tmp + 1;
+				g_free(uuid_value);
+			}
+
+		} else if (strcasecmp(key, "ManufacturerDataLen") == 0) {
+			/* TODO: To be handled later*/
+		} else if (strcasecmp(key, "ManufacturerData") == 0) {
+
+			/* TODO: To be handled later*/
+		}
+	}
+	DBG("-");
+
+	if (size > 1) {
+		DBG("Send Device found event to HAL user, Num Prop [%d] total size [%d]",ev->num_props, size);
+		event_cb(HAL_EV_DEVICE_FOUND, (void*) buf, size);
+	}
+
+	return TRUE;
 }
 
 void __bt_hal_handle_property_changed_event(GVariant *msg, const char *object_path)
@@ -329,6 +532,57 @@ void __bt_hal_handle_property_changed_event(GVariant *msg, const char *object_pa
 	DBG("-");
 }
 
+static void __bt_handle_device_event(GVariant *value, GVariant *parameters)
+{
+	DBG("+");
+
+	if (__bt_parse_interface(parameters) == FALSE) {
+		ERR("Fail to parse the properies");
+		g_variant_unref(value);
+		return;
+	}
+
+	DBG("-");
+}
+
+static gboolean __bt_parse_interface(GVariant *msg)
+{
+	char *path = NULL;
+	GVariant *optional_param;
+	GVariantIter iter;
+	GVariant *child;
+	char *interface_name= NULL;
+	GVariant *inner_iter = NULL;
+	g_variant_get(msg, "(&o@a{sa{sv}})",
+			&path, &optional_param);
+	g_variant_iter_init(&iter, optional_param);
+
+	while ((child = g_variant_iter_next_value(&iter))) {
+		g_variant_get(child,"{&s@a{sv}}", &interface_name, &inner_iter);
+		if (g_strcmp0(interface_name, BT_HAL_DEVICE_INTERFACE) == 0) {
+			DBG("Found a device: %s", path);
+			if (__bt_parse_device_properties(inner_iter) == FALSE) {
+				g_variant_unref(inner_iter);
+				g_variant_unref(child);
+				g_variant_unref(optional_param);
+				ERR("Fail to parse the properies");
+				return FALSE;
+			} else {
+				g_variant_unref(inner_iter);
+				g_variant_unref(child);
+				g_variant_unref(optional_param);
+				return TRUE;
+			}
+		}
+		g_variant_unref(inner_iter);
+		g_variant_unref(child);
+	}
+
+	g_variant_unref(optional_param);
+
+	return FALSE;
+}
+
 static  void __bt_hal_manager_event_filter(GDBusConnection *connection,
 		const gchar *sender_name,
 		const gchar *object_path,
@@ -359,8 +613,8 @@ static  void __bt_hal_manager_event_filter(GDBusConnection *connection,
 		} else {
 			bt_event = __bt_hal_parse_event(value);
 			if (bt_event == BT_HAL_DEVICE_EVENT) {
-				/*TODO: Handle device events from BlueZ */
 				DBG("Device path : %s ", obj_path);
+				__bt_handle_device_event(value, parameters);
 			} else if (bt_event == BT_HAL_AVRCP_CONTROL_EVENT) {
 				/*TODO: Handle AVRCP control events from BlueZ */
 			}

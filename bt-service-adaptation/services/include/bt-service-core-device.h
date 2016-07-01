@@ -17,9 +17,8 @@
  *
  */
 
-
-#ifndef _BT_SERVICE_CORE_ADAPTER_H_
-#define _BT_SERVICE_CORE_ADAPTER_H_
+#ifndef _BT_SERVICE_CORE_DEVICE_H_
+#define _BT_SERVICE_CORE_DEVICE_H_
 
 #include <sys/types.h>
 
@@ -27,41 +26,7 @@
 extern "C" {
 #endif
 
-typedef enum {
-        ADAPTER_DISCOVERY_STOPPED,
-        ADAPTER_DISCOVERY_STARTED,
-        ADAPTER_DISCOVERY_STARTING,
-        ADAPTER_DISCOVERY_STOPPING,
-} bt_adapter_discovery_state_t;
-
-typedef enum {
-	BT_DEACTIVATED,
-	BT_ACTIVATED,
-	BT_ACTIVATING,
-	BT_DEACTIVATING,
-} bt_status_t;
-
-int _bt_enable_adapter(void);
-
-int _bt_disable_adapter(void);
-
-int _bt_start_discovery(void);
-
-int _bt_cancel_discovery(void);
-
-gboolean _bt_is_discovering(void);
-
-int _bt_stack_init(void);
-
-int _bt_get_local_address(void);
-
-int _bt_get_local_version(void);
-
-int _bt_get_local_name(void);
-
-int _bt_get_discoverable_mode(int *mode);
-
-int _bt_is_service_used(void);
+void _bt_device_state_handle_callback_set_request(void);
 
 #ifdef __cplusplus
 }

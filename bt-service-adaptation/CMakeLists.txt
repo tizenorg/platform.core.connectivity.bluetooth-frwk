@@ -10,6 +10,7 @@ marshal.c
 ./services/bt-service-util.c
 ./services/bt-request-handler.c
 ./services/adapter/bt-service-core-adapter.c
+./services/device/bt-service-core-device.c
 ./services/bt-service-event-receiver.c
 )
 

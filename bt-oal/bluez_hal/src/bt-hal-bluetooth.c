@@ -44,9 +44,14 @@ static const bt_callbacks_t *bt_hal_cbacks = NULL;
 
 /* Forward declarations */
 static void __bt_adapter_props_to_hal(bt_property_t *send_props, struct hal_property *prop, uint8_t num_props, uint16_t len);
+static void __bt_device_props_to_hal(bt_property_t *send_props,
+                struct hal_property *prop, uint8_t num_props,
+                uint16_t len);
 static void __bt_hal_handle_adapter_state_changed(void *buf, uint16_t len);
 static void __bt_hal_handle_adapter_property_changed(void *buf, uint16_t len);
 static void __bt_hal_handle_stack_messages(int message, void *buf, uint16_t len);
+static void __bt_hal_handle_adapter_discovery_state_changed(void *buf, uint16_t len);
+static void __bt_hal_handle_device_found_event(void *buf, uint16_t len);
 
 static bool interface_ready(void)
 {
@@ -137,12 +142,12 @@ static int get_remote_services(bt_bdaddr_t *remote_addr)
 
 static int start_discovery(void)
 {
-	return BT_STATUS_UNSUPPORTED;
+	return _bt_hal_dbus_start_discovery();
 }
 
 static int cancel_discovery(void)
 {
-	return BT_STATUS_UNSUPPORTED;
+	return _bt_hal_dbus_stop_discovery();
 }
 
 static int create_bond(const bt_bdaddr_t *bd_addr, int transport)
@@ -374,6 +379,83 @@ static void __bt_adapter_props_to_hal(bt_property_t *send_props, struct hal_prop
 		return;
 }
 
+static void __bt_device_props_to_hal(bt_property_t *send_props,
+                struct hal_property *prop, uint8_t num_props,
+                uint16_t len)
+{
+	void *buf = prop;
+	uint8_t i;
+
+	DBG("+");
+
+	for (i = 0; i < num_props; i++) {
+
+		if (sizeof(*prop) + prop->len > len) {
+			ERR("invalid device properties (%zu > %u), cant process further properties!!!",
+					sizeof(*prop) + prop->len, len);
+			return;
+		}
+
+		send_props[i].type = prop->type;
+
+		DBG("HAL prop Type [%d]", prop->type);
+
+		switch (prop->type) {
+		case HAL_PROP_DEVICE_TYPE:
+		{
+			DBG("Device property:HAL_PROP_DEVICE_TYPE:");
+			enum_prop_to_hal(send_props[i], prop,
+					bt_device_type_t);
+			break;
+		}
+		case HAL_PROP_DEVICE_VERSION_INFO:
+		{
+			DBG("Device property: HAL_PROP_DEVICE_VERSION_INFO");
+			static bt_remote_version_t e;
+			const struct hal_prop_device_info *p;
+			send_props[i].val = &e;
+			send_props[i].len = sizeof(e);
+				p = (struct hal_prop_device_info *) prop->val;
+				e.manufacturer = p->manufacturer;
+			e.sub_ver = p->sub_version;
+			e.version = p->version;
+			break;
+		}
+		case HAL_PROP_DEVICE_SERVICE_REC:
+		{
+			DBG("Device property: HAL_PROP_DEVICE_SERVICE_REC");
+			static bt_service_record_t e;
+			const struct hal_prop_device_service_rec *p;
+			send_props[i].val = &e;
+			send_props[i].len = sizeof(e);
+				p = (struct hal_prop_device_service_rec *) prop->val;
+					memset(&e, 0, sizeof(e));
+			memcpy(&e.channel, &p->channel, sizeof(e.channel));
+			memcpy(e.uuid.uu, p->uuid, sizeof(e.uuid.uu));
+			memcpy(e.name, p->name, p->name_len);
+			break;
+		}
+		default:
+			send_props[i].len = prop->len;
+			send_props[i].val = prop->val;
+			break;
+		}
+
+		DBG("prop[%d]: %s", i, btproperty2str(&send_props[i]));
+		len -= sizeof(*prop) + prop->len;
+		buf += sizeof(*prop) + prop->len;
+		prop = buf;
+
+	}
+
+	if (!len) {
+		DBG("-");
+		return;
+	}
+
+	ERR("invalid device properties (%u bytes left), ", len);
+}
+
 static void __bt_hal_handle_adapter_property_changed(void *buf, uint16_t len)
 {
 	struct hal_ev_adapter_props_changed *ev = (struct hal_ev_adapter_props_changed *)buf;
@@ -390,6 +472,31 @@ static void __bt_hal_handle_adapter_property_changed(void *buf, uint16_t len)
 		bt_hal_cbacks->adapter_properties_cb(ev->status, ev->num_props, props);
 }
 
+static void __bt_hal_handle_adapter_discovery_state_changed(void *buf, uint16_t len)
+{
+	struct hal_ev_discovery_state_changed *ev = (struct hal_ev_discovery_state_changed *)buf;
+
+	DBG("+");
+
+	if (bt_hal_cbacks->discovery_state_changed_cb)
+		bt_hal_cbacks->discovery_state_changed_cb(ev->state);
+}
+
+static void __bt_hal_handle_device_found_event(void *buf, uint16_t len)
+{
+	struct hal_ev_device_found *ev =  (struct hal_ev_device_found *) buf;
+	bt_property_t props[ev->num_props];
+	DBG("+");
+
+	if (!bt_hal_cbacks->device_found_cb)
+		return;
+
+	len -= sizeof(*ev);
+	__bt_device_props_to_hal(props, ev->props, ev->num_props, len);
+
+	bt_hal_cbacks->device_found_cb(ev->num_props, props);
+}
+
 static void __bt_hal_handle_stack_messages(int message, void *buf, uint16_t len)
 {
 	DBG("+");
@@ -402,6 +509,13 @@ static void __bt_hal_handle_stack_messages(int message, void *buf, uint16_t len)
 			DBG("Event: HAL_EV_ADAPTER_PROPS_CHANGED");
 			__bt_hal_handle_adapter_property_changed(buf, len);
 			break;
+		case HAL_EV_DISCOVERY_STATE_CHANGED:
+			DBG("Event: HAL_EV_DISCOVERY_STATE_CHANGED");
+			__bt_hal_handle_adapter_discovery_state_changed(buf, len);
+			break;
+		case HAL_EV_DEVICE_FOUND:
+			DBG("Event: HAL_EV_DEVICE_FOUND");
+			__bt_hal_handle_device_found_event(buf, len);
 		default:
 			DBG("Event Currently not handled!!");
 			break;
