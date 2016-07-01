@@ -45,6 +45,12 @@ int _bt_enable_adapter(void);
 
 int _bt_disable_adapter(void);
 
+int _bt_start_discovery(void);
+
+int _bt_cancel_discovery(void);
+
+gboolean _bt_is_discovering(void);
+
 int _bt_stack_init(void);
 
 int _bt_get_local_address(void);

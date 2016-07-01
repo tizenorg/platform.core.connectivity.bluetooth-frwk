@@ -293,6 +293,28 @@ typedef enum {
 	BT_PROPERTY_MODALIAS,
 
 	/**
+         * Description - BLE Device manufacturer data length
+         * Access mode - GET
+         * Data type   - uint32_t
+         */
+        BT_PROPERTY_REMOTE_DEVICE_MANUFACTURER_DATA_LEN,
+
+        /**
+         * Description - BLE Device manufacturer data
+         * Access mode - GET
+         * Data type   - Array of character string
+         */
+        BT_PROPERTY_REMOTE_DEVICE_MANUFACTURER_DATA,
+
+	/**
+         * Description - Remote BLE advertising data
+         * Access mode - Only received during device found callback.
+         * Data type   - Array of uint8_t of remote BLE adv data.
+         *               (Array size inferred from property length).
+         */
+        BT_PROPERTY_REMOTE_BLE_ADV_DATA,
+
+	/**
 	 * Description - Local LE features
 	 * Access mode - GET.
 	 * Data type   - bt_local_le_features_t.

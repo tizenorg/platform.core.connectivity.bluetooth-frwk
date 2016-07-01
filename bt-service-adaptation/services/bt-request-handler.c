@@ -375,6 +375,20 @@ int __bt_bluez_request(int function_name,
 		}
 		break;
 	}
+	case BT_START_DISCOVERY: {
+		result = _bt_start_discovery();
+		break;
+	}
+	case BT_CANCEL_DISCOVERY:
+                result = _bt_cancel_discovery();
+                break;
+	case BT_IS_DISCOVERYING: {
+		 gboolean discovering = FALSE;
+		 discovering = _bt_is_discovering();
+		 g_array_append_vals(*out_param1,
+				 &discovering, sizeof(gboolean));
+		 break;
+	 }
 	case BT_GET_LOCAL_ADDRESS: {
 		result = _bt_get_local_address();
 

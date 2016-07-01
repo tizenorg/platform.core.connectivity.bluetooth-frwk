@@ -52,6 +52,8 @@ extern "C" {
                         "the reply timeout expired, or the network connection " \
                         "was broken."
 
+#define BT_HAL_DISCOVERY_FINISHED_DELAY 200
+
 #define BT_HAL_ADDRESS_LENGTH_MAX 6
 #define BT_HAL_ADDRESS_STRING_SIZE 18
 #define BT_HAL_LOWER_ADDRESS_LENGTH 9

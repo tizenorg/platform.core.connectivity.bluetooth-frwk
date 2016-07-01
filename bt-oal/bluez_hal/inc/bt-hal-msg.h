@@ -38,7 +38,6 @@
 #define HAL_PROP_ADAPTER_BONDED_DEVICES         0x08
 #define HAL_PROP_ADAPTER_DISC_TIMEOUT           0x09
 
-#define HAL_PROP_ADAPTER_LOCAL_LE_FEAT          0x15
 
 #define HAL_PROP_DEVICE_NAME                    0x01
 #define HAL_PROP_DEVICE_ADDR                    0x02
@@ -72,6 +71,11 @@ struct hal_prop_device_service_rec {
 #define HAL_PROP_ADAPTER_VERSION		0x12
 #define HAL_PROP_ADAPTER_IPSP_INITIALIZED	0x13
 #define HAL_PROP_ADAPTER_MODALIAS		0x14
+
+#define HAL_PROP_DEVICE_MANUFACTURER_DATA_LEN   0x15
+#define HAL_PROP_DEVICE_MANUFACTURER_DATA       0x16
+#define HAL_PROP_DEVICE_BLE_ADV_DATA            0x18
+#define HAL_PROP_ADAPTER_LOCAL_LE_FEAT          0x19
 
 struct hal_prop_device_info {
         uint8_t version;

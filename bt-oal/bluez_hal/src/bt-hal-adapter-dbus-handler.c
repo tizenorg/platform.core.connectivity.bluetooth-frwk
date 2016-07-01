@@ -39,7 +39,6 @@
 #include <bt-hal-adapter-dbus-handler.h>
 #include <bt-hal-dbus-common-utils.h>
 
-#define BT_MAX_PROPERTY_BUF_SIZE 1024
 #define BT_ENABLE_TIMEOUT 20000 /* 20 seconds */
 #define BT_CORE_NAME "org.projectx.bt_core"
 #define BT_CORE_PATH "/org/projectx/bt_core"
@@ -184,6 +183,78 @@ int _bt_hal_dbus_disable_adapter(void)
 	return BT_STATUS_SUCCESS;
 }
 
+int _bt_hal_dbus_start_discovery(void)
+{
+	GDBusProxy *proxy;
+	GError *error = NULL;
+	GVariant *result;
+	DBG("+");
+
+	proxy = _bt_get_adapter_proxy();
+	if (!proxy) {
+		DBG("_bt_hal_dbus_start_discovery: Adapter proxy get failed!!!");
+		return BT_STATUS_FAIL;
+	}
+
+	result = g_dbus_proxy_call_sync(proxy,
+			"StartDiscovery",
+			NULL,
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			&error);
+
+	if (!result) {
+		if (error != NULL) {
+			ERR("StartDiscovery failed (Error: %s)", error->message);
+			g_clear_error(&error);
+		} else
+			ERR("StartDiscovery failed");
+		return BT_STATUS_FAIL;
+	}
+
+	/* discovery status will be change in event */
+	DBG("-");
+	g_variant_unref(result);
+	return BT_STATUS_SUCCESS;
+}
+
+int _bt_hal_dbus_stop_discovery(void)
+{
+	GDBusProxy *proxy;
+	GError *error = NULL;
+	GVariant *result;
+	DBG("+");
+
+	proxy = _bt_get_adapter_proxy();
+	if (!proxy) {
+		DBG("_bt_hal_dbus_stop_discovery: Adapter proxy get failed!!!");
+		return BT_STATUS_FAIL;
+	}
+
+	result = g_dbus_proxy_call_sync(proxy,
+			"StopDiscovery",
+			NULL,
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			&error);
+
+	if (!result) {
+		if (error != NULL) {
+			ERR("StopDiscovery failed (Error: %s)", error->message);
+			g_clear_error(&error);
+		} else
+			ERR("StopDiscovery failed");
+		return BT_STATUS_FAIL;
+	}
+
+	/* discovery status will be change in event */
+	DBG("-");
+	g_variant_unref(result);
+	return BT_STATUS_SUCCESS;
+}
+
 static void ___bt_fill_le_supported_features(const char *item,
 		const char *value, uint8_t *le_features)
 {
@@ -221,7 +292,7 @@ static gboolean __bt_adapter_all_properties_cb(gpointer user_data)
 	GVariant *value;
 
 	/* Buffer and propety count management */
-	uint8_t buf[BT_MAX_PROPERTY_BUF_SIZE];
+	uint8_t buf[BT_HAL_MAX_PROPERTY_BUF_SIZE];
 	struct hal_ev_adapter_props_changed *ev = (void*) buf;
 	size_t size = 0;
 	gchar *address = NULL;
@@ -469,7 +540,7 @@ int _bt_hal_dbus_get_adapter_properties(void)
 static gboolean __bt_adapter_discovery_timeout_cb(gpointer user_data)
 {
 	/* Buffer and propety count management */
-	uint8_t buf[BT_MAX_PROPERTY_BUF_SIZE];
+	uint8_t buf[BT_HAL_MAX_PROPERTY_BUF_SIZE];
 	struct hal_ev_adapter_props_changed *ev = (void*) buf;;
 	size_t size = 0;
 	unsigned int *timeout = user_data;
@@ -558,7 +629,7 @@ int _bt_hal_dbus_get_discovery_timeout(void)
 static gboolean __bt_adapter_scan_mode_cb(gpointer user_data)
 {
 	/* Buffer and propety count management */
-	uint8_t buf[BT_MAX_PROPERTY_BUF_SIZE];
+	uint8_t buf[BT_HAL_MAX_PROPERTY_BUF_SIZE];
 	struct hal_ev_adapter_props_changed *ev = (void*) buf;;
 	size_t size = 0;
 	int *mode = user_data;
@@ -682,7 +753,7 @@ int _bt_hal_dbus_get_scan_mode(void)
 static gboolean __bt_adapter_local_version_cb(gpointer user_data)
 {
 	/* Buffer and propety count management */
-	uint8_t buf[BT_MAX_PROPERTY_BUF_SIZE];
+	uint8_t buf[BT_HAL_MAX_PROPERTY_BUF_SIZE];
 	struct hal_ev_adapter_props_changed *ev = (void*) buf;;
 	size_t size = 0;
 	char *version = NULL;
@@ -765,7 +836,7 @@ int _bt_hal_dbus_get_local_version(void)
 static gboolean __bt_adapter_local_name_cb(gpointer user_data)
 {
 	/* Buffer and propety count management */
-	uint8_t buf[BT_MAX_PROPERTY_BUF_SIZE];
+	uint8_t buf[BT_HAL_MAX_PROPERTY_BUF_SIZE];
 	struct hal_ev_adapter_props_changed *ev = (void*) buf;;
 	size_t size = 0;
 	char *name = NULL;
@@ -848,7 +919,7 @@ int _bt_hal_dbus_get_local_name(void)
 static gboolean __bt_adapter_local_address_cb(gpointer user_data)
 {
 	/* Buffer and propety count management */
-	uint8_t buf[BT_MAX_PROPERTY_BUF_SIZE];
+	uint8_t buf[BT_HAL_MAX_PROPERTY_BUF_SIZE];
 	struct hal_ev_adapter_props_changed *ev = (void*) buf;
 	size_t size = 0;
 	char * address = NULL;

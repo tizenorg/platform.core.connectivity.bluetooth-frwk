@@ -383,16 +383,13 @@ void _bt_convert_uuid_string_to_type(unsigned char *uuid,
 		const char *device_uuid)
 {
 	int i;
+	int k = 0;
 	uint8_t temp[2];
 	uint8_t temp1[1];
 
 	if (uuid == NULL || device_uuid == NULL)
 		return;
-
-	int k=0;
-
 	for (i = 0; i < 36; ) {
-
 		if (device_uuid[i] != '\0') {
 			if (device_uuid[i] == '-') {
 				i = i+1;

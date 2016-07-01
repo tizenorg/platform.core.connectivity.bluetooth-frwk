@@ -30,6 +30,8 @@
 #include "oal-internal.h"
 #include "oal-manager.h"
 #include "oal-hardware.h"
+#include "oal-common.h"
+#include "oal-utils.h"
 
 #define CHECK_MAX(max, x) (((max) > (x)) ? (x) : (max))
 
@@ -42,16 +44,15 @@ static bt_scan_mode_t scan_mode = BT_SCAN_MODE_NONE;
 static int discoverable_timeout = 0;
 
 /* Forward declarations */
-const char * status2string(bt_status_t status);
 oal_status_t convert_to_oal_status(bt_status_t status);
-void parse_device_properties(int num_properties, bt_property_t *properties,
-		remote_device_t *dev_info, ble_adv_data_t * adv_info);
 static gboolean retry_enable_adapter(gpointer data);
 oal_status_t oal_mgr_init_internal(void);
 
 
 /* Callback registered with Stack */
 static void cb_adapter_state_change(bt_state_t status);
+static void cb_adapter_discovery_state_changed(bt_discovery_state_t state);
+static void cb_adapter_device_found(int num_properties, bt_property_t *properties);
 static void cb_adapter_properties (bt_status_t status,
 		int num_properties, bt_property_t *properties);
 
@@ -60,8 +61,8 @@ static bt_callbacks_t callbacks = {
 	cb_adapter_state_change,
 	cb_adapter_properties,
 	NULL, /* remote_device_properties_callback */
-	NULL, /* device_found_callback */
-	NULL, /* discovery_state_changed_callback */
+	cb_adapter_device_found,
+	cb_adapter_discovery_state_changed,
 	NULL, /* pin_request_callback */
 	NULL, /* ssp_request_callback */
 	NULL, /* bond_state_changed_callback */
@@ -137,6 +138,40 @@ oal_status_t adapter_disable(void)
 	return OAL_STATUS_SUCCESS;
 }
 
+oal_status_t adapter_start_inquiry(void)
+{
+	int ret;
+
+	API_TRACE();
+
+	CHECK_OAL_INITIALIZED();
+
+	ret = blued_api->start_discovery();
+	if (ret != BT_STATUS_SUCCESS) {
+		BT_ERR("start_discovery failed: [%s]", status2string(ret));
+		return convert_to_oal_status(ret);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
+oal_status_t adapter_stop_inquiry(void)
+{
+	int ret;
+
+	API_TRACE();
+
+	CHECK_OAL_INITIALIZED();
+
+	ret = blued_api->cancel_discovery();
+	if (ret != BT_STATUS_SUCCESS) {
+		BT_ERR("cancel_discovery failed: [%s]", status2string(ret));
+		return convert_to_oal_status(ret);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
 /* Callbacks from Stack */
 static void cb_adapter_state_change(bt_state_t status)
 {
@@ -158,9 +193,8 @@ oal_status_t adapter_get_address(void)
 {
 	int ret;
 
-	CHECK_OAL_INITIALIZED();
-
 	API_TRACE();
+	CHECK_OAL_INITIALIZED();
 
 	ret = blued_api->get_adapter_property(BT_PROPERTY_BDADDR);
 	if (ret != BT_STATUS_SUCCESS) {
@@ -175,9 +209,8 @@ oal_status_t adapter_get_version(void)
 {
 	int ret;
 
-	CHECK_OAL_INITIALIZED();
-
 	API_TRACE();
+	CHECK_OAL_INITIALIZED();
 
 	ret = blued_api->get_adapter_property(BT_PROPERTY_VERSION);
 	if (ret != BT_STATUS_SUCCESS) {
@@ -237,7 +270,7 @@ oal_status_t adapter_get_discoverable_timeout(int *p_timeout)
 	return OAL_STATUS_SUCCESS;
 }
 
-static void cb_adapter_properties (bt_status_t status,
+static void cb_adapter_properties(bt_status_t status,
                                                int num_properties,
                                                bt_property_t *properties)
 {
@@ -378,8 +411,70 @@ static void cb_adapter_properties (bt_status_t status,
 			break;
 		}
 		default:
-			BT_WARN("Unhandled property: %d", properties[i].type);
-			break;
+			 BT_WARN("Unhandled property: %d", properties[i].type);
+			 break;
 		}
 	}
+}
+
+static void cb_adapter_discovery_state_changed(bt_discovery_state_t state)
+{
+	oal_event_t event;
+
+	event = (BT_DISCOVERY_STARTED == state)?OAL_EVENT_ADAPTER_INQUIRY_STARTED:OAL_EVENT_ADAPTER_INQUIRY_FINISHED;
+
+	BT_DBG("%d", state);
+	send_event(event, NULL, 0);
+}
+
+static void cb_adapter_device_found(int num_properties, bt_property_t *properties)
+{
+	remote_device_t dev_info;
+	ble_adv_data_t adv_info;
+	oal_event_t event;
+	gpointer event_data;
+	gsize properties_size = 0;
+	BT_DBG("+");
+
+	if (num_properties == 0) {
+		BT_ERR("Unexpected, properties count is zero!!");
+		return;
+	}
+
+	memset(&dev_info, 0x00, sizeof(remote_device_t));
+	memset(&adv_info, 0x00, sizeof(ble_adv_data_t));
+
+	print_bt_properties(num_properties, properties);
+	parse_device_properties(num_properties, properties, &dev_info, &adv_info, &properties_size);
+
+	BT_INFO("number of properties= [%d] total size [%u]", num_properties, properties_size);
+
+	if (dev_info.type != DEV_TYPE_BREDR) {
+		/* BLE Single or DUAL mode found, so it should have Adv data */
+		event_ble_dev_found_t * ble_dev_event = g_new0(event_ble_dev_found_t, 1);
+
+		ble_dev_event->adv_len = adv_info.len;
+
+		if (adv_info.len > 0 && adv_info.adv_data) {
+			memcpy(ble_dev_event->adv_data, adv_info.adv_data, adv_info.len);
+			ble_dev_event->adv_len = adv_info.len;
+		} else
+			ble_dev_event->adv_len = 0;
+
+		ble_dev_event->device_info = dev_info;
+
+		event_data = ble_dev_event;
+		event = OAL_EVENT_ADAPTER_INQUIRY_RESULT_BLE;
+	} else {
+		/* BREDR device, so No Adv data */
+		event_dev_found_t * dev_event = g_new0(event_dev_found_t, 1);
+
+		memcpy(dev_event, &dev_info, sizeof(remote_device_t));
+		event_data = dev_event;
+		event = OAL_EVENT_ADAPTER_INQUIRY_RESULT_BREDR_ONLY;
+	}
+
+	send_event(event, event_data, properties_size);
+
+	BT_DBG("-");
 }
