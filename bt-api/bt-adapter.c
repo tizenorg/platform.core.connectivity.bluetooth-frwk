@@ -62,6 +62,7 @@ BT_EXPORT_API int bluetooth_check_adapter(void)
 {
 	int value;
 
+#if 0
 #ifndef EMUL
 	int ret;
 
@@ -70,6 +71,7 @@ BT_EXPORT_API int bluetooth_check_adapter(void)
 	if (ret != BLUETOOTH_ERROR_NONE) {
 		return BLUETOOTH_ADAPTER_DISABLED;
 	}
+#endif
 #endif
 
 	/* check VCONFKEY_BT_STATUS */
