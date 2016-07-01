@@ -59,6 +59,12 @@ typedef struct {
 	unsigned char	key[8];
 } hid_send_key_event_t;
 
+typedef struct {
+	unsigned char	btcode;
+	unsigned char	rep_id;
+	unsigned short	key[3];
+} hid_send_rc_key_event_t;
+
 typedef void (*hid_cb_func_ptr)(int, hid_event_param_t *, void *);
 
 typedef struct {
@@ -283,6 +289,27 @@ int bluetooth_hid_device_send_mouse_event(const char *remote_addr,
 int bluetooth_hid_device_send_key_event(const char *remote_addr,
 		hid_send_key_event_t send_event);
 
+/**
+ * @fn int bluetooth_hid_device_send_rc_key_event(
+ *		const char *remote_addr, hid_send_rc_key_event_t send_event)
+ *
+ * @brief write the event data on the socket.
+ *
+ * This function is a asynchronous call.
+ *
+ * @return  HID_ERROR_NONE  - Success \n
+ *              HID_ERROR_INVALID_PARAM - Invalid parameter \n
+ *              HID_ERROR_NOT_INITIALIZED - Internal Error \n
+ *              HID_ERROR_NOT_ENABLED - Not enabled \n
+ *              HID_ERROR_INTERNAL - Not enabled \n
+ *
+ * @exception   None
+ * @param[in]  remote_addr   device address of remote device.
+ * @param[in]  send_event   This indicates the event data to send to remote device.
+ * @remark      None
+ */
+int bluetooth_hid_device_send_rc_key_event(const char *remote_addr,
+					hid_send_rc_key_event_t send_event);
 /**
  * @fn int bluetooth_hid_device_reply_to_report(const char *remote_addr,
  *			bluetooth_hid_header_type_t htype,

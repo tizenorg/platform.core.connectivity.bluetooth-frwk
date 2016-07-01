@@ -647,6 +647,53 @@ BT_EXPORT_API int bluetooth_hid_device_send_key_event(const char *remote_addr,
 	return written;
 }
 
+BT_EXPORT_API int bluetooth_hid_device_send_rc_key_event(const char *remote_addr,
+					hid_send_rc_key_event_t send_event)
+{
+	int result;
+	int written = 0;
+	int socket_fd;
+	hid_connected_device_info_t *info = NULL;
+
+	switch (privilege_token_send_key) {
+	case 0:
+		result = _bt_check_privilege(BT_BLUEZ_SERVICE, BT_HID_DEVICE_SEND_KEY_EVENT);
+
+		if (result == BLUETOOTH_ERROR_NONE) {
+			privilege_token_send_key = 1; /* Have a permission */
+		} else if (result == BLUETOOTH_ERROR_PERMISSION_DEINED) {
+			BT_ERR("Don't have a privilege to use this API");
+			privilege_token_send_key = -1; /* Don't have a permission */
+			return BLUETOOTH_ERROR_PERMISSION_DEINED;
+		} else {
+			/* Just break - It is not related with permission error */
+		}
+		break;
+	case 1:
+		/* Already have a privilege */
+		break;
+	case -1:
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
+	default:
+		/* Invalid privilge token value */
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	info = __find_hid_info_with_address(remote_addr);
+	if (info == NULL) {
+		BT_ERR("Connection Information not found");
+		return BLUETOOTH_ERROR_INVALID_PARAM;
+	}
+
+	if (info->intr_fd != -1 && info->ctrl_fd == -1)
+		socket_fd = info->intr_fd;
+	else
+		socket_fd = info->ctrl_fd;
+
+	written = write(socket_fd, &send_event, sizeof(send_event));
+	return written;
+}
+
 BT_EXPORT_API int bluetooth_hid_device_reply_to_report(const char *remote_addr,
 				bluetooth_hid_header_type_t htype,
 				bluetooth_hid_param_type_t ptype,
