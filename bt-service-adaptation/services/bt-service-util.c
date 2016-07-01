@@ -146,3 +146,13 @@ void _bt_clear_request_list(void)
 	}
 }
 
+void _bt_service_convert_uuid_type_to_string(char *str, const unsigned char *uuid)
+{
+	ret_if(str == NULL);
+	ret_if(uuid == NULL);
+
+	g_snprintf(str, BT_UUID_STRING_SIZE,
+			"%2.2X%2.2X%2.2X%2.2X-%2.2X%2.2X-%2.2X%2.2X-%2.2X%2.2X-%2.2X%2.2X%2.2X%2.2X%2.2X%2.2X",
+			uuid[0], uuid[1], uuid[2], uuid[3], uuid[4], uuid[5], uuid[6], uuid[7],
+			uuid[8], uuid[9], uuid[10], uuid[11], uuid[12], uuid[13], uuid[14], uuid[15]);
+}

@@ -237,6 +237,23 @@ oal_status_t adapter_get_discoverable_timeout(int *p_timeout)
 	return OAL_STATUS_SUCCESS;
 }
 
+oal_status_t adapter_get_service_uuids(void)
+{
+	int ret;
+
+	CHECK_OAL_INITIALIZED();
+
+	API_TRACE();
+
+	ret = blued_api->get_adapter_property(BT_PROPERTY_UUIDS);
+	if (ret != BT_STATUS_SUCCESS) {
+		BT_ERR("get_adapter_property failed: [%s]", status2string(ret));
+		return convert_to_oal_status(ret);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
 static void cb_adapter_properties (bt_status_t status,
                                                int num_properties,
                                                bt_property_t *properties)

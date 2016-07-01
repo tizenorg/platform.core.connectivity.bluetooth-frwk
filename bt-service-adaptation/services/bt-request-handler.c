@@ -414,6 +414,21 @@ int __bt_bluez_request(int function_name,
 		g_array_append_vals(*out_param1, &discoverable_mode, sizeof(int));
 		break;
 	}
+	case BT_IS_SERVICE_USED: {
+		char *uuid = NULL;
+
+		uuid = (char *)g_variant_get_data(in_param1);
+		BT_INFO("UUID to be searched [%s]", uuid);
+		result = _bt_is_service_used();
+
+		/* Save invocation */
+		if (result == BLUETOOTH_ERROR_NONE) {
+			sender = (char*)g_dbus_method_invocation_get_sender(context);
+			_bt_save_invocation_context(context, result, sender,
+					function_name, (gpointer)uuid);
+		}
+		break;
+	}
 	default:
 		BT_INFO("UnSupported function [%d]", function_name);
 		result = BLUETOOTH_ERROR_NOT_SUPPORT;

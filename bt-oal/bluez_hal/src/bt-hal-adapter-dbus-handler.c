@@ -938,6 +938,118 @@ int _bt_hal_dbus_get_local_address(void)
 	return BT_STATUS_SUCCESS;
 }
 
+/* Get Local services API and callback */
+static gboolean __bt_adapter_service_uuids_cb(gpointer user_data)
+{
+	GVariant *result = user_data;
+	GVariant *temp;
+	GVariantIter *iter = NULL;
+	gchar *uuid_str;
+
+	/* Buffer and propety count management */
+	uint8_t buf[BT_MAX_PROPERTY_BUF_SIZE];
+	struct hal_ev_adapter_props_changed *ev = (void*) buf;
+	size_t size = 0;
+
+	/* UUID collection */
+	uint8_t uuids[HAL_UUID_LEN * MAX_UUID_COUNT];
+	int uuid_count = 0;
+
+	memset(buf, 0, sizeof(buf));
+	size = sizeof(*ev);
+	ev->num_props = 0;
+	ev->status = BT_STATUS_SUCCESS;
+
+	g_variant_get(result, "(v)", &temp);
+	g_variant_get(temp, "as", &iter);
+	if (iter == NULL) {
+		ERR("Failed to get UUIDs");
+		goto fail;
+	}
+
+	while (g_variant_iter_loop(iter, "s", &uuid_str)) {
+		uint8_t uuid[HAL_UUID_LEN];
+
+		DBG("UUID string [%s]\n", uuid_str);
+		_bt_convert_uuid_string_to_type(uuid, uuid_str);
+		memcpy(uuids + uuid_count * HAL_UUID_LEN, uuid, HAL_UUID_LEN);
+		uuid_count++;
+	}
+
+	size += __bt_insert_hal_properties(buf + size,
+			HAL_PROP_ADAPTER_UUIDS,
+			(HAL_UUID_LEN * uuid_count),
+			uuids);
+	ev->num_props++;
+
+	if (size > 2) {
+		DBG("Send Adapter properties changed event to HAL user,"
+				" Num Prop [%d] total size [%d]", ev->num_props, size);
+		event_cb(HAL_EV_ADAPTER_PROPS_CHANGED, (void*) buf, size);
+	}
+
+	g_variant_iter_free(iter);
+	g_variant_unref(result);
+	g_variant_unref(temp);
+	return FALSE;
+
+fail:
+	ev->status = BT_STATUS_FAIL;
+	ev->num_props = 0;
+	DBG("Send Adapter properties changed event to HAL user,"
+			" Num Prop [%d] total size [%d]", ev->num_props, size);
+	event_cb(HAL_EV_ADAPTER_PROPS_CHANGED, (void*) buf, size);
+
+	g_variant_unref(result);
+	return FALSE;
+}
+
+int _bt_hal_dbus_get_adapter_supported_uuids(void)
+{
+	GDBusProxy *proxy;
+	GError *error = NULL;
+	GVariant *result;
+
+	DBG("+");
+
+	proxy = _bt_get_adapter_properties_proxy();
+
+	if (!proxy) {
+		DBG("_bt_hal_dbus_get_local_name: Adapter Properties proxy get failed!!!");
+		return BT_STATUS_FAIL;
+	}
+
+	result = g_dbus_proxy_call_sync(proxy,
+			"Get",
+			g_variant_new("(ss)", BT_ADAPTER_INTERFACE,
+				"UUIDs"),
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			&error);
+
+	if (!result) {
+		if (error != NULL) {
+			ERR("Failed to get UUIDs (Error: %s)", error->message);
+			g_clear_error(&error);
+		} else
+			ERR("Failed to get UUIDs");
+		return BT_STATUS_FAIL;
+	}
+
+
+	DBG("Got All Adaptr service UUID's from Bluez Stack!!, time to start parsing");
+
+	/*
+	 * As we need to provide async callback to user from HAL, simply schedule a
+	 * callback method which will carry actual result
+	 */
+	g_idle_add(__bt_adapter_service_uuids_cb, (gpointer)result);
+
+	DBG("-");
+	return BT_STATUS_SUCCESS;
+}
+
 int _bt_hal_dbus_get_adapter_property(bt_property_type_t property_type)
 {
 	DBG("+");
@@ -958,7 +1070,7 @@ int _bt_hal_dbus_get_adapter_property(bt_property_type_t property_type)
 	case BT_PROPERTY_CLASS_OF_DEVICE:
 		return BT_STATUS_UNSUPPORTED;
 	case BT_PROPERTY_UUIDS:
-		return BT_STATUS_UNSUPPORTED;
+		return _bt_hal_dbus_get_adapter_supported_uuids();
 	case BT_PROPERTY_ADAPTER_BONDED_DEVICES:
 		return BT_STATUS_UNSUPPORTED;
 	default:

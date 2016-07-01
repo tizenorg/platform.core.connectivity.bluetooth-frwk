@@ -116,6 +116,18 @@ oal_status_t adapter_is_connectable(int *p_connectable);
  */
 oal_status_t adapter_get_discoverable_timeout(int *p_timeout);
 
+/**
+ * @brief Get List of UUIDs for services supported
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see OAL_EVENT_ADAPTER_PROPERTY_SERVICES
+ */
+oal_status_t adapter_get_service_uuids(void);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

@@ -188,6 +188,24 @@ int _bt_get_discoverable_mode(int *mode)
 	return BLUETOOTH_ERROR_NONE;
 }
 
+int _bt_is_service_used(void)
+{
+	int result;
+
+	BT_DBG("+");
+
+	result =  adapter_get_service_uuids();
+	if (result != OAL_STATUS_SUCCESS) {
+		BT_ERR("adapter_get_service_uuids failed: %d", result);
+		result = BLUETOOTH_ERROR_INTERNAL;
+	} else {
+		result = BLUETOOTH_ERROR_NONE;
+	}
+
+	BT_DBG("-");
+	return result;
+}
+
 static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 {
         BT_DBG("+");
@@ -262,6 +280,16 @@ static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 		BT_INFO("Discoverable timeout: [%d]", *timeout);
 		break;
 	}
+	case OAL_EVENT_ADAPTER_PROPERTY_SERVICES: {
+		int count;
+		service_uuid_t *service_list;
+		event_adapter_services_t *list = event_data;
+
+		count = list->num;
+		service_list = list->service_list;
+		__bt_adapter_handle_pending_requests(BT_IS_SERVICE_USED, service_list, count);
+		break;
+	}
 	default:
 		BT_ERR("Unhandled event..");
 		break;
@@ -326,6 +354,29 @@ static void __bt_adapter_handle_pending_requests(int service_function, void *use
 		case BT_GET_LOCAL_VERSION:
 			g_array_append_vals(out_param, user_data, size);
 			break;
+		case BT_IS_SERVICE_USED: {
+			int i;
+			gboolean used = FALSE;
+			unsigned char *uuid;
+			char uuid_str[BT_UUID_STRING_SIZE];
+			char *request_uuid = req_info->user_data;
+			service_uuid_t *service_list = user_data;
+
+			BT_INFO("Check for service uuid: %s", request_uuid);
+			for (i = 0; i < size; i++) {
+				uuid = service_list[i].uuid;
+				_bt_service_convert_uuid_type_to_string(uuid_str, uuid);
+				BT_INFO("Adapter Service: [%s]", uuid_str);
+				if (strcasecmp(uuid_str, request_uuid) == 0) {
+					BT_INFO("UUID matched!!");
+					used = TRUE;
+					break;
+				}
+			}
+
+			g_array_append_vals(out_param, &used, sizeof(gboolean));
+			break;
+		}
 		default:
 			BT_ERR("Unknown service function[%d]", service_function);
 		}

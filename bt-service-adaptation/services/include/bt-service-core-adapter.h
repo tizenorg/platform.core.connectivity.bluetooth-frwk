@@ -55,6 +55,8 @@ int _bt_get_local_name(void);
 
 int _bt_get_discoverable_mode(int *mode);
 
+int _bt_is_service_used(void);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

@@ -27,6 +27,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 #define BT_NODE_NAME_LEN 50
+#define BT_UUID_STRING_SIZE 37
 
 typedef struct {
 	int req_id;
@@ -53,6 +54,8 @@ int _bt_delete_request_list(int req_id);
 request_info_t *_bt_get_request_info(int req_id);
 
 void _bt_clear_request_list(void);
+
+void _bt_service_convert_uuid_type_to_string(char *str, const unsigned char *uuid);
 
 #ifdef __cplusplus
 }
