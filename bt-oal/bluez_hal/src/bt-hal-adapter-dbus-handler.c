@@ -1150,3 +1150,184 @@ int _bt_hal_dbus_get_adapter_property(bt_property_type_t property_type)
 
 	DBG("-");
 }
+
+static int __bt_hal_dbus_set_local_name(void *data)
+{
+	GDBusProxy *proxy;
+	const char *name = data;
+	GVariant *result;
+	GError *error = NULL;
+
+	DBG("+");
+	DBG("Local Name: [%s]", name);
+	proxy = _bt_get_adapter_properties_proxy();
+	if (!proxy) {
+		DBG("_bt_hal_dbus_get_local_name: Adapter Properties proxy get failed!!!");
+		return BT_STATUS_FAIL;
+	}
+
+	result = g_dbus_proxy_call_sync(proxy,
+			"Set",
+			g_variant_new("(ssv)", BT_ADAPTER_INTERFACE,
+				"Alias", g_variant_new("s", name)),
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			&error);
+	if (!result) {
+		if (error != NULL) {
+			ERR("Failed to set local name (Error: %s)", error->message);
+			g_clear_error(&error);
+		} else
+			ERR("Failed to set local name");
+		return BT_STATUS_FAIL;
+	}
+	g_variant_unref(result);
+
+	DBG("-");
+	return BT_STATUS_SUCCESS;
+}
+
+static int __bt_hal_dbus_set_scan_mode(void *data)
+{
+	GDBusProxy *proxy;
+	int *mode = data;
+	GVariant *result;
+	GError *error = NULL;
+	gboolean pg_scan;
+	gboolean inq_scan;
+
+	DBG("+");
+	DBG("Scan mode: [%d]", *mode);
+	proxy = _bt_get_adapter_properties_proxy();
+	if (!proxy) {
+		DBG("Adapter Properties proxy get failed!!!");
+		return BT_STATUS_FAIL;
+	}
+
+	switch (*mode) {
+	case BT_SCAN_MODE_NONE:
+		pg_scan = FALSE;
+		inq_scan = FALSE;
+		break;
+	case BT_SCAN_MODE_CONNECTABLE:
+		pg_scan = TRUE;
+		inq_scan = FALSE;
+		break;
+	case BT_SCAN_MODE_CONNECTABLE_DISCOVERABLE:
+		pg_scan = TRUE;
+		inq_scan = TRUE;
+		break;
+	default:
+		ERR("Invalid scan mode");
+		return BT_STATUS_FAIL;
+	}
+
+	result = g_dbus_proxy_call_sync(proxy,
+			"Set",
+			g_variant_new("(ssv)", BT_ADAPTER_INTERFACE,
+				"Connectable", g_variant_new("b", pg_scan)),
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			&error);
+	if (!result) {
+		if (error != NULL) {
+			ERR("Failed to set connectable property (Error: %s)", error->message);
+			g_clear_error(&error);
+		} else
+			ERR("Failed to set connectable property");
+		return BT_STATUS_FAIL;
+	}
+	g_variant_unref(result);
+
+	result = g_dbus_proxy_call_sync(proxy,
+			"Set",
+			g_variant_new("(ssv)", BT_ADAPTER_INTERFACE, "Discoverable",
+				g_variant_new("b", inq_scan)),
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			&error);
+	if (!result) {
+		if (error != NULL) {
+			ERR("Failed to set Discoverable property (Error: %s)", error->message);
+			g_clear_error(&error);
+		} else
+			ERR("Failed to set Discoverable property");
+		return BT_STATUS_FAIL;
+	}
+	g_variant_unref(result);
+
+	DBG("-");
+	return BT_STATUS_SUCCESS;
+}
+
+static int __bt_hal_dbus_set_discovery_timeout(void *data)
+{
+	GDBusProxy *proxy;
+	unsigned int *timeout = data;
+	GVariant *result;
+	GError *error = NULL;
+
+
+	DBG("+");
+
+	DBG("Discovery Timeout: [%d]", *timeout);
+	proxy = _bt_get_adapter_properties_proxy();
+	if (!proxy) {
+		DBG("Adapter Properties proxy get failed!!!");
+		return BT_STATUS_FAIL;
+	}
+
+	result = g_dbus_proxy_call_sync(proxy,
+			"Set",
+			g_variant_new("(ssv)", BT_ADAPTER_INTERFACE,
+				"DiscoverableTimeout", g_variant_new("u", *timeout)),
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			&error);
+	if (!result) {
+		if (error != NULL) {
+			ERR("Failed to set DiscoverableTimeout property (Error: %s)", error->message);
+			g_clear_error(&error);
+		} else
+			ERR("Failed to set DiscoverableTimeout property");
+		return BT_STATUS_FAIL;
+	}
+	g_variant_unref(result);
+
+	DBG("-");
+	return BT_STATUS_SUCCESS;
+}
+
+/* Set Adapter Properties */
+int _bt_hal_dbus_set_adapter_property(const bt_property_t *property)
+{
+	int result;
+
+	DBG("");
+
+	if (property == NULL || property->val == NULL) {
+		ERR("Invalid parameters received");
+		return BT_STATUS_FAIL;
+	}
+
+	switch (property->type) {
+	case BT_PROPERTY_BDNAME:
+		result =  __bt_hal_dbus_set_local_name(property->val);
+		break;
+	case BT_PROPERTY_ADAPTER_SCAN_MODE:
+		result =  __bt_hal_dbus_set_scan_mode(property->val);
+		break;
+	case BT_PROPERTY_ADAPTER_DISCOVERY_TIMEOUT:
+		result =  __bt_hal_dbus_set_discovery_timeout(property->val);
+		break;
+	default:
+		result = BT_STATUS_UNSUPPORTED;
+	}
+
+	DBG("Result= [%d]", result);
+	return result;
+}

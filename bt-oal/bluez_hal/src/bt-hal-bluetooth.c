@@ -109,7 +109,12 @@ static int get_adapter_property(bt_property_type_t type)
 
 static int set_adapter_property(const bt_property_t *property)
 {
-	return BT_STATUS_UNSUPPORTED;
+	if (!property) {
+		ERR("Invalid param");
+		return BT_STATUS_PARM_INVALID;
+	}
+
+	return _bt_hal_dbus_set_adapter_property(property);
 }
 
 static int get_remote_device_properties(bt_bdaddr_t *remote_addr)
