@@ -134,7 +134,14 @@ void _bt_free_info_from_invocation_list(invocation_info_t *req_info)
 
 }
 
-/*TODO:Following function will be used in subsequent patch, so ignore warning for now */
+static void __bt_service_get_parameters(GVariant *in_param,
+		void *value, int size)
+{
+	void *buf = NULL;
+	buf = (void *)g_variant_get_data(in_param);
+	memcpy(value, buf, size);
+}
+
 static gboolean __bt_is_sync_function(int service_function)
 {
 	/*TODO: Keep adding sync methods with expect replies from bluetooth service */
@@ -422,10 +429,32 @@ int __bt_bluez_request(int function_name,
 		}
 		break;
 	}
+	case BT_SET_LOCAL_NAME: {
+		bluetooth_device_name_t local_name = { {0} };
+		__bt_service_get_parameters(in_param1,
+				&local_name, sizeof(bluetooth_device_name_t));
+		result = _bt_set_local_name(local_name.name);
+		break;
+	}
 	case BT_GET_DISCOVERABLE_MODE: {
 		int discoverable_mode = BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE;
 		result = _bt_get_discoverable_mode(&discoverable_mode);
 		g_array_append_vals(*out_param1, &discoverable_mode, sizeof(int));
+		break;
+	}
+	case BT_IS_CONNECTABLE: {
+		gboolean is_connectable = FALSE;
+
+		is_connectable = _bt_is_connectable();
+		g_array_append_vals(*out_param1, &is_connectable, sizeof(gboolean));
+		break;
+	}
+	case BT_SET_CONNECTABLE: {
+		gboolean is_connectable;
+
+		__bt_service_get_parameters(in_param1,
+				&is_connectable, sizeof(gboolean));
+		result = _bt_set_connectable(is_connectable);
 		break;
 	}
 	case BT_IS_SERVICE_USED: {

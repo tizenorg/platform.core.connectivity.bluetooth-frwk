@@ -176,6 +176,24 @@ int _bt_get_local_name(void)
 	return result;
 }
 
+int _bt_set_local_name(char *local_name)
+{
+	int result = BLUETOOTH_ERROR_NONE;
+	BT_DBG("+");
+
+	retv_if(NULL == local_name, BLUETOOTH_ERROR_INVALID_PARAM);
+
+	result =  adapter_set_name(local_name);
+	if (result != OAL_STATUS_SUCCESS) {
+		BT_ERR("adapter_set_name failed: %d", result);
+		result = BLUETOOTH_ERROR_INTERNAL;
+	} else
+		result = BLUETOOTH_ERROR_NONE;
+
+	BT_DBG("-");
+	return result;
+}
+
 int _bt_get_discoverable_mode(int *mode)
 {
 	int scan_mode = 0;
@@ -208,6 +226,40 @@ int _bt_get_discoverable_mode(int *mode)
 
 	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
+}
+
+gboolean _bt_is_connectable(void)
+{
+	int connectable = 0;
+	int result;
+
+	BT_DBG("+");
+
+	adapter_is_connectable(&connectable);
+	if (connectable)
+		result = TRUE;
+	else
+		result = FALSE;
+
+	BT_DBG("Connectable: [%s]", result ? "TRUE":"FALSE");
+	BT_DBG("-");
+	return result;
+}
+
+int _bt_set_connectable(gboolean connectable)
+{
+	int result = BLUETOOTH_ERROR_NONE;
+
+	BT_DBG("+");
+	result =  adapter_set_connectable(connectable);
+	if (result != OAL_STATUS_SUCCESS) {
+		BT_ERR("adapter_get_address failed: %d", result);
+		result = BLUETOOTH_ERROR_INTERNAL;
+	} else
+		result = BLUETOOTH_ERROR_NONE;
+
+	BT_DBG("-");
+	return result;
 }
 
 int _bt_is_service_used(void)
@@ -291,15 +343,28 @@ static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 		break;
 	}
 	case OAL_EVENT_ADAPTER_MODE_NON_CONNECTABLE: {
-		BT_INFO("Adapter discoverable mode: BLUETOOTH_DISCOVERABLE_MODE_NON_CONNECTABLE");
+		gboolean connectable = FALSE;
+
+		BT_INFO("Adapter discoverable mode:"
+			" BLUETOOTH_DISCOVERABLE_MODE_NON_CONNECTABLE");
+		_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_CONNECTABLE_CHANGED,
+				g_variant_new("(b)", connectable));
 		break;
 	}
 	case OAL_EVENT_ADAPTER_MODE_CONNECTABLE: {
-		BT_INFO("Adapter discoverable mode: BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE");
+		gboolean connectable = TRUE;
+
+		BT_INFO("Adapter discoverable mode:"
+			" BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE");
+		_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_CONNECTABLE_CHANGED,
+				g_variant_new("(b)", connectable));
 		break;
 	}
 	case OAL_EVENT_ADAPTER_MODE_DISCOVERABLE: {
-		BT_INFO("Adapter discoverable mode: BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE");
+		BT_INFO("Adapter discoverable mode:"
+			" BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE");
 		break;
 	}
 	case OAL_EVENT_ADAPTER_MODE_DISCOVERABLE_TIMEOUT: {
