@@ -135,6 +135,18 @@ oal_status_t adapter_get_version(void);
 oal_status_t adapter_get_name(void);
 
 /**
+ * @brief Set local BT chip name
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see OAL_EVENT_ADAPTER_PROPERTY_NAME
+ */
+oal_status_t adapter_set_name(char * name);
+
+/**
  * @brief Sets output variable to TRUE if adapter is discoverable & connectable.
  */
 oal_status_t adapter_is_discoverable(int *p_discoverable);
@@ -160,6 +172,26 @@ oal_status_t adapter_get_discoverable_timeout(int *p_timeout);
  * @see OAL_EVENT_ADAPTER_PROPERTY_SERVICES
  */
 oal_status_t adapter_get_service_uuids(void);
+
+/*
+ * @brief Set connectability of adapter
+ *
+ * @remarks     If enabled, after success event, device can connected from remote device.
+ *                      If disabled, after success event, device cannot be connected from remote device;
+ *                      neither can be found in discoveries.
+ *
+ * @details EVENT:  OAL_EVENT_ADAPTER_MODE_CONNECTABLE/OAL_EVENT_ADAPTER_MODE_NON_CONNECTABLE
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see  adapter_is_connectable()
+ * @see  OAL_EVENT_ADAPTER_MODE_CONNECTABLE
+ * @see  OAL_EVENT_ADAPTER_MODE_NON_CONNECTABLE
+ */
+oal_status_t adapter_set_connectable(int connectable);
 
 #ifdef __cplusplus
 }

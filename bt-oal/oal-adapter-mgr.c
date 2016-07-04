@@ -238,6 +238,30 @@ oal_status_t adapter_get_name(void)
 	return OAL_STATUS_SUCCESS;
 }
 
+oal_status_t adapter_set_name(char * name)
+{
+	int ret;
+	bt_property_t prop;
+
+	CHECK_OAL_INITIALIZED();
+
+	OAL_CHECK_PARAMETER(name, return);
+	API_TRACE("Name: %s", name);
+
+	prop.type = BT_PROPERTY_BDNAME;
+	prop.len = strlen(name);
+	prop.val = name;
+
+	ret = blued_api->set_adapter_property(&prop);
+	if (ret != BT_STATUS_SUCCESS) {
+		BT_ERR("set_adapter_property: [%s]", status2string(ret));
+		ret = OAL_STATUS_INTERNAL_ERROR;
+	} else
+		ret = OAL_STATUS_SUCCESS;
+
+	return ret;
+}
+
 oal_status_t adapter_is_discoverable(int *p_discoverable)
 {
 	OAL_CHECK_PARAMETER(p_discoverable, return);
@@ -285,6 +309,41 @@ oal_status_t adapter_get_service_uuids(void)
 	}
 
 	return OAL_STATUS_SUCCESS;
+}
+
+static oal_status_t set_scan_mode(bt_scan_mode_t mode)
+{
+	bt_property_t prop;
+	int res;
+
+	BT_DBG("+");
+
+	CHECK_OAL_INITIALIZED();
+
+	prop.type = BT_PROPERTY_ADAPTER_SCAN_MODE;
+	prop.len = sizeof(bt_scan_mode_t);
+	prop.val = &mode;
+	res = blued_api->set_adapter_property(&prop);
+	if (res != BT_STATUS_SUCCESS) {
+		BT_ERR("set scan mode failed [%s]", status2string(res));
+		return convert_to_oal_status(res);
+	}
+
+	BT_DBG("-");
+	return OAL_STATUS_SUCCESS;
+}
+
+oal_status_t adapter_set_connectable(int connectable)
+{
+	bt_scan_mode_t mode;
+
+	API_TRACE("%d", connectable);
+
+	CHECK_OAL_INITIALIZED();
+
+	mode = connectable ? BT_SCAN_MODE_CONNECTABLE : BT_SCAN_MODE_NONE;
+
+	return set_scan_mode(mode);
 }
 
 static void cb_adapter_properties(bt_status_t status,
