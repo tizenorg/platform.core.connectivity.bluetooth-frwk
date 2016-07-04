@@ -28,6 +28,8 @@ extern "C" {
 
 void _bt_device_state_handle_callback_set_request(void);
 
+int _bt_device_get_bonded_device_info(bluetooth_device_address_t *addr);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

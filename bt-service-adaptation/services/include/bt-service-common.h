@@ -310,6 +310,12 @@ typedef struct {
 	char *address;
 } bt_function_data_t;
 
+typedef struct {
+	int count;
+	bluetooth_device_address_t *addr_list;
+	GArray *out_param;
+} bonded_devices_req_info_t;
+
 GDBusConnection *_bt_get_system_conn(void);
 
 GDBusConnection *_bt_get_system_gconn(void);
@@ -384,6 +390,10 @@ void _bt_copy_remote_dev(bt_remote_dev_info_t * dev_info, remote_device_t * oal_
 void _bt_uuid_to_string(service_uuid_t *p_uuid, char *str);
 
 void _bt_truncate_non_utf8_chars(char * str);
+
+void _bt_copy_remote_device(bt_remote_dev_info_t *rem_dev, bluetooth_device_info_t *dev);
+
+void _bt_service_print_dev_info(bluetooth_device_info_t *dev_info);
 
 #ifdef __cplusplus
 }

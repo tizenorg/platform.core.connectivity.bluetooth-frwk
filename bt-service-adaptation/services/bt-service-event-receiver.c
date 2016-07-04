@@ -78,16 +78,19 @@ void _bt_service_oal_event_receiver(int event_type, gpointer event_data, gsize l
 	case OAL_EVENT_ADAPTER_PROPERTY_NAME:
 	case OAL_EVENT_ADAPTER_PROPERTY_VERSION:
 	case OAL_EVENT_ADAPTER_PROPERTY_SERVICES:
+	case OAL_EVENT_ADAPTER_BONDED_DEVICE_LIST:
 	case OAL_EVENT_ADAPTER_MODE_NON_CONNECTABLE:
 	case OAL_EVENT_ADAPTER_MODE_CONNECTABLE:
 	case OAL_EVENT_ADAPTER_MODE_DISCOVERABLE:
 	case OAL_EVENT_ADAPTER_MODE_DISCOVERABLE_TIMEOUT:
 	case OAL_EVENT_ADAPTER_INQUIRY_STARTED:
 	case OAL_EVENT_ADAPTER_INQUIRY_FINISHED:
-        case OAL_EVENT_ADAPTER_INQUIRY_RESULT_BREDR_ONLY:
-        case OAL_EVENT_ADAPTER_INQUIRY_RESULT_BLE:
 		if (adapter_cb)
 			adapter_cb(event_type, event_data);
+		break;
+        case OAL_EVENT_ADAPTER_INQUIRY_RESULT_BREDR_ONLY:
+        case OAL_EVENT_ADAPTER_INQUIRY_RESULT_BLE:
+	case OAL_EVENT_DEVICE_PROPERTIES:
 		if (device_cb)
                         device_cb(event_type, event_data);
 		break;

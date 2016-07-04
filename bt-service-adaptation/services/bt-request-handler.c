@@ -28,6 +28,7 @@
 #include "bt-service-util.h"
 
 #include "bt-service-core-adapter.h"
+#include "bt-service-core-device.h"
 
 /* For maintaining Application Sync API call requests */
 GSList *invocation_list = NULL;
@@ -387,15 +388,15 @@ int __bt_bluez_request(int function_name,
 		break;
 	}
 	case BT_CANCEL_DISCOVERY:
-                result = _bt_cancel_discovery();
-                break;
+		result = _bt_cancel_discovery();
+		break;
 	case BT_IS_DISCOVERYING: {
-		 gboolean discovering = FALSE;
-		 discovering = _bt_is_discovering();
-		 g_array_append_vals(*out_param1,
-				 &discovering, sizeof(gboolean));
-		 break;
-	 }
+		gboolean discovering = FALSE;
+		discovering = _bt_is_discovering();
+		g_array_append_vals(*out_param1,
+				&discovering, sizeof(gboolean));
+		break;
+	}
 	case BT_GET_LOCAL_ADDRESS: {
 		result = _bt_get_local_address();
 
@@ -469,6 +470,38 @@ int __bt_bluez_request(int function_name,
 			sender = (char*)g_dbus_method_invocation_get_sender(context);
 			_bt_save_invocation_context(context, result, sender,
 					function_name, (gpointer)uuid);
+		}
+		break;
+	}
+	case BT_GET_BONDED_DEVICES: {
+		result = _bt_adapter_get_bonded_devices();
+		/* Save invocation */
+		if (result == BLUETOOTH_ERROR_NONE) {
+			sender = (char*)g_dbus_method_invocation_get_sender(context);
+			_bt_save_invocation_context(context, result, sender,
+					function_name, NULL);
+		}
+		break;
+	}
+	case BT_GET_BONDED_DEVICE: {
+		bluetooth_device_address_t address = { {0} };
+
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+
+		result = _bt_device_get_bonded_device_info(&address);
+		/* Save invocation */
+		if (result == BLUETOOTH_ERROR_NONE) {
+			char *addr = g_malloc0(sizeof(char) * BT_ADDRESS_STRING_SIZE);
+			if (!addr) {
+				result = BLUETOOTH_ERROR_MEMORY_ALLOCATION;
+				break;
+			}
+
+			_bt_convert_addr_type_to_string(addr, address.addr);
+			sender = (char*)g_dbus_method_invocation_get_sender(context);
+			_bt_save_invocation_context(context, result, sender,
+					function_name, addr);
 		}
 		break;
 	}

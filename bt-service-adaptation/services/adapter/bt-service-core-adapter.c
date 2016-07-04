@@ -280,9 +280,25 @@ int _bt_is_service_used(void)
 	return result;
 }
 
+int _bt_adapter_get_bonded_devices(void)
+{
+	int result = BLUETOOTH_ERROR_NONE;
+
+	BT_DBG("+");
+	result =  adapter_get_bonded_devices();
+	if (result != OAL_STATUS_SUCCESS) {
+		BT_ERR("adapter_get_bonded_devices failed: %d", result);
+		result = BLUETOOTH_ERROR_INTERNAL;
+	} else
+		result = BLUETOOTH_ERROR_NONE;
+
+	BT_DBG("-");
+	return result;
+}
+
 static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 {
-        BT_DBG("+");
+	BT_DBG("+");
 
 	switch(event_type) {
 	case OAL_EVENT_OAL_INITIALISED_SUCCESS:
@@ -298,8 +314,8 @@ static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 	case OAL_EVENT_ADAPTER_INQUIRY_STARTED:
 		__bt_adapter_discovery_state_change_callback(ADAPTER_DISCOVERY_STARTED);
 		break;
-        case OAL_EVENT_ADAPTER_INQUIRY_FINISHED:
-		 __bt_adapter_discovery_state_change_callback(ADAPTER_DISCOVERY_STOPPED);
+	case OAL_EVENT_ADAPTER_INQUIRY_FINISHED:
+		__bt_adapter_discovery_state_change_callback(ADAPTER_DISCOVERY_STOPPED);
 		break;
 	case OAL_EVENT_ADAPTER_PROPERTY_ADDRESS: {
 		bt_address_t *bd_addr = event_data;
@@ -346,7 +362,7 @@ static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 		gboolean connectable = FALSE;
 
 		BT_INFO("Adapter discoverable mode:"
-			" BLUETOOTH_DISCOVERABLE_MODE_NON_CONNECTABLE");
+				" BLUETOOTH_DISCOVERABLE_MODE_NON_CONNECTABLE");
 		_bt_send_event(BT_ADAPTER_EVENT,
 				BLUETOOTH_EVENT_CONNECTABLE_CHANGED,
 				g_variant_new("(b)", connectable));
@@ -356,7 +372,7 @@ static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 		gboolean connectable = TRUE;
 
 		BT_INFO("Adapter discoverable mode:"
-			" BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE");
+				" BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE");
 		_bt_send_event(BT_ADAPTER_EVENT,
 				BLUETOOTH_EVENT_CONNECTABLE_CHANGED,
 				g_variant_new("(b)", connectable));
@@ -364,7 +380,7 @@ static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 	}
 	case OAL_EVENT_ADAPTER_MODE_DISCOVERABLE: {
 		BT_INFO("Adapter discoverable mode:"
-			" BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE");
+				" BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE");
 		break;
 	}
 	case OAL_EVENT_ADAPTER_MODE_DISCOVERABLE_TIMEOUT: {
@@ -381,6 +397,25 @@ static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 		count = list->num;
 		service_list = list->service_list;
 		__bt_adapter_handle_pending_requests(BT_IS_SERVICE_USED, service_list, count);
+		break;
+	}
+	case OAL_EVENT_ADAPTER_BONDED_DEVICE_LIST: {
+		int i;
+		int count;
+		bluetooth_device_address_t *addr_list;
+
+		event_device_list_t *bonded_device_list = event_data;
+		count = bonded_device_list->num;
+
+		addr_list = g_malloc0(count * sizeof(bluetooth_device_address_t));
+		for (i = 0; i < count; i++) {
+			memcpy(addr_list[i].addr,
+					bonded_device_list->devices[i].addr,
+					BLUETOOTH_ADDRESS_LENGTH);
+		}
+
+		__bt_adapter_handle_pending_requests(BT_GET_BONDED_DEVICES,
+				(void *)addr_list, bonded_device_list->num);
 		break;
 	}
 	default:
@@ -468,6 +503,58 @@ static void __bt_adapter_handle_pending_requests(int service_function, void *use
 			}
 
 			g_array_append_vals(out_param, &used, sizeof(gboolean));
+			break;
+		}
+		case BT_GET_BONDED_DEVICES: {
+			bluetooth_device_address_t *addr_list = user_data;
+			bonded_devices_req_info_t *bonded_devices_req_info;
+			char address[BT_ADDRESS_STRING_SIZE];
+			int count = size;
+			int res = BLUETOOTH_ERROR_NONE;
+
+			/*
+			 * BT_GET_BONDED_DEVICES is already processed for this request,
+			 * continue for next BT_GET_BONDED_DEVICES request if any
+			 */
+			if (NULL != req_info->user_data)
+				continue;
+
+			BT_DBG("BT_GET_BONDED_DEVICES: count = [%d]", count);
+			/* No bonded devices, return method invocation */
+			if (0 == count || !addr_list)
+				break;
+
+			/* Save address list in user data  for futur reference. */
+			bonded_devices_req_info = g_malloc0(sizeof(bonded_devices_req_info));
+			if (!bonded_devices_req_info) {
+				BT_ERR("Memory allocation failed");
+				req_info->result = BLUETOOTH_ERROR_MEMORY_ALLOCATION;
+				g_free(addr_list);
+				break;
+			}
+
+			bonded_devices_req_info->count = count;
+			bonded_devices_req_info->addr_list = addr_list;
+			bonded_devices_req_info->out_param = out_param;
+			req_info->user_data = bonded_devices_req_info;
+
+			while (bonded_devices_req_info->count > 0) {
+				bonded_devices_req_info->count -= 1;
+				res = _bt_device_get_bonded_device_info(
+						&addr_list[bonded_devices_req_info->count]);
+				if (BLUETOOTH_ERROR_NONE == res)
+					return;
+				else {
+					_bt_convert_addr_type_to_string((char *)address,
+							addr_list[bonded_devices_req_info->count].addr);
+					BT_ERR("_bt_device_get_bonded_device_info Failed for [%s]", address);
+					if (bonded_devices_req_info->count == 0) {
+						g_free(bonded_devices_req_info->addr_list);
+						g_free(bonded_devices_req_info);
+						req_info->user_data = NULL;
+					}
+				}
+			}
 			break;
 		}
 		default:

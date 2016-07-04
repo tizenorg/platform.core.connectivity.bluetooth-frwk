@@ -69,6 +69,8 @@ int _bt_is_service_used(void);
 
 int _bt_set_connectable(gboolean connectable);
 
+int _bt_adapter_get_bonded_devices(void);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

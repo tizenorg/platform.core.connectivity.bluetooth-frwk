@@ -430,8 +430,9 @@ void _bt_convert_addr_type_to_string(char *address,
 
 void _bt_print_device_address_t(const bluetooth_device_address_t *addr)
 {
-	BT_DBG("%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X\n", addr->addr[0], addr->addr[1], addr->addr[2],
-				addr->addr[3], addr->addr[4], addr->addr[5]);
+	BT_INFO("%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X\n",
+		addr->addr[0], addr->addr[1], addr->addr[2],
+		addr->addr[3], addr->addr[4], addr->addr[5]);
 }
 
 void _bt_divide_device_class(bluetooth_device_class_t *device_class,
@@ -866,6 +867,94 @@ void _bt_copy_remote_dev(bt_remote_dev_info_t * dev_info, remote_device_t * oal_
 	}
 
 	BT_INFO("-");
+}
+
+static void __bt_get_service_list(bt_remote_dev_info_t *info, bluetooth_device_info_t *dev)
+{
+	int i;
+	char **uuids;
+	char **parts;
+
+	BT_DBG("+");
+
+	ret_if(info == NULL);
+	ret_if(dev == NULL);
+
+	uuids = info->uuids;
+	if(uuids == NULL) {
+		BT_ERR("No UUID's");
+		return;
+	}
+
+	dev->service_index = 0;
+	BT_DBG("Total UUID count [%d]", info->uuid_count);
+	for (i = 0; i < info->uuid_count; i++) {
+		BT_DBG("UUID count [%d]", i);
+		g_strlcpy(dev->uuids[i], uuids[i], BLUETOOTH_UUID_STRING_MAX);
+
+		parts = g_strsplit(uuids[i], "-", -1);
+
+		if (parts == NULL || parts[0] == NULL)
+			break;
+
+		dev->service_list_array[i] = g_ascii_strtoull(parts[0], NULL, 16);
+		g_strfreev(parts);
+
+		dev->service_index++;
+	}
+
+	BT_DBG("-");
+}
+
+void _bt_copy_remote_device(bt_remote_dev_info_t *rem_dev, bluetooth_device_info_t *dev)
+{
+	BT_DBG("+");
+
+	memset(dev, 0x00, sizeof(bluetooth_device_info_t));
+	__bt_get_service_list(rem_dev, dev);
+	_bt_convert_addr_string_to_type(dev->device_address.addr, rem_dev->address);
+	_bt_divide_device_class(&dev->device_class, rem_dev->class);
+	g_strlcpy(dev->device_name.name, rem_dev->name,
+			BLUETOOTH_DEVICE_NAME_LENGTH_MAX+1);
+	dev->rssi = rem_dev->rssi;
+	dev->trust = rem_dev->trust;
+	dev->paired = rem_dev->paired;
+	dev->connected = rem_dev->connected;
+
+	/* Fill Manufacturer data */
+	if (rem_dev->manufacturer_data_len > 0) {
+		dev->manufacturer_data.data_len = rem_dev->manufacturer_data_len;
+		memcpy(dev->manufacturer_data.data,
+			rem_dev->manufacturer_data, rem_dev->manufacturer_data_len);
+	} else {
+		dev->manufacturer_data.data_len = 0;
+	}
+	BT_DBG("-");
+}
+
+void _bt_service_print_dev_info(bluetooth_device_info_t *dev_info)
+{
+	int i;
+
+	ret_if(dev_info == NULL);
+
+	_bt_print_device_address_t(&(dev_info->device_address));
+	BT_INFO("Device Name:[%s]", dev_info->device_name.name);
+	BT_INFO("Device Major Class:[0x%X]", dev_info->device_class.major_class);
+	BT_INFO("Device Minor Class:[0x%X]", dev_info->device_class.minor_class);
+	BT_INFO("Device Service Class:[0x%X]", dev_info->device_class.minor_class);
+	BT_INFO("Device Paired:[%s]", (dev_info->paired?"TRUE":"FALSE"));
+	BT_INFO("Device Trusted:[%s]", (dev_info->trust?"TRUE":"FALSE"));
+	BT_INFO("Device Connected:[%d]", dev_info->connected);
+	BT_INFO("Device Service index:[%d]", dev_info->service_index);
+	for (i = 0; i < dev_info->service_index; i++) {
+		BT_INFO("Device Service List:[%d]", dev_info->service_list_array[i]);
+		BT_INFO("Device UUID:[%s]", dev_info->uuids[i]);
+	}
+
+	BT_INFO("Device manufacturer data len:[%d]", dev_info->manufacturer_data.data_len);
+	for (i = 0; i < dev_info->manufacturer_data.data_len; i++)
+		BT_INFO("%2.2X", dev_info->manufacturer_data.data[i]);
 }
 
 void _bt_uuid_to_string(service_uuid_t *p_uuid, char *str)
