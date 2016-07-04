@@ -207,6 +207,34 @@ static struct gatt_desc_info *__bt_gatt_find_gatt_desc_info(
 
 static struct gatt_req_info *__bt_gatt_find_request_info(guint request_id);
 
+static void __bt_gatt_close_gdbus_connection(void)
+{
+	GError *err = NULL;
+
+	BT_DBG("+");
+
+	ret_if(g_conn == NULL);
+
+	if (!g_dbus_connection_flush_sync(g_conn, NULL, &err)) {
+		BT_ERR("Fail to flush the connection: %s", err->message);
+		g_error_free(err);
+		err = NULL;
+	}
+
+	if (!g_dbus_connection_close_sync(g_conn, NULL, &err)) {
+		if (err) {
+			BT_ERR("Fail to close the dbus connection: %s", err->message);
+			g_error_free(err);
+		}
+	}
+
+	g_object_unref(g_conn);
+
+	g_conn = NULL;
+
+	BT_DBG("-");
+}
+
 #ifdef HPS_FEATURE
 static int __bt_send_event_to_hps(int event, GVariant *var)
 {
@@ -1434,19 +1462,48 @@ BT_EXPORT_API int bluetooth_gatt_unregister_application(void)
 static GDBusConnection *__bt_gatt_get_gdbus_connection(void)
 {
 	GDBusConnection *local_system_gconn = NULL;
+	char *address;
 	GError *err = NULL;
 
 	if (g_conn == NULL) {
-		g_conn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &err);
+		address = g_dbus_address_get_for_bus_sync(G_BUS_TYPE_SYSTEM, NULL, &err);
+		if (address == NULL) {
+			if (err) {
+				BT_ERR("Failed to get bus address: %s", err->message);
+				g_clear_error(&err);
+			}
+			return NULL;
+		}
+
+		g_conn = g_dbus_connection_new_for_address_sync(address,
+					G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT |
+					G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION,
+					NULL, /* GDBusAuthObserver */
+					NULL,
+					&err);
 		if (!g_conn) {
 			if (err) {
 				BT_ERR("Unable to connect to dbus: %s", err->message);
 				g_clear_error(&err);
 			}
-			g_conn = NULL;
+			return NULL;
 		}
 	} else if (g_dbus_connection_is_closed(g_conn)) {
-		local_system_gconn = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &err);
+		address = g_dbus_address_get_for_bus_sync(G_BUS_TYPE_SYSTEM, NULL, &err);
+		if (address == NULL) {
+			if (err) {
+				BT_ERR("Failed to get bus address: %s", err->message);
+				g_clear_error(&err);
+			}
+			return NULL;
+		}
+
+		local_system_gconn = g_dbus_connection_new_for_address_sync(address,
+					G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT |
+					G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION,
+					NULL, /* GDBusAuthObserver */
+					NULL,
+					&err);
 
 		if (!local_system_gconn) {
 			BT_ERR("Unable to connect to dbus: %s", err->message);
@@ -1497,10 +1554,14 @@ BT_EXPORT_API int bluetooth_gatt_init(void)
 		goto failed;
 	}
 
-	manager_id = g_dbus_connection_register_object(g_conn, app_path,
-						node_info->interfaces[0],
-						&manager_interface_vtable,
-						NULL, NULL, &error);
+	if (manager_id == 0) {
+		BT_INFO("manager_id does not exists");
+
+		manager_id = g_dbus_connection_register_object(g_conn, app_path,
+							node_info->interfaces[0],
+							&manager_interface_vtable,
+							NULL, NULL, &error);
+	}
 
 	if (manager_id == 0) {
 		BT_ERR("failed to register: %s", error->message);
@@ -1523,6 +1584,8 @@ failed:
 	app_path = NULL;
 	owner_id = 0;
 
+	__bt_gatt_close_gdbus_connection();
+
 	return BLUETOOTH_ERROR_INTERNAL;
 }
 
@@ -1539,6 +1602,8 @@ BT_EXPORT_API int bluetooth_gatt_deinit()
 		g_dbus_connection_unregister_object(g_conn,
 					manager_id);
 
+		manager_id = 0;
+
 		ret = bluetooth_gatt_unregister_application();
 		if (ret != BLUETOOTH_ERROR_NONE)
 			BT_ERR("Fail to unregister application\n");
@@ -1554,15 +1619,21 @@ BT_EXPORT_API int bluetooth_gatt_deinit()
 		g_slist_free(gatt_services);
 		gatt_services = NULL;
 
+		g_object_unref(manager_gproxy);
+		manager_gproxy = NULL;
+
 		/* Temperary block under codes to avoid TC blocking issue.
 		    But we should unref node info in later. */
 #if 0
 		g_dbus_node_info_unref(obj_info);
 		obj_info = NULL;
 #endif
+		__bt_gatt_close_gdbus_connection();
 
 		return ret;
 	}
+
+	__bt_gatt_close_gdbus_connection();
 
 	return BLUETOOTH_ERROR_NOT_FOUND;
 }
@@ -2235,6 +2306,7 @@ BT_EXPORT_API int bluetooth_gatt_update_characteristic(
 
 BT_EXPORT_API int bluetooth_gatt_unregister_service(const char *svc_path)
 {
+	int i = 0;
 	GSList *l, *l1;
 	struct gatt_service_info *svc_info;
 	gboolean ret;
@@ -2258,8 +2330,14 @@ BT_EXPORT_API int bluetooth_gatt_unregister_service(const char *svc_path)
 	for (l = svc_info->char_data; l != NULL; l = l->next) {
 		struct gatt_char_info *char_info = l->data;
 
+		if (char_info == NULL)
+			break;
+
 		for (l1 = char_info->desc_data; l1 != NULL; l1 = l1->next) {
 			struct gatt_desc_info *desc_info = l1->data;
+
+			if (desc_info == NULL)
+				break;
 
 			ret = g_dbus_connection_unregister_object(g_conn,
 						desc_info->desc_id);
@@ -2270,7 +2348,22 @@ BT_EXPORT_API int bluetooth_gatt_unregister_service(const char *svc_path)
 			} else {
 				err = BLUETOOTH_ERROR_INTERNAL;
 			}
+
+			char_info->desc_data = g_slist_remove(char_info->desc_data, desc_info);
+
+			g_free(desc_info->desc_path);
+			g_free(desc_info->desc_uuid);
+			g_free(desc_info->desc_value);
+
+			for (i = 0; i < desc_info->flags_length; i++)
+				g_free(desc_info->desc_flags[i]);
+
+			g_free(desc_info);
 		}
+
+		g_slist_free(char_info->desc_data);
+		char_info->desc_data = NULL;
+
 		ret = g_dbus_connection_unregister_object(g_conn,
 					char_info->char_id);
 		if (ret) {
@@ -2279,7 +2372,18 @@ BT_EXPORT_API int bluetooth_gatt_unregister_service(const char *svc_path)
 		} else {
 			err = BLUETOOTH_ERROR_INTERNAL;
 		}
+
+		g_free(char_info->char_path);
+		g_free(char_info->char_uuid);
+		g_free(char_info->char_value);
+
+		for (i = 0; i < char_info->flags_length; i++)
+			g_free(char_info->char_flags[i]);
 	}
+
+	g_slist_free(svc_info->char_data);
+	svc_info->char_data = NULL;
+
 	ret = g_dbus_connection_unregister_object(g_conn, svc_info->serv_id);
 	if (ret) {
 		__bt_gatt_emit_interface_removed(svc_info->serv_path,
@@ -2297,14 +2401,20 @@ BT_EXPORT_API int bluetooth_gatt_unregister_service(const char *svc_path)
 		struct gatt_service_info *info = tmp->data;
 
 		if (g_strcmp0(info->serv_path, svc_path) == 0) {
-			gatt_services = g_slist_delete_link(gatt_services, tmp->data);
+			gatt_services = g_slist_remove(gatt_services, tmp->data);
+			g_free(info->serv_path);
+			g_free(info->service_uuid);
+			g_free(info);
 		}
 	}
 
 	new_service = FALSE;
 
-	if (gatt_services->next == NULL)
+	if (gatt_services == NULL) {
+		serv_id = 1;
+	} else if (gatt_services->next == NULL) {
 		serv_id--;
+	}
 
 	return err;
 }
