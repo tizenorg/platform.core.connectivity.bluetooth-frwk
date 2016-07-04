@@ -120,7 +120,12 @@ static int set_adapter_property(const bt_property_t *property)
 
 static int get_remote_device_properties(bt_bdaddr_t *remote_addr)
 {
-	return BT_STATUS_UNSUPPORTED;
+	if (!remote_addr) {
+		ERR("Invalid param");
+		return BT_STATUS_PARM_INVALID;
+	}
+
+	return _bt_hal_dbus_get_remote_device_properties(remote_addr);
 }
 
 static int get_remote_device_property(bt_bdaddr_t *remote_addr,
@@ -505,6 +510,25 @@ static void __bt_hal_handle_device_found_event(void *buf, uint16_t len)
 	bt_hal_cbacks->device_found_cb(ev->num_props, props);
 }
 
+static void __bt_hal_handle_remote_device_properties_event(void *buf, uint16_t len)
+{
+	struct hal_ev_remote_device_props *ev = (struct hal_ev_remote_device_props *) buf;
+	bt_bdaddr_t bd_addr;
+	bt_property_t props[ev->num_props];
+
+	DBG("+");
+
+	if (!bt_hal_cbacks->remote_device_properties_cb)
+		return;
+
+	len -= sizeof(*ev);
+	__bt_device_props_to_hal(props, ev->props, ev->num_props, len);
+	memcpy(bd_addr.address, ev->bdaddr, 6);
+	bt_hal_cbacks->remote_device_properties_cb(
+			ev->status, &bd_addr, ev->num_props, props);
+	DBG("-");
+}
+
 static void __bt_hal_handle_stack_messages(int message, void *buf, uint16_t len)
 {
 	DBG("+");
@@ -524,6 +548,11 @@ static void __bt_hal_handle_stack_messages(int message, void *buf, uint16_t len)
 		case HAL_EV_DEVICE_FOUND:
 			DBG("Event: HAL_EV_DEVICE_FOUND");
 			__bt_hal_handle_device_found_event(buf, len);
+			break;
+		case HAL_EV_REMOTE_DEVICE_PROPS:
+			DBG("Event: HAL_EV_REMOTE_DEVICE_PROPS");
+			__bt_hal_handle_remote_device_properties_event(buf, len);
+			break;
 		default:
 			DBG("Event Currently not handled!!");
 			break;
