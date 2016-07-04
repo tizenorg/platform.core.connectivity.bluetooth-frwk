@@ -50,6 +50,8 @@ int _bt_hal_dbus_get_adapter_property(bt_property_type_t type);
 
 int _bt_hal_dbus_get_adapter_properties(void);
 
+int _bt_hal_dbus_set_adapter_property(const bt_property_t *property);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
