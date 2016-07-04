@@ -2304,14 +2304,104 @@ BT_EXPORT_API int bluetooth_gatt_update_characteristic(
 	return err;
 }
 
+static void __bt_gatt_unregister_descriptor_info(struct gatt_desc_info *desc_info)
+{
+	int ret;
+	int i;
+	ret = g_dbus_connection_unregister_object(g_conn,
+			desc_info->desc_id);
+	if (ret) {
+		__bt_gatt_emit_interface_removed(
+				desc_info->desc_path,
+				GATT_DESC_INTERFACE);
+	} else
+		BT_ERR("Unable to unregister desc info");
+
+	g_free(desc_info->desc_path);
+	g_free(desc_info->desc_uuid);
+	g_free(desc_info->desc_value);
+
+	for (i = 0; i < desc_info->flags_length; i++)
+		g_free(desc_info->desc_flags[i]);
+
+	g_free(desc_info);
+}
+
+static void __bt_gatt_unregister_character_info(struct gatt_char_info *char_info)
+{
+	GSList *l1;
+	int ret, i;
+	for (l1 = char_info->desc_data; l1 != NULL; l1 = l1->next) {
+		struct gatt_desc_info *desc_info = l1->data;
+
+		if (desc_info == NULL)
+			break;
+
+		char_info->desc_data = g_slist_remove(char_info->desc_data, desc_info);
+		__bt_gatt_unregister_descriptor_info(desc_info);
+	}
+
+	g_slist_free(char_info->desc_data);
+	char_info->desc_data = NULL;
+
+	ret = g_dbus_connection_unregister_object(g_conn,
+			char_info->char_id);
+	if (ret) {
+		__bt_gatt_emit_interface_removed(char_info->char_path,
+				GATT_CHAR_INTERFACE);
+	} else
+		BT_ERR("Unable to unregister char info");
+
+	g_free(char_info->char_path);
+	g_free(char_info->char_uuid);
+	g_free(char_info->char_value);
+
+	for (i = 0; i < char_info->flags_length; i++)
+		g_free(char_info->char_flags[i]);
+
+	g_free(char_info);
+}
+
+static void __bt_gatt_unregister_service_info(struct gatt_service_info *svc_info)
+{
+	GSList *l;
+	int ret;
+
+	for (l = svc_info->char_data; l != NULL; l = l->next) {
+		struct gatt_char_info *char_info = l->data;
+
+		if (char_info == NULL)
+			break;
+
+		svc_info->char_data = g_slist_remove(svc_info->char_data, char_info);
+		__bt_gatt_unregister_character_info(char_info);
+	}
+
+	g_slist_free(svc_info->char_data);
+	svc_info->char_data = NULL;
+
+	ret = g_dbus_connection_unregister_object(g_conn, svc_info->serv_id);
+	if (ret) {
+		__bt_gatt_emit_interface_removed(svc_info->serv_path,
+						GATT_SERV_INTERFACE);
+	} else
+		BT_ERR("Unable to unregister serv info");
+
+	ret = g_dbus_connection_unregister_object(g_conn, svc_info->prop_id);
+	if (ret) {
+		BT_DBG("Unregistered the service on properties interface");
+	}
+
+	gatt_services = g_slist_remove(gatt_services, svc_info);
+	g_free(svc_info->serv_path);
+	g_free(svc_info->service_uuid);
+	g_free(svc_info);
+}
+
 BT_EXPORT_API int bluetooth_gatt_unregister_service(const char *svc_path)
 {
-	int i = 0;
-	GSList *l, *l1;
 	struct gatt_service_info *svc_info;
-	gboolean ret;
 	int err = BLUETOOTH_ERROR_NONE;
-	GSList *tmp;
 
 	BT_DBG("svc_path %s", svc_path);
 	svc_info = __bt_gatt_find_gatt_service_info(svc_path);
@@ -2327,86 +2417,7 @@ BT_EXPORT_API int bluetooth_gatt_unregister_service(const char *svc_path)
 		return err;
 	}
 
-	for (l = svc_info->char_data; l != NULL; l = l->next) {
-		struct gatt_char_info *char_info = l->data;
-
-		if (char_info == NULL)
-			break;
-
-		for (l1 = char_info->desc_data; l1 != NULL; l1 = l1->next) {
-			struct gatt_desc_info *desc_info = l1->data;
-
-			if (desc_info == NULL)
-				break;
-
-			ret = g_dbus_connection_unregister_object(g_conn,
-						desc_info->desc_id);
-			if (ret) {
-				__bt_gatt_emit_interface_removed(
-						desc_info->desc_path,
-						GATT_DESC_INTERFACE);
-			} else {
-				err = BLUETOOTH_ERROR_INTERNAL;
-			}
-
-			char_info->desc_data = g_slist_remove(char_info->desc_data, desc_info);
-
-			g_free(desc_info->desc_path);
-			g_free(desc_info->desc_uuid);
-			g_free(desc_info->desc_value);
-
-			for (i = 0; i < desc_info->flags_length; i++)
-				g_free(desc_info->desc_flags[i]);
-
-			g_free(desc_info);
-		}
-
-		g_slist_free(char_info->desc_data);
-		char_info->desc_data = NULL;
-
-		ret = g_dbus_connection_unregister_object(g_conn,
-					char_info->char_id);
-		if (ret) {
-			__bt_gatt_emit_interface_removed(char_info->char_path,
-						GATT_CHAR_INTERFACE);
-		} else {
-			err = BLUETOOTH_ERROR_INTERNAL;
-		}
-
-		g_free(char_info->char_path);
-		g_free(char_info->char_uuid);
-		g_free(char_info->char_value);
-
-		for (i = 0; i < char_info->flags_length; i++)
-			g_free(char_info->char_flags[i]);
-	}
-
-	g_slist_free(svc_info->char_data);
-	svc_info->char_data = NULL;
-
-	ret = g_dbus_connection_unregister_object(g_conn, svc_info->serv_id);
-	if (ret) {
-		__bt_gatt_emit_interface_removed(svc_info->serv_path,
-						GATT_SERV_INTERFACE);
-	} else {
-		err = BLUETOOTH_ERROR_INTERNAL;
-	}
-
-	ret = g_dbus_connection_unregister_object(g_conn, svc_info->prop_id);
-	if (ret) {
-		BT_DBG("Unregistered the service on properties interface");
-	}
-
-	for (tmp = gatt_services; tmp != NULL; tmp = tmp->next) {
-		struct gatt_service_info *info = tmp->data;
-
-		if (g_strcmp0(info->serv_path, svc_path) == 0) {
-			gatt_services = g_slist_remove(gatt_services, tmp->data);
-			g_free(info->serv_path);
-			g_free(info->service_uuid);
-			g_free(info);
-		}
-	}
+	__bt_gatt_unregister_service_info(svc_info);
 
 	new_service = FALSE;
 
