@@ -2304,14 +2304,56 @@ BT_EXPORT_API int bluetooth_gatt_update_characteristic(
 	return err;
 }
 
+static void __bt_gatt_free_descriptor_info(struct gatt_desc_info *desc_info)
+{
+	int i;
+
+	if (!desc_info)
+		return;
+
+	g_free(desc_info->desc_path);
+	g_free(desc_info->desc_uuid);
+	g_free(desc_info->desc_value);
+
+	for (i = 0; i < desc_info->flags_length; i++)
+		g_free(desc_info->desc_flags[i]);
+
+	g_free(desc_info);
+}
+
+static void __bt_gatt_free_characteristic_info(struct gatt_char_info *char_info)
+{
+	int i;
+
+	if (!char_info)
+		return;
+
+	g_free(char_info->char_path);
+	g_free(char_info->char_uuid);
+	g_free(char_info->char_value);
+
+	for (i = 0; i < char_info->flags_length; i++)
+		g_free(char_info->char_flags[i]);
+
+	g_free(char_info);
+}
+
+static void __bt_gatt_free_service_info(struct gatt_service_info *svc_info)
+{
+	if (!svc_info)
+		return;
+
+	g_free(svc_info->serv_path);
+	g_free(svc_info->service_uuid);
+	g_free(svc_info);
+}
+
 BT_EXPORT_API int bluetooth_gatt_unregister_service(const char *svc_path)
 {
-	int i = 0;
 	GSList *l, *l1;
 	struct gatt_service_info *svc_info;
 	gboolean ret;
 	int err = BLUETOOTH_ERROR_NONE;
-	GSList *tmp;
 
 	BT_DBG("svc_path %s", svc_path);
 	svc_info = __bt_gatt_find_gatt_service_info(svc_path);
@@ -2349,16 +2391,9 @@ BT_EXPORT_API int bluetooth_gatt_unregister_service(const char *svc_path)
 				err = BLUETOOTH_ERROR_INTERNAL;
 			}
 
+			/* list remove & free */
 			char_info->desc_data = g_slist_remove(char_info->desc_data, desc_info);
-
-			g_free(desc_info->desc_path);
-			g_free(desc_info->desc_uuid);
-			g_free(desc_info->desc_value);
-
-			for (i = 0; i < desc_info->flags_length; i++)
-				g_free(desc_info->desc_flags[i]);
-
-			g_free(desc_info);
+			__bt_gatt_free_descriptor_info(desc_info);
 		}
 
 		g_slist_free(char_info->desc_data);
@@ -2373,12 +2408,9 @@ BT_EXPORT_API int bluetooth_gatt_unregister_service(const char *svc_path)
 			err = BLUETOOTH_ERROR_INTERNAL;
 		}
 
-		g_free(char_info->char_path);
-		g_free(char_info->char_uuid);
-		g_free(char_info->char_value);
-
-		for (i = 0; i < char_info->flags_length; i++)
-			g_free(char_info->char_flags[i]);
+		/* list remove & free */
+		svc_info->char_data = g_slist_remove(svc_info->char_data, char_info);
+		__bt_gatt_free_characteristic_info(char_info);
 	}
 
 	g_slist_free(svc_info->char_data);
@@ -2397,16 +2429,9 @@ BT_EXPORT_API int bluetooth_gatt_unregister_service(const char *svc_path)
 		BT_DBG("Unregistered the service on properties interface");
 	}
 
-	for (tmp = gatt_services; tmp != NULL; tmp = tmp->next) {
-		struct gatt_service_info *info = tmp->data;
-
-		if (g_strcmp0(info->serv_path, svc_path) == 0) {
-			gatt_services = g_slist_remove(gatt_services, tmp->data);
-			g_free(info->serv_path);
-			g_free(info->service_uuid);
-			g_free(info);
-		}
-	}
+	/* list remove & free */
+	gatt_services = g_slist_remove(gatt_services, svc_info);
+	__bt_gatt_free_service_info(svc_info);
 
 	new_service = FALSE;
 
