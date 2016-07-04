@@ -31,6 +31,7 @@
 #include "bt-hal-utils.h"
 
 #include <bt-hal-adapter-dbus-handler.h>
+#include <bt-hal-device-dbus-handler.h>
 
 #define enum_prop_to_hal(prop, hal_prop, type) do { \
 	static type e; \
@@ -157,7 +158,8 @@ static int cancel_discovery(void)
 
 static int create_bond(const bt_bdaddr_t *bd_addr, int transport)
 {
-	return BT_STATUS_UNSUPPORTED;
+	DBG("+");
+	return _bt_hal_device_create_bond(bd_addr);
 }
 
 static int cancel_bond(const bt_bdaddr_t *bd_addr)
@@ -167,7 +169,8 @@ static int cancel_bond(const bt_bdaddr_t *bd_addr)
 
 static int remove_bond(const bt_bdaddr_t *bd_addr)
 {
-	return BT_STATUS_UNSUPPORTED;
+	DBG("+");
+	return _bt_hal_device_remove_bond(bd_addr);
 }
 
 static int pin_reply(const bt_bdaddr_t *bd_addr, uint8_t accept,
