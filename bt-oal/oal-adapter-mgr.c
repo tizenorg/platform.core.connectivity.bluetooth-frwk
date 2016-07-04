@@ -55,12 +55,14 @@ static void cb_adapter_discovery_state_changed(bt_discovery_state_t state);
 static void cb_adapter_device_found(int num_properties, bt_property_t *properties);
 static void cb_adapter_properties (bt_status_t status,
 		int num_properties, bt_property_t *properties);
+extern void cb_device_properties(bt_status_t status, bt_bdaddr_t *bd_addr,
+		int num_properties, bt_property_t *properties);
 
 static bt_callbacks_t callbacks = {
 	sizeof(callbacks),
 	cb_adapter_state_change,
 	cb_adapter_properties,
-	NULL, /* remote_device_properties_callback */
+	cb_device_properties,
 	cb_adapter_device_found,
 	cb_adapter_discovery_state_changed,
 	NULL, /* pin_request_callback */
@@ -311,6 +313,23 @@ oal_status_t adapter_get_service_uuids(void)
 	return OAL_STATUS_SUCCESS;
 }
 
+oal_status_t adapter_get_bonded_devices(void)
+{
+	int ret;
+
+	CHECK_OAL_INITIALIZED();
+
+	API_TRACE();
+
+	ret = blued_api->get_adapter_property(BT_PROPERTY_ADAPTER_BONDED_DEVICES);
+	if (ret != BT_STATUS_SUCCESS) {
+		BT_ERR("get_adapter_property failed: [%s]", status2string(ret));
+		return convert_to_oal_status(ret);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
 static oal_status_t set_scan_mode(bt_scan_mode_t mode)
 {
 	bt_property_t prop;
@@ -509,7 +528,7 @@ static void cb_adapter_device_found(int num_properties, bt_property_t *propertie
 	ble_adv_data_t adv_info;
 	oal_event_t event;
 	gpointer event_data;
-	gsize properties_size = 0;
+	gsize size = 0;
 	BT_DBG("+");
 
 	if (num_properties == 0) {
@@ -521,9 +540,9 @@ static void cb_adapter_device_found(int num_properties, bt_property_t *propertie
 	memset(&adv_info, 0x00, sizeof(ble_adv_data_t));
 
 	print_bt_properties(num_properties, properties);
-	parse_device_properties(num_properties, properties, &dev_info, &adv_info, &properties_size);
+	parse_device_properties(num_properties, properties, &dev_info, &adv_info);
 
-	BT_INFO("number of properties= [%d] total size [%u]", num_properties, properties_size);
+	BT_INFO("number of properties= [%d] ", num_properties, size);
 
 	if (dev_info.type != DEV_TYPE_BREDR) {
 		/* BLE Single or DUAL mode found, so it should have Adv data */
@@ -540,6 +559,7 @@ static void cb_adapter_device_found(int num_properties, bt_property_t *propertie
 		ble_dev_event->device_info = dev_info;
 
 		event_data = ble_dev_event;
+		size = sizeof(event_ble_dev_found_t);
 		event = OAL_EVENT_ADAPTER_INQUIRY_RESULT_BLE;
 	} else {
 		/* BREDR device, so No Adv data */
@@ -547,10 +567,11 @@ static void cb_adapter_device_found(int num_properties, bt_property_t *propertie
 
 		memcpy(dev_event, &dev_info, sizeof(remote_device_t));
 		event_data = dev_event;
+		size = sizeof(remote_device_t);
 		event = OAL_EVENT_ADAPTER_INQUIRY_RESULT_BREDR_ONLY;
 	}
 
-	send_event(event, event_data, properties_size);
+	send_event(event, event_data, size);
 
 	BT_DBG("-");
 }

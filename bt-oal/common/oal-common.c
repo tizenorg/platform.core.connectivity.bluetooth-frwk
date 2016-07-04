@@ -36,9 +36,7 @@
 #define BT_UUID_LENGTH_MAX 16
 
 void parse_device_properties(int num_properties, bt_property_t *properties,
-		remote_device_t *dev_info,
-		ble_adv_data_t * adv_info,
-		gsize *size)
+		remote_device_t *dev_info, ble_adv_data_t * adv_info)
 {
 	int i = 0;
 	int uuid_count = 0, table_len = 0;
@@ -56,20 +54,19 @@ void parse_device_properties(int num_properties, bt_property_t *properties,
 	for(i=0; i<num_properties; i++) {
 		BT_DBG("===>Prop type: %d, Len: %d<===", properties[i].type, properties[i].len);
 
-		switch(properties[i].type)
-		{
+		switch (properties[i].type) {
 		case BT_PROPERTY_BDADDR: {
 			addr = (bt_bdaddr_t *)properties[i].val;
 				memcpy(dev_info->address.addr, addr->address, 6);
-			BT_DBG("%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X\n", dev_info->address.addr[0], dev_info->address.addr[1], dev_info->address.addr[2],
-					dev_info->address.addr[3], dev_info->address.addr[4], dev_info->address.addr[5]);
-			*size += properties[i].len;
+			BT_DBG("%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X\n",
+					dev_info->address.addr[0], dev_info->address.addr[1],
+					dev_info->address.addr[2], dev_info->address.addr[3],
+					dev_info->address.addr[4], dev_info->address.addr[5]);
 			break;
 		}
 		case BT_PROPERTY_CLASS_OF_DEVICE: {
 			dev_info->cod = *((int *)properties[i].val);
 			BT_DBG("CLASS: 0x%06x", dev_info->cod);
-			*size += properties[i].len;
 			break;
 		}
 		case BT_PROPERTY_BDNAME: {
@@ -77,7 +74,6 @@ void parse_device_properties(int num_properties, bt_property_t *properties,
 
 			g_strlcpy(dev_info->name, (const gchar *)name->name, BT_DEVICE_NAME_LENGTH_MAX);
 			BT_DBG("NAME: %s", dev_info->name);
-			*size += properties[i].len;
 			break;
 		}
 		case  BT_PROPERTY_REMOTE_FRIENDLY_NAME: {
@@ -85,31 +81,26 @@ void parse_device_properties(int num_properties, bt_property_t *properties,
 			if (NULL != name && (0 != properties[i].len))
 				g_strlcpy(dev_info->name, (const gchar *)name->name, BT_DEVICE_NAME_LENGTH_MAX);
 			BT_DBG("FRIENDLY NAME: [%s]", dev_info->name);
-			*size += properties[i].len;
 			break;
 		}
 		case BT_PROPERTY_REMOTE_PAIRED: {
 			dev_info->is_bonded = *((gboolean*)properties[i].val);
 			BT_DBG("BONDED [%d]", dev_info->is_bonded);
-			*size += properties[i].len;
 			break;
 		}
 		case BT_PROPERTY_REMOTE_CONNECTED: {
 			dev_info->is_connected = *((int*)properties[i].val);
 			BT_DBG("CONNECTED [%d]", dev_info->is_connected);
-			*size += properties[i].len;
 			break;
 		}
 		case BT_PROPERTY_REMOTE_TRUST: {
 			dev_info->is_trusted = *((gboolean*)properties[i].val);
 			BT_DBG("TRUSTED [%d]", dev_info->is_trusted);
-			*size += properties[i].len;
 			break;
 		}
 		case BT_PROPERTY_REMOTE_RSSI: {
 			dev_info->rssi = *((int *)properties[i].val);
 			BT_DBG("RSSI: %d", dev_info->rssi);
-			*size += properties[i].len;
 			break;
 		}
 		case BT_PROPERTY_UUIDS: {
@@ -118,15 +109,16 @@ void parse_device_properties(int num_properties, bt_property_t *properties,
 			table_len += uuid_count;
 			for(; tmp_uuid_cnt < table_len; tmp_uuid_cnt++) {
 				uuid_to_string(&uuids[tmp_uuid_cnt], lcl_uuid);
-				chk = check_duplicate_uuid(dev_info->uuid, uuids[tmp_uuid_cnt], dev_info->uuid_count);
+				chk = check_duplicate_uuid(dev_info->uuid,
+					uuids[tmp_uuid_cnt], dev_info->uuid_count);
 				if(chk != 0) {
-					memcpy(&dev_info->uuid[dev_info->uuid_count++].uuid[0], &uuids[tmp_uuid_cnt].uuid[0], 16);
+					memcpy(&dev_info->uuid[dev_info->uuid_count++].uuid,
+							&uuids[tmp_uuid_cnt].uuid, 16);
 				} else {
 					BT_DBG("Duplicate UUID found:%s\n", lcl_uuid);
 				}
 				BT_DBG("%d.BT_PROPERTY_UUIDS:%s", dev_info->uuid_count, lcl_uuid);
 			}
-			*size += properties[i].len;
 			break;
 		}
 		case BT_PROPERTY_TYPE_OF_DEVICE: {
@@ -136,7 +128,6 @@ void parse_device_properties(int num_properties, bt_property_t *properties,
 			else if(dev_type == BT_DEVICE_DEVTYPE_DUAL)
 				BT_DBG("Dual mode BLE Device");
 			dev_info->type = dev_type - 1;//OAL enum starts with 0 and Bluedroid with 1
-			*size += properties[i].len;
 			break;
 		}
 		case BT_PROPERTY_REMOTE_BLE_ADV_DATA: {
@@ -145,17 +136,14 @@ void parse_device_properties(int num_properties, bt_property_t *properties,
 				adv_info->len = properties[i].len;
 			}
 			BT_DBG("----Advertising Data Length: %d",properties[i].len);
-			*size += properties[i].len;
 			break;
 		}
 		case BT_PROPERTY_REMOTE_DEVICE_TIMESTAMP: {
 			BT_INFO("BT_PROPERTY_REMOTE_DEVICE_TIMESTAMP: Not Handled!!");
-			*size += properties[i].len;
 			break;
 		}
 		case BT_PROPERTY_SERVICE_RECORD: {
 			BT_INFO("BT_PROPERTY_SERVICE_RECORD: Not Handled!!");
-			*size += properties[i].len;
 			break;
 		}
 		default:
@@ -164,7 +152,6 @@ void parse_device_properties(int num_properties, bt_property_t *properties,
 		}
 	}
 }
-
 
 oal_status_t convert_to_oal_status(bt_status_t status)
 {
@@ -220,7 +207,7 @@ static const char * status_str[] = {
 int check_duplicate_uuid(oal_uuid_t *table, oal_uuid_t toMatch, int table_len)
 {
 	int i;
-	int ret = 0;
+	int ret = 1;
 
 	for (i = 0; i < table_len; i++)	{
 		ret = memcmp(table[i].uuid, toMatch.uuid, 16);

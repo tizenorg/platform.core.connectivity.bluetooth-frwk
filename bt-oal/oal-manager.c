@@ -63,6 +63,8 @@ oal_status_t oal_mgr_init_internal(void)
 		return OAL_STATUS_INTERNAL_ERROR;
 	}
 
+	device_mgr_init(blued_api);
+
 	return adapter_mgr_init(blued_api);
 }
 

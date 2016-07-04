@@ -104,6 +104,11 @@ typedef struct {
 	service_uuid_t service_list[0];
 } event_adapter_services_t;
 
+typedef struct {
+	remote_device_t device_info;
+	uint8_t adv_data[62];
+	int adv_len;
+} event_dev_properties_t;
 
 /*********Datastructures for Remote Device events ******************/
 typedef struct {

@@ -173,6 +173,20 @@ oal_status_t adapter_get_discoverable_timeout(int *p_timeout);
  */
 oal_status_t adapter_get_service_uuids(void);
 
+/**
+ * @brief Get list of bonded devices
+ *
+ * @remarks     A list of bt_address_t is provided in the event data.
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see OAL_EVENT_ADAPTER_BONDED_DEVICE_LIST
+ */
+oal_status_t adapter_get_bonded_devices(void);
+
 /*
  * @brief Set connectability of adapter
  *

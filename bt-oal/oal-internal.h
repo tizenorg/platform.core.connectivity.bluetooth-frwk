@@ -115,11 +115,17 @@ typedef struct {
 void oal_mgr_cleanup(void);
 void oal_mgr_stack_reload(void);
 
+/* Device manager */
+void device_mgr_init(const bt_interface_t * stack_if);
+void device_mgr_cleanup(void);
+
 oal_status_t adapter_mgr_init(const bt_interface_t * stack_if);
 
 /* Event Manager */
 /* Use this when Address is to be printed */
 void send_event_bda_trace(oal_event_t event, gpointer event_data, gsize len, bt_address_t *address);
+
+void send_event_no_trace(oal_event_t event, gpointer event_data, gsize len);
 
 /* Use this when no address printing is required */
 #define _bt_dispatch_event send_event
