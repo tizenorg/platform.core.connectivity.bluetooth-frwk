@@ -475,12 +475,19 @@ static gboolean __bt_adapter_all_properties_cb(gpointer user_data)
 		ev->num_props++;
 	}
 
+	if (!event_cb)
+		event_cb = _bt_get_adapter_event_cb();
+	if (!event_cb) {
+		ERR("event_cb is NULL");
+		goto done;
+	}
+
 	if (size > 2) {
 		DBG("Send Adapter properties changed event to HAL user,"
 			" Num Prop [%d] total size [%d]", ev->num_props, size);
 		event_cb(HAL_EV_ADAPTER_PROPS_CHANGED, (void*) buf, size);
 	}
-
+done:
 	g_variant_unref(result);
 	return FALSE;
 }
@@ -558,12 +565,19 @@ static gboolean __bt_adapter_discovery_timeout_cb(gpointer user_data)
 	ev->num_props++;
 	DBG("Timeout value [%d] property Num [%d]", *timeout, ev->num_props);
 
+	if (!event_cb)
+		event_cb = _bt_get_adapter_event_cb();
+	if (!event_cb) {
+		ERR("event_cb is NULL");
+		goto done;
+	}
+
 	if (size > 2) {
 		DBG("Send Adapter Properties changed event to HAL user,"
 			" Num Prop [%d] total size [%d]",ev->num_props, size);
 		event_cb(HAL_EV_ADAPTER_PROPS_CHANGED, (void*) buf, size);
 	}
-
+done:
 	g_free(timeout);
 	return FALSE;
 }
@@ -647,12 +661,19 @@ static gboolean __bt_adapter_scan_mode_cb(gpointer user_data)
 	ev->num_props++;
 	DBG("Scan mode [%d] property Num [%d]", *mode, ev->num_props);
 
+	if (!event_cb)
+		event_cb = _bt_get_adapter_event_cb();
+	if (!event_cb) {
+		ERR("event_cb is NULL");
+		goto done;
+	}
+
 	if (size > 2) {
 		DBG("Send Adapter Properties changed event to HAL user,"
 			" Num Prop [%d] total size [%d]",ev->num_props, size);
 		event_cb(HAL_EV_ADAPTER_PROPS_CHANGED, (void*) buf, size);
 	}
-
+done:
 	g_free(mode);
 	return FALSE;
 }
@@ -772,12 +793,19 @@ static gboolean __bt_adapter_local_version_cb(gpointer user_data)
 	ev->num_props++;
 	DBG("Device version [%s] property Num [%d]", version, ev->num_props);
 
+	if (!event_cb)
+		event_cb = _bt_get_adapter_event_cb();
+	if (!event_cb) {
+		ERR("event_cb is NULL");
+		goto done;
+	}
+
 	if (size > 2) {
 		DBG("Send Adapter Properties changed event to HAL user,"
 			" Num Prop [%d] total size [%d]",ev->num_props, size);
 		event_cb(HAL_EV_ADAPTER_PROPS_CHANGED, (void*) buf, size);
 	}
-
+done:
 	g_free(version);
 	return FALSE;
 }
@@ -855,12 +883,19 @@ static gboolean __bt_adapter_local_name_cb(gpointer user_data)
 	ev->num_props++;
 	DBG("Device name [%s] property Num [%d]",name, ev->num_props);
 
+	if (!event_cb)
+		event_cb = _bt_get_adapter_event_cb();
+	if (!event_cb) {
+		ERR("event_cb is NULL");
+		goto done;
+	}
+
 	if (size > 2) {
 		DBG("Send Adapter Properties changed event to HAL user,"
 			" Num Prop [%d] total size [%d]",ev->num_props, size);
 		event_cb(HAL_EV_ADAPTER_PROPS_CHANGED, (void*) buf, size);
 	}
-
+done:
 	g_free(name);
 	return FALSE;
 }
@@ -943,12 +978,19 @@ static gboolean __bt_adapter_local_address_cb(gpointer user_data)
 	size += __bt_insert_hal_properties(buf + size, HAL_PROP_ADAPTER_ADDR,
 			sizeof(bdaddr), bdaddr);
 
+	if (!event_cb)
+		event_cb = _bt_get_adapter_event_cb();
+	if (!event_cb) {
+		ERR("event_cb is NULL");
+		goto done;
+	}
+
 	if (size > 1) {
 		DBG("Send Device found event to HAL user,"
 			" Num Prop [%d] total size [%d]",ev->num_props, size);
 		event_cb(HAL_EV_ADAPTER_PROPS_CHANGED, (void*) buf, size);
 	}
-
+done:
 	g_free(address);
 	return FALSE;
 }
@@ -1053,23 +1095,33 @@ static gboolean __bt_adapter_service_uuids_cb(gpointer user_data)
 			uuids);
 	ev->num_props++;
 
+	if (!event_cb)
+		event_cb = _bt_get_adapter_event_cb();
+	if (!event_cb) {
+		ERR("event_cb is NULL");
+		goto done;
+	}
+
 	if (size > 2) {
 		DBG("Send Adapter properties changed event to HAL user,"
 				" Num Prop [%d] total size [%d]", ev->num_props, size);
 		event_cb(HAL_EV_ADAPTER_PROPS_CHANGED, (void*) buf, size);
 	}
-
+done:
 	g_variant_iter_free(iter);
 	g_variant_unref(result);
 	g_variant_unref(temp);
 	return FALSE;
-
 fail:
-	ev->status = BT_STATUS_FAIL;
-	ev->num_props = 0;
-	DBG("Send Adapter properties changed event to HAL user,"
-			" Num Prop [%d] total size [%d]", ev->num_props, size);
-	event_cb(HAL_EV_ADAPTER_PROPS_CHANGED, (void*) buf, size);
+	if (!event_cb)
+		event_cb = _bt_get_adapter_event_cb();
+	if (event_cb) {
+		ev->status = BT_STATUS_FAIL;
+		ev->num_props = 0;
+		DBG("Send Adapter properties changed event to HAL user,"
+				" Num Prop [%d] total size [%d]", ev->num_props, size);
+		event_cb(HAL_EV_ADAPTER_PROPS_CHANGED, (void*) buf, size);
+	}
 
 	g_variant_unref(result);
 	return FALSE;
@@ -1121,6 +1173,113 @@ int _bt_hal_dbus_get_adapter_supported_uuids(void)
 	return BT_STATUS_SUCCESS;
 }
 
+static gboolean __bt_adapter_bonded_devices_cb(gpointer user_data)
+{
+	/* Buffer and propety count management */
+	uint8_t buf[BT_HAL_MAX_PROPERTY_BUF_SIZE];
+	uint8_t addresses[BT_HAL_MAX_PROPERTY_BUF_SIZE];
+	struct hal_ev_adapter_props_changed *ev = (void*) buf;;
+	size_t size = 0;
+	size_t count = 0;
+
+	GVariant *result = user_data;
+	GVariantIter *iter;
+	GVariantIter *interface_iter;
+	char *object_path = NULL;
+	char *interface_str = NULL;
+
+	char device_address[BT_HAL_ADDRESS_STRING_SIZE] = { 0 };
+	uint8_t bdaddr[BT_HAL_ADDRESS_LENGTH_MAX];
+
+	memset(buf, 0, sizeof(buf));
+	size = sizeof(*ev);
+	ev->num_props = 0;
+	ev->status = BT_STATUS_SUCCESS;
+
+	/* signature of GetManagedObjects:  a{oa{sa{sv}}} */
+	g_variant_get(result, "(a{oa{sa{sv}}})", &iter);
+
+	/* Parse the signature: {oa{sa{sv}}} */
+	while (g_variant_iter_loop(iter, "{&oa{sa{sv}}}", &object_path, &interface_iter)) {
+		if(object_path == NULL)
+			continue;
+
+		while (g_variant_iter_loop(interface_iter, "{sa{sv}}",
+					&interface_str, NULL)) {
+			if (g_strcmp0(interface_str, "org.bluez.Device1") == 0) {
+				DBG("Found a device: %s", object_path);
+				_bt_convert_device_path_to_address(object_path, device_address);
+				DBG("Device Address: [%s]", device_address);
+
+				_bt_convert_addr_string_to_type(bdaddr, device_address);
+				memcpy((addresses + (count * BT_HAL_ADDRESS_LENGTH_MAX)),
+						bdaddr, BT_HAL_ADDRESS_LENGTH_MAX);
+				count++;
+				g_free(interface_str);
+				interface_str = NULL;
+				break;
+			}
+			g_free(interface_str);
+			interface_str = NULL;
+		}
+	}
+
+	g_variant_iter_free(iter);
+	g_variant_unref(result);
+
+	size += __bt_insert_hal_properties((buf + size),
+			HAL_PROP_ADAPTER_BONDED_DEVICES,
+			(count * BT_HAL_ADDRESS_LENGTH_MAX), addresses);
+	ev->num_props++;
+
+	if (!event_cb)
+		event_cb = _bt_get_adapter_event_cb();
+	if (!event_cb) {
+		ERR("event_cb is NULL");
+		goto done;
+	}
+
+	if (size > 2) {
+		DBG("Send Adapter properties changed event to HAL user,"
+			" Num Prop [%d] total size [%d]",ev->num_props, size);
+		event_cb(HAL_EV_ADAPTER_PROPS_CHANGED, (void*) buf, size);
+	}
+done:
+	return FALSE;
+}
+
+int _bt_hal_dbus_get_bonded_devices(void)
+{
+	GDBusProxy *manager_proxy;
+	GVariant *result = NULL;
+
+	DBG("+");
+
+	manager_proxy = _bt_get_manager_proxy();
+	if (manager_proxy == NULL)
+		return  BT_STATUS_FAIL;
+
+	result = g_dbus_proxy_call_sync(manager_proxy, "GetManagedObjects",
+			NULL,
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			NULL);
+	if (!result) {
+		ERR("Can't get managed objects");
+		return BT_STATUS_FAIL;
+	}
+
+	/*
+	 * As we need to provide async callback to user from HAL, simply schedule a
+	 * callback method which will carry actual result
+	 */
+	g_idle_add(__bt_adapter_bonded_devices_cb, (gpointer) result);
+
+	DBG("-");
+	return BT_STATUS_SUCCESS;
+}
+
 int _bt_hal_dbus_get_adapter_property(bt_property_type_t property_type)
 {
 	DBG("+");
@@ -1143,7 +1302,7 @@ int _bt_hal_dbus_get_adapter_property(bt_property_type_t property_type)
 	case BT_PROPERTY_UUIDS:
 		return _bt_hal_dbus_get_adapter_supported_uuids();
 	case BT_PROPERTY_ADAPTER_BONDED_DEVICES:
-		return BT_STATUS_UNSUPPORTED;
+		return _bt_hal_dbus_get_bonded_devices();
 	default:
 		return BT_STATUS_UNSUPPORTED;
 	}
