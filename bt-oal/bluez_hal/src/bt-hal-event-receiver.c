@@ -71,6 +71,8 @@ static gboolean __bt_hal_discovery_finished_cb(gpointer user_data);
 static void __bt_hal_device_property_changed_event(GVariant *msg, const char *path);
 static void __bt_hal_dbus_device_found_properties(const char *device_path);
 static void __bt_hal_device_properties_lookup(GVariant *result, char *address);
+static void __bt_hal_handle_device_specific_events(GVariant *msg, const char *member,const char *path);
+static void __bt_hal_send_device_acl_connection_state_event(gboolean connected, const char *address);
 
 static gboolean __bt_hal_discovery_finished_cb(gpointer user_data)
 {
@@ -670,6 +672,7 @@ static  void __bt_hal_manager_event_filter(GDBusConnection *connection,
 		DBG("Manager Event: Interface Name:BT_HAL_AGENT_INTERFACE");
 	} else if (g_strcmp0(interface_name, BT_HAL_DEVICE_INTERFACE) == 0) {
 		DBG("Manager Event: Interface Name:BT_HAL_DEVICE_INTERFACE");
+		__bt_hal_handle_device_specific_events(parameters, signal_name, object_path);
 	}
 
 	return;
@@ -1104,4 +1107,76 @@ static void __bt_hal_device_properties_lookup(GVariant *result, char *address)
 		event_cb(HAL_EV_DEVICE_FOUND, (void*) buf, size);
 	}
 	DBG("-");
+}
+
+static void __bt_hal_send_device_acl_connection_state_event(gboolean connected, const char *address)
+{
+	DBG("+");
+	struct hal_ev_acl_state_changed ev;
+
+	ev.status = BT_STATUS_SUCCESS;
+	ev.state = (connected == TRUE) ?
+		HAL_ACL_STATE_CONNECTED :
+		HAL_ACL_STATE_DISCONNECTED;
+
+	_bt_convert_addr_string_to_type(ev.bdaddr, address);
+
+	if (!event_cb)
+		ERR("Bluetooth HAL event handler not registered");
+	else
+		event_cb(HAL_EV_ACL_STATE_CHANGED, &ev, sizeof(ev));
+	DBG("-");
+}
+
+static void __bt_hal_handle_device_specific_events(GVariant *msg, const char *member,
+			const char *path)
+{
+	char *address;
+	const char *property = NULL;
+	if (path == NULL)
+		return;
+
+	if (strcasecmp(member, "PropertyChanged") == 0) {
+		g_variant_get(msg, "(s)", &property);
+		if (property == NULL)
+			return;
+		if (strcasecmp(property, "GattConnected") == 0) {
+			/* TODO */
+		} else if (strcasecmp(property, "Paired") == 0) {
+			/* TODO */
+		} else if (strcasecmp(property, "UUIDs") == 0) {
+			/* TODO */
+		}
+	} else if (strcasecmp(member, "DeviceConnected") == 0) {
+		unsigned char addr_type = 0;
+
+		g_variant_get(msg, "(y)", &addr_type);
+
+		address = g_malloc0(BT_HAL_ADDRESS_STRING_SIZE);
+		_bt_convert_device_path_to_address(path, address);
+
+		DBG("Member: [%s]", member);
+		ERR_C("Connected [%s] [%s]", !addr_type ? "BREDR" : "LE", address);
+		__bt_hal_send_device_acl_connection_state_event(TRUE, address);
+		g_free(address);
+	} else if (strcasecmp(member, "Disconnected") == 0) {
+		unsigned char disc_reason = 0;
+		unsigned char addr_type = 0;
+
+		g_variant_get(msg, "(yy)", &addr_type, &disc_reason);
+
+		address = g_malloc0(BT_HAL_ADDRESS_STRING_SIZE);
+		_bt_convert_device_path_to_address(path, address);
+
+		DBG("Member: [%s]", member);
+		ERR_C("DisConnected [%s] [%s]", !addr_type ? "BREDR" : "LE", address);
+		DBG("Disconnect Reason: %d", disc_reason);
+		__bt_hal_send_device_acl_connection_state_event(FALSE, address);
+		g_free(address);
+	} else if (strcasecmp(member, "ProfileStateChanged") == 0) {
+		/* TODO */
+	} else if (strcasecmp(member, "AdvReport") == 0) {
+		/* TODO */
+		DBG("Member: [%s]", member);
+	}
 }
