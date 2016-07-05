@@ -86,6 +86,7 @@ static void __bt_adapter_state_change_callback(int bt_status);
 static int __bt_adapter_state_handle_request(gboolean enable);
 static int __bt_adapter_state_discovery_request(gboolean enable);
 static void __bt_adapter_discovery_state_change_callback(int bt_discovery_status);
+static gboolean __bt_is_service_request_present(int service_function);
 
 /* Initialize BT stack (Initialize OAL layer) */
 int _bt_stack_init(void)
@@ -517,6 +518,8 @@ int _bt_adapter_get_bonded_devices(void)
 
 static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 {
+	int result = BLUETOOTH_ERROR_NONE;
+
 	BT_DBG("+");
 
 	switch(event_type) {
@@ -552,16 +555,22 @@ static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 	}
 	case OAL_EVENT_ADAPTER_PROPERTY_NAME: {
 		char *name = event_data;
-		bluetooth_device_name_t local_name;
+		BT_DBG("Adapter Name: %s", name);
 
-		memset(&local_name, 0x00, sizeof(bluetooth_device_name_t));
-		/* Copy data */
-		g_strlcpy(local_name.name,
+		if (__bt_is_service_request_present(BT_GET_LOCAL_NAME)) {
+			bluetooth_device_name_t local_name;
+
+			memset(&local_name, 0x00, sizeof(bluetooth_device_name_t));
+			g_strlcpy(local_name.name,
 				(const gchar *)name, BLUETOOTH_DEVICE_NAME_LENGTH_MAX);
-		BT_DBG("Adapter Name: %s", local_name.name);
-
-		__bt_adapter_handle_pending_requests(BT_GET_LOCAL_NAME,
+			__bt_adapter_handle_pending_requests(BT_GET_LOCAL_NAME,
 				(void *) &local_name, sizeof(bluetooth_device_name_t));
+		} else {
+			/* Send event to application */
+			_bt_send_event(BT_ADAPTER_EVENT,
+					BLUETOOTH_EVENT_LOCAL_NAME_CHANGED,
+					g_variant_new("(is)", result, name));
+		}
 		break;
 	}
 	case OAL_EVENT_ADAPTER_PROPERTY_VERSION: {
@@ -578,6 +587,7 @@ static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 		break;
 	}
 	case OAL_EVENT_ADAPTER_MODE_NON_CONNECTABLE: {
+		int mode = -1;
 		gboolean connectable = FALSE;
 
 		BT_INFO("Adapter discoverable mode:"
@@ -585,9 +595,14 @@ static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 		_bt_send_event(BT_ADAPTER_EVENT,
 				BLUETOOTH_EVENT_CONNECTABLE_CHANGED,
 				g_variant_new("(b)", connectable));
+
+		_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_DISCOVERABLE_MODE_CHANGED,
+				g_variant_new("(in)", result, mode));
 		break;
 	}
 	case OAL_EVENT_ADAPTER_MODE_CONNECTABLE: {
+		int mode;
 		gboolean connectable = TRUE;
 
 		BT_INFO("Adapter discoverable mode:"
@@ -595,17 +610,38 @@ static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 		_bt_send_event(BT_ADAPTER_EVENT,
 				BLUETOOTH_EVENT_CONNECTABLE_CHANGED,
 				g_variant_new("(b)", connectable));
+
+		mode = BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE;
+		_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_DISCOVERABLE_MODE_CHANGED,
+				g_variant_new("(in)", result, mode));
 		break;
 	}
 	case OAL_EVENT_ADAPTER_MODE_DISCOVERABLE: {
+		int mode;
+
 		BT_INFO("Adapter discoverable mode:"
 				" BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE");
+
+		/* Send event to application */
+		mode = BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE;
+		_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_DISCOVERABLE_MODE_CHANGED,
+				g_variant_new("(in)", result, mode));
+
 		break;
 	}
 	case OAL_EVENT_ADAPTER_MODE_DISCOVERABLE_TIMEOUT: {
 		int *timeout = event_data;
+		int mode;
 
 		BT_INFO("Discoverable timeout: [%d]", *timeout);
+
+		/* Send event to application */
+		_bt_get_discoverable_mode(&mode);
+		_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_DISCOVERABLE_MODE_CHANGED,
+				g_variant_new("(in)", result, mode));
 		break;
 	}
 	case OAL_EVENT_ADAPTER_PROPERTY_SERVICES: {
@@ -670,6 +706,24 @@ static void __bt_handle_oal_initialisation(oal_event_t event)
 		BT_ERR("Unknown Event");
 		break;
 	}
+}
+
+static gboolean __bt_is_service_request_present(int service_function)
+{
+	GSList *l;
+	invocation_info_t *req_info;
+
+	BT_DBG("+");
+
+	/* Get method invocation context */
+	for (l = _bt_get_invocation_list(); l != NULL; l = g_slist_next(l)) {
+		req_info = l->data;
+		if (!req_info && req_info->service_function == service_function)
+			return TRUE;
+	}
+
+	BT_DBG("-");
+	return FALSE;
 }
 
 /* Internal functions of core adapter service */
