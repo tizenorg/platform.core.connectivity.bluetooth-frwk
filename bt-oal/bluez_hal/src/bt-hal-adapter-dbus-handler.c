@@ -1173,6 +1173,25 @@ int _bt_hal_dbus_get_adapter_supported_uuids(void)
 	return BT_STATUS_SUCCESS;
 }
 
+static gboolean __is_device_paired(GVariantIter *item_iter)
+{
+	gboolean paired = FALSE;
+	GVariant *value;
+	gchar *key;
+
+	while (g_variant_iter_loop(item_iter, "{sv}", &key, &value)) {
+		if (NULL == key || g_strcmp0(key,"Paired"))
+			continue;
+
+		paired = g_variant_get_boolean(value);
+		g_variant_unref(value);
+		g_free(key);
+		break;
+	}
+
+	return paired;
+}
+
 static gboolean __bt_adapter_bonded_devices_cb(gpointer user_data)
 {
 	/* Buffer and propety count management */
@@ -1185,10 +1204,11 @@ static gboolean __bt_adapter_bonded_devices_cb(gpointer user_data)
 	GVariant *result = user_data;
 	GVariantIter *iter;
 	GVariantIter *interface_iter;
+	GVariantIter *svc_iter;
 	char *object_path = NULL;
 	char *interface_str = NULL;
 
-	char device_address[BT_HAL_ADDRESS_STRING_SIZE] = { 0 };
+	char device_address[BT_HAL_ADDRESS_STRING_SIZE];
 	uint8_t bdaddr[BT_HAL_ADDRESS_LENGTH_MAX];
 
 	memset(buf, 0, sizeof(buf));
@@ -1205,22 +1225,23 @@ static gboolean __bt_adapter_bonded_devices_cb(gpointer user_data)
 			continue;
 
 		while (g_variant_iter_loop(interface_iter, "{sa{sv}}",
-					&interface_str, NULL)) {
+					&interface_str, &svc_iter)) {
 			if (g_strcmp0(interface_str, "org.bluez.Device1") == 0) {
 				DBG("Found a device: %s", object_path);
-				_bt_convert_device_path_to_address(object_path, device_address);
-				DBG("Device Address: [%s]", device_address);
+				if (__is_device_paired(svc_iter)) {
+					_bt_convert_device_path_to_address(object_path, device_address);
+					DBG("Paired Device Address: [%s]", device_address);
 
-				_bt_convert_addr_string_to_type(bdaddr, device_address);
-				memcpy((addresses + (count * BT_HAL_ADDRESS_LENGTH_MAX)),
-						bdaddr, BT_HAL_ADDRESS_LENGTH_MAX);
-				count++;
+					_bt_convert_addr_string_to_type(bdaddr, device_address);
+					memcpy((addresses + (count * BT_HAL_ADDRESS_LENGTH_MAX)),
+							bdaddr, BT_HAL_ADDRESS_LENGTH_MAX);
+					count++;
+				}
+				g_variant_iter_free(svc_iter);
 				g_free(interface_str);
 				interface_str = NULL;
 				break;
 			}
-			g_free(interface_str);
-			interface_str = NULL;
 		}
 	}
 
