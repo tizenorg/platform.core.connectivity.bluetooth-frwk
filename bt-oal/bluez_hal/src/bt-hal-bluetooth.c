@@ -164,7 +164,7 @@ static int cancel_discovery(void)
 static int create_bond(const bt_bdaddr_t *bd_addr, int transport)
 {
 	DBG("+");
-	return _bt_hal_device_create_bond(bd_addr);
+	return _bt_hal_device_create_bond(bd_addr, transport);
 }
 
 static int cancel_bond(const bt_bdaddr_t *bd_addr)

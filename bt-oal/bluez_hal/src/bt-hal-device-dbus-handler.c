@@ -55,11 +55,10 @@ static void __bt_hal_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res, gpoint
 static void __bt_hal_unbond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
                                         gpointer user_data);
 
-int _bt_hal_device_create_bond(const bt_bdaddr_t *bd_addr)
+int _bt_hal_device_create_bond(const bt_bdaddr_t *bd_addr, unsigned short transport)
 {
 	GDBusProxy *proxy;
 	char address[BT_HAL_ADDRESS_STRING_SIZE] = { 0 };
-	int transport = 0;
 
 	GDBusConnection *conn;
 	char *device_path = NULL;
@@ -69,7 +68,7 @@ int _bt_hal_device_create_bond(const bt_bdaddr_t *bd_addr)
 	memset(&ev, 0, sizeof(ev));
 	DBG("+");
 
-	DBG("Transport [%d] Add[0x%x] [0x%x][0x%x][0x%x][0x%x][0x%x]",
+	DBG("Transport [0x%x] Add[0x%x] [0x%x][0x%x][0x%x][0x%x][0x%x]",
 			transport, bd_addr->address[0], bd_addr->address[1],
 			bd_addr->address[2], bd_addr->address[3],
 			bd_addr->address[4], bd_addr->address[5]);

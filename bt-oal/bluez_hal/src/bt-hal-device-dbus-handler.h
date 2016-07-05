@@ -36,7 +36,7 @@
 extern "C" {
 #endif
 
-int _bt_hal_device_create_bond(const bt_bdaddr_t *bd_addr);
+int _bt_hal_device_create_bond(const bt_bdaddr_t *bd_addr, unsigned short transport);
 
 int _bt_hal_device_remove_bond(const bt_bdaddr_t *bd_addr);
 

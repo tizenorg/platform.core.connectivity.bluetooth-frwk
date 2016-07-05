@@ -28,6 +28,7 @@
 #include "oal-common.h"
 #include "oal-manager.h"
 #include "oal-utils.h"
+#include "oal-device-mgr.h"
 
 static const bt_interface_t * blued_api;
 
@@ -81,6 +82,46 @@ oal_status_t device_set_alias(bt_address_t * addr, char * alias)
 	if (res != BT_STATUS_SUCCESS) {
 		BT_ERR("set_remote_device_property error: [%s]", status2string(res));
 		BT_ERR("Alias: %s", alias);
+		return convert_to_oal_status(res);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
+oal_status_t device_create_bond(bt_address_t *addr, connection_type_e transport)
+{
+	int res;
+	bdstr_t bdstr;
+
+	CHECK_OAL_INITIALIZED();
+
+	OAL_CHECK_PARAMETER(addr, return);
+
+	API_TRACE("[%s]", bdt_bd2str(addr, &bdstr));
+
+	res = blued_api->create_bond((bt_bdaddr_t *)addr, (unsigned char)transport);
+	if (res != BT_STATUS_SUCCESS) {
+		BT_ERR("create_bond error: [%s]", status2string(res));
+		return convert_to_oal_status(res);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
+oal_status_t device_destroy_bond(bt_address_t * addr)
+{
+	int res;
+	bdstr_t bdstr;
+
+	CHECK_OAL_INITIALIZED();
+
+	OAL_CHECK_PARAMETER(addr, return);
+
+	API_TRACE("[%s]", bdt_bd2str(addr, &bdstr));
+
+	res = blued_api->remove_bond((bt_bdaddr_t *)addr);
+	if (res != BT_STATUS_SUCCESS) {
+		BT_ERR("remove_bond error: [%s]", status2string(res));
 		return convert_to_oal_status(res);
 	}
 
@@ -164,4 +205,43 @@ void cb_device_properties(bt_status_t status, bt_bdaddr_t *bd_addr,
 	}
 
 	send_event_bda_trace(event, event_data, size, (bt_address_t*)bd_addr);
+}
+
+void cb_device_bond_state_changed(bt_status_t status, bt_bdaddr_t *bd_addr,
+                                        bt_bond_state_t state)
+{
+	bt_address_t * address = g_new0(bt_address_t, 1);
+	oal_event_t event;
+	gsize size = 0;
+
+	BT_DBG("status: %d, state: %d", status, state);
+
+	memcpy(address->addr, bd_addr->address, 6);
+
+	switch(state) {
+		case BT_BOND_STATE_BONDED:
+			event = OAL_EVENT_DEVICE_BONDING_SUCCESS;
+			break;
+		case BT_BOND_STATE_NONE:
+			/* Reaches both when bonding removed or bonding cancelled */
+			if (BT_STATUS_SUCCESS != status) {
+				event_dev_bond_failed_t * bond_fail_info = g_new0(event_dev_bond_failed_t, 1);
+				bond_fail_info->status = convert_to_oal_status(status);
+				bond_fail_info->address = *address;
+				size = sizeof(event_dev_bond_failed_t);
+				send_event_bda_trace(OAL_EVENT_DEVICE_BONDING_FAILED, bond_fail_info, size, (bt_address_t*)bd_addr);
+				g_free(address);
+				return;
+			} else
+				event = OAL_EVENT_DEVICE_BONDING_REMOVED;
+			break;
+		case BT_BOND_STATE_BONDING:
+			g_free(address);
+			return;
+		default:
+			BT_ERR("Unexpected Bond state %d", state);
+			g_free(address);
+			return;
+	}
+	send_event_bda_trace(event, address, size, (bt_address_t*)bd_addr);
 }
