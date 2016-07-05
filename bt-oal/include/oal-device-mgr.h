@@ -45,6 +45,19 @@ extern "C" {
  */
 oal_status_t device_query_attributes(bt_address_t * addr);
 
+/**
+ * @brief Set alias for remote device
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS	Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see  remote_device_t
+ */
+oal_status_t device_set_alias(bt_address_t * addr, char * alias);
+
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

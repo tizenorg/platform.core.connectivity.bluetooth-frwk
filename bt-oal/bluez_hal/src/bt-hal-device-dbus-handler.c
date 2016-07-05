@@ -562,3 +562,97 @@ int _bt_hal_dbus_get_remote_device_properties(bt_bdaddr_t *remote_addr)
 	DBG("-");
 	return BT_STATUS_SUCCESS;
 }
+
+static int __bt_hal_dbus_set_remote_device_alias(bt_bdaddr_t *remote_addr, char *alias)
+{
+	char address[BT_HAL_ADDRESS_STRING_SIZE];
+	gchar *device_path = NULL;
+	GDBusProxy *adapter_proxy;
+	GDBusProxy *device_proxy;
+	GError *error = NULL;
+	GDBusConnection *conn;
+	GVariant *result;
+
+	adapter_proxy = _bt_get_adapter_proxy();
+		if (!adapter_proxy) {
+			ERR("Could not get Adapter Proxy");
+			return BT_STATUS_FAIL;
+		}
+
+	conn = _bt_get_system_gconn();
+	if (!conn) {
+		ERR("_bt_get_system_gconn failed");
+		return BT_STATUS_FAIL;
+	}
+
+	_bt_convert_addr_type_to_string(address, remote_addr->address);
+	INFO("Address: %s, Alias: %s", address, alias);
+
+	device_path = _bt_get_device_object_path(address);
+	if (device_path == NULL) {
+		ERR("No paired device");
+		return BT_STATUS_FAIL;
+	}
+
+	device_proxy = g_dbus_proxy_new_sync(conn, G_DBUS_PROXY_FLAGS_NONE,
+			NULL, BT_HAL_BLUEZ_NAME, device_path,
+			BT_HAL_PROPERTIES_INTERFACE, NULL, NULL);
+	g_free(device_path);
+	if (!device_proxy) {
+		ERR("Error creating device_proxy");
+		return BT_STATUS_FAIL;
+	}
+
+	result = g_dbus_proxy_call_sync(device_proxy, "Set",
+			g_variant_new("(ssv)",
+				BT_HAL_DEVICE_INTERFACE,
+				"Alias", g_variant_new("s", alias)),
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			&error);
+	g_object_unref(device_proxy);
+	if (!result) {
+		ERR("Error occured in Proxy call");
+		if (error != NULL) {
+			ERR("Error occured in Proxy call (Error: %s)", error->message);
+			g_clear_error(&error);
+		}
+		return BT_STATUS_FAIL;
+	}
+	g_variant_unref(result);
+
+	return BT_STATUS_SUCCESS;
+}
+
+/* Set Remote Device Properties */
+int _bt_hal_dbus_set_remote_device_property(
+		bt_bdaddr_t *remote_addr, const bt_property_t *property)
+{
+	int result;
+
+	DBG("+");
+
+	if (remote_addr == NULL) {
+		ERR("Invalid parameters received");
+		return BT_STATUS_PARM_INVALID;
+	}
+
+	if (property == NULL || property->val == NULL) {
+		ERR("Invalid parameters received");
+		return BT_STATUS_PARM_INVALID;
+	}
+
+	switch (property->type) {
+	case BT_PROPERTY_REMOTE_FRIENDLY_NAME:
+		result =  __bt_hal_dbus_set_remote_device_alias(
+				remote_addr, (char *) property->val);
+		break;
+	default:
+		result = BT_STATUS_UNSUPPORTED;
+	}
+
+	DBG("Result= [%d]", result);
+	DBG("-");
+	return result;
+}

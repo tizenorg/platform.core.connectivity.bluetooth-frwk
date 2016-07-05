@@ -30,6 +30,8 @@ void _bt_device_state_handle_callback_set_request(void);
 
 int _bt_device_get_bonded_device_info(bluetooth_device_address_t *addr);
 
+int _bt_set_alias(bluetooth_device_address_t *device_address, const char *alias);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

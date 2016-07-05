@@ -328,3 +328,20 @@ int _bt_device_get_bonded_device_info(bluetooth_device_address_t *addr)
 	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
 }
+
+int _bt_set_alias(bluetooth_device_address_t *device_address, const char *alias)
+{
+	int ret;
+
+	BT_DBG("+");
+	BT_CHECK_PARAMETER(alias, return);
+
+	ret = device_set_alias((bt_address_t *)device_address, (char *)alias);
+	if (ret != OAL_STATUS_SUCCESS) {
+		BT_ERR("device_set_alias: %d", ret);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	BT_DBG("-");
+	return BLUETOOTH_ERROR_NONE;
+}

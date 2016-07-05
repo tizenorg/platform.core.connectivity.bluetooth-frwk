@@ -62,6 +62,31 @@ oal_status_t device_query_attributes(bt_address_t *addr)
 	return OAL_STATUS_SUCCESS;
 }
 
+oal_status_t device_set_alias(bt_address_t * addr, char * alias)
+{
+	int res;
+	bt_property_t prop;
+	bdstr_t bdstr;
+
+	CHECK_OAL_INITIALIZED();
+	OAL_CHECK_PARAMETER(addr, return);
+	OAL_CHECK_PARAMETER(alias, return);
+
+	API_TRACE("%s ->Alias: %s", bdt_bd2str(addr, &bdstr), alias);
+
+	prop.type = BT_PROPERTY_REMOTE_FRIENDLY_NAME;
+	prop.len = strlen(alias);
+	prop.val = alias;
+	res = blued_api->set_remote_device_property((bt_bdaddr_t*)addr, &prop);
+	if (res != BT_STATUS_SUCCESS) {
+		BT_ERR("set_remote_device_property error: [%s]", status2string(res));
+		BT_ERR("Alias: %s", alias);
+		return convert_to_oal_status(res);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
 void cb_device_properties(bt_status_t status, bt_bdaddr_t *bd_addr,
 		int num_properties, bt_property_t *properties)
 {

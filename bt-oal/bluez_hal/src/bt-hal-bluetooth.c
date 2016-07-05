@@ -137,7 +137,7 @@ static int get_remote_device_property(bt_bdaddr_t *remote_addr,
 static int set_remote_device_property(bt_bdaddr_t *remote_addr,
 		const bt_property_t *property)
 {
-	return BT_STATUS_UNSUPPORTED;
+	return _bt_hal_dbus_set_remote_device_property(remote_addr, property);
 }
 
 static int get_remote_service_record(bt_bdaddr_t *remote_addr, bt_uuid_t *uuid)

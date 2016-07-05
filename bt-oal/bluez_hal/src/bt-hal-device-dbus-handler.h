@@ -42,6 +42,9 @@ int _bt_hal_device_remove_bond(const bt_bdaddr_t *bd_addr);
 
 int _bt_hal_dbus_get_remote_device_properties(bt_bdaddr_t *remote_addr);
 
+int _bt_hal_dbus_set_remote_device_property(
+		bt_bdaddr_t *remote_addr, const bt_property_t *property);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

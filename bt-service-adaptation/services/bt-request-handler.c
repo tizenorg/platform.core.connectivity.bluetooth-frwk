@@ -522,6 +522,17 @@ int __bt_bluez_request(int function_name,
 		}
 		break;
 	}
+	case BT_SET_ALIAS: {
+		bluetooth_device_address_t address = { {0} };
+		const char *local_name;
+
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+		local_name = (const char *)g_variant_get_data(in_param2);
+
+		result = _bt_set_alias(&address, local_name);
+		break;
+	}
 	default:
 		BT_INFO("UnSupported function [%d]", function_name);
 		result = BLUETOOTH_ERROR_NOT_SUPPORT;
