@@ -59,6 +59,8 @@ extern void cb_device_properties(bt_status_t status, bt_bdaddr_t *bd_addr,
 		int num_properties, bt_property_t *properties);
 extern void cb_device_bond_state_changed(bt_status_t status, bt_bdaddr_t *bd_addr,
                                         bt_bond_state_t state);
+extern void cb_device_acl_state_changed(bt_status_t status, bt_bdaddr_t *remote_bd_addr,
+                                            bt_acl_state_t state);
 
 static bt_callbacks_t callbacks = {
 	sizeof(callbacks),
@@ -70,7 +72,7 @@ static bt_callbacks_t callbacks = {
 	NULL, /* pin_request_callback */
 	NULL, /* ssp_request_callback */
 	cb_device_bond_state_changed,
-	NULL, /* acl_state_changed_callback */
+	cb_device_acl_state_changed,
 	NULL, /* callback_thread_event */
 	NULL, /* dut_mode_recv_callback */
 	NULL, /* le_test_mode_callback*/

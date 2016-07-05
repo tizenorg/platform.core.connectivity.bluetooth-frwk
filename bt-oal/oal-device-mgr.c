@@ -250,3 +250,41 @@ void cb_device_bond_state_changed(bt_status_t status, bt_bdaddr_t *bd_addr,
 	}
 	send_event_bda_trace(event, address, size, (bt_address_t*)bd_addr);
 }
+
+void cb_device_acl_state_changed(bt_status_t status, bt_bdaddr_t *bd_addr,
+		bt_acl_state_t state)
+{
+	event_dev_conn_status_t * conn_status = g_new0(event_dev_conn_status_t, 1);
+	//bt_address_t * address = g_new0(bt_address_t, 1);
+	oal_event_t event;
+	gsize size = 0;
+
+	BT_DBG("ACL State:%d, state: %d", status, state);
+
+	memcpy(conn_status->address.addr, bd_addr->address, 6);
+
+	if (BT_STATUS_SUCCESS != status) {
+		/* At present only timeout will cause non-success status, later we can add more */
+		conn_status->status = OAL_STATUS_CONN_TIMEOUT;
+		BT_ERR("ACL State Error:%d, state: %d", status, state);
+	} else
+		conn_status->status = OAL_STATUS_SUCCESS;
+
+	memcpy(conn_status->address.addr, bd_addr->address, 6);
+	switch(state) {
+	case BT_ACL_STATE_CONNECTED:
+		event = OAL_EVENT_DEVICE_ACL_CONNECTED;
+		conn_status->status = OAL_STATUS_SUCCESS;
+		break;
+	case BT_ACL_STATE_DISCONNECTED:
+		event = OAL_EVENT_DEVICE_ACL_DISCONNECTED;
+		break;
+	default:
+		BT_ERR("Unexpected ACL state %d", state);
+		g_free(conn_status);
+		return;
+	}
+
+	size = sizeof(event_dev_conn_status_t);
+	send_event_bda_trace(event, conn_status, size, (bt_address_t*)bd_addr);
+}
