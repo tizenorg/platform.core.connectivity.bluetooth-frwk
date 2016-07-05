@@ -97,6 +97,8 @@ void _bt_service_oal_event_receiver(int event_type, gpointer event_data, gsize l
         case OAL_EVENT_DEVICE_BONDING_SUCCESS:
         case OAL_EVENT_DEVICE_BONDING_REMOVED:
         case OAL_EVENT_DEVICE_BONDING_FAILED:
+	case OAL_EVENT_DEVICE_ACL_CONNECTED:
+        case OAL_EVENT_DEVICE_ACL_DISCONNECTED:
                 if (device_cb)
                         device_cb(event_type, event_data);
 	default:

@@ -96,6 +96,8 @@ static void __bt_device_handle_bond_completion_event(bt_address_t *bd_addr);
 static void __bt_device_handle_bond_removal_event(bt_address_t *bd_addr);
 static void __bt_device_handle_bond_failed_event(event_dev_bond_failed_t* bond_fail_event);
 static void __bt_handle_ongoing_bond(bt_remote_dev_info_t *remote_dev_info);
+static void __bt_device_acl_state_changed_callback(event_dev_conn_status_t * acl_event,
+				gboolean connected);
 
 void _bt_device_state_handle_callback_set_request(void)
 {
@@ -269,8 +271,11 @@ static void __bt_device_remote_properties_callback(event_dev_properties_t *oal_d
 	/* a. Check if bonding is on-going, if yes, we MUST update the bonding device properties */
 	if (trigger_bond_info  && !strcmp(trigger_bond_info->addr, rem_info->address)) {
 		BT_INFO("Bonding is ongoing, try update properties");
-		if (!trigger_bond_info->dev_info) {
-			BT_INFO("Bonding device properties is NULL, Assigning rem_info");
+		if (!trigger_bond_info->dev_info ||
+				!trigger_bond_info->dev_info->name ||
+					!trigger_bond_info->dev_info->address ||
+						!trigger_bond_info->dev_info->uuid_count == 0) {
+			BT_INFO("Complete data is not present, Assigning rem_info");
 			trigger_bond_info->dev_info = rem_info;
 		}
 	}
@@ -517,9 +522,45 @@ static void __bt_device_event_handler(int event_type, gpointer event_data)
 	      __bt_device_handle_bond_failed_event((event_dev_bond_failed_t*) event_data);
 	      break;
 	}
+	case OAL_EVENT_DEVICE_ACL_CONNECTED: {
+	     BT_INFO("ACL Connected event Received");
+	     event_dev_conn_status_t* param = event_data;
+	     __bt_device_acl_state_changed_callback(param, TRUE);
+	     __bt_device_handle_bond_removal_event(&(param->address));
+	     break;
+	}
+	case OAL_EVENT_DEVICE_ACL_DISCONNECTED: {
+		BT_INFO("ACL Disconnected event Received");
+		__bt_device_acl_state_changed_callback((event_dev_conn_status_t *)event_data, FALSE);
+		break;
+	}
 	default:
 		BT_INFO("Unhandled event..");
 	}
+}
+
+static void __bt_device_acl_state_changed_callback(event_dev_conn_status_t * acl_event, gboolean connected)
+{
+	gchar address[BT_ADDRESS_STR_LEN];
+	int result = BLUETOOTH_ERROR_NONE;
+	GVariant *param = NULL;
+	unsigned char addr_type = 0;
+	BT_DBG("+");
+
+	_bt_convert_addr_type_to_string(address, acl_event->address.addr);
+
+	if (connected) {
+		param = g_variant_new("(isy)", result, address, addr_type);
+		_bt_send_event(BT_DEVICE_EVENT,
+				BLUETOOTH_EVENT_DEVICE_CONNECTED,
+				param);
+	} else {
+		param = g_variant_new("(isy)", result, address, addr_type);
+		_bt_send_event(BT_DEVICE_EVENT,
+				BLUETOOTH_EVENT_DEVICE_DISCONNECTED,
+				param);
+	}
+	BT_DBG("-");
 }
 
 static void __bt_device_remote_device_found_callback(gpointer event_data, gboolean is_ble)
