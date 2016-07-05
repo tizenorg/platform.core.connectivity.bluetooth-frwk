@@ -63,6 +63,10 @@ int _bt_set_local_name(char *local_name);
 
 int _bt_get_discoverable_mode(int *mode);
 
+int _bt_get_timeout_value(int *timeout);
+
+int _bt_set_discoverable_mode(int discoverable_mode, int timeout);
+
 gboolean _bt_is_connectable(void);
 
 int _bt_is_service_used(void);

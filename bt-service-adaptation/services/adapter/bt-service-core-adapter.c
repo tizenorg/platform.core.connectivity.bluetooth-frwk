@@ -29,6 +29,8 @@
 #include <eventsystem.h>
 #include <bundle_internal.h>
 
+#include "alarm.h"
+
 /*bt-service headers */
 #include "bt-internal-types.h"
 #include "bt-service-common.h"
@@ -39,6 +41,9 @@
 #include "bt-service-event-receiver.h"
 #include "bt-request-handler.h"
 #include "bt-service-event.h"
+#ifdef TIZEN_DPM_ENABLE
+#include "bt-service-dpm.h"
+#endif
 
 /* OAL headers */
 #include <oal-event.h>
@@ -50,6 +55,16 @@
 /*This file will contain state machines related to adapter and remote device */
 
 /* Global variables */
+typedef struct {
+	guint event_id;
+	int timeout;
+	time_t start_time;
+	gboolean alarm_init;
+	int alarm_id;
+} bt_adapter_timer_t;
+
+static bt_adapter_timer_t visible_timer;
+
 static guint timer_id = 0;
 
 /* Adapter default states */
@@ -218,14 +233,218 @@ int _bt_get_discoverable_mode(int *mode)
 			/*
 			 * TODO: NON CONNECTABLE is not defined in bluetooth_discoverable_mode_t.
 			 * After adding BLUETOOTH_DISCOVERABLE_MODE_NON_CONNECTABLE, set mode as
-			 * BLUETOOTH_DISCOVERABLE_MODE_NON_CONNECTABLE. Until then return error.
+			 * BLUETOOTH_DISCOVERABLE_MODE_NON_CONNECTABLE. Until then return -1.
 			 */
-			return BLUETOOTH_ERROR_INTERNAL;
+			return -1;
 		}
 	}
 
 	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
+}
+
+int _bt_get_timeout_value(int *timeout)
+{
+	time_t current_time;
+	int time_diff;
+
+	/* Take current time */
+	time(&current_time);
+	time_diff = difftime(current_time, visible_timer.start_time);
+
+	BT_DBG("Time diff = %d\n", time_diff);
+	*timeout = visible_timer.timeout - time_diff;
+
+	return BLUETOOTH_ERROR_NONE;
+}
+
+static void __bt_visibility_alarm_remove()
+{
+	if (visible_timer.event_id > 0) {
+		g_source_remove(visible_timer.event_id);
+		visible_timer.event_id = 0;
+	}
+
+	if (visible_timer.alarm_id > 0) {
+		alarmmgr_remove_alarm(visible_timer.alarm_id);
+		visible_timer.alarm_id = 0;
+	}
+}
+
+static int __bt_visibility_alarm_cb(alarm_id_t alarm_id, void* user_param)
+{
+	int result = BLUETOOTH_ERROR_NONE;
+	int timeout = 0;
+
+	BT_DBG("__bt_visibility_alarm_cb - alram id = [%d] \n", alarm_id);
+
+	if (alarm_id != visible_timer.alarm_id)
+		return 0;
+
+	if (visible_timer.event_id) {
+		_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_DISCOVERABLE_TIMEOUT_CHANGED,
+				g_variant_new("(in)", result, timeout));
+		g_source_remove(visible_timer.event_id);
+		visible_timer.event_id = 0;
+		visible_timer.timeout = 0;
+
+#ifndef TIZEN_WEARABLE
+		if (vconf_set_int(BT_FILE_VISIBLE_TIME, 0) != 0)
+			BT_ERR("Set vconf failed\n");
+#endif
+	}
+	/* Switch Off visibility in Bluez */
+	_bt_set_discoverable_mode(BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE, 0);
+	visible_timer.alarm_id = 0;
+	return 0;
+}
+
+static gboolean __bt_timeout_handler(gpointer user_data)
+{
+	int result = BLUETOOTH_ERROR_NONE;
+	time_t current_time;
+	int time_diff;
+
+	/* Take current time */
+	time(&current_time);
+	time_diff = difftime(current_time, visible_timer.start_time);
+
+	/* Send event to application */
+	_bt_send_event(BT_ADAPTER_EVENT,
+			BLUETOOTH_EVENT_DISCOVERABLE_TIMEOUT_CHANGED,
+			g_variant_new("(in)", result, time_diff));
+
+	if (visible_timer.timeout <= time_diff) {
+		g_source_remove(visible_timer.event_id);
+		visible_timer.event_id = 0;
+		visible_timer.timeout = 0;
+
+#ifndef TIZEN_WEARABLE
+		if (vconf_set_int(BT_FILE_VISIBLE_TIME, 0) != 0)
+			BT_ERR("Set vconf failed\n");
+#endif
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+static void __bt_visibility_alarm_create()
+{
+	alarm_id_t alarm_id;
+	int result;
+
+	result = alarmmgr_add_alarm(ALARM_TYPE_VOLATILE, visible_timer.timeout,
+			0, NULL, &alarm_id);
+	if (result < 0) {
+		BT_ERR("Failed to create alarm error = %d\n", result);
+	} else {
+		BT_DBG("Alarm created = %d\n", alarm_id);
+		visible_timer.alarm_id = alarm_id;
+	}
+}
+
+static int __bt_set_visible_time(int timeout)
+{
+	int result;
+
+	__bt_visibility_alarm_remove();
+
+	visible_timer.timeout = timeout;
+
+#ifndef TIZEN_WEARABLE
+#ifdef TIZEN_DPM_ENABLE
+	if (_bt_dpm_get_bluetooth_limited_discoverable_state() != DPM_RESTRICTED) {
+#endif
+		if (vconf_set_int(BT_FILE_VISIBLE_TIME, timeout) != 0)
+			BT_ERR("Set vconf failed");
+#ifdef TIZEN_DPM_ENABLE
+	}
+#endif
+#endif
+
+	if (timeout <= 0)
+		return BLUETOOTH_ERROR_NONE;
+
+	if (!visible_timer.alarm_init) {
+		/* Set Alarm timer to switch off BT */
+		result = alarmmgr_init("bt-service");
+		if (result != 0)
+			return BLUETOOTH_ERROR_INTERNAL;
+
+		visible_timer.alarm_init = TRUE;
+	}
+
+	result = alarmmgr_set_cb(__bt_visibility_alarm_cb, NULL);
+	if (result != 0)
+		return BLUETOOTH_ERROR_INTERNAL;
+
+	/* Take start time */
+	time(&(visible_timer.start_time));
+	visible_timer.event_id = g_timeout_add_seconds(1,
+			__bt_timeout_handler, NULL);
+
+	__bt_visibility_alarm_create();
+
+	return BLUETOOTH_ERROR_NONE;
+}
+
+int _bt_set_discoverable_mode(int discoverable_mode, int timeout)
+{
+	int result;
+
+	BT_DBG("+");
+
+	BT_INFO("discoverable_mode: %d, timeout: %d", discoverable_mode, timeout);
+
+#ifdef TIZEN_DPM_ENABLE
+	if (discoverable_mode != BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE &&
+			_bt_dpm_get_bluetooth_limited_discoverable_state() == DPM_RESTRICTED) {
+		_bt_launch_dpm_popup("DPM_POLICY_DISABLE_BT_HANDSFREE");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+	if (discoverable_mode != BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE &&
+			_bt_dpm_get_bluetooth_limited_discoverable_state() == DPM_RESTRICTED) {
+		_bt_launch_dpm_popup("DPM_POLICY_DISABLE_BT");
+		return BLUETOOTH_ERROR_ACCESS_DENIED;
+	}
+#endif
+
+	switch (discoverable_mode) {
+	case BLUETOOTH_DISCOVERABLE_MODE_CONNECTABLE:
+		result = adapter_set_connectable(TRUE);
+		timeout = 0;
+		break;
+	case BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE:
+		result = adapter_set_discoverable();
+		timeout = 0;
+		break;
+	case BLUETOOTH_DISCOVERABLE_MODE_TIME_LIMITED_DISCOVERABLE:
+		result = adapter_set_discoverable();
+		break;
+	default:
+		return BLUETOOTH_ERROR_INVALID_PARAM;
+	}
+
+	if (result != OAL_STATUS_SUCCESS) {
+		BT_ERR("set scan mode failed %d", result);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	result = adapter_set_discoverable_timeout(timeout);
+	if (result != OAL_STATUS_SUCCESS) {
+		BT_ERR("adapter_set_discoverable_timeout failed %d", result);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	if (discoverable_mode == BLUETOOTH_DISCOVERABLE_MODE_GENERAL_DISCOVERABLE)
+		timeout = -1;
+
+	result = __bt_set_visible_time(timeout);
+
+	BT_DBG("-");
+	return result;
 }
 
 gboolean _bt_is_connectable(void)
