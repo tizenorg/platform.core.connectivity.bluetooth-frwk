@@ -365,6 +365,34 @@ oal_status_t adapter_set_connectable(int connectable)
 	return set_scan_mode(mode);
 }
 
+oal_status_t adapter_set_discoverable(void)
+{
+	CHECK_OAL_INITIALIZED();
+	API_TRACE();
+
+	return set_scan_mode(BT_SCAN_MODE_CONNECTABLE_DISCOVERABLE);
+}
+
+oal_status_t adapter_set_discoverable_timeout(int timeout)
+{
+	bt_property_t prop;
+	int res;
+	uint32_t prop_val = timeout;
+
+	CHECK_OAL_INITIALIZED();
+	API_TRACE("%d", timeout);
+
+	prop.type = BT_PROPERTY_ADAPTER_DISCOVERY_TIMEOUT;
+	prop.len = sizeof(prop_val);
+	prop.val = &prop_val;
+	res = blued_api->set_adapter_property(&prop);
+	if (res != BT_STATUS_SUCCESS) {
+		BT_ERR("set_adapter_property failed [%s]", status2string(res));
+		return convert_to_oal_status(res);
+	}
+	return OAL_STATUS_SUCCESS;
+}
+
 static void cb_adapter_properties(bt_status_t status,
                                                int num_properties,
                                                bt_property_t *properties)

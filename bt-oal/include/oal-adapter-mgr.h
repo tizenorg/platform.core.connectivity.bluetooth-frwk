@@ -207,8 +207,41 @@ oal_status_t adapter_get_bonded_devices(void);
  */
 oal_status_t adapter_set_connectable(int connectable);
 
+/**
+ * @brief Make adapter discoverable
+ *
+ * @remarks  This device appears in inquiries and can be connected by remote device.
+ *
+ * @details If operation successful OAL_EVENT_ADAPTER_MODE_DISCOVERABLE is generated
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS	Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see  adapter_is_discoverable()
+ * @see  OAL_EVENT_ADAPTER_MODE_DISCOVERABLE
+ */
+oal_status_t adapter_set_discoverable(void);
+
+/**
+ * @brief Set discoverable timeout
+ *
+ * @param timeout Timeout in seconds after which device cannot be found in discoveries
+ *
+ * @details Event  OAL_EVENT_ADAPTER_MODE_DISCOVERABLE_TIMEOUT will be generated.
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see  adapter_is_discoverable()
+ * @see  OAL_EVENT_ADAPTER_MODE_DISCOVERABLE_TIMEOUT
+ */
+oal_status_t adapter_set_discoverable_timeout(int timeout);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
 #endif /*_OAL_ADAPTER_MGR_H_*/
-
