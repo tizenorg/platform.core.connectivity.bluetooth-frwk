@@ -37,6 +37,7 @@
 #include "bt-hal-internal.h"
 #include "bt-hal-event-receiver.h"
 #include "bt-hal-dbus-common-utils.h"
+#include "bt-hal-agent.h"
 
 #define BASELEN_PROP_CHANGED (sizeof(struct hal_ev_adapter_props_changed) \
 		+ sizeof(struct hal_property))
@@ -243,12 +244,14 @@ static void __bt_hal_adapter_property_changed_event(GVariant *msg)
 				ev.state = HAL_POWER_OFF;
 				event_cb(HAL_EV_ADAPTER_STATE_CHANGED, &ev, sizeof(ev));
 				/* Destroy Agent */
+				_bt_hal_destroy_adapter_agent();
 			} else {
 				DBG("###### Adapter Powered Up ######");
 				struct hal_ev_adapter_state_changed ev;
 				ev.state = HAL_POWER_ON;
 				event_cb(HAL_EV_ADAPTER_STATE_CHANGED, &ev, sizeof(ev));
 				/* Create Agent */
+				_bt_hal_initialize_adapter_agent();
 			}
 
 		} else if (!g_strcmp0(key, "Pairable")) {

@@ -8,6 +8,8 @@ SET(SRCS
 ./src/bt-hal-dbus-common-utils.c
 ./src/bt-hal-event-receiver.c
 ./src/bt-hal-utils.c
+./src/bt-hal-gap-agent1.c
+./src/bt-hal-agent.c
 )
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})

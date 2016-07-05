@@ -71,6 +71,9 @@ extern "C" {
 #define BT_HAL_MANAGER_PATH "/"
 #define BT_HAL_BLUEZ_HCI_PATH "/org/bluez/hci0"
 
+#define BT_HAL_DEVICE_AGENT_PATH "/org/tizen/device_agent"
+#define BT_HAL_ADAPTER_AGENT_PATH "/org/tizen/adapter_agent"
+
 #define BT_HAL_MANAGER_INTERFACE "org.freedesktop.DBus.ObjectManager"
 #define BT_HAL_ADAPTER_INTERFACE "org.bluez.Adapter1"
 #define BT_HAL_DEVICE_INTERFACE "org.bluez.Device1"

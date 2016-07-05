@@ -45,13 +45,14 @@
 #include "bt-hal-adapter-dbus-handler.h"
 #include "bt-hal-device-dbus-handler.h"
 #include "bt-hal-event-receiver.h"
+#include "bt-hal-agent.h"
 
 static handle_stack_msg event_cb = NULL;
 
 /* Forward Delcaration */
-static void __bt_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res, gpointer user_data);
+static void __bt_hal_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res, gpointer user_data);
 
-static void __bt_unbond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
+static void __bt_hal_unbond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
                                         gpointer user_data);
 
 int _bt_hal_device_create_bond(const bt_bdaddr_t *bd_addr)
@@ -127,7 +128,7 @@ int _bt_hal_device_create_bond(const bt_bdaddr_t *bd_addr)
 			G_DBUS_CALL_FLAGS_NONE,
 			BT_HAL_MAX_DBUS_TIMEOUT,
 			NULL,
-			(GAsyncReadyCallback)__bt_bond_device_cb,
+			(GAsyncReadyCallback)__bt_hal_bond_device_cb,
 			NULL);
 
 	/* Prepare to send Bonding event event to HAL bluetooth */
@@ -219,14 +220,14 @@ int _bt_hal_device_remove_bond(const bt_bdaddr_t *bd_addr)
 			G_DBUS_CALL_FLAGS_NONE,
 			BT_HAL_MAX_DBUS_TIMEOUT,
 			NULL,
-			(GAsyncReadyCallback)__bt_unbond_device_cb,
+			(GAsyncReadyCallback)__bt_hal_unbond_device_cb,
 			(gpointer)device_path);
 
 	DBG("-");
 	return BT_STATUS_SUCCESS;
 }
 
-static void __bt_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
+static void __bt_hal_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
                                         gpointer user_data)
 {
 	GError *err = NULL;
@@ -252,21 +253,37 @@ static void __bt_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
 		g_dbus_error_strip_remote_error(err);
 		ERR("@@@Error occured in CreateBonding [%s]", err->message);
 		if (g_strrstr(err->message, "Already Exists")) {
-			DBG("Existing Bond, remove and retry");
+			ERR("Still bond existing even after remove");
+			result = BT_STATUS_AUTH_FAILURE;
 		} else if (g_strrstr(err->message, "Authentication Rejected")) {
-			DBG("REJECTED");
+			INFO("REJECTED");
+			result = BT_STATUS_AUTH_REJECTED;
+		} else if (_bt_hal_agent_is_canceled() ||
+				g_strrstr(err->message, "Authentication Canceled")) {
+			INFO("Cancelled by USER");
+			result = BT_STATUS_AUTH_FAILURE;
 		} else if (g_strrstr(err->message, "In Progress")) {
-			DBG("Bond in progress, cancel and retry");
+			INFO("Bond in progress, cancel and retry");
 		} else if (g_strrstr(err->message, "Authentication Failed")) {
-			DBG("Authentication Failed");
+			INFO("Authentication Failed");
 			result = BT_STATUS_AUTH_FAILURE;
 		} else if (g_strrstr(err->message, "Page Timeout")) {
-			DBG("Page Timeout");
+			INFO("Page Timeout");
+			/* This is the special case
+			   As soon as call bluetooth_bond_device, try to cancel bonding.
+			   In this case, before completing to call 'CreatePairedDevice' method
+			   the procedure is stopped. So 'Cancle' error is not return.
+			 */
 			result = BT_STATUS_RMT_DEV_DOWN;
 		} else if (g_strrstr(err->message, BT_HAL_TIMEOUT_MESSAGE)) {
-			DBG("Timeout");
+			INFO("Timeout");
+			result = BT_STATUS_FAIL;
 		} else if (g_strrstr(err->message, "Connection Timeout")) {
+			/* Pairing request timeout */
+			result = BT_STATUS_RMT_DEV_DOWN;
 		} else if (g_strrstr(err->message, "Authentication Timeout")) {
+			/* Pairing request timeout */
+			result = BT_STATUS_AUTH_FAILURE;
 		} else {
 			DBG("Default case: Pairing failed");
 			result = BT_STATUS_AUTH_FAILURE;
@@ -274,7 +291,9 @@ static void __bt_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
 	}
 
 	if (result == BT_STATUS_AUTH_FAILURE ||
-			result == BT_STATUS_RMT_DEV_DOWN) {
+			result == BT_STATUS_RMT_DEV_DOWN ||
+			result == BT_STATUS_AUTH_REJECTED ||
+			result == BT_STATUS_FAIL) {
 		DBG("Bonding Failed!!");
 	} else {
 		DBG("Bonding Success!!");
@@ -298,7 +317,7 @@ static void __bt_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
 	DBG("-");
 }
 
-static void __bt_unbond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
+static void __bt_hal_unbond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
                                         gpointer user_data)
 {
 	GError *err = NULL;
