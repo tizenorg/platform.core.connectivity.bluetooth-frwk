@@ -505,8 +505,6 @@ void __bt_hal_handle_property_changed_event(GVariant *msg, const char *object_pa
 	char *interface_name = NULL;
 	GVariant *val = NULL;
 
-	DBG("+");
-
 	g_variant_get(msg, "(&s@a{sv}@as)", &interface_name, &val,NULL);
 
 	if (strcasecmp(interface_name, BT_HAL_ADAPTER_INTERFACE) == 0) {
@@ -534,8 +532,6 @@ void __bt_hal_handle_property_changed_event(GVariant *msg, const char *object_pa
 		DBG("Event: Property Changed: Interface: BT_HAL_INPUT_INTERFACE");
 	}
 	g_variant_unref(val);
-
-	DBG("-");
 }
 
 static void __bt_hal_handle_device_event(GVariant *value, GVariant *parameters)
@@ -601,8 +597,6 @@ static  void __bt_hal_manager_event_filter(GDBusConnection *connection,
 	GVariant *value;
 	char *obj_path = NULL;
 
-	DBG("+");
-
 	if (signal_name == NULL)
 		return;
 
@@ -636,8 +630,6 @@ static  void __bt_hal_manager_event_filter(GDBusConnection *connection,
 		char *current = NULL;
 
 		/* TODO: Handle Name Owener changed Signal */
-		DBG("Manager Event: Signal Name: NameOwnerChanged");
-
 		if (__bt_hal_get_owner_info(parameters, &name, &previous, &current)) {
 			DBG("Fail to get the owner info");
 			return;
@@ -659,7 +651,6 @@ static  void __bt_hal_manager_event_filter(GDBusConnection *connection,
 		g_free(current);
 
 	} else if (g_strcmp0(interface_name, BT_HAL_PROPERTIES_INTERFACE) == 0) {
-		DBG("Manager Event: Interface Name: BT_HAL_PROPERTIES_INTERFACE");
 		__bt_hal_handle_property_changed_event(parameters, object_path);
 	} else if (g_strcmp0(interface_name, BT_HAL_ADAPTER_INTERFACE) == 0) {
 		/* TODO: Handle Adapter events from stack */
@@ -681,7 +672,6 @@ static  void __bt_hal_manager_event_filter(GDBusConnection *connection,
 		DBG("Manager Event: Interface Name:BT_HAL_DEVICE_INTERFACE");
 	}
 
-	DBG("-");
 	return;
 }
 
