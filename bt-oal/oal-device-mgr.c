@@ -99,7 +99,7 @@ oal_status_t device_create_bond(bt_address_t *addr, connection_type_e transport)
 
 	API_TRACE("[%s]", bdt_bd2str(addr, &bdstr));
 
-	res = blued_api->create_bond((bt_bdaddr_t *)addr, (unsigned char)transport);
+	res = blued_api->create_bond((bt_bdaddr_t *)addr, transport);
 	if (res != BT_STATUS_SUCCESS) {
 		BT_ERR("create_bond error: [%s]", status2string(res));
 		return convert_to_oal_status(res);
@@ -138,11 +138,16 @@ void cb_device_properties(bt_status_t status, bt_bdaddr_t *bd_addr,
 	gsize size = 0;
 	bdstr_t bdstr;
 
+	/*Below code is commented out for handling Get Bonded devices for BLuez case.
+	GetALl properties on a particular device interface can reyurn properties of
+	an unpaired or untrusted device. If We block the below event, Application
+	request (BT_GET_BONDED_DEVICES) will timeout on DBUS */
+#if 0
 	if(BT_STATUS_SUCCESS != status) {
 		BT_ERR("[%s]status: %d", bdt_bd2str((bt_address_t*)bd_addr, &bdstr), status);
 		return;
 	}
-
+#endif
 	BT_DBG("[%s]", bdt_bd2str((bt_address_t*)bd_addr, &bdstr));
 	dev_info = g_new0(remote_device_t, 1);
 	memcpy(dev_info->address.addr, bd_addr->address, 6);

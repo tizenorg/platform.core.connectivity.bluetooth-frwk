@@ -533,6 +533,42 @@ int __bt_bluez_request(int function_name,
 		result = _bt_set_alias(&address, local_name);
 		break;
 	}
+	case BT_BOND_DEVICE:{
+		    bluetooth_device_address_t address = { {0} };
+
+		    __bt_service_get_parameters(in_param1,
+					    &address, sizeof(bluetooth_device_address_t));
+		    result = _bt_bond_device(&address, BLUETOOTH_DEV_CONN_DEFAULT, out_param1);
+
+		    /* Save invocation */
+		    if (result == BLUETOOTH_ERROR_NONE) {
+			    char * addr = g_malloc0(BT_ADDRESS_STRING_SIZE);
+			    _bt_convert_addr_type_to_string(addr, address.addr);
+			    BT_DBG("_bt_bond_device scheduled successfully! save invocation context");
+			    sender = (char*)g_dbus_method_invocation_get_sender(context);
+			    _bt_save_invocation_context(context, result, sender,
+					    function_name, (gpointer)addr);
+		    }
+		    break;
+	}
+	case BT_UNBOND_DEVICE: {
+		       bluetooth_device_address_t address = { {0} };
+
+		       __bt_service_get_parameters(in_param1,
+				       &address, sizeof(bluetooth_device_address_t));
+		       result = _bt_unbond_device(&address, out_param1);
+
+		       /* Save invocation */
+		       if (result == BLUETOOTH_ERROR_NONE) {
+			       char * addr = g_malloc0(BT_ADDRESS_STRING_SIZE);
+			       _bt_convert_addr_type_to_string(addr, address.addr);
+			       BT_DBG("_bt_unbond_device scheduled successfully! save invocation context");
+			       sender = (char*)g_dbus_method_invocation_get_sender(context);
+			       _bt_save_invocation_context(context, result, sender,
+					       function_name, (gpointer)addr);
+		       }
+		       break;
+	}
 	default:
 		BT_INFO("UnSupported function [%d]", function_name);
 		result = BLUETOOTH_ERROR_NOT_SUPPORT;

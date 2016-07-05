@@ -46,10 +46,56 @@
 #include <oal-adapter-mgr.h>
 #include <oal-device-mgr.h>
 
+#define MAX_BOND_RETRY_COUNT 3
+
+/* Bonding Info structure */
+typedef struct {
+        int result;
+        char *addr;
+        gboolean is_autopair;
+        unsigned short conn_type;
+        gboolean is_cancelled_by_user;
+        gboolean is_device_creating;
+        bluetooth_device_address_t *dev_addr;
+        bt_remote_dev_info_t *dev_info;
+} bt_bond_data_t;
+
+
+/* Bonding and Pairing Informations */
+bt_bond_data_t *trigger_bond_info;
+bt_bond_data_t *trigger_unbond_info;
+
+typedef enum {
+  BT_DEVICE_BOND_STATE_NONE,
+  BT_DEVICE_BOND_STATE_CANCEL_DISCOVERY,
+  BT_DEVICE_BOND_STATE_DISCOVERY_CANCELLED,
+  BT_DEVICE_BOND_STATE_REMOVE_BONDING,
+  BT_DEVICE_BOND_STATE_REMOVED_BONDING,
+  BT_DEVICE_BOND_STATE_STARTED,
+  BT_DEVICE_BOND_STATE_WAIT_PROP,
+  BT_DEVICE_BOND_STATE_WAIT_DID
+} bt_bond_state_e;
+
+typedef enum {
+   BT_DEVICE_BOND_INFO,
+   BT_DEVICE_UNBOND_INFO
+} bt_bond_info_e;
+
+/* BT device bond state variable */
+static bt_bond_state_e bt_device_bond_state;
+static int bond_retry_count;
+
 /* Forward declaration */
 static void __bt_device_event_handler(int event_type, gpointer event_data);
 static void __bt_device_remote_device_found_callback(gpointer event_data, gboolean is_ble);
 
+
+static int __bt_device_handle_bond_state(void);
+static void __bt_free_bond_info(uint8_t type);
+static void __bt_device_handle_bond_completion_event(bt_address_t *bd_addr);
+static void __bt_device_handle_bond_removal_event(bt_address_t *bd_addr);
+static void __bt_device_handle_bond_failed_event(event_dev_bond_failed_t* bond_fail_event);
+static void __bt_handle_ongoing_bond(bt_remote_dev_info_t *remote_dev_info);
 
 void _bt_device_state_handle_callback_set_request(void)
 {
@@ -73,6 +119,27 @@ void __bt_device_handle_pending_requests(int result, int service_function,
 			continue;
 
 		switch (service_function) {
+		case BT_BOND_DEVICE:
+		case BT_UNBOND_DEVICE: {
+			char *address = (char *)user_data;
+			if (strncmp((char*)req_info->user_data, address, BT_ADDRESS_STRING_SIZE)) {
+				BT_ERR("Unexpected: Info request pending for a different address!!");
+				return;
+			} else {
+				BT_INFO("Found info request addr [%s]", (char*)req_info->user_data);
+				bluetooth_device_info_t dev_info;
+				memset(&dev_info, 0x00, sizeof(bluetooth_device_info_t));
+				_bt_convert_addr_string_to_type(dev_info.device_address.addr,
+						address);
+					out_param = g_array_new(FALSE, FALSE, sizeof(gchar));
+				g_array_append_vals(out_param, &dev_info,
+						sizeof(bluetooth_device_info_t));
+					_bt_service_method_return(req_info->context, out_param, result);
+				_bt_free_info_from_invocation_list(req_info);
+				g_array_free(out_param, TRUE);
+			}
+			break;
+		}
 		case BT_GET_BONDED_DEVICE: {
 			char rem_addr[BT_ADDRESS_STRING_SIZE];
 			char *address = req_info->user_data;
@@ -199,6 +266,15 @@ static void __bt_device_remote_properties_callback(event_dev_properties_t *oal_d
 		rem_info->manufacturer_data_len = 0;
 	}
 
+	/* a. Check if bonding is on-going, if yes, we MUST update the bonding device properties */
+	if (trigger_bond_info  && !strcmp(trigger_bond_info->addr, rem_info->address)) {
+		BT_INFO("Bonding is ongoing, try update properties");
+		if (!trigger_bond_info->dev_info) {
+			BT_INFO("Bonding device properties is NULL, Assigning rem_info");
+			trigger_bond_info->dev_info = rem_info;
+		}
+	}
+
 	_bt_copy_remote_device(rem_info, &dev_info);
 	_bt_service_print_dev_info(&dev_info);
 
@@ -208,7 +284,201 @@ static void __bt_device_remote_properties_callback(event_dev_properties_t *oal_d
 	__bt_device_handle_pending_requests(result, BT_GET_BONDED_DEVICE,
 			(void *)&dev_info, sizeof(bluetooth_device_info_t));
 
+	if (trigger_bond_info  && !strcmp(trigger_bond_info->addr, rem_info->address)) {
+		BT_DBG("Bonding dev addr has matched with remote dev properties address [%s]", rem_info->address);
+		__bt_handle_ongoing_bond(trigger_bond_info->dev_info);
+	}
+
 	BT_DBG("-");
+}
+
+static void __bt_handle_ongoing_bond(bt_remote_dev_info_t *remote_dev_info)
+{
+	GVariant *param = NULL;
+	BT_DBG("+");
+
+	if (remote_dev_info->name
+			&& remote_dev_info->address
+			&& remote_dev_info->uuids) {
+		BT_INFO("All properties updated,  time to send bonding finished event");
+		GVariant *uuids = NULL;
+		GVariantBuilder *builder = NULL;
+		GVariant *manufacturer_data;
+		int i = 0;
+		builder = g_variant_builder_new(G_VARIANT_TYPE("as"));
+		for (i=0; i < remote_dev_info->uuid_count; i++) {
+			g_variant_builder_add(builder, "s",
+					remote_dev_info->uuids[i]);
+		}
+		uuids = g_variant_new("as", builder);
+		g_variant_builder_unref(builder);
+		manufacturer_data = g_variant_new_from_data((const GVariantType *)"ay",
+				remote_dev_info->manufacturer_data, remote_dev_info->manufacturer_data_len,
+				TRUE, NULL, NULL);
+
+		param = g_variant_new("(isunsbub@asn@ay)",
+				BLUETOOTH_ERROR_NONE,
+				remote_dev_info->address,
+				remote_dev_info->class,
+				remote_dev_info->rssi,
+				remote_dev_info->name,
+				remote_dev_info->paired,
+				remote_dev_info->connected,
+				remote_dev_info->trust,
+				uuids,
+				remote_dev_info->manufacturer_data_len,
+				manufacturer_data);
+		/* Send the event to application */
+		_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_BONDING_FINISHED,
+				param);
+		__bt_free_bond_info(BT_DEVICE_BOND_INFO);
+		/* TODO Free pairing Info*/
+	} else {
+		BT_INFO("Lets wait for more remote device properties");
+	}
+}
+
+static void __bt_device_handle_bond_completion_event(bt_address_t *bd_addr)
+{
+	gchar address[BT_ADDRESS_STR_LEN];
+	bluetooth_device_address_t dev_addr;
+	BT_INFO("+");
+	/* Tizen does not propagate incoming bond complete event to app */
+	if (trigger_bond_info == NULL) {
+		/* Send reply */
+		BT_DBG("trigger_bond_info == NULL");
+		return;
+	}
+
+	_bt_convert_addr_type_to_string(address, bd_addr->addr);
+	if (g_strcmp0(trigger_bond_info->addr, address)) {
+		BT_DBG("Bonding address= [%s] is different from requested address =[%s]",
+				address, trigger_bond_info->addr);
+		return;
+	}
+
+	BT_INFO("Bonding successfully completed");
+	/* TODO: Bonding state will be cleaned up & BONDING FINISHED EVENT
+	   will be sent only when Properties are fetched from stack
+	   Till that time lets not free trigger_bond_info */
+	__bt_device_handle_pending_requests(BLUETOOTH_ERROR_NONE, BT_BOND_DEVICE,
+			trigger_bond_info->addr, BT_ADDRESS_STRING_SIZE);
+
+	_bt_convert_addr_string_to_type(dev_addr.addr,
+                        trigger_bond_info->addr);
+	_bt_device_get_bonded_device_info(&dev_addr);
+	BT_INFO("-");
+}
+
+/**********************************************************************************************
+*  Bond removal event can be triggered for following reasons -
+*  a. If Bonding procedure if failed (for Auth failed, Page timeout, cancelled by user etc)
+*  b. If Application requests for explicitly removing the bond
+*  c. When application attempt to create bond,bond is removed first which triggers this event
+*     c. is in-line with Bluedroid bond create\emoval architecture
+*********************************************************************************************/
+static void __bt_device_handle_bond_removal_event(bt_address_t *bd_addr)
+{
+	BT_INFO("+");
+	if (trigger_unbond_info) {
+		BT_INFO("Bond removal request successfully handled, return DBUS and send event");
+		GVariant *param = NULL;
+		__bt_device_handle_pending_requests(BLUETOOTH_ERROR_NONE, BT_UNBOND_DEVICE,
+				trigger_unbond_info->addr, BT_ADDRESS_STRING_SIZE);
+		param = g_variant_new("(is)", BLUETOOTH_ERROR_NONE, trigger_unbond_info->addr);
+		_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_BONDED_DEVICE_REMOVED,
+				param);
+		__bt_free_bond_info(BT_DEVICE_UNBOND_INFO);
+		/* TODO Free pairing info*/
+	} else if (trigger_bond_info) {
+		__bt_device_handle_bond_state();
+	}
+	BT_INFO("-");
+}
+
+static void __bt_device_handle_bond_failed_event(event_dev_bond_failed_t* bond_fail_event)
+{
+	BT_INFO("+");
+	oal_status_t status = bond_fail_event->status;
+	BT_INFO("Bonding failed, reason: %d", status);
+
+	switch(status) {
+	case OAL_STATUS_RMT_DEVICE_DOWN:
+	{
+		if (trigger_bond_info) {
+			BT_INFO("OAL_STATUS_RMT_DEVICE_DOWN:Lets retry bonding!! retry count [%d]",
+					bond_retry_count);
+			int ret = OAL_STATUS_SUCCESS;
+			if (bond_retry_count < MAX_BOND_RETRY_COUNT) {
+				ret = device_create_bond((bt_address_t *)trigger_bond_info->dev_addr, BLUETOOTH_DEV_CONN_DEFAULT);
+				bond_retry_count++;
+			} else {
+				BT_ERR("Create Bond failed MAX_BOND_RETRY_COUNT TIMES!!");
+			}
+			if (ret != OAL_STATUS_SUCCESS || bond_retry_count >= MAX_BOND_RETRY_COUNT) {
+				BT_ERR("Create Bond procedure could not suceed");
+				__bt_device_handle_pending_requests(BLUETOOTH_ERROR_INTERNAL, BT_BOND_DEVICE,
+						trigger_bond_info->addr, BT_ADDRESS_STRING_SIZE);
+				__bt_free_bond_info(BT_DEVICE_BOND_INFO);
+			/* TODO Free pairing info */
+				bond_retry_count = 0;
+			}
+		}
+		break;
+	}
+	case OAL_STATUS_AUTH_FAILED:
+	{
+		/*TODO Auto pairing status set & ignore auto pairing logics can be done at this point.
+		  To be considered later*/
+		int result = BLUETOOTH_ERROR_INTERNAL;
+		BT_INFO("BT_OPERATION_STATUS_AUTH_FAILED");
+		if (trigger_bond_info) {
+			BT_ERR("Create Bond procedure could not suceed, check if cancelled by User");
+			if (trigger_bond_info->is_cancelled_by_user) {
+				BT_ERR("Bonding is cancelled by user");
+				result = BLUETOOTH_ERROR_CANCEL_BY_USER;
+			}
+			__bt_device_handle_pending_requests(result, BT_BOND_DEVICE,
+					trigger_bond_info->addr, BT_ADDRESS_STRING_SIZE);
+			__bt_free_bond_info(BT_DEVICE_BOND_INFO);
+			/* TODO Free pairing info */
+		}
+		break;
+	}
+	case OAL_STATUS_INTERNAL_ERROR:
+	{
+		BT_INFO("OAL_STATUS_INTERNAL_ERROR");
+		if (trigger_unbond_info) {
+			BT_INFO("Bond removal request failed, return DBUS and send event");
+			GVariant *param = NULL;
+			__bt_device_handle_pending_requests(BLUETOOTH_ERROR_INTERNAL, BT_UNBOND_DEVICE,
+					trigger_unbond_info->addr, BT_ADDRESS_STRING_SIZE);
+			param = g_variant_new("(is)", BLUETOOTH_ERROR_INTERNAL, trigger_unbond_info->addr);
+			_bt_send_event(BT_ADAPTER_EVENT,
+					BLUETOOTH_EVENT_BONDED_DEVICE_REMOVED,
+					param);
+			__bt_free_bond_info(BT_DEVICE_UNBOND_INFO);
+			/* TODO Free pairing info */
+		} else if (trigger_bond_info) {
+			if (__bt_device_handle_bond_state()!= BLUETOOTH_ERROR_NONE) {
+				__bt_device_handle_pending_requests(BLUETOOTH_ERROR_INTERNAL, BT_BOND_DEVICE,
+						trigger_bond_info->addr, BT_ADDRESS_STRING_SIZE);
+				__bt_free_bond_info(BT_DEVICE_BOND_INFO);
+				/* TODO Free pairing info */
+			}
+		}
+		break;
+	}
+	default:
+	{
+		BT_ERR("Unknown status of Bond failed event status [%d]", status);
+		break;
+	}
+
+	}
+	BT_INFO("-");
 }
 
 static void __bt_device_event_handler(int event_type, gpointer event_data)
@@ -231,6 +501,21 @@ static void __bt_device_event_handler(int event_type, gpointer event_data)
 		BT_INFO("Remote Device properties Received");
 		__bt_device_remote_properties_callback((event_dev_properties_t *)event_data);
 		break;
+	}
+	case OAL_EVENT_DEVICE_BONDING_SUCCESS: {
+	       BT_INFO("Bonding Success event Received");
+	       __bt_device_handle_bond_completion_event((bt_address_t *)event_data);
+	       break;
+       }
+	case OAL_EVENT_DEVICE_BONDING_REMOVED: {
+	       BT_INFO("Bonding Removed event Received");
+	       __bt_device_handle_bond_removal_event((bt_address_t *)event_data);
+	       break;
+	}
+	case OAL_EVENT_DEVICE_BONDING_FAILED: {
+	      BT_INFO("Bonding Failed event Received");
+	      __bt_device_handle_bond_failed_event((event_dev_bond_failed_t*) event_data);
+	      break;
 	}
 	default:
 		BT_INFO("Unhandled event..");
@@ -309,6 +594,96 @@ static void __bt_device_remote_device_found_callback(gpointer event_data, gboole
 	BT_DBG("-");
 }
 
+static void __bt_free_bond_info(uint8_t type)
+{
+	BT_INFO("+");
+	if (type == BT_DEVICE_BOND_INFO) {
+		if (trigger_bond_info) {
+			if (trigger_bond_info->addr)
+				g_free(trigger_bond_info->addr);
+			if (trigger_bond_info->dev_addr)
+				g_free(trigger_bond_info->dev_addr);
+			if (trigger_bond_info->dev_info) {
+				if (trigger_bond_info->dev_info->address)
+					g_free(trigger_bond_info->dev_info->address);
+				if (trigger_bond_info->dev_info->name)
+					g_free(trigger_bond_info->dev_info->name);
+				if (trigger_bond_info->dev_info->manufacturer_data)
+					g_free(trigger_bond_info->dev_info->manufacturer_data);
+				g_free(trigger_bond_info->dev_info);
+			}
+			g_free(trigger_bond_info);
+			trigger_bond_info = NULL;
+		}
+	} else {
+		if (trigger_unbond_info) {
+			if (trigger_unbond_info->addr)
+				g_free(trigger_unbond_info->addr);
+			if (trigger_unbond_info->dev_addr)
+				g_free(trigger_unbond_info->dev_addr);
+			if (trigger_unbond_info->dev_info) {
+				if (trigger_unbond_info->dev_info->address)
+					g_free(trigger_unbond_info->dev_info->address);
+				if (trigger_unbond_info->dev_info->name)
+					g_free(trigger_unbond_info->dev_info->name);
+				if (trigger_unbond_info->dev_info->manufacturer_data)
+					g_free(trigger_unbond_info->dev_info->manufacturer_data);
+				g_free(trigger_unbond_info->dev_info);
+			}
+			g_free(trigger_unbond_info);
+			trigger_unbond_info = NULL;
+		}
+	}
+}
+
+static int __bt_device_handle_bond_state(void)
+{
+	BT_INFO("Current Bond state: %d", bt_device_bond_state);
+	int ret = OAL_STATUS_INTERNAL_ERROR;
+
+	switch (bt_device_bond_state) {
+	case BT_DEVICE_BOND_STATE_CANCEL_DISCOVERY:
+		/*TODO:Bonding during discovery: Unhandled!!*/
+		BT_INFO("Bonding during discovery: Unhandled!!");
+		break;
+	case BT_DEVICE_BOND_STATE_DISCOVERY_CANCELLED:
+		/*TODO:Bonding during discovery: Unhandled!!*/
+		BT_INFO("Bonding during discovery: Unhandled!!");
+		break;
+	case BT_DEVICE_BOND_STATE_REMOVE_BONDING:
+		bt_device_bond_state = BT_DEVICE_BOND_STATE_REMOVED_BONDING;
+		ret = device_destroy_bond((bt_address_t *)trigger_bond_info->dev_addr);
+		if (ret != OAL_STATUS_SUCCESS) {
+			ret = __bt_device_handle_bond_state();
+		}
+		break;
+	case BT_DEVICE_BOND_STATE_REMOVED_BONDING:
+		bt_device_bond_state = BT_DEVICE_BOND_STATE_NONE;
+		ret = device_create_bond((bt_address_t *)trigger_bond_info->dev_addr, BLUETOOTH_DEV_CONN_DEFAULT);
+		/* Bonding procedure was started but unfortunately could not complete.
+		   Basically removed bonding was success, but create bond request could not proceed
+		   So lets cleanup the context */
+		if (ret != OAL_STATUS_SUCCESS) {
+			BT_ERR("Create Bond procedure could not suceed");
+			__bt_device_handle_pending_requests(BLUETOOTH_ERROR_INTERNAL, BT_BOND_DEVICE,
+					trigger_bond_info->addr, BT_ADDRESS_STRING_SIZE);
+			__bt_free_bond_info(BT_DEVICE_BOND_INFO);
+			/* TODO: Free pairing Info */
+		}
+		break;
+	case BT_DEVICE_BOND_STATE_NONE:
+		BT_INFO("Create Bond failed!!");
+		break;
+	default:
+		break;
+	}
+
+	if (ret != OAL_STATUS_SUCCESS)
+		return BLUETOOTH_ERROR_INTERNAL;
+	else
+		return BLUETOOTH_ERROR_NONE;
+}
+
 int _bt_device_get_bonded_device_info(bluetooth_device_address_t *addr)
 {
 	int result;
@@ -344,4 +719,105 @@ int _bt_set_alias(bluetooth_device_address_t *device_address, const char *alias)
 
 	BT_DBG("-");
 	return BLUETOOTH_ERROR_NONE;
+}
+
+int _bt_bond_device(bluetooth_device_address_t *device_address,
+                unsigned short conn_type, GArray **out_param1)
+{
+	int result = BLUETOOTH_ERROR_NONE;
+	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
+	bluetooth_device_info_t dev_info;
+	BT_DBG("+");
+
+	retv_if(device_address == NULL, BLUETOOTH_ERROR_INVALID_PARAM);
+
+	/* If bonding or discovery already going on */
+	if (trigger_bond_info || _bt_is_discovering()) {
+		BT_ERR("Device is buzy, bonding can not proceed now..");
+		result = BLUETOOTH_ERROR_DEVICE_BUSY;
+		goto fail;
+	}
+
+	/*TODO: If unbonding with same device going on */
+	_bt_convert_addr_type_to_string(address, device_address->addr);
+
+	trigger_bond_info = g_malloc0(sizeof(bt_bond_data_t));
+	trigger_bond_info->addr = g_strdup(address);
+	trigger_bond_info->conn_type = conn_type;
+	trigger_bond_info->is_device_creating = TRUE;
+	trigger_bond_info->dev_addr = g_memdup(device_address, sizeof(bluetooth_device_address_t));
+	trigger_bond_info->dev_info = NULL;
+
+	/* Ready to initiate bonding */
+
+	/* In Tizen, we will first remove bond and then attempt to create bond to keep
+	   consistency with bluedroid. Even if remove bond fails due to device not already
+	   bonded, then straight away create bond is triggered. This is because, remove bond
+	   is handled differently in bluedroid and bluez. In Bluez, if device is
+	   already removed, remove bond call fails.
+	   However in bluedroid, remove bond on already removed device returns success. So we will
+	   handle the cases transparently*/
+	bt_device_bond_state = BT_DEVICE_BOND_STATE_REMOVE_BONDING;
+	bond_retry_count = 0;
+	result = __bt_device_handle_bond_state();
+
+	if (result != BLUETOOTH_ERROR_NONE)
+		goto fail;
+
+	BT_DBG("-");
+	return result;
+
+fail:
+	memset(&dev_info, 0x00, sizeof(bluetooth_device_info_t));
+	memcpy(dev_info.device_address.addr, device_address->addr,
+			BLUETOOTH_ADDRESS_LENGTH);
+
+	g_array_append_vals(*out_param1, &dev_info,
+			sizeof(bluetooth_device_info_t));
+	__bt_free_bond_info(BT_DEVICE_BOND_INFO);
+
+	BT_DBG("-");
+	return result;
+}
+
+int _bt_unbond_device(bluetooth_device_address_t *device_address,
+                GArray **out_param1)
+{
+	int result = OAL_STATUS_SUCCESS;
+	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
+	bluetooth_device_info_t dev_info;
+	BT_INFO("+");
+
+	retv_if(device_address == NULL, BLUETOOTH_ERROR_INVALID_PARAM);
+
+	_bt_convert_addr_type_to_string(address, device_address->addr);
+
+	trigger_unbond_info = g_malloc0(sizeof(bt_bond_data_t));
+	trigger_unbond_info->addr = g_malloc0(BT_ADDRESS_STRING_SIZE);
+	trigger_unbond_info->addr = g_strdup(address);
+	trigger_unbond_info->dev_addr = g_memdup(device_address, sizeof(bluetooth_device_address_t));
+
+	/* Check if Bonding is already going on, we should not abruptly remove bonding*/
+	if (trigger_bond_info && strncmp(trigger_bond_info->addr, trigger_unbond_info->addr, BT_ADDRESS_STRING_SIZE) == 0) {
+		BT_ERR("Bonding with same device already ongoing");
+		result = BLUETOOTH_ERROR_PERMISSION_DEINED;
+		goto fail;
+	}
+
+	result = device_destroy_bond((bt_address_t *)device_address);
+	if (result != OAL_STATUS_SUCCESS)
+		goto fail;
+
+	return result;
+
+fail:
+	memset(&dev_info, 0x00, sizeof(bluetooth_device_info_t));
+	_bt_convert_addr_string_to_type(dev_info.device_address.addr,
+			trigger_unbond_info->addr);
+
+	g_array_append_vals(*out_param1, &dev_info,
+			sizeof(bluetooth_device_info_t));
+	__bt_free_bond_info(BT_DEVICE_UNBOND_INFO);
+
+	return result;
 }

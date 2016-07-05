@@ -32,8 +32,14 @@ int _bt_device_get_bonded_device_info(bluetooth_device_address_t *addr);
 
 int _bt_set_alias(bluetooth_device_address_t *device_address, const char *alias);
 
+int _bt_bond_device(bluetooth_device_address_t *device_address,
+                unsigned short conn_type, GArray **out_param1);
+
+int _bt_unbond_device(bluetooth_device_address_t *device_address,
+                        GArray **out_param1);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
-#endif /*_BT_SERVICE_CORE_ADAPTER_H_*/
+#endif /*_BT_SERVICE_CORE_DEVICE_H_*/
 

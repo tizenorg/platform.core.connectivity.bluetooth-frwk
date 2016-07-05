@@ -94,6 +94,11 @@ void _bt_service_oal_event_receiver(int event_type, gpointer event_data, gsize l
 		if (device_cb)
                         device_cb(event_type, event_data);
 		break;
+        case OAL_EVENT_DEVICE_BONDING_SUCCESS:
+        case OAL_EVENT_DEVICE_BONDING_REMOVED:
+        case OAL_EVENT_DEVICE_BONDING_FAILED:
+                if (device_cb)
+                        device_cb(event_type, event_data);
 	default:
 		BT_ERR("Unhandled Event: %d", event_type);
 		break;

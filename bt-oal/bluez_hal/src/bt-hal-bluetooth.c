@@ -53,6 +53,7 @@ static void __bt_hal_handle_adapter_property_changed(void *buf, uint16_t len);
 static void __bt_hal_handle_stack_messages(int message, void *buf, uint16_t len);
 static void __bt_hal_handle_adapter_discovery_state_changed(void *buf, uint16_t len);
 static void __bt_hal_handle_device_found_event(void *buf, uint16_t len);
+static void __bt_hal_handle_bond_state_changed_event(void *buf, uint16_t len);
 
 static bool interface_ready(void)
 {
@@ -529,6 +530,34 @@ static void __bt_hal_handle_remote_device_properties_event(void *buf, uint16_t l
 	DBG("-");
 }
 
+static void __bt_hal_handle_bond_state_changed_event(void *buf, uint16_t len)
+{
+
+	struct hal_ev_bond_state_changed *ev = (struct hal_ev_bond_state_changed *)buf;
+	bt_bdaddr_t bd_addr;
+	DBG("+");
+
+	memcpy(bd_addr.address, ev->bdaddr, 6);
+	/* BD address*/
+	DBG("[0x%x]", bd_addr.address[0]);
+	DBG("[0x%x]", bd_addr.address[1]);
+	DBG("[0x%x]", bd_addr.address[2]);
+	DBG("[0x%x]", bd_addr.address[3]);
+	DBG("[0x%x]", bd_addr.address[4]);
+	DBG("[0x%x]", bd_addr.address[5]);
+
+	DBG("Bonding  State changed Status [0x%x]", ev->status);
+	DBG("Bonding  State [0x%x]", ev->state);
+
+	if (!bt_hal_cbacks->bond_state_changed_cb) {
+		ERR("HAL User bond_state_changed_callback is not set!!");
+		return;
+	}
+
+	bt_hal_cbacks->bond_state_changed_cb(ev->status, &bd_addr, ev->state);
+	DBG("-");
+}
+
 static void __bt_hal_handle_stack_messages(int message, void *buf, uint16_t len)
 {
 	DBG("+");
@@ -553,6 +582,10 @@ static void __bt_hal_handle_stack_messages(int message, void *buf, uint16_t len)
 			DBG("Event: HAL_EV_REMOTE_DEVICE_PROPS");
 			__bt_hal_handle_remote_device_properties_event(buf, len);
 			break;
+		case HAL_EV_BOND_STATE_CHANGED:
+                        DBG("Event: HAL_EV_BOND_STATE_CHANGED:");
+                        __bt_hal_handle_bond_state_changed_event(buf, len);
+                        break;
 		default:
 			DBG("Event Currently not handled!!");
 			break;
