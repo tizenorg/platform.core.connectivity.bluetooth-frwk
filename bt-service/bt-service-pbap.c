@@ -630,7 +630,7 @@ void __bt_pbap_get_vcard_list_cb(GDBusProxy *proxy,
 	}
 
 	BT_DBG("Address = %s", address_string);
-	GVariant *temp = g_variant_new_strv((const gchar*)vcard_list, length);
+	GVariant *temp = g_variant_new_strv((const gchar * const *)vcard_list, length);
 	signal = g_variant_new("(isv)", result, address_string, temp);
 
 	_bt_send_event(BT_PBAP_CLIENT_EVENT,
@@ -747,7 +747,7 @@ void __bt_pbap_search_phonebook_cb(GDBusProxy *proxy,
 	BT_DBG("Address = %s", address_string);
 
 	signal = g_variant_new("(is@as)", result, address_string,
-			g_variant_new_strv((const gchar *)vcard_list, length));
+			g_variant_new_strv((const gchar * const *)vcard_list, length));
 
 	_bt_send_event(BT_PBAP_CLIENT_EVENT,
 				BLUETOOTH_PBAP_PHONEBOOK_SEARCH,
