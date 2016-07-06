@@ -106,7 +106,6 @@ oal_status_t device_create_bond(bt_address_t * addr, connection_type_e transport
  */
 oal_status_t device_stop_bond(bt_address_t * addr);
 
-
 /**
  * @brief Remove the already created Bond with remote device
  *
@@ -120,6 +119,92 @@ oal_status_t device_stop_bond(bt_address_t * addr);
  * @see  OAL_EVENT_DEVICE_BONDING_REMOVED
  */
 oal_status_t device_destroy_bond(bt_address_t * addr);
+
+/**
+ * @brief Accept PIN request as part of Bonding procedure
+ *
+ * @details Positive response to OAL_EVENT_DEVICE_PIN_REQUEST
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see  OAL_EVENT_DEVICE_PIN_REQUEST
+ */
+oal_status_t device_accept_pin_request(bt_address_t * addr, char * pin);
+
+/**
+ * @brief Reject PIN request as part of Bonding procedure
+ *
+ * @details Negative response to OAL_EVENT_DEVICE_PIN_REQUEST
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see  OAL_EVENT_DEVICE_PIN_REQUEST
+ */
+oal_status_t device_reject_pin_request(bt_address_t * addr);
+
+/**
+ * @brief Accept passkey entry request as part of Bonding procedure
+ *
+ * @details Positive response to OAL_EVENT_DEVICE_PASSKEY_ENTRY_REQUEST
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see  OAL_EVENT_DEVICE_PASSKEY_ENTRY_REQUEST
+ */
+oal_status_t device_accept_passkey_entry(bt_address_t * addr, uint32_t passkey);
+
+/**
+ * @brief Reject passkey entry request as part of Bonding procedure
+ *
+ * @details Negative response to OAL_EVENT_DEVICE_PASSKEY_ENTRY_REQUEST
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see  OAL_EVENT_DEVICE_PASSKEY_ENTRY_REQUEST
+ */
+oal_status_t device_reject_passkey_entry(bt_address_t * addr);
+
+/**
+ * @brief Reply passkey confirmation request as part of Bonding procedure
+ *
+ * @details Response to OAL_EVENT_DEVICE_PASSKEY_CONFIRMATION_REQUEST
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see  OAL_EVENT_DEVICE_PASSKEY_CONFIRMATION_REQUEST
+ */
+oal_status_t device_reply_passkey_confirmation(bt_address_t * addr, int accept);
+
+/**
+ * @brief Reply SSP consent request as part of Bonding procedure
+ *
+ * @details Response to OAL_EVENT_DEVICE_SSP_CONSENT_REQUEST
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see  OAL_EVENT_DEVICE_SSP_CONSENT_REQUEST
+ */
+oal_status_t device_reply_ssp_consent(bt_address_t * addr, int accept);
+
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
