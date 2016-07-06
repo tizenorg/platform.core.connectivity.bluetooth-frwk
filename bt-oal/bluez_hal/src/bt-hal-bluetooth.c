@@ -185,13 +185,13 @@ static int remove_bond(const bt_bdaddr_t *bd_addr)
 static int pin_reply(const bt_bdaddr_t *bd_addr, uint8_t accept,
 		uint8_t pin_len, bt_pin_code_t *pin_code)
 {
-	return BT_STATUS_UNSUPPORTED;
+	return _bt_hal_device_legacy_pin_reply(bd_addr, accept, pin_len, (char*)pin_code);
 }
 
 static int ssp_reply(const bt_bdaddr_t *bd_addr, bt_ssp_variant_t variant,
 		uint8_t accept, uint32_t passkey)
 {
-	return BT_STATUS_UNSUPPORTED;
+	return _bt_hal_device_ssp_reply(bd_addr, variant, accept, passkey);
 }
 
 static const void *get_profile_interface(const char *profile_id)
