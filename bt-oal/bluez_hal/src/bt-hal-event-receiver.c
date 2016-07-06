@@ -54,6 +54,7 @@ static guint event_id;
 /* Forward declarations */
 int __bt_hal_register_service_event(GDBusConnection *g_conn, int event_type);
 static int __bt_hal_register_manager_subscribe_signal(GDBusConnection *conn, int subscribe);
+static int __bt_hal_register_device_subscribe_signal(GDBusConnection *conn, int subscribe);
 static int __bt_hal_parse_event(GVariant *msg);
 static int __bt_hal_get_owner_info(GVariant *msg, char **name, char **previous, char **current);
 static void __bt_hal_adapter_property_changed_event(GVariant *msg);
@@ -759,6 +760,35 @@ static int __bt_hal_register_manager_subscribe_signal(GDBusConnection *conn,
 	return 0;
 }
 
+static int __bt_hal_register_device_subscribe_signal(GDBusConnection *conn,
+                                int subscribe)
+{
+	static int subs_device_id = -1;
+
+	DBG("+");
+	if (conn == NULL)
+		return -1;
+
+	if (subscribe) {
+		if (subs_device_id == -1) {
+			subs_device_id = g_dbus_connection_signal_subscribe(conn,
+					NULL, BT_HAL_DEVICE_INTERFACE,
+					NULL, NULL, NULL, 0,
+					__bt_hal_manager_event_filter,
+					NULL, NULL);
+		}
+	} else {
+		if (subs_device_id != -1) {
+			g_dbus_connection_signal_unsubscribe(conn,
+					subs_device_id);
+			subs_device_id = -1;
+		}
+	}
+
+	DBG("-");
+	return 0;
+}
+
 int __bt_hal_register_service_event(GDBusConnection *g_conn, int event_type)
 {
 	DBG("+");
@@ -770,6 +800,9 @@ int __bt_hal_register_service_event(GDBusConnection *g_conn, int event_type)
 	switch (event_type) {
 		case BT_HAL_MANAGER_EVENT:
 			__bt_hal_register_manager_subscribe_signal(g_conn, TRUE);
+			break;
+		case BT_HAL_DEVICE_EVENT:
+			__bt_hal_register_device_subscribe_signal(g_conn, TRUE);
 			break;
 		default:
 			INFO_C("Register Event: event_type [%d]", event_type);
@@ -798,7 +831,9 @@ static int __bt_hal_initialize_manager_receiver(void)
 	if (__bt_hal_register_service_event(manager_conn,
 				BT_HAL_MANAGER_EVENT) != BT_HAL_ERROR_NONE)
 		goto fail;
-
+	if (__bt_hal_register_service_event(manager_conn,
+				BT_HAL_DEVICE_EVENT) != BT_HAL_ERROR_NONE)
+		goto fail;
 	return BT_HAL_ERROR_NONE;
 fail:
 	if (manager_conn) {
