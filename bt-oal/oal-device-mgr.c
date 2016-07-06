@@ -288,3 +288,84 @@ void cb_device_acl_state_changed(bt_status_t status, bt_bdaddr_t *bd_addr,
 	size = sizeof(event_dev_conn_status_t);
 	send_event_bda_trace(event, conn_status, size, (bt_address_t*)bd_addr);
 }
+
+void cb_device_pin_request(bt_bdaddr_t *bd_addr, bt_bdname_t *bdname, uint32_t device_class)
+{
+	remote_device_t * dev_info = g_new0(remote_device_t, 1);
+	gsize size = 0;
+	BT_DBG("+");
+
+	memcpy(dev_info->address.addr, bd_addr->address, 6);
+	g_strlcpy(dev_info->name, (const gchar *)bdname->name, BT_DEVICE_NAME_LENGTH_MAX);
+	dev_info->cod = device_class;
+	size = sizeof(remote_device_t);
+
+	send_event_bda_trace(OAL_EVENT_DEVICE_PIN_REQUEST, dev_info, size, (bt_address_t*)bd_addr);
+}
+
+void cb_device_ssp_request(bt_bdaddr_t *bd_addr, bt_bdname_t *bdname, uint32_t device_class,
+		bt_ssp_variant_t pairing_variant, uint32_t pass_key)
+{
+	oal_event_t event;
+	gpointer event_data = NULL;
+	gsize size = 0;
+	BT_DBG("+");
+
+	switch(pairing_variant) {
+	case BT_SSP_VARIANT_PASSKEY_ENTRY:
+	{
+		remote_device_t * dev_info = g_new0(remote_device_t, 1);
+		memcpy(dev_info->address.addr, bd_addr->address, 6);
+			g_strlcpy(dev_info->name, (const gchar *)bdname->name, BT_DEVICE_NAME_LENGTH_MAX);
+		dev_info->cod = device_class;
+		event = OAL_EVENT_DEVICE_PASSKEY_ENTRY_REQUEST;
+		event_data = dev_info;
+		size = sizeof(remote_device_t);
+		break;
+	}
+	case BT_SSP_VARIANT_PASSKEY_NOTIFICATION:
+	{
+		event_dev_passkey_t * passkey_data = g_new0(event_dev_passkey_t, 1);
+
+		memcpy(passkey_data->device_info.address.addr, bd_addr->address, 6);
+			g_strlcpy(passkey_data->device_info.name, (const gchar *)bdname->name, BT_DEVICE_NAME_LENGTH_MAX);
+		passkey_data->device_info.cod = device_class;
+		passkey_data->pass_key = pass_key;
+		event = OAL_EVENT_DEVICE_PASSKEY_DISPLAY;
+		event_data = passkey_data;
+		size = sizeof(event_dev_passkey_t);
+		break;
+	}
+	case BT_SSP_VARIANT_PASSKEY_CONFIRMATION:
+	{
+		event_dev_passkey_t * passkey_data = g_new0(event_dev_passkey_t, 1);
+
+		memcpy(passkey_data->device_info.address.addr, bd_addr->address, 6);
+				g_strlcpy(passkey_data->device_info.name, (const gchar *)bdname->name, BT_DEVICE_NAME_LENGTH_MAX);
+		passkey_data->device_info.cod = device_class;
+		passkey_data->pass_key = pass_key;
+		event = OAL_EVENT_DEVICE_PASSKEY_CONFIRMATION_REQUEST;
+		event_data = passkey_data;
+		size = sizeof(event_dev_passkey_t);
+		break;
+	}
+	case BT_SSP_VARIANT_CONSENT:
+	{
+		remote_device_t * dev_info = g_new0(remote_device_t, 1);
+
+		memcpy(dev_info->address.addr, bd_addr->address, 6);
+			g_strlcpy(dev_info->name, (const gchar *)bdname->name, BT_DEVICE_NAME_LENGTH_MAX);
+		dev_info->cod = device_class;
+		event = OAL_EVENT_DEVICE_SSP_CONSENT_REQUEST;
+		event_data = dev_info;
+		size = sizeof(remote_device_t);
+		break;
+	}
+	default:
+	{
+		BT_ERR("Unhandled SSP request [%d]", pairing_variant);
+		return;
+	}
+	}
+	send_event_bda_trace(event, event_data, size, (bt_address_t*)bd_addr);
+}
