@@ -128,6 +128,133 @@ oal_status_t device_destroy_bond(bt_address_t * addr)
 	return OAL_STATUS_SUCCESS;
 }
 
+oal_status_t device_accept_pin_request(bt_address_t * addr, char * pin)
+{
+	int res;
+	bdstr_t bdstr;
+
+	CHECK_OAL_INITIALIZED();
+
+	OAL_CHECK_PARAMETER(addr, return);
+	OAL_CHECK_PARAMETER(pin, return);
+
+	API_TRACE("[%s] PIN: %s", bdt_bd2str(addr, &bdstr), pin);
+
+	res = blued_api->pin_reply((bt_bdaddr_t *)addr, TRUE, strlen(pin), (bt_pin_code_t *)pin);
+	if (res != BT_STATUS_SUCCESS) {
+		BT_ERR("pin_reply error: [%s]", status2string(res));
+		BT_ERR("PIN: %s", pin);
+		return convert_to_oal_status(res);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
+oal_status_t device_reject_pin_request(bt_address_t * addr)
+{
+	int res;
+	bdstr_t bdstr;
+
+	CHECK_OAL_INITIALIZED();
+
+	OAL_CHECK_PARAMETER(addr, return);
+
+	API_TRACE("[%s]", bdt_bd2str(addr, &bdstr));
+
+	res = blued_api->pin_reply((bt_bdaddr_t *)addr, FALSE, 0, NULL);
+	if (res != BT_STATUS_SUCCESS) {
+		BT_ERR("pin_reply error: [%s]", status2string(res));
+		return convert_to_oal_status(res);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
+oal_status_t device_accept_passkey_entry(bt_address_t * addr, uint32_t passkey)
+{
+	int res;
+	bdstr_t bdstr;
+
+	CHECK_OAL_INITIALIZED();
+
+	OAL_CHECK_PARAMETER(addr, return);
+
+	API_TRACE("[%s] Passkey: %d", bdt_bd2str(addr, &bdstr), passkey);
+
+	res = blued_api->ssp_reply((bt_bdaddr_t *)addr, BT_SSP_VARIANT_PASSKEY_ENTRY, TRUE, passkey);
+	if (res != BT_STATUS_SUCCESS) {
+		BT_ERR("ssp_reply error: [%s]", status2string(res));
+		BT_ERR("Passkey: %d", passkey);
+		return convert_to_oal_status(res);
+
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
+oal_status_t device_reject_passkey_entry(bt_address_t * addr)
+{
+	int res;
+	bdstr_t bdstr;
+
+	CHECK_OAL_INITIALIZED();
+
+	OAL_CHECK_PARAMETER(addr, return);
+
+	API_TRACE("[%s]", bdt_bd2str(addr, &bdstr));
+
+	res = blued_api->ssp_reply((bt_bdaddr_t *)addr, BT_SSP_VARIANT_PASSKEY_ENTRY, FALSE, 0);
+	if (res != BT_STATUS_SUCCESS) {
+		BT_ERR("ssp_reply error: [%s]", status2string(res));
+		return convert_to_oal_status(res);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
+oal_status_t device_reply_passkey_confirmation(bt_address_t * addr, int accept)
+{
+	int res;
+	bdstr_t bdstr;
+
+	CHECK_OAL_INITIALIZED();
+
+	OAL_CHECK_PARAMETER(addr, return);
+
+	API_TRACE("[%s] accept: %d", bdt_bd2str(addr, &bdstr), accept);
+
+	res = blued_api->ssp_reply((bt_bdaddr_t *)addr, BT_SSP_VARIANT_PASSKEY_CONFIRMATION, accept, 0);
+	if (res != BT_STATUS_SUCCESS) {
+		BT_ERR("ssp_reply error: [%s]", status2string(res));
+		BT_ERR("%d", accept);
+		return convert_to_oal_status(res);
+	}
+
+	return OAL_STATUS_SUCCESS;
+
+}
+
+oal_status_t device_reply_ssp_consent(bt_address_t * addr, int accept)
+{
+	int res;
+	bdstr_t bdstr;
+
+	CHECK_OAL_INITIALIZED();
+
+	OAL_CHECK_PARAMETER(addr, return);
+
+	API_TRACE("[%s] %d", bdt_bd2str(addr, &bdstr), accept);
+
+	res = blued_api->ssp_reply((bt_bdaddr_t *)addr, BT_SSP_VARIANT_CONSENT, accept, 0);
+	if (res != BT_STATUS_SUCCESS) {
+		BT_ERR("ssp_reply error: [%s]", status2string(res));
+		BT_ERR("%d", accept);
+		return convert_to_oal_status(res);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
 void cb_device_properties(bt_status_t status, bt_bdaddr_t *bd_addr,
 		int num_properties, bt_property_t *properties)
 {
