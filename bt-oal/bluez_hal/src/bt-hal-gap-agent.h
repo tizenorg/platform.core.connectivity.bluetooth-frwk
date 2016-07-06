@@ -19,8 +19,8 @@
  *
  */
 
-#ifndef __BT_HAL_GAP_AGENT_1_H__
-#define _BT_HAL_GAP_AGENT_1_H__
+#ifndef __BT_HAL_GAP_AGENT_H__
+#define _BT_HAL_GAP_AGENT_H__
 
 #include <stdint.h>
 #include <glib.h>
@@ -99,4 +99,13 @@ gboolean _gap_agent_is_canceled(GapAgentPrivate *agent);
 
 void _gap_agent_set_canceled(GapAgentPrivate *agent, gboolean value);
 
-#endif //_BT_HAL_GAP_AGENT_1_H__
+gboolean gap_agent_reply_pin_code(GapAgentPrivate *agent, const guint accept,
+                                                const char *pin_code,
+                                                GDBusMethodInvocation *context);
+gboolean gap_agent_reply_passkey(GapAgentPrivate *agent, const guint accept,
+                                                const char *passkey,
+                                                GDBusMethodInvocation *context);
+gboolean gap_agent_reply_confirmation(GapAgentPrivate *agent, const guint accept,
+                GDBusMethodInvocation *context);
+
+#endif //_BT_HAL_GAP_AGENT_H__

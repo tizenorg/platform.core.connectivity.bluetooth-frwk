@@ -28,6 +28,26 @@
 #include <dlog.h>
 #include <stdio.h>
 
+typedef enum {
+        BT_HAL_AGENT_EVENT_PIN_REQUEST,
+        BT_HAL_AGENT_EVENT_PASSKEY_CONFIRM_REQUEST,
+        BT_HAL_AGENT_EVENT_PASSKEY_AUTO_ACCEPTED,
+        BT_HAL_AGENT_EVENT_PASSKEY_REQUEST,
+        BT_HAL_AGENT_EVENT_PASSKEY_DISPLAY_REQUEST,
+        BT_HAL_AGENT_EVENT_AUTHORIZE_REQUEST,
+        BT_HAL_AGENT_EVENT_CONFIRM_MODE_REQUEST,
+        BT_HAL_AGENT_EVENT_APP_CONFIRM_REQUEST,
+        BT_HAL_AGENT_EVENT_FILE_RECEIVED,
+        BT_HAL_AGENT_EVENT_KEYBOARD_PASSKEY_REQUEST,
+        BT_HAL_AGENT_EVENT_SECURITY,
+        BT_HAL_AGENT_EVENT_TERMINATE,
+        BT_HAL_AGENT_EVENT_EXCHANGE_REQUEST,
+        BT_HAL_AGENT_EVENT_PBAP_REQUEST,
+        BT_HAL_AGENT_EVENT_MAP_REQUEST,
+        BT_HAL_AGENT_EVENT_SYSTEM_RESET_REQUEST,
+        BT_HAL_AGENT_EVENT_LEGACY_PAIR_FAILED_FROM_REMOTE,
+} bt_hal_agent_event_type_t;
+
 void* _bt_hal_create_agent(const char *path, gboolean adapter);
 
 void _bt_hal_destroy_agent(void *agent);
@@ -44,4 +64,7 @@ void _bt_hal_initialize_adapter_agent(void);
 
 void _bt_hal_destroy_adapter_agent(void);
 
+int _bt_hal_launch_system_popup(bt_hal_agent_event_type_t event_type, const char *device_name,
+			char *passkey, const char *filename,
+			const char *agent_path);
 #endif //__BT_HAL_AGENT__

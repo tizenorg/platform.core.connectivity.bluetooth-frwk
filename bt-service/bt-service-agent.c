@@ -112,16 +112,10 @@ static gboolean __bt_agent_system_popup_timer_cb(gpointer user_data)
 	retv_if(user_data == NULL, FALSE);
 
 	++retry_count;
-#if defined(LIBNOTIFY_SUPPORT)
-        ret = notify_launch(b);
-#elif defined(LIBNOTIFICATION_SUPPORT)
-        ret = notification_launch(b);
-#else
-        ret = syspopup_launch("bt-syspopup", b);
-#endif
+	ret = syspopup_launch("bt-syspopup", b);
 	if (ret < 0) {
 		BT_ERR("Sorry! Can't launch popup, ret=%d, Re-try[%d] time..",
-							ret, retry_count);
+				ret, retry_count);
 		if (retry_count >= BT_AGENT_SYSPOPUP_MAX_ATTEMPT) {
 			BT_ERR("Sorry!! Max retry %d reached", retry_count);
 			bundle_free(b);
