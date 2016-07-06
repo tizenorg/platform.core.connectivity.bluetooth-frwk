@@ -132,7 +132,7 @@ oal_status_t device_destroy_bond(bt_address_t * addr);
  *
  * @see  OAL_EVENT_DEVICE_PIN_REQUEST
  */
-oal_status_t device_accept_pin_request(bt_address_t * addr, char * pin);
+oal_status_t device_accept_pin_request(bt_address_t * addr, const char * pin);
 
 /**
  * @brief Reject PIN request as part of Bonding procedure

@@ -569,6 +569,22 @@ int __bt_bluez_request(int function_name,
 		       }
 		       break;
 	}
+	case BT_PASSKEY_REPLY: {
+		       const char *passkey = NULL;
+		       gboolean authentication_reply = FALSE;
+		       passkey = g_variant_get_data(in_param1);
+		       __bt_service_get_parameters(in_param2,
+				       &authentication_reply, sizeof(gboolean));
+		       result = _bt_passkey_reply(passkey, authentication_reply);
+		       break;
+       }
+	case BT_PASSKEY_CONFIRMATION_REPLY: {
+		    gboolean confirmation_reply = FALSE;
+		    __bt_service_get_parameters(in_param1,
+				    &confirmation_reply, sizeof(gboolean));
+		    result = _bt_passkey_confirmation_reply(confirmation_reply);
+		    break;
+	}
 	default:
 		BT_INFO("UnSupported function [%d]", function_name);
 		result = BLUETOOTH_ERROR_NOT_SUPPORT;
@@ -711,6 +727,8 @@ gboolean __bt_service_check_privilege(int function_name,
 	case BT_BOND_DEVICE:
 	case BT_CANCEL_BONDING:
 	case BT_UNBOND_DEVICE:
+	case BT_PASSKEY_CONFIRMATION_REPLY:
+        case BT_PASSKEY_REPLY:
 	case BT_SET_ALIAS:
 	case BT_SET_AUTHORIZATION:
 	case BT_UNSET_AUTHORIZATION:

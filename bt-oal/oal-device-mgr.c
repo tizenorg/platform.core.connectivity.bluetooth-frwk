@@ -128,7 +128,7 @@ oal_status_t device_destroy_bond(bt_address_t * addr)
 	return OAL_STATUS_SUCCESS;
 }
 
-oal_status_t device_accept_pin_request(bt_address_t * addr, char * pin)
+oal_status_t device_accept_pin_request(bt_address_t * addr, const char * pin)
 {
 	int res;
 	bdstr_t bdstr;

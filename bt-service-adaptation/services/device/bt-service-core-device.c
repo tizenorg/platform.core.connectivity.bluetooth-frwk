@@ -643,7 +643,7 @@ done:
 	BT_DBG("-");
 }
 
-
+/* SSP Pairing event handler */
 static void __bt_device_ssp_passkey_entry_callback(remote_device_t* dev_info)
 {
 	GVariant *param;
@@ -1138,6 +1138,65 @@ fail:
 	__bt_free_bond_info(BT_DEVICE_UNBOND_INFO);
 
 	return result;
+}
+
+int _bt_passkey_reply(const char *passkey, gboolean cnfm_reply)
+{
+	bluetooth_device_address_t device_address;
+	int ret = OAL_STATUS_SUCCESS;
+	BT_INFO("reply: %d", cnfm_reply);
+
+	retv_if(trigger_pairing_info == NULL, BLUETOOTH_ERROR_INTERNAL);
+	retv_if(trigger_pairing_info->addr == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	_bt_convert_addr_string_to_type(device_address.addr, trigger_pairing_info->addr);
+
+	if (trigger_pairing_info->is_ssp) {
+		if (cnfm_reply)
+			ret = device_accept_passkey_entry((bt_address_t *)&device_address, atoi(passkey));
+		else
+			ret = device_reject_passkey_entry((bt_address_t *)&device_address);
+		trigger_pairing_info->is_ssp = FALSE;
+	} else {
+		if (cnfm_reply)
+			ret = device_accept_pin_request((bt_address_t *)&device_address, passkey);
+		else
+			ret = device_reject_pin_request((bt_address_t *)&device_address);
+	}
+
+	__bt_free_pairing_info(&trigger_pairing_info);
+
+	if (ret != OAL_STATUS_SUCCESS) {
+		BT_ERR("_bt_device_handle_passkey_reply: err [%d]", ret);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	BT_INFO("-");
+	return BLUETOOTH_ERROR_NONE;
+}
+
+int _bt_passkey_confirmation_reply(gboolean cnfm_reply)
+{
+	BT_INFO("BT_PASSKEY_CONFIRMATION_REPLY");
+	bluetooth_device_address_t device_address;
+	int ret = OAL_STATUS_SUCCESS;
+	BT_INFO("reply: %d", cnfm_reply);
+
+	retv_if(trigger_pairing_info == NULL, BLUETOOTH_ERROR_INTERNAL);
+	retv_if(trigger_pairing_info->addr == NULL, BLUETOOTH_ERROR_INTERNAL);
+
+	_bt_convert_addr_string_to_type(device_address.addr, trigger_pairing_info->addr);
+
+	ret = device_reply_passkey_confirmation((bt_address_t *)&device_address, cnfm_reply);
+
+	__bt_free_pairing_info(&trigger_pairing_info);
+	if (ret != OAL_STATUS_SUCCESS) {
+		BT_ERR("_bt_device_handle_passkey_confirmation_reply: err [%d]", ret);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	BT_INFO("-");
+	return BLUETOOTH_ERROR_NONE;
 }
 
 gboolean _bt_device_is_pairing(void)

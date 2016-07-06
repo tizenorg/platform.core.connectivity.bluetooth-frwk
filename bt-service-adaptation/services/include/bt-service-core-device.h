@@ -48,6 +48,11 @@ gboolean _bt_is_bonding_device_address(const char *address);
 
 void _bt_set_autopair_status_in_bonding_info(gboolean is_autopair);
 
+int _bt_passkey_reply(const char *passkey, gboolean authentication_reply);
+
+int _bt_passkey_confirmation_reply(gboolean confirmation_reply);
+
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
