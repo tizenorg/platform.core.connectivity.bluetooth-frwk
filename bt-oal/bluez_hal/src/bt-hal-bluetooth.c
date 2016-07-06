@@ -55,6 +55,8 @@ static void __bt_hal_handle_adapter_discovery_state_changed(void *buf, uint16_t 
 static void __bt_hal_handle_device_found_event(void *buf, uint16_t len);
 static void __bt_hal_handle_bond_state_changed_event(void *buf, uint16_t len);
 static void __bt_hal_handle_device_acl_state_changed_event(void *buf, uint16_t len);
+static void __bt_hal_handle_ssp_request_event(void *buf, uint16_t len);
+static void __bt_hal_handle_pin_request_event(void *buf, uint16_t len);
 
 static bool interface_ready(void)
 {
@@ -586,6 +588,69 @@ static void __bt_hal_handle_device_acl_state_changed_event(void *buf, uint16_t l
         DBG("-");
 }
 
+static void __bt_hal_handle_ssp_request_event(void *buf, uint16_t len)
+{
+	struct hal_ev_ssp_request *ev = (struct hal_ev_ssp_request *)buf;
+	bt_bdaddr_t bd_addr;
+	bt_bdname_t bd_name;
+	DBG("+");
+
+	memcpy(bd_addr.address, ev->bdaddr, 6);
+	memcpy(bd_name.name, ev->name, 248);
+
+	/* BD address*/
+	DBG("[0x%x]", bd_addr.address[0]);
+	DBG("[0x%x]", bd_addr.address[1]);
+	DBG("[0x%x]", bd_addr.address[2]);
+	DBG("[0x%x]", bd_addr.address[3]);
+	DBG("[0x%x]", bd_addr.address[4]);
+	DBG("[0x%x]", bd_addr.address[5]);
+
+	DBG("COD [%d]", ev->class_of_dev);
+	DBG("pairing variant [%d]", ev->pairing_variant);
+	DBG("passkey [%d]", ev->passkey);
+
+	if (!bt_hal_cbacks->ssp_request_cb) {
+		ERR("HAL User ssp_request_cb is not set!!");
+		return;
+	}
+
+	bt_hal_cbacks->ssp_request_cb(&bd_addr, &bd_name,
+			ev->class_of_dev,
+			ev->pairing_variant, ev->passkey);
+	DBG("-");
+}
+
+static void __bt_hal_handle_pin_request_event(void *buf, uint16_t len)
+{
+	struct hal_ev_pin_request *ev = (struct hal_ev_pin_request *)buf;
+	bt_bdaddr_t bd_addr;
+	bt_bdname_t bd_name;
+	DBG("+");
+
+	memcpy(bd_addr.address, ev->bdaddr, 6);
+	memcpy(bd_name.name, ev->name, 248);
+
+	/* BD address*/
+	DBG("[0x%x]", bd_addr.address[0]);
+	DBG("[0x%x]", bd_addr.address[1]);
+	DBG("[0x%x]", bd_addr.address[2]);
+	DBG("[0x%x]", bd_addr.address[3]);
+	DBG("[0x%x]", bd_addr.address[4]);
+	DBG("[0x%x]", bd_addr.address[5]);
+
+	DBG("COD [%u]", ev->class_of_dev);
+
+	if (!bt_hal_cbacks->pin_request_cb) {
+		ERR("HAL User pin_request_cb is not set!!");
+		return;
+	}
+
+	bt_hal_cbacks->pin_request_cb(&bd_addr, &bd_name,
+			ev->class_of_dev);
+	DBG("-");
+}
+
 static void __bt_hal_handle_stack_messages(int message, void *buf, uint16_t len)
 {
 	DBG("+");
@@ -611,13 +676,21 @@ static void __bt_hal_handle_stack_messages(int message, void *buf, uint16_t len)
 			__bt_hal_handle_remote_device_properties_event(buf, len);
 			break;
 		case HAL_EV_BOND_STATE_CHANGED:
-                        DBG("Event: HAL_EV_BOND_STATE_CHANGED:");
-                        __bt_hal_handle_bond_state_changed_event(buf, len);
-                        break;
+			DBG("Event: HAL_EV_BOND_STATE_CHANGED:");
+			__bt_hal_handle_bond_state_changed_event(buf, len);
+			break;
 		case HAL_EV_ACL_STATE_CHANGED:
-                        DBG("Event: HAL_ACL_STATE_CONNECTED or Disconnected");
-                        __bt_hal_handle_device_acl_state_changed_event(buf, len);
-                        break;
+			DBG("Event: HAL_ACL_STATE_CONNECTED or Disconnected");
+			__bt_hal_handle_device_acl_state_changed_event(buf, len);
+			break;
+		case HAL_EV_SSP_REQUEST:
+			DBG("Event: HAL_EV_SSP_REQUEST");
+			__bt_hal_handle_ssp_request_event(buf, len);
+			break;
+		case HAL_EV_PIN_REQUEST:
+			DBG("Event: HAL_EV_PIN_REQUEST");
+			__bt_hal_handle_pin_request_event(buf, len);
+			break;
 		default:
 			DBG("Event Currently not handled!!");
 			break;
