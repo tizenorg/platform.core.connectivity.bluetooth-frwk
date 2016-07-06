@@ -46,6 +46,7 @@
 #include "bt-hal-device-dbus-handler.h"
 #include "bt-hal-event-receiver.h"
 #include "bt-hal-agent.h"
+#include "bt-hal-gap-agent.h"
 
 static handle_stack_msg event_cb = NULL;
 
@@ -221,6 +222,68 @@ int _bt_hal_device_remove_bond(const bt_bdaddr_t *bd_addr)
 			NULL,
 			(GAsyncReadyCallback)__bt_hal_unbond_device_cb,
 			(gpointer)device_path);
+
+	DBG("-");
+	return BT_STATUS_SUCCESS;
+}
+
+int _bt_hal_device_legacy_pin_reply(const bt_bdaddr_t *bd_addr, 
+                                gboolean accept, uint8_t pin_len, char *pincode)
+{
+	GapAgentPrivate *agent = _bt_hal_get_adapter_agent();
+	DBG("+");
+
+	if (!agent)
+		return BT_STATUS_FAIL;
+
+	DBG("pin_len [0x%x]", pin_len);
+	DBG("pincode [%s]", pincode);
+
+	if (accept) {
+		gap_agent_reply_pin_code(agent, GAP_AGENT_ACCEPT, pincode, NULL);
+	} else 
+		gap_agent_reply_pin_code(agent, GAP_AGENT_REJECT, NULL, NULL);
+
+	DBG("-");
+	return BT_STATUS_SUCCESS;
+}
+
+int _bt_hal_device_ssp_reply(const bt_bdaddr_t *bd_addr, bt_ssp_variant_t variant,
+                uint8_t accept, uint32_t passkey)
+{
+	GapAgentPrivate *agent = _bt_hal_get_adapter_agent();
+	DBG("+");
+
+	if (!agent)
+		return BT_STATUS_FAIL;
+
+	switch (variant) {
+		case BT_SSP_VARIANT_PASSKEY_CONFIRMATION:
+			DBG("SSP: PASSKEY_CONFIRMATION");
+			if (accept)
+				gap_agent_reply_confirmation(agent, GAP_AGENT_ACCEPT, NULL);
+			else
+				gap_agent_reply_confirmation(agent, GAP_AGENT_REJECT, NULL);
+			break;
+		case BT_SSP_VARIANT_PASSKEY_NOTIFICATION:
+			DBG("SSP: PASSKEY_NOTIFICATION");
+			break;
+		case BT_SSP_VARIANT_PASSKEY_ENTRY:
+			DBG("SSP: PASSKEY_ENTRY");
+			if (accept) {
+				char str_passkey[7];
+				snprintf(str_passkey, sizeof(str_passkey), "%.6d", passkey);
+				DBG("Passkey [%s]", str_passkey);
+				gap_agent_reply_passkey(agent, GAP_AGENT_ACCEPT, str_passkey, NULL);
+			} else
+				gap_agent_reply_passkey(agent, GAP_AGENT_REJECT, NULL, NULL);
+			break;
+		case BT_SSP_VARIANT_CONSENT:
+			DBG("SSP: VARIANT_CONSENT: Unhandled!");
+			break;
+		default:
+			break;
+	}
 
 	DBG("-");
 	return BT_STATUS_SUCCESS;
