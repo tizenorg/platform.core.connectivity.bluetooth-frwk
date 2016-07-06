@@ -61,6 +61,9 @@ extern void cb_device_bond_state_changed(bt_status_t status, bt_bdaddr_t *bd_add
                                         bt_bond_state_t state);
 extern void cb_device_acl_state_changed(bt_status_t status, bt_bdaddr_t *remote_bd_addr,
                                             bt_acl_state_t state);
+extern void cb_device_pin_request(bt_bdaddr_t *bd_addr, bt_bdname_t *bdname, uint32_t device_class);
+extern void cb_device_ssp_request(bt_bdaddr_t *bd_addr, bt_bdname_t *bdname, uint32_t device_class,
+			bt_ssp_variant_t pairing_variant, uint32_t pass_key);
 
 static bt_callbacks_t callbacks = {
 	sizeof(callbacks),
@@ -69,8 +72,8 @@ static bt_callbacks_t callbacks = {
 	cb_device_properties,
 	cb_adapter_device_found,
 	cb_adapter_discovery_state_changed,
-	NULL, /* pin_request_callback */
-	NULL, /* ssp_request_callback */
+	cb_device_pin_request,
+	cb_device_ssp_request,
 	cb_device_bond_state_changed,
 	cb_device_acl_state_changed,
 	NULL, /* callback_thread_event */
