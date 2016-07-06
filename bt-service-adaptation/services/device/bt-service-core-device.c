@@ -39,6 +39,7 @@
 #include "bt-service-event-receiver.h"
 #include "bt-request-handler.h"
 #include "bt-service-event.h"
+#include "bt-service-agent-util.h"
 
 /* OAL headers */
 #include <oal-event.h>
@@ -47,6 +48,7 @@
 #include <oal-device-mgr.h>
 
 #define MAX_BOND_RETRY_COUNT 3
+#define BT_PASSKEY_MAX_LENGTH 4
 
 /* Bonding Info structure */
 typedef struct {
@@ -60,10 +62,17 @@ typedef struct {
         bt_remote_dev_info_t *dev_info;
 } bt_bond_data_t;
 
+/* Pairing Info structure */
+typedef struct {
+        char *addr;
+        gboolean is_autopair;
+        int is_ssp;
+} bt_pairing_data_t;
 
 /* Bonding and Pairing Informations */
 bt_bond_data_t *trigger_bond_info;
 bt_bond_data_t *trigger_unbond_info;
+bt_pairing_data_t *trigger_pairing_info;
 
 typedef enum {
   BT_DEVICE_BOND_STATE_NONE,
@@ -98,6 +107,13 @@ static void __bt_device_handle_bond_failed_event(event_dev_bond_failed_t* bond_f
 static void __bt_handle_ongoing_bond(bt_remote_dev_info_t *remote_dev_info);
 static void __bt_device_acl_state_changed_callback(event_dev_conn_status_t * acl_event,
 				gboolean connected);
+static void __bt_free_pairing_info(bt_pairing_data_t **p_info);
+
+static void __bt_device_ssp_consent_callback(remote_device_t* dev_info);
+static void __bt_device_pin_request_callback(remote_device_t* pin_req_event);
+static void __bt_device_ssp_passkey_display_callback(event_dev_passkey_t *dev_info);
+static void __bt_device_ssp_passkey_confirmation_callback(event_dev_passkey_t *dev_info);
+static void __bt_device_ssp_passkey_entry_callback(remote_device_t* dev_info);
 
 void _bt_device_state_handle_callback_set_request(void)
 {
@@ -338,7 +354,7 @@ static void __bt_handle_ongoing_bond(bt_remote_dev_info_t *remote_dev_info)
 				BLUETOOTH_EVENT_BONDING_FINISHED,
 				param);
 		__bt_free_bond_info(BT_DEVICE_BOND_INFO);
-		/* TODO Free pairing Info*/
+		__bt_free_pairing_info(&trigger_pairing_info);
 	} else {
 		BT_INFO("Lets wait for more remote device properties");
 	}
@@ -396,7 +412,7 @@ static void __bt_device_handle_bond_removal_event(bt_address_t *bd_addr)
 				BLUETOOTH_EVENT_BONDED_DEVICE_REMOVED,
 				param);
 		__bt_free_bond_info(BT_DEVICE_UNBOND_INFO);
-		/* TODO Free pairing info*/
+		__bt_free_pairing_info(&trigger_pairing_info);
 	} else if (trigger_bond_info) {
 		__bt_device_handle_bond_state();
 	}
@@ -427,7 +443,7 @@ static void __bt_device_handle_bond_failed_event(event_dev_bond_failed_t* bond_f
 				__bt_device_handle_pending_requests(BLUETOOTH_ERROR_INTERNAL, BT_BOND_DEVICE,
 						trigger_bond_info->addr, BT_ADDRESS_STRING_SIZE);
 				__bt_free_bond_info(BT_DEVICE_BOND_INFO);
-			/* TODO Free pairing info */
+				__bt_free_pairing_info(&trigger_pairing_info);
 				bond_retry_count = 0;
 			}
 		}
@@ -448,7 +464,7 @@ static void __bt_device_handle_bond_failed_event(event_dev_bond_failed_t* bond_f
 			__bt_device_handle_pending_requests(result, BT_BOND_DEVICE,
 					trigger_bond_info->addr, BT_ADDRESS_STRING_SIZE);
 			__bt_free_bond_info(BT_DEVICE_BOND_INFO);
-			/* TODO Free pairing info */
+			__bt_free_pairing_info(&trigger_pairing_info);
 		}
 		break;
 	}
@@ -465,13 +481,13 @@ static void __bt_device_handle_bond_failed_event(event_dev_bond_failed_t* bond_f
 					BLUETOOTH_EVENT_BONDED_DEVICE_REMOVED,
 					param);
 			__bt_free_bond_info(BT_DEVICE_UNBOND_INFO);
-			/* TODO Free pairing info */
+			__bt_free_pairing_info(&trigger_pairing_info);
 		} else if (trigger_bond_info) {
 			if (__bt_device_handle_bond_state()!= BLUETOOTH_ERROR_NONE) {
 				__bt_device_handle_pending_requests(BLUETOOTH_ERROR_INTERNAL, BT_BOND_DEVICE,
 						trigger_bond_info->addr, BT_ADDRESS_STRING_SIZE);
 				__bt_free_bond_info(BT_DEVICE_BOND_INFO);
-				/* TODO Free pairing info */
+				__bt_free_pairing_info(&trigger_pairing_info);
 			}
 		}
 		break;
@@ -534,9 +550,257 @@ static void __bt_device_event_handler(int event_type, gpointer event_data)
 		__bt_device_acl_state_changed_callback((event_dev_conn_status_t *)event_data, FALSE);
 		break;
 	}
+	case OAL_EVENT_DEVICE_PIN_REQUEST: {
+		   BT_INFO("PIN Request Received");
+		   __bt_device_pin_request_callback((remote_device_t*)event_data);
+		   break;
+	}
+	case OAL_EVENT_DEVICE_PASSKEY_ENTRY_REQUEST: {
+		BT_INFO("Passkey Entry request Received");
+		__bt_device_ssp_passkey_entry_callback((remote_device_t*)event_data);
+		break;
+	}
+	case OAL_EVENT_DEVICE_PASSKEY_CONFIRMATION_REQUEST:{
+		   BT_INFO("Passkey Confirmation Request Received");
+		   __bt_device_ssp_passkey_confirmation_callback((event_dev_passkey_t *)event_data);
+		   break;
+	}
+	case OAL_EVENT_DEVICE_PASSKEY_DISPLAY: {
+	      BT_INFO("Passkey Display Request Received");
+	      __bt_device_ssp_passkey_display_callback((event_dev_passkey_t *)event_data);
+	      break;
+	}
+	case OAL_EVENT_DEVICE_SSP_CONSENT_REQUEST: {
+		BT_INFO("SSP Consent Request Received");
+		 __bt_device_ssp_consent_callback((remote_device_t*)event_data);
+		break;
+	}
 	default:
 		BT_INFO("Unhandled event..");
 	}
+}
+
+/* Legacy Pairing event handler */
+static void __bt_device_pin_request_callback(remote_device_t* pin_req_event)
+{
+	GVariant *param;
+	gchar address[BT_ADDRESS_STR_LEN];
+	BT_DBG("+");
+
+	_bt_convert_addr_type_to_string(address, pin_req_event->address.addr);
+
+	BT_INFO("Address[%s]", address);
+	BT_INFO("Name[%s]", pin_req_event->name);
+	BT_INFO("COD[%d]", pin_req_event->cod);
+
+	if (trigger_pairing_info) {
+		/* BTAPI support only one pairing at a time */
+		BT_ERR("Already Pairing address [%s]", trigger_pairing_info->addr);
+		BT_ERR("New PIN request address [%s]", address);
+		device_reject_pin_request(&pin_req_event->address);
+		return;
+	}
+
+	/* If user initiated bonding and auto response is possible, just reply with default 0000*/
+	if (_bt_is_bonding_device_address(address) == TRUE &&
+			_bt_agent_is_auto_response(pin_req_event->cod, address, pin_req_event->name)) {
+		/* Note: Currently even if SYSPOPUP is supported, we use Fixed PIN "0000" for basic pairing
+		   as BT SYSPOPUP is currently not working for PIN KEY entry in Tizen platform. This needs
+		   to be checked and fixed apropriately */
+		_bt_set_autopair_status_in_bonding_info(TRUE);
+		device_accept_pin_request(&pin_req_event->address, "0000");
+	} else if (_bt_agent_is_hid_keyboard(pin_req_event->cod)) {
+		char str_passkey[BT_PASSKEY_MAX_LENGTH + 1] = { 0 };
+
+		if (_bt_agent_generate_passkey(str_passkey,
+					BT_PASSKEY_MAX_LENGTH) != 0) {
+			device_reject_pin_request(&pin_req_event->address);
+			goto done;
+		}
+		device_accept_pin_request(&pin_req_event->address, str_passkey);
+
+		BT_DBG("Send BLUETOOTH_EVENT_KEYBOARD_PASSKEY_DISPLAY");
+		param = g_variant_new("(isss)", BLUETOOTH_ERROR_NONE, address, pin_req_event->name, str_passkey);
+		_bt_send_event(BT_ADAPTER_EVENT,
+				BLUETOOTH_EVENT_KEYBOARD_PASSKEY_DISPLAY, param);
+		BT_DBG("Key board pairing in process");
+	} else {
+		if (_bt_is_bonding_device_address(address) == TRUE) {
+			BT_DBG("Show Pin entry");
+			trigger_pairing_info = g_malloc0(sizeof(bt_pairing_data_t));
+			trigger_pairing_info->addr = g_strdup(address);
+			trigger_pairing_info->is_ssp = FALSE;
+
+			BT_DBG("Send BLUETOOTH_EVENT_PIN_REQUEST");
+			param = g_variant_new("(iss)", BLUETOOTH_ERROR_NONE, address, pin_req_event->name);
+			_bt_send_event(BT_ADAPTER_EVENT,
+					BLUETOOTH_EVENT_PIN_REQUEST, param);
+		}
+	}
+
+done:
+	_bt_agent_release_memory();
+	BT_DBG("-");
+}
+
+
+static void __bt_device_ssp_passkey_entry_callback(remote_device_t* dev_info)
+{
+	GVariant *param;
+	gchar address[BT_ADDRESS_STR_LEN];
+	char *p_addr;
+	gchar *name;
+	int result = BLUETOOTH_ERROR_NONE;
+	BT_DBG("+");
+
+	_bt_convert_addr_type_to_string(address, dev_info->address.addr);
+	p_addr = address;
+	name = dev_info->name;
+
+	BT_INFO("Address[%s]", address);
+	BT_INFO("Name[%s]", name);
+	BT_INFO("COD[%d]", dev_info->cod);
+
+	if (trigger_pairing_info) {
+		/* BTAPI support only one pairing at a time */
+		BT_ERR("Already Pairing address [%s]", trigger_pairing_info->addr);
+		BT_ERR("New PIN request address [%s]", address);
+		device_reject_pin_request(&dev_info->address);
+		BT_DBG("-");
+		return;
+	}
+
+	/* Set pairing data */
+	trigger_pairing_info = g_malloc0(sizeof(bt_pairing_data_t));
+	trigger_pairing_info->addr = g_strdup(address);
+	trigger_pairing_info->is_ssp = TRUE;
+
+	param = g_variant_new("(iss)", result, p_addr, name);
+	_bt_send_event(BT_ADAPTER_EVENT,
+			BLUETOOTH_EVENT_PASSKEY_REQUEST, param);
+	BT_DBG("-");
+}
+
+static void __bt_device_ssp_passkey_confirmation_callback(event_dev_passkey_t *dev_info)
+{
+	GVariant *param;
+	gchar address[BT_ADDRESS_STR_LEN];
+	char *p_addr;
+	gchar *name;
+	char str_passkey[7];
+	int result = BLUETOOTH_ERROR_NONE;
+	BT_DBG("+");
+
+	_bt_convert_addr_type_to_string(address, dev_info->device_info.address.addr);
+	p_addr = address;
+	name = dev_info->device_info.name;
+
+	BT_INFO("Address[%s]", address);
+	BT_INFO("Name[%s]", name);
+	BT_INFO("COD[%d]", dev_info->device_info.cod);
+
+	if (trigger_pairing_info) {
+		/* BTAPI support only one pairing at a time */
+		BT_ERR("Already Pairing address [%s]", trigger_pairing_info->addr);
+		BT_ERR("New PIN request address [%s]", address);
+		device_reject_pin_request(&dev_info->device_info.address);
+		BT_DBG("-");
+		return;
+	}
+
+	/* Set pairing data */
+	trigger_pairing_info = g_malloc0(sizeof(bt_pairing_data_t));
+	trigger_pairing_info->addr = g_strdup(address);
+	trigger_pairing_info->is_ssp = TRUE;
+
+	BT_DBG("Send BLUETOOTH_EVENT_PASSKEY_CONFIRMATION");
+	snprintf(str_passkey, sizeof(str_passkey), "%.6d", dev_info->pass_key);
+
+	param = g_variant_new("(isss)", result, p_addr, name, str_passkey);
+	_bt_send_event(BT_ADAPTER_EVENT,
+			BLUETOOTH_EVENT_PASSKEY_CONFIRM_REQUEST, param);
+	BT_DBG("-");
+}
+
+static void __bt_device_ssp_passkey_display_callback(event_dev_passkey_t *dev_info)
+{
+	GVariant *param;
+	gchar address[BT_ADDRESS_STR_LEN];
+	char *p_addr;
+	gchar *name;
+	char str_passkey[7];
+	int result = BLUETOOTH_ERROR_NONE;
+	BT_DBG("+");
+
+	_bt_convert_addr_type_to_string(address, dev_info->device_info.address.addr);
+	p_addr = address;
+	name = dev_info->device_info.name;
+
+	BT_INFO("Address[%s]", address);
+	BT_INFO("Name[%s]", name);
+	BT_INFO("COD[%d]", dev_info->device_info.cod);
+
+	if (trigger_pairing_info) {
+		/* BTAPI support only one pairing at a time */
+		BT_ERR("Already Pairing address [%s]", trigger_pairing_info->addr);
+		BT_ERR("New PIN request address [%s]", address);
+		device_reject_pin_request(&dev_info->device_info.address);
+		BT_DBG("-");
+		return;
+	}
+
+	/* Set pairing data */
+	trigger_pairing_info = g_malloc0(sizeof(bt_pairing_data_t));
+	trigger_pairing_info->addr = g_strdup(address);
+	trigger_pairing_info->is_ssp = TRUE;
+
+	BT_DBG("Send BLUETOOTH_EVENT_KEYBOARD_PASSKEY_DISPLAY");
+	snprintf(str_passkey, sizeof(str_passkey), "%.6d", dev_info->pass_key);
+
+	param = g_variant_new("(isss)", result, p_addr, name, str_passkey);
+	_bt_send_event(BT_ADAPTER_EVENT,
+			BLUETOOTH_EVENT_KEYBOARD_PASSKEY_DISPLAY, param);
+	BT_DBG("-");
+
+}
+
+static void __bt_device_ssp_consent_callback(remote_device_t* dev_info)
+{
+	gchar address[BT_ADDRESS_STR_LEN];
+	gchar *name;
+	int local_major;
+	int local_minor;
+	int cod;
+	BT_DBG("+");
+
+	_bt_convert_addr_type_to_string(address, dev_info->address.addr);
+	name = dev_info->name;
+	cod = dev_info->cod;
+
+	BT_INFO("Address[%s]", address);
+	BT_INFO("Name[%s]", name);
+	BT_INFO("COD[%d]", cod);
+
+	if (trigger_pairing_info) {
+		/* BTAPI support only one pairing at a time */
+		BT_ERR("Already Pairing address [%s]", trigger_pairing_info->addr);
+		BT_ERR("New PIN request address [%s]", address);
+		device_reject_pin_request(&dev_info->address);
+		BT_DBG("-");
+		return;
+	}
+
+	/* Set pairing data */
+	trigger_pairing_info = g_malloc0(sizeof(bt_pairing_data_t));
+	trigger_pairing_info->addr = g_strdup(address);
+	trigger_pairing_info->is_ssp = TRUE;
+
+	local_major = ((cod >> 8) & 0x001f);
+	local_minor = (cod & 0x00fc);
+	BT_DBG("SSP_CONSENT: Major type=[0x%x] and Minor type=[0x%x]",local_major, local_minor);
+
+	/*TODO: BLUETOOTH_EVENT_SSP_CONSENT_REQUEST to be handled in Tizen */
+	BT_DBG("-");
 }
 
 static void __bt_device_acl_state_changed_callback(event_dev_conn_status_t * acl_event, gboolean connected)
@@ -635,6 +899,19 @@ static void __bt_device_remote_device_found_callback(gpointer event_data, gboole
 	BT_DBG("-");
 }
 
+static void __bt_free_pairing_info(bt_pairing_data_t **p_info)
+{
+	bt_pairing_data_t * info = *p_info;
+	if (info) {
+		if(info->addr) {
+			g_free(info->addr);
+		}
+
+		g_free(info);
+	}
+	*p_info = NULL;
+}
+
 static void __bt_free_bond_info(uint8_t type)
 {
 	BT_INFO("+");
@@ -709,7 +986,7 @@ static int __bt_device_handle_bond_state(void)
 			__bt_device_handle_pending_requests(BLUETOOTH_ERROR_INTERNAL, BT_BOND_DEVICE,
 					trigger_bond_info->addr, BT_ADDRESS_STRING_SIZE);
 			__bt_free_bond_info(BT_DEVICE_BOND_INFO);
-			/* TODO: Free pairing Info */
+			__bt_free_pairing_info(&trigger_pairing_info);
 		}
 		break;
 	case BT_DEVICE_BOND_STATE_NONE:
@@ -861,4 +1138,34 @@ fail:
 	__bt_free_bond_info(BT_DEVICE_UNBOND_INFO);
 
 	return result;
+}
+
+gboolean _bt_device_is_pairing(void)
+{
+        return (trigger_pairing_info) ? TRUE : FALSE;
+}
+
+gboolean _bt_device_is_bonding(void)
+{
+        return (trigger_bond_info) ? TRUE : FALSE;
+}
+
+gboolean _bt_is_bonding_device_address(const char *address)
+{
+	if (trigger_bond_info == NULL || trigger_bond_info->addr == NULL)
+		return FALSE;
+
+	if (g_strcmp0(trigger_bond_info->addr, address) == 0) {
+		BT_DBG("[%s]  is bonding device", address);
+		return TRUE;
+	}
+
+	BT_DBG("[%s]  is NOT bonding device", address);
+	return FALSE;
+}
+
+void _bt_set_autopair_status_in_bonding_info(gboolean is_autopair)
+{
+        ret_if (trigger_bond_info == NULL);
+        trigger_bond_info->is_autopair = is_autopair;
 }
