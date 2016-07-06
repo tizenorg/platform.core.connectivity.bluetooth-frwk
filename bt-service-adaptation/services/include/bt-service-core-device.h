@@ -38,6 +38,16 @@ int _bt_bond_device(bluetooth_device_address_t *device_address,
 int _bt_unbond_device(bluetooth_device_address_t *device_address,
                         GArray **out_param1);
 
+gboolean _bt_is_bonding_device_address(const char *address);
+
+gboolean _bt_device_is_bonding(void);
+
+gboolean _bt_device_is_pairing(void);
+
+gboolean _bt_is_bonding_device_address(const char *address);
+
+void _bt_set_autopair_status_in_bonding_info(gboolean is_autopair);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

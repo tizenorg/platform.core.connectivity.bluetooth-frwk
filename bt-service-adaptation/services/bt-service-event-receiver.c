@@ -99,8 +99,14 @@ void _bt_service_oal_event_receiver(int event_type, gpointer event_data, gsize l
         case OAL_EVENT_DEVICE_BONDING_FAILED:
 	case OAL_EVENT_DEVICE_ACL_CONNECTED:
         case OAL_EVENT_DEVICE_ACL_DISCONNECTED:
+	case OAL_EVENT_DEVICE_PIN_REQUEST:
+        case OAL_EVENT_DEVICE_PASSKEY_ENTRY_REQUEST:
+        case OAL_EVENT_DEVICE_PASSKEY_CONFIRMATION_REQUEST:
+        case OAL_EVENT_DEVICE_PASSKEY_DISPLAY:
+        case OAL_EVENT_DEVICE_SSP_CONSENT_REQUEST:
                 if (device_cb)
                         device_cb(event_type, event_data);
+		break;
 	default:
 		BT_ERR("Unhandled Event: %d", event_type);
 		break;

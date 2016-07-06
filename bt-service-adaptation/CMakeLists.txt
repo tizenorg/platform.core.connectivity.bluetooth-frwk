@@ -13,6 +13,7 @@ marshal.c
 ./services/device/bt-service-core-device.c
 ./services/bt-service-event-receiver.c
 ./services/bt-service-dpm.c
+./services/bt-service-agent-util.c
 )
 
 IF("${CMAKE_BUILD_TYPE}" STREQUAL "")
