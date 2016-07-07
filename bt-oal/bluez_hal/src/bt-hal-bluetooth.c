@@ -173,7 +173,7 @@ static int create_bond(const bt_bdaddr_t *bd_addr, int transport)
 
 static int cancel_bond(const bt_bdaddr_t *bd_addr)
 {
-	return BT_STATUS_UNSUPPORTED;
+	return _bt_hal_device_cancel_bond(bd_addr);
 }
 
 static int remove_bond(const bt_bdaddr_t *bd_addr)

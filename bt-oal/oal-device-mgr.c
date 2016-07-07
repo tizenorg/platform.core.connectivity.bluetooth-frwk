@@ -128,6 +128,26 @@ oal_status_t device_destroy_bond(bt_address_t * addr)
 	return OAL_STATUS_SUCCESS;
 }
 
+oal_status_t device_stop_bond(bt_address_t * addr)
+{
+	int res;
+	bdstr_t bdstr;
+
+	CHECK_OAL_INITIALIZED();
+
+	OAL_CHECK_PARAMETER(addr, return);
+
+	API_TRACE("[%s]", bdt_bd2str(addr, &bdstr));
+
+	res = blued_api->cancel_bond((bt_bdaddr_t *)addr);
+	if (res != BT_STATUS_SUCCESS) {
+		BT_ERR("cancel_bond error: [%s]", status2string(res));
+		return convert_to_oal_status(res);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
 oal_status_t device_accept_pin_request(bt_address_t * addr, const char * pin)
 {
 	int res;

@@ -38,6 +38,8 @@ int _bt_bond_device(bluetooth_device_address_t *device_address,
 int _bt_unbond_device(bluetooth_device_address_t *device_address,
                         GArray **out_param1);
 
+int _bt_cancel_bonding(void);
+
 gboolean _bt_is_bonding_device_address(const char *address);
 
 gboolean _bt_device_is_bonding(void);

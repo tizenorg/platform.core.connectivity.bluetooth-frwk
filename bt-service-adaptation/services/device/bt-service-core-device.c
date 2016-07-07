@@ -610,6 +610,7 @@ static void __bt_device_pin_request_callback(remote_device_t* pin_req_event)
 		_bt_set_autopair_status_in_bonding_info(TRUE);
 		device_accept_pin_request(&pin_req_event->address, "0000");
 	} else if (_bt_agent_is_hid_keyboard(pin_req_event->cod)) {
+		BT_DBG("Remote Device is HID keyboard Type..");
 		char str_passkey[BT_PASSKEY_MAX_LENGTH + 1] = { 0 };
 
 		if (_bt_agent_generate_passkey(str_passkey,
@@ -1136,6 +1137,21 @@ fail:
 	g_array_append_vals(*out_param1, &dev_info,
 			sizeof(bluetooth_device_info_t));
 	__bt_free_bond_info(BT_DEVICE_UNBOND_INFO);
+
+	return result;
+}
+
+int _bt_cancel_bonding(void)
+{
+	int result = OAL_STATUS_SUCCESS;
+	BT_INFO("+");
+
+	retv_if(trigger_bond_info == NULL, BLUETOOTH_ERROR_NOT_IN_OPERATION);
+
+	result = device_stop_bond((bt_address_t *)trigger_bond_info->dev_addr);
+
+	if (result == OAL_STATUS_SUCCESS)
+		trigger_bond_info->is_cancelled_by_user = TRUE;
 
 	return result;
 }

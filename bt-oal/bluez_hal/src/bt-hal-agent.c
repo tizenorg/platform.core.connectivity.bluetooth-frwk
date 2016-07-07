@@ -166,8 +166,14 @@ int _bt_hal_agent_reply_cancellation(void)
 	void *agent = _bt_hal_get_adapter_agent();
 	if (!agent)
 		return BT_STATUS_FAIL;
-	/* TODO Handle GAP Agent Cancel */
+
+	if (gap_agent_reply_confirmation(agent, GAP_AGENT_CANCEL, NULL) != TRUE) {
+		ERR("Fail to reply agent");
+		return BT_STATUS_FAIL;
+	}
+	DBG("gap agent cancellation done successfully!");
 	return BT_STATUS_SUCCESS;
+
 }
 
 void _bt_hal_agent_set_canceled(gboolean value)

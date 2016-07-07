@@ -569,6 +569,10 @@ int __bt_bluez_request(int function_name,
 		       }
 		       break;
 	}
+	case BT_CANCEL_BONDING:{
+		       result = _bt_cancel_bonding();
+		       break;
+	}
 	case BT_PASSKEY_REPLY: {
 		       const char *passkey = NULL;
 		       gboolean authentication_reply = FALSE;

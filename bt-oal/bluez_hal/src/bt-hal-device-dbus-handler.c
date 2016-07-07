@@ -227,6 +227,21 @@ int _bt_hal_device_remove_bond(const bt_bdaddr_t *bd_addr)
 	return BT_STATUS_SUCCESS;
 }
 
+int _bt_hal_device_cancel_bond(const bt_bdaddr_t *bd_addr)
+{
+	int result = BT_STATUS_SUCCESS;
+	DBG("+");
+
+	result = _bt_hal_agent_reply_cancellation();
+	if (result != BT_HAL_ERROR_NONE){
+		ERR("Fail to call reply cancellation");
+		return BT_STATUS_FAIL;
+	}
+
+	_bt_hal_agent_set_canceled(TRUE);
+	return result;
+}
+
 int _bt_hal_device_legacy_pin_reply(const bt_bdaddr_t *bd_addr,
                                 gboolean accept, uint8_t pin_len, char *pincode)
 {
