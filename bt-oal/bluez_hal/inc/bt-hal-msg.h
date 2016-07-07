@@ -170,5 +170,68 @@ struct hal_ev_acl_state_changed {
 #define BT_TRANSPORT_BR_EDR             0x01
 #define BT_TRANSPORT_LE                 0x02
 
+/* HID host events */
+#define HAL_HIDHOST_STATE_CONNECTED	0x00
+#define HAL_HIDHOST_STATE_CONNECTING	0x01
+#define HAL_HIDHOST_STATE_DISCONNECTED	0x02
+#define HAL_HIDHOST_STATE_DISCONNECTING	0x03
+#define HAL_HIDHOST_STATE_NO_HID	0x07
+#define HAL_HIDHOST_STATE_FAILED	0x08
+#define HAL_HIDHOST_STATE_UNKNOWN	0x09
+
+#define HAL_EV_HIDHOST_CONN_STATE		0x81
+struct hal_ev_hidhost_conn_state {
+		uint8_t bdaddr[6];
+			uint8_t state;
+} __attribute__((packed));
+
+#define HAL_EV_HIDHOST_INFO	0x82
+struct hal_ev_hidhost_info {
+	uint8_t  bdaddr[6];
+	uint8_t  attr;
+	uint8_t  subclass;
+	uint8_t  app_id;
+	uint16_t vendor;
+	uint16_t product;
+	uint16_t version;
+	uint8_t  country;
+	uint16_t descr_len;
+	uint8_t  descr[884];
+} __attribute__((packed));
+
+#define HAL_EV_HIDHOST_PROTO_MODE	0x83
+struct hal_ev_hidhost_proto_mode {
+	uint8_t bdaddr[6];
+	uint8_t status;
+	uint8_t mode;
+} __attribute__((packed));
+
+#define HAL_EV_HIDHOST_IDLE_TIME	0x84
+struct hal_ev_hidhost_idle_time {
+	uint8_t bdaddr[6];
+	uint8_t status;
+	uint32_t idle_rate;
+} __attribute__((packed));
+
+#define HAL_EV_HIDHOST_GET_REPORT	0x85
+struct hal_ev_hidhost_get_report {
+	uint8_t  bdaddr[6];
+	uint8_t  status;
+	uint16_t len;
+	uint8_t  data[0];
+} __attribute__((packed));
+
+#define HAL_EV_HIDHOST_VIRTUAL_UNPLUG	0x86
+struct hal_ev_hidhost_virtual_unplug {
+	uint8_t  bdaddr[6];
+	uint8_t  status;
+} __attribute__((packed));
+
+#define HAL_EV_HIDHOST_HANDSHAKE	0x87
+struct hal_ev_hidhost_handshake {
+	uint8_t  bdaddr[6];
+	uint8_t  status;
+} __attribute__((packed));
+
 #endif //_BT_HAL_MSG_H_
 
