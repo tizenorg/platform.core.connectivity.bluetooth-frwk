@@ -10,6 +10,7 @@ SET(SRCS
 ./src/bt-hal-utils.c
 ./src/bt-hal-gap-agent.c
 ./src/bt-hal-agent.c
+./src/bt-hal-hidhost.c
 )
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
