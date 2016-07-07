@@ -65,6 +65,8 @@ extern "C" {
 	EVENT(OAL_EVENT_DEVICE_ACL_DISCONNECTED)			/* bt_address_t */\
 	EVENT(OAL_EVENT_OAL_INITIALISED_SUCCESS)		/* OAL Initialisation event */	\
 	EVENT(OAL_EVENT_OAL_INITIALISED_FAILED)			/* OAL Initialisation event */	\
+	EVENT(OAL_EVENT_HID_CONNECTED)						/* event_hid_conn_t */\
+	EVENT(OAL_EVENT_HID_DISCONNECTED)					/* event_hid_conn_t */\
 	EVENT(OAL_EVENT_END)                                /* End of event*/\
 
 
@@ -133,6 +135,13 @@ typedef struct {
 } event_dev_conn_status_t;
 
 typedef event_dev_conn_status_t event_dev_bond_failed_t;
+
+/*********Datastructures for HID callback******************/
+/* HID :: connection state callback response data */
+typedef struct {
+	bt_address_t address;
+	oal_status_t status;
+} event_hid_conn_t;
 
 #ifdef __cplusplus
 }

@@ -120,6 +120,7 @@ void device_mgr_init(const bt_interface_t * stack_if);
 void device_mgr_cleanup(void);
 
 oal_status_t adapter_mgr_init(const bt_interface_t * stack_if);
+const bt_interface_t* adapter_get_stack_interface(void);
 
 /* Event Manager */
 /* Use this when Address is to be printed */
