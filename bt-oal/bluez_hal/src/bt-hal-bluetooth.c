@@ -32,6 +32,7 @@
 
 #include <bt-hal-adapter-dbus-handler.h>
 #include <bt-hal-device-dbus-handler.h>
+#include <bt-hal-hidhost.h>
 
 #define enum_prop_to_hal(prop, hal_prop, type) do { \
 	static type e; \
@@ -201,6 +202,9 @@ static const void *get_profile_interface(const char *profile_id)
 
 	if (!interface_ready())
 		return NULL;
+
+	if (!strncmp(profile_id, BT_PROFILE_HIDHOST_ID, strlen(profile_id)))
+		return bt_get_hidhost_interface();
 
 	if (!strcmp(profile_id, BT_PROFILE_PAN_ID))
 		return NULL;
