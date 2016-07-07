@@ -14,6 +14,7 @@ oal-hardware.c
 oal-manager.c
 oal-adapter-mgr.c
 oal-device-mgr.c
+oal-hid-host.c
 common/oal-utils.c
 common/oal-common.c
 common/oal-event-dispatcher.c
