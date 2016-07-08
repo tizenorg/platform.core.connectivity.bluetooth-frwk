@@ -35,6 +35,7 @@
 
 _bt_service_event_handler_callback adapter_cb;
 _bt_service_event_handler_callback device_cb;
+_bt_service_event_handler_callback hid_cb;
 
 void _bt_service_register_event_handler_callback(
 		bt_service_module_t module, _bt_service_event_handler_callback cb)
@@ -48,6 +49,10 @@ void _bt_service_register_event_handler_callback(
                 BT_INFO("Register BT_DEVICE_MODULE Callback");
                 device_cb = cb;
                 break;
+	case BT_HID_MODULE:
+                BT_INFO("Register BT_HID_MODULE Callback");
+                hid_cb = cb;
+                break;
 	default:
 		BT_INFO("Unknown module");
 	}
@@ -60,6 +65,14 @@ void _bt_service_unregister_event_handler_callback(bt_service_module_t module)
 		BT_INFO("Un-Register BT_ADAPTER_MODULE Callback");
 		adapter_cb = NULL;
 		break;
+	case BT_DEVICE_MODULE:
+                BT_INFO("Un-Register BT_DEVICE_MODULE Callback");
+                device_cb = NULL;
+                break;
+	case BT_HID_MODULE:
+                BT_INFO("Un-Register BT_HID_MODULE Callback");
+                hid_cb = NULL;
+                break;
 	default:
 		BT_INFO("Unknown module");
 	}
@@ -88,24 +101,31 @@ void _bt_service_oal_event_receiver(int event_type, gpointer event_data, gsize l
 		if (adapter_cb)
 			adapter_cb(event_type, event_data);
 		break;
-        case OAL_EVENT_ADAPTER_INQUIRY_RESULT_BREDR_ONLY:
-        case OAL_EVENT_ADAPTER_INQUIRY_RESULT_BLE:
-	case OAL_EVENT_DEVICE_PROPERTIES:
-		if (device_cb)
-                        device_cb(event_type, event_data);
-		break;
-        case OAL_EVENT_DEVICE_BONDING_SUCCESS:
-        case OAL_EVENT_DEVICE_BONDING_REMOVED:
-        case OAL_EVENT_DEVICE_BONDING_FAILED:
+	case OAL_EVENT_ADAPTER_INQUIRY_RESULT_BREDR_ONLY:
+	case OAL_EVENT_ADAPTER_INQUIRY_RESULT_BLE:
+	case OAL_EVENT_DEVICE_BONDING_SUCCESS:
+	case OAL_EVENT_DEVICE_BONDING_REMOVED:
+	case OAL_EVENT_DEVICE_BONDING_FAILED:
 	case OAL_EVENT_DEVICE_ACL_CONNECTED:
-        case OAL_EVENT_DEVICE_ACL_DISCONNECTED:
+	case OAL_EVENT_DEVICE_ACL_DISCONNECTED:
 	case OAL_EVENT_DEVICE_PIN_REQUEST:
-        case OAL_EVENT_DEVICE_PASSKEY_ENTRY_REQUEST:
-        case OAL_EVENT_DEVICE_PASSKEY_CONFIRMATION_REQUEST:
-        case OAL_EVENT_DEVICE_PASSKEY_DISPLAY:
-        case OAL_EVENT_DEVICE_SSP_CONSENT_REQUEST:
-                if (device_cb)
-                        device_cb(event_type, event_data);
+	case OAL_EVENT_DEVICE_PASSKEY_ENTRY_REQUEST:
+	case OAL_EVENT_DEVICE_PASSKEY_CONFIRMATION_REQUEST:
+	case OAL_EVENT_DEVICE_PASSKEY_DISPLAY:
+	case OAL_EVENT_DEVICE_SSP_CONSENT_REQUEST:
+		if (device_cb)
+			device_cb(event_type, event_data);
+		break;
+	case OAL_EVENT_DEVICE_PROPERTIES:
+		if (hid_cb)
+			hid_cb(event_type, event_data);
+		if (device_cb)
+			device_cb(event_type, event_data);
+		break;
+	case OAL_EVENT_HID_CONNECTED:
+	case OAL_EVENT_HID_DISCONNECTED:
+		if (hid_cb)
+			hid_cb(event_type, event_data);
 		break;
 	default:
 		BT_ERR("Unhandled Event: %d", event_type);

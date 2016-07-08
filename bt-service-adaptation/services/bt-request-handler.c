@@ -32,6 +32,7 @@
 #ifdef TIZEN_DPM_ENABLE
 #include "bt-service-dpm.h"
 #endif
+#include "bt-service-hidhost.h"
 
 /* For maintaining Application Sync API call requests */
 GSList *invocation_list = NULL;
@@ -590,6 +591,44 @@ int __bt_bluez_request(int function_name,
 		__bt_service_get_parameters(in_param1,
 				&confirmation_reply, sizeof(gboolean));
 		result = _bt_passkey_confirmation_reply(confirmation_reply);
+		break;
+	}
+	case BT_HID_CONNECT: {
+		bluetooth_device_address_t address = { {0} };
+
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+
+		result = _bt_hid_connect(&address);
+		if (result != BLUETOOTH_ERROR_NONE) {
+			g_array_append_vals(*out_param1, &address,
+					sizeof(bluetooth_device_address_t));
+		} else {
+			char *addr = g_malloc0(BT_ADDRESS_STRING_SIZE);
+			_bt_convert_addr_type_to_string(addr, address.addr);
+			sender = (char*)g_dbus_method_invocation_get_sender(context);
+			_bt_save_invocation_context(context, result, sender,
+					function_name, (gpointer)addr);
+		}
+		break;
+	}
+	case BT_HID_DISCONNECT: {
+		bluetooth_device_address_t address = { {0} };
+
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+
+		result = _bt_hid_disconnect(&address);
+		if (result != BLUETOOTH_ERROR_NONE) {
+			g_array_append_vals(*out_param1, &address,
+					sizeof(bluetooth_device_address_t));
+		} else {
+			char *addr = g_malloc0(BT_ADDRESS_STRING_SIZE);
+			_bt_convert_addr_type_to_string(addr, address.addr);
+			sender = (char*)g_dbus_method_invocation_get_sender(context);
+			_bt_save_invocation_context(context, result, sender,
+					function_name, (gpointer)addr);
+		}
 		break;
 	}
 #ifdef TIZEN_DPM_ENABLE

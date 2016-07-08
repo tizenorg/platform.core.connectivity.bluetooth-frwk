@@ -44,6 +44,7 @@
 #ifdef TIZEN_DPM_ENABLE
 #include "bt-service-dpm.h"
 #endif
+#include "bt-service-hidhost.h"
 
 /* OAL headers */
 #include <oal-event.h>
@@ -681,11 +682,30 @@ static void __bt_adapter_event_handler(int event_type, gpointer event_data)
 	BT_DBG("-");
 }
 
+static int __bt_init_profiles()
+{
+	int ret;
+
+	/*TODO: Init bluetooth profiles */
+	ret = _bt_hidhost_initialize();
+	if (ret != BLUETOOTH_ERROR_NONE) {
+		BT_ERR("_bt_hidhost_initialize Failed");
+		return ret;
+	}
+
+	return BLUETOOTH_ERROR_NONE;
+}
+
 /* OAL post initialization handler */
 static void __bt_post_oal_init(void)
 {
+	int ret;
+
 	BT_DBG("OAL initialized, Init profiles..");
-	/*TODO */
+	ret = __bt_init_profiles();
+	if (ret != BLUETOOTH_ERROR_NONE)
+		BT_ERR("Bluetooth profile init error: %d", ret);
+
 	return;
 }
 
@@ -718,7 +738,7 @@ static gboolean __bt_is_service_request_present(int service_function)
 	/* Get method invocation context */
 	for (l = _bt_get_invocation_list(); l != NULL; l = g_slist_next(l)) {
 		req_info = l->data;
-		if (!req_info && req_info->service_function == service_function)
+		if (req_info && req_info->service_function == service_function)
 			return TRUE;
 	}
 

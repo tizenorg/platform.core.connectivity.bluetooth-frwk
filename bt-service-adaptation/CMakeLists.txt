@@ -14,6 +14,7 @@ marshal.c
 ./services/bt-service-event-receiver.c
 ./services/bt-service-dpm.c
 ./services/bt-service-agent-util.c
+./services/hid/bt-service-hidhost.c
 )
 
 IF("${CMAKE_BUILD_TYPE}" STREQUAL "")
