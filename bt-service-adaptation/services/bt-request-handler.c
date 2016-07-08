@@ -29,6 +29,9 @@
 
 #include "bt-service-core-adapter.h"
 #include "bt-service-core-device.h"
+#ifdef TIZEN_DPM_ENABLE
+#include "bt-service-dpm.h"
+#endif
 
 /* For maintaining Application Sync API call requests */
 GSList *invocation_list = NULL;
@@ -533,58 +536,355 @@ int __bt_bluez_request(int function_name,
 		result = _bt_set_alias(&address, local_name);
 		break;
 	}
-	case BT_BOND_DEVICE:{
-		    bluetooth_device_address_t address = { {0} };
+	case BT_BOND_DEVICE: {
+		bluetooth_device_address_t address = { {0} };
 
-		    __bt_service_get_parameters(in_param1,
-					    &address, sizeof(bluetooth_device_address_t));
-		    result = _bt_bond_device(&address, BLUETOOTH_DEV_CONN_DEFAULT, out_param1);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+		result = _bt_bond_device(&address, BLUETOOTH_DEV_CONN_DEFAULT, out_param1);
 
-		    /* Save invocation */
-		    if (result == BLUETOOTH_ERROR_NONE) {
-			    char * addr = g_malloc0(BT_ADDRESS_STRING_SIZE);
-			    _bt_convert_addr_type_to_string(addr, address.addr);
-			    BT_DBG("_bt_bond_device scheduled successfully! save invocation context");
-			    sender = (char*)g_dbus_method_invocation_get_sender(context);
-			    _bt_save_invocation_context(context, result, sender,
-					    function_name, (gpointer)addr);
-		    }
-		    break;
+		/* Save invocation */
+		if (result == BLUETOOTH_ERROR_NONE) {
+			char * addr = g_malloc0(BT_ADDRESS_STRING_SIZE);
+			_bt_convert_addr_type_to_string(addr, address.addr);
+			BT_DBG("_bt_bond_device scheduled successfully! save invocation context");
+			sender = (char*)g_dbus_method_invocation_get_sender(context);
+			_bt_save_invocation_context(context, result, sender,
+					function_name, (gpointer)addr);
+		}
+		break;
 	}
 	case BT_UNBOND_DEVICE: {
-		       bluetooth_device_address_t address = { {0} };
+		bluetooth_device_address_t address = { {0} };
 
-		       __bt_service_get_parameters(in_param1,
-				       &address, sizeof(bluetooth_device_address_t));
-		       result = _bt_unbond_device(&address, out_param1);
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+		result = _bt_unbond_device(&address, out_param1);
 
-		       /* Save invocation */
-		       if (result == BLUETOOTH_ERROR_NONE) {
-			       char * addr = g_malloc0(BT_ADDRESS_STRING_SIZE);
-			       _bt_convert_addr_type_to_string(addr, address.addr);
-			       BT_DBG("_bt_unbond_device scheduled successfully! save invocation context");
-			       sender = (char*)g_dbus_method_invocation_get_sender(context);
-			       _bt_save_invocation_context(context, result, sender,
-					       function_name, (gpointer)addr);
-		       }
-		       break;
+		/* Save invocation */
+		if (result == BLUETOOTH_ERROR_NONE) {
+			char * addr = g_malloc0(BT_ADDRESS_STRING_SIZE);
+			_bt_convert_addr_type_to_string(addr, address.addr);
+			BT_DBG("_bt_unbond_device scheduled successfully! save invocation context");
+			sender = (char*)g_dbus_method_invocation_get_sender(context);
+			_bt_save_invocation_context(context, result, sender,
+					function_name, (gpointer)addr);
+		}
+		break;
 	}
 	case BT_PASSKEY_REPLY: {
-		       const char *passkey = NULL;
-		       gboolean authentication_reply = FALSE;
-		       passkey = g_variant_get_data(in_param1);
-		       __bt_service_get_parameters(in_param2,
-				       &authentication_reply, sizeof(gboolean));
-		       result = _bt_passkey_reply(passkey, authentication_reply);
-		       break;
-       }
-	case BT_PASSKEY_CONFIRMATION_REPLY: {
-		    gboolean confirmation_reply = FALSE;
-		    __bt_service_get_parameters(in_param1,
-				    &confirmation_reply, sizeof(gboolean));
-		    result = _bt_passkey_confirmation_reply(confirmation_reply);
-		    break;
+		const char *passkey = NULL;
+		gboolean authentication_reply = FALSE;
+		passkey = g_variant_get_data(in_param1);
+		__bt_service_get_parameters(in_param2,
+				&authentication_reply, sizeof(gboolean));
+		result = _bt_passkey_reply(passkey, authentication_reply);
+		break;
 	}
+	case BT_PASSKEY_CONFIRMATION_REPLY: {
+		gboolean confirmation_reply = FALSE;
+		__bt_service_get_parameters(in_param1,
+				&confirmation_reply, sizeof(gboolean));
+		result = _bt_passkey_confirmation_reply(confirmation_reply);
+		break;
+	}
+#ifdef TIZEN_DPM_ENABLE
+	case BT_DPM_SET_ALLOW_BT_MODE: {
+		dpm_bt_allow_t value = DPM_BT_ERROR;
+
+		__bt_service_get_parameters(in_param1, &value,
+				sizeof(int));
+
+		result = _bt_dpm_set_allow_bluetooth_mode(value);
+		break;
+	}
+	case BT_DPM_GET_ALLOW_BT_MODE: {
+		dpm_bt_allow_t value = DPM_BT_ERROR;
+
+		value = _bt_dpm_get_allow_bluetooth_mode();
+		result = DPM_RESULT_SUCCESS;
+		g_array_append_vals(*out_param1, &value, sizeof(int));
+
+		break;
+	}
+	case BT_DPM_SET_DEVICE_RESTRITION: {
+		dpm_status_t value = DPM_BT_ERROR;
+
+		__bt_service_get_parameters(in_param1, &value,
+				sizeof(int));
+
+		result = _bt_dpm_activate_bluetooth_device_restriction(value);
+		break;
+	}
+	case BT_DPM_GET_DEVICE_RESTRITION: {
+		dpm_status_t value = DPM_BT_ERROR;
+
+		value = _bt_dpm_is_bluetooth_device_restriction_active();
+		result = DPM_RESULT_SUCCESS;
+		g_array_append_vals(*out_param1, &value, sizeof(int));
+
+		break;
+	}
+	case BT_DPM_SET_UUID_RESTRITION: {
+		dpm_status_t value = DPM_BT_ERROR;
+
+		__bt_service_get_parameters(in_param1, &value,
+				sizeof(int));
+
+		result = _bt_dpm_activate_bluetoooth_uuid_restriction(value);
+		break;
+	}
+	case BT_DPM_GET_UUID_RESTRITION: {
+		dpm_status_t value = DPM_BT_ERROR;
+
+		value = _bt_dpm_is_bluetooth_uuid_restriction_active();
+		result = DPM_RESULT_SUCCESS;
+		g_array_append_vals(*out_param1, &value, sizeof(int));
+
+		break;
+	}
+	case BT_DPM_ADD_DEVICES_BLACKLIST: {
+		bluetooth_device_address_t address = { {0} };
+
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
+
+		result = _bt_dpm_add_bluetooth_devices_to_blacklist(&address);
+		break;
+	}
+	case BT_DPM_ADD_DEVICES_WHITELIST: {
+		bluetooth_device_address_t address = { {0} };
+
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
+
+		result = _bt_dpm_add_bluetooth_devices_to_whitelist(&address);
+		break;
+	}
+	case BT_DPM_ADD_UUIDS_BLACKLIST: {
+		const char *uuid = NULL;
+
+		uuid = g_variant_get_data(in_param1);
+
+		result = _bt_dpm_add_bluetooth_uuids_to_blacklist(uuid);
+		break;
+	}
+	case BT_DPM_ADD_UUIDS_WHITELIST: {
+		const char *uuid = NULL;
+
+		uuid = g_variant_get_data(in_param1);
+
+		result = _bt_dpm_add_bluetooth_uuids_to_whitelist(uuid);
+		break;
+	}
+	case BT_DPM_CLEAR_DEVICES_BLACKLIST: {
+		result = _bt_dpm_clear_bluetooth_devices_from_blacklist();
+		break;
+	}
+	case BT_DPM_CLEAR_DEVICES_WHITELIST: {
+		result = _bt_dpm_clear_bluetooth_devices_from_whitelist();
+		break;
+	}
+	case BT_DPM_CLEAR_UUIDS_BLACKLIST: {
+		result = _bt_dpm_clear_bluetooth_uuids_from_blacklist();
+		break;
+	}
+	case BT_DPM_CLEAR_UUIDS_WHITELIST: {
+		result = _bt_dpm_clear_bluetooth_uuids_from_whitelist();
+		break;
+	}
+	case BT_DPM_REMOVE_DEVICE_BLACKLIST: {
+		bluetooth_device_address_t address = { {0} };
+
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
+
+		result = _bt_dpm_remove_bluetooth_devices_from_blacklist(&address);
+		break;
+	}
+	case BT_DPM_REMOVE_DEVICE_WHITELIST: {
+		bluetooth_device_address_t address = { {0} };
+
+		__bt_service_get_parameters(in_param1, &address,
+				sizeof(bluetooth_device_address_t));
+
+		result = _bt_dpm_remove_bluetooth_devices_from_whitelist(&address);
+		break;
+	}
+	case BT_DPM_REMOVE_UUID_BLACKLIST: {
+		const char *uuid = NULL;
+
+		uuid = g_variant_get_data(in_param1);
+
+		result = _bt_dpm_remove_bluetooth_uuids_from_blacklist(uuid);
+		break;
+	}
+	case BT_DPM_REMOVE_UUID_WHITELIST: {
+		const char *uuid = NULL;
+
+		uuid = g_variant_get_data(in_param1);
+
+		result = _bt_dpm_remove_bluetooth_uuids_from_whitelist(uuid);
+
+		break;
+	}
+	case BT_DPM_GET_DEVICES_BLACKLIST: {
+		result = _bt_dpm_get_bluetooth_devices_from_blacklist(out_param1);
+		break;
+	}
+	case BT_DPM_GET_DEVICES_WHITELIST: {
+		result = _bt_dpm_get_bluetooth_devices_from_whitelist(out_param1);
+		break;
+	}
+	case BT_DPM_GET_UUIDS_BLACKLIST: {
+		result = _bt_dpm_get_bluetooth_uuids_from_blacklist(out_param1);
+		break;
+	}
+	case BT_DPM_GET_UUIDS_WHITELIST: {
+		result = _bt_dpm_get_bluetooth_uuids_from_whitelist(out_param1);
+		break;
+	}
+	case BT_DPM_SET_ALLOW_OUTGOING_CALL: {
+		dpm_status_t value = DPM_BT_ERROR;
+
+		__bt_service_get_parameters(in_param1, &value,
+				sizeof(int));
+
+		result = _bt_dpm_set_allow_bluetooth_outgoing_call(value);
+
+		break;
+	}
+	case BT_DPM_GET_ALLOW_OUTGOING_CALL: {
+		dpm_status_t value = DPM_BT_ERROR;
+
+		value = _bt_dpm_get_allow_bluetooth_outgoing_call();
+		result = DPM_RESULT_SUCCESS;
+		g_array_append_vals(*out_param1, &value, sizeof(int));
+
+		break;
+	}
+	case BT_DPM_SET_PAIRING_STATE: {
+		dpm_status_t value = DPM_BT_ERROR;
+
+		__bt_service_get_parameters(in_param1, &value,
+				sizeof(int));
+
+		result = _bt_dpm_set_bluetooth_pairing_state(value);
+
+		break;
+	}
+	case BT_DPM_GET_PAIRING_STATE: {
+		dpm_status_t value = DPM_BT_ERROR;
+
+		value = _bt_dpm_get_bluetooth_pairing_state();
+		result = DPM_RESULT_SUCCESS;
+		g_array_append_vals(*out_param1, &value, sizeof(int));
+
+		break;
+	}
+	case BT_DPM_SET_PROFILE_STATE: {
+		dpm_status_t value = DPM_BT_ERROR;
+		dpm_profile_t profile = DPM_PROFILE_NONE;
+
+		__bt_service_get_parameters(in_param1, &profile,
+				sizeof(int));
+		__bt_service_get_parameters(in_param2, &value,
+				sizeof(int));
+
+		result = _bt_dpm_set_bluetooth_profile_state(profile, value);
+
+		break;
+	}
+	case BT_DPM_GET_PROFILE_STATE: {
+		dpm_status_t value = DPM_BT_ERROR;
+		dpm_profile_t profile = DPM_PROFILE_NONE;
+
+		__bt_service_get_parameters(in_param2, &profile,
+				sizeof(int));
+
+		value = _bt_dpm_get_bluetooth_profile_state(profile);
+		result = DPM_RESULT_SUCCESS;
+		g_array_append_vals(*out_param1, &value, sizeof(int));
+
+		break;
+	}
+	case BT_DPM_SET_DESKROP_CONNECTIVITY_STATE: {
+		dpm_status_t value = DPM_BT_ERROR;
+
+		__bt_service_get_parameters(in_param1, &value,
+				sizeof(int));
+
+		result = _bt_dpm_set_bluetooth_desktop_connectivity_state(value);
+
+		break;
+	}
+	case BT_DPM_GET_DESKROP_CONNECTIVITY_STATE: {
+		dpm_status_t value = DPM_BT_ERROR;
+
+		value = _bt_dpm_get_bluetooth_desktop_connectivity_state();
+		result = DPM_RESULT_SUCCESS;
+		g_array_append_vals(*out_param1, &value, sizeof(int));
+
+		break;
+	}
+	case BT_DPM_SET_DISCOVERABLE_STATE: {
+		dpm_status_t value = DPM_BT_ERROR;
+
+		__bt_service_get_parameters(in_param1, &value,
+				sizeof(int));
+
+		result = _bt_dpm_set_bluetooth_discoverable_state(value);
+
+		break;
+	}
+	case BT_DPM_GET_DISCOVERABLE_STATE: {
+		dpm_status_t value = DPM_BT_ERROR;
+
+		value = _bt_dpm_get_bluetooth_discoverable_state();
+		result = DPM_RESULT_SUCCESS;
+		g_array_append_vals(*out_param1, &value, sizeof(int));
+
+		break;
+	}
+	case BT_DPM_SET_LIMITED_DISCOVERABLE_STATE: {
+		dpm_status_t value = DPM_BT_ERROR;
+
+		__bt_service_get_parameters(in_param1, &value,
+				sizeof(int));
+
+		result = _bt_dpm_set_bluetooth_limited_discoverable_state(value);
+
+		break;
+	}
+	case BT_DPM_GET_LIMITED_DISCOVERABLE_STATE: {
+		dpm_status_t value = DPM_BT_ERROR;
+
+		value = _bt_dpm_get_bluetooth_limited_discoverable_state();
+		result = DPM_RESULT_SUCCESS;
+		g_array_append_vals(*out_param1, &value, sizeof(int));
+
+		break;
+	}
+	case BT_DPM_SET_DATA_TRANSFER_STATE: {
+		dpm_status_t value = DPM_BT_ERROR;
+
+		__bt_service_get_parameters(in_param1, &value,
+				sizeof(int));
+
+		result = _bt_dpm_set_bluetooth_data_transfer_state(value);
+
+		break;
+	}
+	case BT_DPM_GET_DATA_TRANSFER_STATE: {
+		dpm_status_t value = DPM_BT_ERROR;
+
+		value = _bt_dpm_get_allow_bluetooth_data_transfer_state();
+		result = DPM_RESULT_SUCCESS;
+		g_array_append_vals(*out_param1, &value, sizeof(int));
+
+		break;
+	}
+#endif
 	default:
 		BT_INFO("UnSupported function [%d]", function_name);
 		result = BLUETOOTH_ERROR_NOT_SUPPORT;
