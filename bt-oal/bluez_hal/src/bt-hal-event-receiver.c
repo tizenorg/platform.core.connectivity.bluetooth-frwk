@@ -49,21 +49,23 @@
 /* Global variables and structures */
 static GDBusConnection *manager_conn;
 static handle_stack_msg event_cb = NULL;
+static handle_stack_msg hid_event_cb = NULL;
 static guint event_id;
 
 /* Forward declarations */
-int __bt_hal_register_service_event(GDBusConnection *g_conn, int event_type);
+static int __bt_hal_register_service_event(GDBusConnection *g_conn, int event_type);
 static int __bt_hal_register_manager_subscribe_signal(GDBusConnection *conn, int subscribe);
 static int __bt_hal_register_device_subscribe_signal(GDBusConnection *conn, int subscribe);
+static int __bt_hal_register_input_subscribe_signal(GDBusConnection *conn, int subscribe);
+
 static int __bt_hal_parse_event(GVariant *msg);
 static int __bt_hal_get_owner_info(GVariant *msg, char **name, char **previous, char **current);
+
+static void __bt_hal_handle_property_changed_event(GVariant *msg, const char *object_path);
 static void __bt_hal_adapter_property_changed_event(GVariant *msg);
-void __bt_hal_handle_property_changed_event(GVariant *msg, const char *object_path);
 static  void __bt_hal_manager_event_filter(GDBusConnection *connection, const gchar *sender_name,
 			const gchar *object_path, const gchar *interface_name, const gchar *signal_name,
 			GVariant *parameters, gpointer user_data);
-static int __bt_hal_register_manager_subscribe_signal(GDBusConnection *conn, int subscribe);
-int __bt_hal_register_service_event(GDBusConnection *g_conn, int event_type);
 static int __bt_hal_initialize_manager_receiver(void);
 static gboolean __bt_hal_parse_interface(GVariant *msg);
 static void __bt_hal_handle_device_event(GVariant *value, GVariant *parameters);
@@ -74,6 +76,7 @@ static void __bt_hal_dbus_device_found_properties(const char *device_path);
 static void __bt_hal_device_properties_lookup(GVariant *result, char *address);
 static void __bt_hal_handle_device_specific_events(GVariant *msg, const char *member,const char *path);
 static void __bt_hal_send_device_acl_connection_state_event(gboolean connected, const char *address);
+static void __bt_hal_handle_input_event(GVariant *msg, const char *path);
 
 static gboolean __bt_hal_discovery_finished_cb(gpointer user_data)
 {
@@ -504,7 +507,7 @@ static gboolean __bt_hal_parse_device_properties(GVariant *item)
 	return TRUE;
 }
 
-void __bt_hal_handle_property_changed_event(GVariant *msg, const char *object_path)
+static void __bt_hal_handle_property_changed_event(GVariant *msg, const char *object_path)
 {
 	char *interface_name = NULL;
 	GVariant *val = NULL;
@@ -534,6 +537,7 @@ void __bt_hal_handle_property_changed_event(GVariant *msg, const char *object_pa
 		/* TODO: Handle event */
 	} else if (strcasecmp(interface_name, BT_HAL_INPUT_INTERFACE) == 0) {
 		DBG("Event: Property Changed: Interface: BT_HAL_INPUT_INTERFACE");
+		__bt_hal_handle_input_event(val, object_path);
 	}
 	g_variant_unref(val);
 }
@@ -546,6 +550,55 @@ static void __bt_hal_handle_device_event(GVariant *value, GVariant *parameters)
 		ERR("Fail to parse the properies");
 		g_variant_unref(value);
 		return;
+	}
+
+	DBG("-");
+}
+
+static void __bt_hal_send_hid_connection_state_event(
+		gboolean connected, char *address)
+{
+	struct hal_ev_hidhost_conn_state ev;
+
+	ev.state = (connected == TRUE) ?
+		HAL_HIDHOST_STATE_CONNECTED :
+		HAL_HIDHOST_STATE_DISCONNECTED;
+
+	_bt_convert_addr_string_to_type(ev.bdaddr, address);
+
+	if (!hid_event_cb)
+		ERR("HID event handler not registered");
+	else
+		hid_event_cb(HAL_EV_HIDHOST_CONN_STATE, &ev, sizeof(ev));
+}
+
+static void __bt_hal_handle_input_event(GVariant *msg, const char *path)
+{
+	gboolean property_flag = FALSE;
+	GVariantIter value_iter;
+	char *property = NULL;
+	GVariant *child = NULL, *val = NULL;
+
+	DBG("+");
+	g_variant_iter_init (&value_iter, msg);
+	while ((child = g_variant_iter_next_value (&value_iter))) {
+		g_variant_get(child, "{sv}", &property, &val);
+
+		if (property == NULL)
+			return;
+
+		if (strcasecmp(property, "Connected") == 0) {
+			char *address;
+
+			g_variant_get(val, "b", &property_flag);
+			address = g_malloc0(BT_HAL_ADDRESS_STRING_SIZE);
+			_bt_convert_device_path_to_address(path, address);
+			__bt_hal_send_hid_connection_state_event(property_flag, address);
+			g_free(address);
+		}
+		g_free(property);
+		g_variant_unref(val);
+		g_variant_unref(child);
 	}
 
 	DBG("-");
@@ -661,6 +714,7 @@ static  void __bt_hal_manager_event_filter(GDBusConnection *connection,
 		DBG("Manager Event: Interface Name: BT_HAL_ADAPTER_INTERFACE");
 	} else if (g_strcmp0(interface_name, BT_HAL_INPUT_INTERFACE) == 0) {
 		DBG("Manager Event: Interface Name: BT_HAL_INPUT_INTERFACE");
+		__bt_hal_handle_input_event(parameters, object_path);
 	} else if (g_strcmp0(interface_name, BT_HAL_NETWORK_SERVER_INTERFACE) == 0) {
 		/* TODO: Handle Network Server events from stack */
 		DBG("Manager Event: Interface Name: BT_HAL_NETWORK_SERVER_INTERFACE");
@@ -790,7 +844,37 @@ static int __bt_hal_register_device_subscribe_signal(GDBusConnection *conn,
 	return 0;
 }
 
-int __bt_hal_register_service_event(GDBusConnection *g_conn, int event_type)
+static int __bt_hal_register_input_subscribe_signal(GDBusConnection *conn, int subscribe)
+{
+	static int subs_input_id = -1;
+
+	DBG("+");
+
+	if (conn == NULL)
+		return -1;
+
+	if (subscribe) {
+		if (subs_input_id == -1) {
+			subs_input_id = g_dbus_connection_signal_subscribe(conn,
+					NULL, BT_HAL_INPUT_INTERFACE,
+					NULL, NULL, NULL, 0,
+					__bt_hal_manager_event_filter,
+					NULL, NULL);
+		}
+	} else {
+		if (subs_input_id != -1) {
+			g_dbus_connection_signal_unsubscribe(conn,
+					subs_input_id);
+			subs_input_id = -1;
+		}
+	}
+
+	DBG("-");
+
+	return 0;
+}
+
+static int __bt_hal_register_service_event(GDBusConnection *g_conn, int event_type)
 {
 	DBG("+");
 
@@ -799,15 +883,18 @@ int __bt_hal_register_service_event(GDBusConnection *g_conn, int event_type)
 
 	/* TODO: Add more events in subsequent patches */
 	switch (event_type) {
-		case BT_HAL_MANAGER_EVENT:
-			__bt_hal_register_manager_subscribe_signal(g_conn, TRUE);
-			break;
-		case BT_HAL_DEVICE_EVENT:
-			__bt_hal_register_device_subscribe_signal(g_conn, TRUE);
-			break;
-		default:
-			INFO_C("Register Event: event_type [%d]", event_type);
-			return BT_HAL_ERROR_NOT_SUPPORT;
+	case BT_HAL_MANAGER_EVENT:
+		__bt_hal_register_manager_subscribe_signal(g_conn, TRUE);
+		break;
+	case BT_HAL_DEVICE_EVENT:
+		__bt_hal_register_device_subscribe_signal(g_conn, TRUE);
+		break;
+	case BT_HAL_HID_EVENT:
+		__bt_hal_register_input_subscribe_signal(g_conn, TRUE);
+		break;
+	default:
+		INFO_C("Register Event: event_type [%d]", event_type);
+		return BT_HAL_ERROR_NOT_SUPPORT;
 	}
 
 	return BT_HAL_ERROR_NONE;
@@ -834,6 +921,9 @@ static int __bt_hal_initialize_manager_receiver(void)
 		goto fail;
 	if (__bt_hal_register_service_event(manager_conn,
 				BT_HAL_DEVICE_EVENT) != BT_HAL_ERROR_NONE)
+		goto fail;
+	if (__bt_hal_register_service_event(manager_conn,
+				BT_HAL_HID_EVENT) != BT_HAL_ERROR_NONE)
 		goto fail;
 	return BT_HAL_ERROR_NONE;
 fail:
@@ -1213,9 +1303,39 @@ static void __bt_hal_handle_device_specific_events(GVariant *msg, const char *me
 		__bt_hal_send_device_acl_connection_state_event(FALSE, address);
 		g_free(address);
 	} else if (strcasecmp(member, "ProfileStateChanged") == 0) {
-		/* TODO */
+		int state = 0;
+		char *profile_uuid = NULL;
+
+		g_variant_get(msg, "(si)", &profile_uuid, &state);
+		address = g_malloc0(BT_HAL_ADDRESS_STRING_SIZE);
+		_bt_convert_device_path_to_address(path, address);
+
+		DBG("Address: %s", address);
+		DBG("Profile UUID: %s", profile_uuid);
+		DBG("State: %d", state);
+		if (strncmp(profile_uuid, HID_UUID, strlen(HID_UUID)) == 0) {
+			if (state == BT_HAL_PROFILE_STATE_CONNECTED)
+				__bt_hal_send_hid_connection_state_event(TRUE, address);
+			else if (state == BT_HAL_PROFILE_STATE_DISCONNECTED)
+				__bt_hal_send_hid_connection_state_event(FALSE, address);
+			else
+				DBG("Profile state: %d", state);
+
+		}
+		g_free(address);
+		g_free(profile_uuid);
 	} else if (strcasecmp(member, "AdvReport") == 0) {
 		/* TODO */
 		DBG("Member: [%s]", member);
 	}
+}
+
+void _bt_hal_register_hid_event_handler_cb(handle_stack_msg cb)
+{
+		hid_event_cb = cb;
+}
+
+void _bt_hal_unregister_hid_event_handler_cb()
+{
+		hid_event_cb = NULL;
 }
