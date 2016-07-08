@@ -40,6 +40,10 @@ typedef void (*handle_stack_msg) (int message, void *buf, uint16_t len);
 
 int _bt_hal_initialize_event_receiver(handle_stack_msg cb);
 
+void _bt_hal_register_hid_event_handler_cb(handle_stack_msg cb);
+
+void _bt_hal_unregister_hid_event_handler_cb();
+
 handle_stack_msg _bt_hal_get_stack_message_handler(void);
 
 int __bt_insert_hal_properties(void *buf, uint8_t type, uint16_t len, const void *val);

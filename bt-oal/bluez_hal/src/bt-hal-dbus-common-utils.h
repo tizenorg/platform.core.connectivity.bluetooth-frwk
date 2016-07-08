@@ -110,8 +110,6 @@ extern "C" {
 #define BT_HAL_NAME_OWNER_CHANGED "NameOwnerChanged"
 #define BT_HAL_PROPERTIES_CHANGED "PropertiesChanged"
 
-#define HID_UUID                "00001124-0000-1000-8000-00805f9b34fb"
-
 /**
  * This is Bluetooth error code
  */

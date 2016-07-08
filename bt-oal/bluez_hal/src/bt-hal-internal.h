@@ -53,6 +53,18 @@ typedef enum {
         /* Will be added */
 } bt_hal_event_type_t;
 
+/* Profile states matched to btd_service_state_t of bluez service.h */
+typedef enum {
+	BT_HAL_PROFILE_STATE_UNAVAILABLE,
+	BT_HAL_PROFILE_STATE_DISCONNECTED,
+	BT_HAL_PROFILE_STATE_CONNECTING,
+	BT_HAL_PROFILE_STATE_CONNECTED,
+	BT_HAL_PROFILE_STATE_DISCONNECTING,
+} bt_hal_profile_state_t;
+
+/* UUIDs */
+#define HID_UUID                "00001124-0000-1000-8000-00805f9b34fb"
+
 /* TODO  More declarations to be added in subsequent patches */
 #ifdef __cplusplus
 }
