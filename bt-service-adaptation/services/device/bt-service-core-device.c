@@ -74,6 +74,7 @@ bt_bond_data_t *trigger_bond_info;
 bt_bond_data_t *trigger_unbond_info;
 bt_pairing_data_t *trigger_pairing_info;
 
+
 typedef enum {
   BT_DEVICE_BOND_STATE_NONE,
   BT_DEVICE_BOND_STATE_CANCEL_DISCOVERY,
@@ -380,15 +381,31 @@ static void __bt_device_handle_bond_completion_event(bt_address_t *bd_addr)
 	}
 
 	BT_INFO("Bonding successfully completed");
-	/* TODO: Bonding state will be cleaned up & BONDING FINISHED EVENT
+	/* Bonding state will be cleaned up & BONDING FINISHED EVENT
 	   will be sent only when Properties are fetched from stack
-	   Till that time lets not free trigger_bond_info */
-	__bt_device_handle_pending_requests(BLUETOOTH_ERROR_NONE, BT_BOND_DEVICE,
-			trigger_bond_info->addr, BT_ADDRESS_STRING_SIZE);
-
+	   Till that time lets not free trigger_bond_info.
+	   However it is possible that while fetching device properties, internal
+	   stack error can occur which can lead to no valid properties or
+	   no properties at all. So in such cases, we must not wait for properties,
+	   otherwise, it can lead to infinite wait  */
 	_bt_convert_addr_string_to_type(dev_addr.addr,
-                        trigger_bond_info->addr);
-	_bt_device_get_bonded_device_info(&dev_addr);
+			trigger_bond_info->addr);
+
+	if (_bt_device_get_bonded_device_info(&dev_addr) == BLUETOOTH_ERROR_NONE) {
+		BT_DBG("BOnded device info query posted to stack successfully");
+		__bt_device_handle_pending_requests(BLUETOOTH_ERROR_NONE, BT_BOND_DEVICE,
+				trigger_bond_info->addr, BT_ADDRESS_STRING_SIZE);
+	} else {
+		BT_DBG("Possibly internal stack error in bonded device info query, perform cleanup");
+		__bt_device_handle_pending_requests(BLUETOOTH_ERROR_INTERNAL, BT_BOND_DEVICE,
+				trigger_bond_info->addr, BT_ADDRESS_STRING_SIZE);
+		/* Destroy if at all device got bonded at stack level */
+		device_destroy_bond((bt_address_t *)trigger_bond_info->dev_addr);
+
+		__bt_free_bond_info(BT_DEVICE_BOND_INFO);
+		__bt_free_pairing_info(&trigger_pairing_info);
+	}
+
 	BT_INFO("-");
 }
 
@@ -414,6 +431,7 @@ static void __bt_device_handle_bond_removal_event(bt_address_t *bd_addr)
 		__bt_free_bond_info(BT_DEVICE_UNBOND_INFO);
 		__bt_free_pairing_info(&trigger_pairing_info);
 	} else if (trigger_bond_info) {
+		BT_ERR("Bonding was removed");
 		__bt_device_handle_bond_state();
 	}
 	BT_INFO("-");
@@ -542,7 +560,6 @@ static void __bt_device_event_handler(int event_type, gpointer event_data)
 	     BT_INFO("ACL Connected event Received");
 	     event_dev_conn_status_t* param = event_data;
 	     __bt_device_acl_state_changed_callback(param, TRUE);
-	     __bt_device_handle_bond_removal_event(&(param->address));
 	     break;
 	}
 	case OAL_EVENT_DEVICE_ACL_DISCONNECTED: {
@@ -992,6 +1009,12 @@ static int __bt_device_handle_bond_state(void)
 		break;
 	case BT_DEVICE_BOND_STATE_NONE:
 		BT_INFO("Create Bond failed!!");
+		if (trigger_bond_info) {
+			__bt_device_handle_pending_requests(BLUETOOTH_ERROR_INTERNAL, BT_BOND_DEVICE,
+					trigger_bond_info->addr, BT_ADDRESS_STRING_SIZE);
+			__bt_free_bond_info(BT_DEVICE_BOND_INFO);
+			__bt_free_pairing_info(&trigger_pairing_info);
+		}
 		break;
 	default:
 		break;

@@ -285,22 +285,28 @@ void cb_device_properties(bt_status_t status, bt_bdaddr_t *bd_addr,
 	gsize size = 0;
 	bdstr_t bdstr;
 
-	/*Below code is commented out for handling Get Bonded devices for BLuez case.
-	GetALl properties on a particular device interface can reyurn properties of
-	an unpaired or untrusted device. If We block the below event, Application
-	request (BT_GET_BONDED_DEVICES) will timeout on DBUS */
-#if 0
-	if(BT_STATUS_SUCCESS != status) {
-		BT_ERR("[%s]status: %d", bdt_bd2str((bt_address_t*)bd_addr, &bdstr), status);
-		return;
-	}
-#endif
-	BT_DBG("[%s]", bdt_bd2str((bt_address_t*)bd_addr, &bdstr));
+	BT_DBG("[%s]status: [%d] num properties [%d]", bdt_bd2str((bt_address_t*)bd_addr, &bdstr),
+			status, num_properties);
+
 	dev_info = g_new0(remote_device_t, 1);
 	memcpy(dev_info->address.addr, bd_addr->address, 6);
 	parse_device_properties(num_properties, properties, dev_info, &adv_info);
 
-	if(num_properties == 1) {
+	if (num_properties == 0) {
+		BT_ERR("!!Unexpected!! num properties is 0 status [%d]", status);
+		/* It is possible that app called get bonded device info for a device
+		   which is not yet bonded or udner bonding, in such case, stack will return no properties.
+		   It is also possible that after bonding is done, BT MW attempted to fetch
+		   bonded device info, but due to internal stack error, 0 properties with status FAIL
+	           are received from stack. In such cases, simply send the event to BT MW
+		   and let it handle this event */
+		event_dev_properties_t *dev_props_event = g_new0(event_dev_properties_t, 1);
+		memcpy(&dev_props_event->device_info,
+				dev_info, sizeof(remote_device_t));
+		event_data = dev_props_event;
+		event = OAL_EVENT_DEVICE_PROPERTIES;
+		size = sizeof(event_dev_properties_t);
+	} else if (num_properties == 1) {
 		/* For one particular property a dedicated event to be sent */
 		switch(properties[0].type) {
 		case BT_PROPERTY_BDNAME:
