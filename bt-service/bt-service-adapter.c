@@ -1221,6 +1221,7 @@ int __bt_disable_cb(void)
 	GError *error = NULL;
 
 	_bt_adapter_set_status(BT_DEACTIVATING);
+#if 0
 	le_status = _bt_adapter_get_le_status();
 	BT_DBG("le_status : %d", le_status);
 	if (le_status == BT_LE_ACTIVATED) {
@@ -1240,7 +1241,7 @@ int __bt_disable_cb(void)
 			}
 		}
 	}
-
+#endif
 	proxy = __bt_get_core_proxy();
 	retv_if(!proxy, BLUETOOTH_ERROR_INTERNAL);
 
