@@ -121,6 +121,34 @@ oal_status_t device_stop_bond(bt_address_t * addr);
 oal_status_t device_destroy_bond(bt_address_t * addr);
 
 /**
+ * @brief Request services supported by remote device
+ *
+ * @details List of services in form UUIDs will be provided in event data
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre Adapter must be enabled with adapter_enable() followed by OAL_EVENT_ADAPTER_ENABLED
+ *
+ * @see  OAL_EVENT_DEVICE_SERVICES
+ * @see  event_dev_services_t
+ */
+oal_status_t device_query_services(bt_address_t * addr);
+
+/**
+ * @brief Cancel already in-progress SDP procedure
+ *
+ * @details Based on current progress different events can be recieved.
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre SDP must be in progress by calling device_query_services()
+ *
+ */
+oal_status_t device_stop_query_sevices(bt_address_t * addr);
+
+/**
  * @brief Accept PIN request as part of Bonding procedure
  *
  * @details Positive response to OAL_EVENT_DEVICE_PIN_REQUEST

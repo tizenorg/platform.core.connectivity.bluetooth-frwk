@@ -105,6 +105,7 @@ void parse_device_properties(int num_properties, bt_property_t *properties,
 		}
 		case BT_PROPERTY_UUIDS: {
 			uuids  = (service_uuid_t *)properties[i].val;
+			BT_DBG("Length of properties from HAL [%d]", properties[i].len);
 			uuid_count = properties[i].len/sizeof(bt_uuid_t);
 			table_len += uuid_count;
 			for(; tmp_uuid_cnt < table_len; tmp_uuid_cnt++) {

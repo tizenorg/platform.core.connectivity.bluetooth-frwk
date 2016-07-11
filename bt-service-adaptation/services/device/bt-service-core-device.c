@@ -62,6 +62,15 @@ typedef struct {
         bt_remote_dev_info_t *dev_info;
 } bt_bond_data_t;
 
+/* Searching Info structure */
+typedef struct {
+        int result;
+        char *addr;
+        gboolean is_cancelled_by_user;
+        bluetooth_device_address_t *dev_addr;
+        bt_remote_dev_info_t *dev_info;
+} bt_service_search_info_data_t;
+
 /* Pairing Info structure */
 typedef struct {
         char *addr;
@@ -73,7 +82,7 @@ typedef struct {
 bt_bond_data_t *trigger_bond_info;
 bt_bond_data_t *trigger_unbond_info;
 bt_pairing_data_t *trigger_pairing_info;
-
+bt_service_search_info_data_t *service_search_info;
 
 typedef enum {
   BT_DEVICE_BOND_STATE_NONE,
@@ -102,6 +111,7 @@ static void __bt_device_remote_device_found_callback(gpointer event_data, gboole
 
 static int __bt_device_handle_bond_state(void);
 static void __bt_free_bond_info(uint8_t type);
+static void __bt_free_service_search_info(bt_service_search_info_data_t **p_info);
 static void __bt_device_handle_bond_completion_event(bt_address_t *bd_addr);
 static void __bt_device_handle_bond_removal_event(bt_address_t *bd_addr);
 static void __bt_device_handle_bond_failed_event(event_dev_bond_failed_t* bond_fail_event);
@@ -115,6 +125,9 @@ static void __bt_device_pin_request_callback(remote_device_t* pin_req_event);
 static void __bt_device_ssp_passkey_display_callback(event_dev_passkey_t *dev_info);
 static void __bt_device_ssp_passkey_confirmation_callback(event_dev_passkey_t *dev_info);
 static void __bt_device_ssp_passkey_entry_callback(remote_device_t* dev_info);
+
+static void __bt_device_services_callback(event_dev_services_t* uuid_list);
+static void __bt_handle_ongoing_device_service_search(bt_remote_dev_info_t *remote_dev_info);
 
 void _bt_device_state_handle_callback_set_request(void)
 {
@@ -139,6 +152,7 @@ void __bt_device_handle_pending_requests(int result, int service_function,
 
 		switch (service_function) {
 		case BT_BOND_DEVICE:
+		case BT_SEARCH_SERVICE:
 		case BT_UNBOND_DEVICE: {
 			char *address = (char *)user_data;
 			if (strncmp((char*)req_info->user_data, address, BT_ADDRESS_STRING_SIZE)) {
@@ -298,7 +312,9 @@ static void __bt_device_remote_properties_callback(event_dev_properties_t *oal_d
 	}
 
 	_bt_copy_remote_device(rem_info, &dev_info);
+#ifdef __TEST_
 	_bt_service_print_dev_info(&dev_info);
+#endif
 
 	/* Check if app has requested for device info for already bonded devices */
 	__bt_device_handle_pending_requests(result, BT_GET_BONDED_DEVICES,
@@ -311,6 +327,121 @@ static void __bt_device_remote_properties_callback(event_dev_properties_t *oal_d
 		__bt_handle_ongoing_bond(trigger_bond_info->dev_info);
 	}
 
+	/* Handle SDP Device properties update */
+	if (service_search_info && service_search_info->dev_info) {
+		if (!strcmp(service_search_info->addr, rem_info->address)) {
+			BT_DBG("Properties received and SDP request pending, fill device properties and send event");
+			service_search_info->dev_info->class = rem_info->class;
+			service_search_info->dev_info->paired = rem_info->paired;
+			service_search_info->dev_info->connected = rem_info->connected;
+			service_search_info->dev_info->rssi = rem_info->rssi;
+			service_search_info->dev_info->addr_type = rem_info->addr_type;
+			service_search_info->dev_info->trust = rem_info->trust;
+
+			/* TODO*/
+			service_search_info->dev_info->manufacturer_data = NULL;
+			service_search_info->dev_info->manufacturer_data_len = 0;
+
+			__bt_handle_ongoing_device_service_search(service_search_info->dev_info);
+		}
+	}
+
+	BT_DBG("-");
+}
+
+static void __bt_handle_ongoing_device_service_search(bt_remote_dev_info_t *remote_dev_info)
+{
+	GVariant *param = NULL;
+	GVariant *uuids = NULL;
+	GVariantBuilder *builder = NULL;
+	GVariant *manufacturer_data;
+	int i = 0;
+	BT_INFO("Send Service Search request event");
+
+	builder = g_variant_builder_new(G_VARIANT_TYPE("as"));
+	for (i=0; i < remote_dev_info->uuid_count; i++) {
+		g_variant_builder_add(builder, "s",
+				remote_dev_info->uuids[i]);
+	}
+	uuids = g_variant_new("as", builder);
+	g_variant_builder_unref(builder);
+	manufacturer_data = g_variant_new_from_data((const GVariantType *)"ay",
+			remote_dev_info->manufacturer_data, remote_dev_info->manufacturer_data_len,
+			TRUE, NULL, NULL);
+
+	param = g_variant_new("(isunsbub@asn@ay)",
+			BLUETOOTH_ERROR_NONE,
+			remote_dev_info->address,
+			remote_dev_info->class,
+			remote_dev_info->rssi,
+			remote_dev_info->name,
+			remote_dev_info->paired,
+			remote_dev_info->connected,
+			remote_dev_info->trust,
+			uuids,
+			remote_dev_info->manufacturer_data_len,
+			manufacturer_data);
+	/* Send the event to application */
+	_bt_send_event(BT_ADAPTER_EVENT,
+			BLUETOOTH_EVENT_SERVICE_SEARCHED,
+			param);
+
+	__bt_free_service_search_info(&service_search_info);
+	BT_DBG("-");
+}
+
+static void __bt_device_services_callback(event_dev_services_t* uuid_list)
+{
+	bt_remote_dev_info_t *rem_info = NULL;
+	int i;
+	BT_DBG("+");
+
+	if (service_search_info == NULL) {
+		/* Send reply */
+		BT_DBG("searching_info == NULL");
+		return;
+	}
+
+	if (_bt_compare_adddress(service_search_info->dev_addr,
+				(bluetooth_device_address_t *)&uuid_list->address) == FALSE) {
+		BT_DBG("This device is not queried");
+		return;
+	}
+
+	rem_info = g_malloc0(sizeof(bt_remote_dev_info_t));
+	memset(rem_info, 0x00, sizeof(bt_remote_dev_info_t));
+
+	rem_info->address = g_new0(char, BT_ADDRESS_STRING_SIZE);
+	_bt_convert_addr_type_to_string(rem_info->address, uuid_list->address.addr);
+
+	rem_info->uuid_count = uuid_list->num;
+
+	BT_INFO("Address [%s]", rem_info->address);
+	BT_INFO("Number of UUID's [%d]", rem_info->uuid_count);
+	if (rem_info->uuid_count > 0)
+		rem_info->uuids = g_new0(char *, rem_info->uuid_count);
+
+	/* Fill Remote Device Service List list */
+	for (i=0; i < rem_info->uuid_count; i++) {
+		rem_info->uuids[i] = g_malloc0(BLUETOOTH_UUID_STRING_MAX);
+		_bt_uuid_to_string((service_uuid_t *)&uuid_list->service_list[i].uuid, rem_info->uuids[i]);
+		BT_DBG("UUID value=%s", rem_info->uuids[i]);
+	}
+
+	BT_DBG("DBUS return");
+	__bt_device_handle_pending_requests(BLUETOOTH_ERROR_NONE, BT_SEARCH_SERVICE,
+			service_search_info->addr, BT_ADDRESS_STRING_SIZE);
+
+	/* Save UUID List of remote devices */
+	service_search_info->dev_info = rem_info;
+
+	/* Query Other device properties */
+	if (_bt_device_get_bonded_device_info(service_search_info->dev_addr) == BLUETOOTH_ERROR_NONE) {
+		BT_DBG("Bonded device info query posted to stack successfully");
+	} else {
+		BT_DBG("Possibly internal stack error in bonded device info query, perform cleanup");
+		__bt_free_service_search_info(&service_search_info);
+	}
 	BT_DBG("-");
 }
 
@@ -590,6 +721,11 @@ static void __bt_device_event_handler(int event_type, gpointer event_data)
 	case OAL_EVENT_DEVICE_SSP_CONSENT_REQUEST: {
 		BT_INFO("SSP Consent Request Received");
 		 __bt_device_ssp_consent_callback((remote_device_t*)event_data);
+		break;
+	}
+	case OAL_EVENT_DEVICE_SERVICES: {
+		BT_INFO("Remote Device Services Received");
+		__bt_device_services_callback((event_dev_services_t*)event_data);
 		break;
 	}
 	default:
@@ -972,6 +1108,30 @@ static void __bt_free_bond_info(uint8_t type)
 	}
 }
 
+static void __bt_free_service_search_info(bt_service_search_info_data_t **p_info)
+{
+	bt_service_search_info_data_t * info = *p_info;
+	if (info) {
+		if (info->addr) {
+			g_free(info->addr);
+			info->addr = NULL;
+		}
+
+		if (info->dev_addr) {
+			g_free(info->dev_addr);
+			info->dev_addr = NULL;
+		}
+
+		if (info->dev_info) {
+			_bt_free_device_info(info->dev_info);
+			info->dev_info = NULL;
+		}
+
+		g_free(info);
+	}
+	*p_info = NULL;
+}
+
 static int __bt_device_handle_bond_state(void)
 {
 	BT_INFO("Current Bond state: %d", bt_device_bond_state);
@@ -1266,4 +1426,60 @@ void _bt_set_autopair_status_in_bonding_info(gboolean is_autopair)
 {
         ret_if (trigger_bond_info == NULL);
         trigger_bond_info->is_autopair = is_autopair;
+}
+
+int _bt_search_device(bluetooth_device_address_t *device_address)
+{
+	int result = OAL_STATUS_SUCCESS;
+	BT_DBG("+");
+
+	BT_CHECK_PARAMETER(device_address, return);
+
+	if (trigger_bond_info) {
+		BT_ERR("Bonding in progress");
+		return BLUETOOTH_ERROR_DEVICE_BUSY;
+	}
+
+	if (service_search_info) {
+		BT_ERR("Service searching in progress");
+		return BLUETOOTH_ERROR_DEVICE_BUSY;
+	}
+
+	/* allocate user data so that it can be retrieved in callback */
+	service_search_info = g_malloc0(sizeof(bt_service_search_info_data_t));
+	service_search_info->addr = g_malloc0(BT_ADDRESS_STRING_SIZE);
+	service_search_info->dev_addr = g_memdup(device_address, sizeof(bluetooth_device_address_t));
+
+	_bt_convert_addr_type_to_string(service_search_info->addr,
+			device_address->addr);
+
+	result = device_query_services((bt_address_t *)device_address);
+
+	if (result != OAL_STATUS_SUCCESS) {
+		BT_ERR("Device Service Search Failed..: %d", result);
+		__bt_free_service_search_info(&service_search_info);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+	return BLUETOOTH_ERROR_NONE;
+}
+
+int _bt_cancel_search_device(void)
+{
+	int ret = OAL_STATUS_SUCCESS;
+	retv_if(service_search_info == NULL, BLUETOOTH_ERROR_NOT_IN_OPERATION);
+
+	ret = device_stop_query_sevices((bt_address_t *)service_search_info->dev_addr);
+
+	if (ret != OAL_STATUS_SUCCESS) {
+		BT_ERR("SDP Cancel request failed [%d]", ret);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	__bt_device_handle_pending_requests(BLUETOOTH_ERROR_CANCEL_BY_USER, BT_SEARCH_SERVICE,
+			service_search_info->addr, BT_ADDRESS_STRING_SIZE);
+
+	__bt_free_service_search_info(&service_search_info);
+
+	return BLUETOOTH_ERROR_NONE;
+	BT_DBG("-");
 }

@@ -577,6 +577,28 @@ int __bt_bluez_request(int function_name,
 		       result = _bt_cancel_bonding();
 		       break;
 	}
+	case BT_SEARCH_SERVICE: {
+		bluetooth_device_address_t address = { {0} };
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+		result = _bt_search_device(&address);
+		/* Save invocation */
+		if (result == BLUETOOTH_ERROR_NONE) {
+			char * addr = g_malloc0(BT_ADDRESS_STRING_SIZE);
+			_bt_convert_addr_type_to_string(addr, address.addr);
+			BT_DBG("BT Device Service Search Request scheduled successfully! save invocation context");
+			sender = (char*)g_dbus_method_invocation_get_sender(context);
+			_bt_save_invocation_context(context, result, sender,
+					function_name, (gpointer)addr);
+		} else
+			g_array_append_vals(*out_param1, &address,
+					sizeof(bluetooth_device_address_t));
+		break;
+	}
+	case BT_CANCEL_SEARCH_SERVICE: {
+	       result = _bt_cancel_search_device();
+		       break;
+       }
 	case BT_PASSKEY_REPLY: {
 		const char *passkey = NULL;
 		gboolean authentication_reply = FALSE;

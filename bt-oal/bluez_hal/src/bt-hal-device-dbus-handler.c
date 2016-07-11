@@ -55,6 +55,11 @@ static void __bt_hal_bond_device_cb(GDBusProxy *proxy, GAsyncResult *res, gpoint
 
 static void __bt_hal_unbond_device_cb(GDBusProxy *proxy, GAsyncResult *res,
                                         gpointer user_data);
+static void __bt_hal_device_service_search_cb(GDBusProxy *proxy, GAsyncResult *res,
+                                        gpointer user_data);
+int __bt_hal_dbus_enquire_remote_device_services(char *address);
+
+static void __bt_device_parse_services(GVariant *result);
 
 int _bt_hal_device_create_bond(const bt_bdaddr_t *bd_addr, unsigned short transport)
 {
@@ -299,6 +304,265 @@ int _bt_hal_device_ssp_reply(const bt_bdaddr_t *bd_addr, bt_ssp_variant_t varian
 		default:
 			break;
 	}
+
+	DBG("-");
+	return BT_STATUS_SUCCESS;
+}
+
+int _bt_hal_dbus_get_remote_device_services(const bt_bdaddr_t *remote_addr)
+{
+	char *device_path = NULL;
+	GDBusProxy *device_proxy = NULL;
+	GDBusConnection *conn;
+	GDBusProxy *adapter_proxy;
+	//char address[BT_HAL_ADDRESS_STRING_SIZE] = { 0 };
+	char *address = NULL;
+	int result = BT_STATUS_SUCCESS;
+	DBG("+");
+
+	address = g_malloc0(BT_HAL_ADDRESS_STRING_SIZE);
+
+	_bt_convert_addr_type_to_string(address, remote_addr->address);
+
+	if (remote_addr == NULL) {
+		result = BT_STATUS_PARM_INVALID;
+		goto fail;
+	}
+
+	adapter_proxy = _bt_get_adapter_proxy();
+	if (adapter_proxy == NULL) {
+		result = BT_STATUS_FAIL;
+		goto fail;
+	}
+
+	conn = _bt_get_system_gconn();
+	if (conn == NULL) {
+		ERR("Could not get System DBUS Connection");
+		result = BT_STATUS_FAIL;
+		goto fail;
+	}
+
+	device_path = _bt_get_device_object_path(address);
+
+	if (device_path == NULL) {
+		ERR("Remote device is not paired..can not perform SDP!!!");
+		result = BT_STATUS_FAIL;
+		goto fail;
+	}
+
+	device_proxy = g_dbus_proxy_new_sync(conn, G_DBUS_PROXY_FLAGS_NONE,
+			NULL, BT_HAL_BLUEZ_NAME,
+			device_path, BT_HAL_DEVICE_INTERFACE,  NULL, NULL);
+	g_free(device_path);
+
+	if (device_proxy == NULL) {
+		ERR("Could not create Device Proxy");
+		result = BT_STATUS_FAIL;
+		goto fail;
+	}
+
+
+	g_dbus_proxy_call(device_proxy, "DiscoverServices",
+			g_variant_new("(s)", ""),
+			G_DBUS_CALL_FLAGS_NONE,
+			BT_HAL_MAX_DBUS_TIMEOUT,
+			NULL,
+			(GAsyncReadyCallback)__bt_hal_device_service_search_cb,
+			address);
+
+	return BT_STATUS_SUCCESS;
+
+fail:
+	g_free(address);
+	return result;
+}
+
+static void __bt_hal_device_service_search_cb(GDBusProxy *proxy, GAsyncResult *res,
+                                        gpointer user_data)
+{
+	/* Buffer and propety count management */
+	uint8_t buf[BT_HAL_MAX_PROPERTY_BUF_SIZE];
+	struct hal_ev_remote_device_props *ev = (void*) buf;;
+	size_t size = 0;
+
+	GError *err = NULL;
+	int result = BT_HAL_ERROR_NONE;
+	char *address = (char*) user_data;
+	DBG("+");
+
+	g_dbus_proxy_call_finish(proxy, res, &err);
+
+	g_object_unref(proxy);
+
+	/* Check event pointer */
+	if (!event_cb)
+                event_cb = _bt_hal_get_stack_message_handler();
+        if (!event_cb) {
+                ERR("event_cb is NULL, can not send Service search results to HAL User");
+                goto cleanup;
+        }
+
+	if (err != NULL) {
+		g_dbus_error_strip_remote_error(err);
+		ERR("Error occured in Proxy call [%s]\n", err->message);
+
+		if (g_strrstr("Operation canceled", err->message)) {
+			result = BT_HAL_ERROR_CANCEL_BY_USER;
+		} else if (g_strrstr("In Progress", err->message)) {
+			result = BT_HAL_ERROR_IN_PROGRESS;
+		} else if (g_strrstr("Host is down", err->message)) {
+			result = BT_HAL_ERROR_HOST_DOWN;
+		} else {
+			result = BT_HAL_ERROR_CONNECTION_ERROR;
+		}
+
+		if (result == BT_HAL_ERROR_HOST_DOWN ||
+				result == BT_HAL_ERROR_CONNECTION_ERROR) {
+			ERR("Service search has failed due to Host Down or connection error, attempt to find properties");
+			if (__bt_hal_dbus_enquire_remote_device_services(address) == BT_STATUS_SUCCESS)
+				goto cleanup;
+
+		}
+		goto done;
+	}
+
+	DBG("SDP is successful..lets fetch the device properties..");
+	if (__bt_hal_dbus_enquire_remote_device_services(address) == BT_STATUS_SUCCESS)
+		goto cleanup;
+done:
+	ev->status = BT_STATUS_FAIL;
+	ev->num_props = 0;
+	size = sizeof(*ev);
+	ERR("Error: Failed to get Remote device properties after SDP,"
+			" Num Prop [%d] total size [%d]",ev->num_props, size);
+	event_cb(HAL_EV_REMOTE_DEVICE_PROPS, (void*) buf, size);
+
+cleanup:
+	if (err)
+		g_error_free(err);
+	g_free(address);
+}
+
+static void __bt_device_parse_services(GVariant *result)
+{
+	/* Buffer and propety count management */
+	uint8_t buf[BT_HAL_MAX_PROPERTY_BUF_SIZE];
+	struct hal_ev_remote_device_props *ev = (void*) buf;;
+	size_t size = 0;
+
+	GVariantIter *property_iter;
+
+	const gchar *key;
+	GVariant *value;
+	const gchar *address = NULL;
+
+	memset(buf, 0, sizeof(buf));
+	size = sizeof(*ev);
+	ev->num_props = 0;
+	ev->status = BT_STATUS_SUCCESS;
+
+	g_variant_get(result, "(a{sv})", &property_iter);
+	while (g_variant_iter_loop(property_iter, "{sv}", &key, &value)) {
+		if (!g_strcmp0(key, "Address")) {
+			address = g_variant_get_string(value, NULL);
+			DBG("Address [%s]", address);
+			_bt_convert_addr_string_to_type(ev->bdaddr, address);
+		} else if (!g_strcmp0(key, "UUIDs")) {
+			char **uuid_value;
+			int uuid_count = 0;
+			gsize size1 = 0;
+			int i =0;
+			size1 = g_variant_get_size(value);
+			int num_props_tmp = ev->num_props;
+			if (size1 > 0) {
+				uuid_value = (char **)g_variant_get_strv(value, &size1);
+				for (i = 0; uuid_value[i] != NULL; i++)
+					uuid_count++;
+				/* UUID collection */
+				uint8_t uuids[BT_HAL_STACK_UUID_SIZE * uuid_count];
+				for (i = 0; uuid_value[i] != NULL; i++) {
+					char *uuid_str = NULL;
+					uint8_t uuid[BT_HAL_STACK_UUID_SIZE];
+					memset(uuid, 0x00, BT_HAL_STACK_UUID_SIZE);
+					uuid_str = g_strdup(uuid_value[i]);
+					DBG("UUID string [%s]\n", uuid_str);
+					_bt_convert_uuid_string_to_type(uuid, uuid_str);
+					memcpy(uuids + i * BT_HAL_STACK_UUID_SIZE, uuid, BT_HAL_STACK_UUID_SIZE);
+				}
+				size += __bt_insert_hal_properties(buf + size, HAL_PROP_DEVICE_UUIDS,
+						(BT_HAL_STACK_UUID_SIZE * uuid_count), uuids);
+				ev->num_props = num_props_tmp + 1;
+				g_free(uuid_value);
+			}
+		} else {
+			ERR("Unhandled Property:[%s]", key);
+		}
+	}
+
+	DBG("Send Remote Device services to HAL,"
+			" Num Prop [%d] total size [%d]",ev->num_props, size);
+	event_cb(HAL_EV_REMOTE_DEVICE_PROPS, (void*) buf, size);
+
+	g_variant_unref(result);
+}
+
+int __bt_hal_dbus_enquire_remote_device_services(char *address)
+{
+	char *device_path = NULL;
+	GError *error = NULL;
+	GDBusProxy *device_proxy;
+	GDBusConnection *conn;
+	GVariant *result;
+
+	device_path = _bt_get_device_object_path(address);
+	if (!device_path) {
+		ERR("Device not paired");
+		return BT_STATUS_FAIL;
+	}
+
+	conn = _bt_get_system_gconn();
+	if (!conn) {
+		ERR("_bt_get_system_gconn failed");
+		return BT_STATUS_FAIL;
+	}
+
+	device_proxy = g_dbus_proxy_new_sync(conn, G_DBUS_PROXY_FLAGS_NONE,
+			NULL,
+			BT_HAL_BLUEZ_NAME,
+			device_path,
+			BT_HAL_PROPERTIES_INTERFACE,
+			NULL, NULL);
+
+	if (!device_proxy) {
+		ERR("Error creating device_proxy");
+		g_free(device_path);
+		return BT_STATUS_FAIL;
+	}
+
+	result = g_dbus_proxy_call_sync(device_proxy,
+			"GetAll",
+			g_variant_new("(s)", BT_HAL_DEVICE_INTERFACE),
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			&error);
+
+	if (!result) {
+		ERR("Error occured in Proxy call");
+		if (error != NULL) {
+			ERR("Error occured in Proxy call (Error: %s)", error->message);
+			g_clear_error(&error);
+		}
+		g_object_unref(device_proxy);
+		g_free(device_path);
+		return BT_STATUS_FAIL;
+	}
+
+	g_object_unref(device_proxy);
+	g_free(device_path);
+
+	/* Fetch Device Services and send to HAL User */
+	__bt_device_parse_services(result);
 
 	DBG("-");
 	return BT_STATUS_SUCCESS;

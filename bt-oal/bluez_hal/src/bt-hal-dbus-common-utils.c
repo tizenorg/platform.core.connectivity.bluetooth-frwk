@@ -28,6 +28,7 @@
 #include <termios.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 
 #include <dlog.h>
 #include <dbus/dbus-glib-lowlevel.h>
@@ -380,29 +381,29 @@ void _bt_convert_device_path_to_address(const char *device_path,
 }
 
 void _bt_convert_uuid_string_to_type(unsigned char *uuid,
-		const char *device_uuid)
+                const char *device_uuid)
 {
-	int i;
-	int k = 0;
-	uint8_t temp[2];
-	uint8_t temp1[1];
+	uint32_t uuid0, uuid4;
+	uint16_t uuid1, uuid2, uuid3, uuid5;
 
-	if (uuid == NULL || device_uuid == NULL)
-		return;
-	for (i = 0; i < 36; ) {
-		if (device_uuid[i] != '\0') {
-			if (device_uuid[i] == '-') {
-				i = i+1;
-				continue;
-			}
-			temp[0] = device_uuid[i];
-			temp[1] = device_uuid[i+ 1];
-			sscanf((char*)temp, "%hhx", temp1);  //hexadecimal scanf format for uint8_t
-			uuid[k] = temp1[0];
-			i = i + 2;
-			k++;
-		}
-	}
+	sscanf(device_uuid, "%08x-%04hx-%04hx-%04hx-%08x%04hx",
+			&uuid0, &uuid1, &uuid2, &uuid3, &uuid4, &uuid5);
+
+	uuid0 = htonl(uuid0);
+	uuid1 = htons(uuid1);
+	uuid2 = htons(uuid2);
+	uuid3 = htons(uuid3);
+	uuid4 = htonl(uuid4);
+	uuid5 = htons(uuid5);
+
+	memcpy(&(uuid[0]), &uuid0, 4);
+	memcpy(&(uuid[4]), &uuid1, 2);
+	memcpy(&(uuid[6]), &uuid2, 2);
+	memcpy(&(uuid[8]), &uuid3, 2);
+	memcpy(&(uuid[10]), &uuid4, 4);
+	memcpy(&(uuid[14]), &uuid5, 2);
+
+	return;
 }
 
 void _bt_convert_addr_string_to_type(unsigned char *addr,

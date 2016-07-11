@@ -360,6 +360,9 @@ int _bt_byte_arr_cmp(const char *data1, const char *data2, int data_len);
 int _bt_byte_arr_cmp_with_mask(const char *data1, const char *data2,
 				const char *mask, int data_len);
 
+gboolean _bt_compare_adddress(const bluetooth_device_address_t *addr1,
+                const bluetooth_device_address_t *addr2);
+
 void _bt_print_device_address_t(const bluetooth_device_address_t *addr);
 
 void _bt_divide_device_class(bluetooth_device_class_t *device_class,

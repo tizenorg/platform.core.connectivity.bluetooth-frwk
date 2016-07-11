@@ -63,6 +63,37 @@ oal_status_t device_query_attributes(bt_address_t *addr)
 	return OAL_STATUS_SUCCESS;
 }
 
+oal_status_t device_query_services(bt_address_t * addr)
+{
+	int res;
+	bdstr_t bdstr;
+
+	CHECK_OAL_INITIALIZED();
+
+	OAL_CHECK_PARAMETER(addr, return);
+
+	API_TRACE("[%s]", bdt_bd2str(addr, &bdstr));
+
+	res = blued_api->get_remote_services((bt_bdaddr_t *)addr);
+	if (res != BT_STATUS_SUCCESS) {
+		BT_ERR("get_remote_services error: [%s]", status2string(res));
+		return convert_to_oal_status(res);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
+oal_status_t device_stop_query_sevices(bt_address_t * addr)
+{
+	CHECK_OAL_INITIALIZED();
+
+	OAL_CHECK_PARAMETER(addr, return);
+
+	API_TRACE("Stop SDP search");
+	/* Currently no HAL Interface for Stopping Service Search */
+	return BT_STATUS_UNSUPPORTED;
+}
+
 oal_status_t device_set_alias(bt_address_t * addr, char * alias)
 {
 	int res;
@@ -318,11 +349,13 @@ void cb_device_properties(bt_status_t status, bt_bdaddr_t *bd_addr,
 		case BT_PROPERTY_UUIDS: {
 			event_dev_services_t *services_info;
 			bt_uuid_t *uuids = (bt_uuid_t *) properties[0].val;
+			BT_INFO("Properties len [%d] event structure size [%d]", properties[0].len, sizeof(event_dev_services_t));
 
 			services_info = g_malloc(sizeof(event_dev_services_t) + properties[0].len);
 			services_info->address = dev_info->address;
 			memcpy(services_info->service_list, uuids, properties[0].len);
 			services_info->num = properties[0].len/sizeof(bt_uuid_t);
+			BT_INFO("Number of UUID [%d]", services_info->num);
 			event = OAL_EVENT_DEVICE_SERVICES;
 			event_data = services_info;
 			size = sizeof(event_dev_services_t) + properties[0].len;

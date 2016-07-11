@@ -46,6 +46,10 @@ gboolean _bt_device_is_bonding(void);
 
 gboolean _bt_device_is_pairing(void);
 
+int _bt_cancel_search_device(void);
+
+int _bt_search_device(bluetooth_device_address_t *device_address);
+
 gboolean _bt_is_bonding_device_address(const char *address);
 
 void _bt_set_autopair_status_in_bonding_info(gboolean is_autopair);

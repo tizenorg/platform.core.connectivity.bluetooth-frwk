@@ -283,6 +283,7 @@ static void __bt_hal_adapter_property_changed_event(GVariant *msg)
 					DBG("##UUID string [%s]\n", uuid_str);
 					_bt_convert_uuid_string_to_type(uuid, uuid_str);
 					memcpy(uuids+i*BT_HAL_STACK_UUID_SIZE, uuid, BT_HAL_STACK_UUID_SIZE);
+					g_free(uuid_str);
 				}
 				size += __bt_insert_hal_properties(buf + size, HAL_PROP_ADAPTER_UUIDS,
 						(BT_HAL_STACK_UUID_SIZE * uuid_count),
@@ -1066,7 +1067,9 @@ static void __bt_hal_device_properties_lookup(GVariant *result, char *address)
 		{
 			/* UUID collection */
 			int i;
+#ifdef __TEST_
 			int z;
+#endif
 			int num_props_tmp = ev->num_props;
 
 			uint8_t uuids[BT_HAL_STACK_UUID_SIZE * uuid_count];
@@ -1082,9 +1085,10 @@ static void __bt_hal_device_properties_lookup(GVariant *result, char *address)
 				DBG("UUID string [%s]\n", uuid_str);
 
 				_bt_convert_uuid_string_to_type(uuid, uuid_str);
-
+#ifdef __TEST_
 				for(z=0; z < 16; z++)
 					DBG("[0x%x]", uuid[z]);
+#endif
 
 				memcpy(uuids+i*BT_HAL_STACK_UUID_SIZE, uuid, BT_HAL_STACK_UUID_SIZE);
 				g_free(uuid_str);

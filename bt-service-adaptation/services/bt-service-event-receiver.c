@@ -113,6 +113,7 @@ void _bt_service_oal_event_receiver(int event_type, gpointer event_data, gsize l
 	case OAL_EVENT_DEVICE_PASSKEY_CONFIRMATION_REQUEST:
 	case OAL_EVENT_DEVICE_PASSKEY_DISPLAY:
 	case OAL_EVENT_DEVICE_SSP_CONSENT_REQUEST:
+	case OAL_EVENT_DEVICE_SERVICES:
 		if (device_cb)
 			device_cb(event_type, event_data);
 		break;

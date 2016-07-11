@@ -148,12 +148,15 @@ static int set_remote_device_property(bt_bdaddr_t *remote_addr,
 static int get_remote_service_record(bt_bdaddr_t *remote_addr, bt_uuid_t *uuid)
 {
 	return BT_STATUS_UNSUPPORTED;
-
 }
 
 static int get_remote_services(bt_bdaddr_t *remote_addr)
 {
-	return BT_STATUS_UNSUPPORTED;
+	if (!remote_addr) {
+		ERR("Invalid param");
+		return BT_STATUS_PARM_INVALID;
+	}
+	return _bt_hal_dbus_get_remote_device_services(remote_addr);
 }
 
 static int start_discovery(void)

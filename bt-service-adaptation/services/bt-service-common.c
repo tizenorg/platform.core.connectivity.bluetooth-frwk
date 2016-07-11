@@ -428,6 +428,15 @@ void _bt_convert_addr_type_to_string(char *address,
 			addr[3], addr[4], addr[5]);
 }
 
+gboolean _bt_compare_adddress(const bluetooth_device_address_t *addr1,
+		const bluetooth_device_address_t *addr2)
+{
+	if (memcmp(&addr1->addr, &addr2->addr, 6) == 0)
+		return TRUE;
+	else
+		return FALSE;
+}
+
 void _bt_print_device_address_t(const bluetooth_device_address_t *addr)
 {
 	BT_INFO("%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X\n",
@@ -863,7 +872,7 @@ void _bt_copy_remote_dev(bt_remote_dev_info_t * dev_info, remote_device_t * oal_
 	for (i=0; i < dev_info->uuid_count; i++) {
 		dev_info->uuids[i] = g_malloc0(BLUETOOTH_UUID_STRING_MAX);
 		_bt_uuid_to_string((service_uuid_t *)&oal_device->uuid[i].uuid, dev_info->uuids[i]);
-		BT_DBG("UUID size=%d value=%s", sizeof(dev_info->uuids[i]), dev_info->uuids[i]);
+		BT_DBG("[%s]", dev_info->uuids[i]);
 	}
 
 	BT_INFO("-");
@@ -889,7 +898,6 @@ static void __bt_get_service_list(bt_remote_dev_info_t *info, bluetooth_device_i
 	dev->service_index = 0;
 	BT_DBG("Total UUID count [%d]", info->uuid_count);
 	for (i = 0; i < info->uuid_count; i++) {
-		BT_DBG("UUID count [%d]", i);
 		g_strlcpy(dev->uuids[i], uuids[i], BLUETOOTH_UUID_STRING_MAX);
 
 		parts = g_strsplit(uuids[i], "-", -1);

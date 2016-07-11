@@ -52,6 +52,9 @@ int _bt_hal_device_legacy_pin_reply(const bt_bdaddr_t *bd_addr,
 
 int _bt_hal_device_ssp_reply(const bt_bdaddr_t *bd_addr, bt_ssp_variant_t variant,
 		uint8_t accept, uint32_t passkey);
+
+int _bt_hal_dbus_get_remote_device_services(const bt_bdaddr_t *remote_addr);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
