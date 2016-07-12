@@ -67,6 +67,8 @@ extern "C" {
 	EVENT(OAL_EVENT_OAL_INITIALISED_FAILED)			/* OAL Initialisation event */	\
 	EVENT(OAL_EVENT_HID_CONNECTED)						/* event_hid_conn_t */\
 	EVENT(OAL_EVENT_HID_DISCONNECTED)					/* event_hid_conn_t */\
+	EVENT(OAL_EVENT_SOCKET_OUTGOING_CONNECTED)                 /* RFCOMM */  \
+	EVENT(OAL_EVENT_SOCKET_DISCONNECTED)            /* RFCOMM */  \
 	EVENT(OAL_EVENT_END)                                /* End of event*/\
 
 
@@ -142,6 +144,14 @@ typedef struct {
 	bt_address_t address;
 	oal_status_t status;
 } event_hid_conn_t;
+
+/********* Datastructures for Socket event ******************/
+/* SOCKET:: socket outgoing client connection event data */
+typedef struct {
+	int fd;			/**< FD of Outgoing client */
+	int sock_type;		/**< Type of socket */
+	bt_address_t address;	/**< Address of remote server */
+} event_socket_client_conn_t;
 
 #ifdef __cplusplus
 }

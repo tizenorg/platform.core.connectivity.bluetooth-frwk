@@ -25,6 +25,12 @@
 extern "C" {
 #endif
 
+typedef enum {
+	OAL_SOCK_RFCOMM,
+	OAL_SOCK_SCO,
+	OAL_SOCK_L2CAP
+} oal_sock_type_t;
+
 /**
  * @fn oal_status_t socket_enable(void);
  * @brief Enables the rfcomm profile
@@ -54,6 +60,31 @@ oal_status_t socket_enable(void);
  * @see         socket_disconnect
  * */
 oal_status_t socket_disable(void);
+
+/**
+ * @fn int  socket_connect(oal_sock_type_t sock_type, bt_address_t* bd, oal_uuid_t* p_uuid, int channel);
+ * @brief Creates outgoing client
+ *
+ * This API connects to the remote RFCOMM server. It takes either server UUID or Channel
+ * along with the bluetooth MAC address of Server.
+ * It returns the Outgoing Client FD. Two events are associated with this API:
+ *	1. OAL_EVENT_OUTGOING_CONNECTED: When Outgoing Client connects
+ *	succefully to remote Server.
+ *	2. OAL_EVENT_SOCKET_DISCONNECTED: When Outgoing Client fails to
+ *	connect/Outgoing client hung up.
+ * The FD received can be used to send data using interface socket_write. Data
+ * coming from remote interface comes through the callback registered at time of
+ * socket_init
+ * This function is a asynchronous call.
+ *
+ * @param[in]   sock_type  Bluetooth socket type to be connected
+ * @param[in]   p_uuid     UUID of the remote RFCOMM SERVER
+ * @param[in]   channel    channel
+ * @param[in]   bd         Bluetooth Mac address of RFCOMM server
+ * @return      Outgoing client FD --- Success
+ * @see         socket_disconnect
+ */
+int socket_connect(oal_sock_type_t sock_type, oal_uuid_t* p_uuid, int channel, bt_address_t* bd);
 
 #ifdef __cplusplus
 }
