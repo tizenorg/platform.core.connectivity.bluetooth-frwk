@@ -19,28 +19,21 @@
  *
  */
 
-#ifndef _BT_SERVICE_EVENT_RECEIVER_H_
-#define _BT_SERVICE_EVENT_RECEIVER_H_
+#ifndef __BT_SERVICE_SOCKET_H__
+#define __BT_SERVICE_SOCKET_H__
+
+#include <glib.h>
+#include <sys/types.h>
+#include "bluetooth-api.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef void (*_bt_service_event_handler_callback) (int event_type, gpointer event_data);
-
-typedef enum {
-	BT_ADAPTER_MODULE,
-	BT_DEVICE_MODULE,
-	BT_HID_MODULE,
-	BT_SOCKET_MODULE,
-} bt_service_module_t;
-
-void _bt_service_oal_event_receiver(int event_type, gpointer event_data, gsize len);
-void _bt_service_register_event_handler_callback(
-	bt_service_module_t module, _bt_service_event_handler_callback cb);
-void _bt_service_unregister_event_handler_callback(bt_service_module_t module);
+int _bt_socket_init(void);
+void _bt_socket_deinit(void);
 
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
-#endif /* _BT_SERVICE_EVENT_RECEIVER_H_ */
+#endif /* __BT_SERVICE_SOCKET_H__ */

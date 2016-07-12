@@ -45,6 +45,7 @@
 #include "bt-service-dpm.h"
 #endif
 #include "bt-service-hidhost.h"
+#include "bt-service-socket.h"
 
 /* OAL headers */
 #include <oal-event.h>
@@ -690,6 +691,11 @@ static int __bt_init_profiles()
 	ret = _bt_hidhost_initialize();
 	if (ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("_bt_hidhost_initialize Failed");
+		return ret;
+	}
+	ret = _bt_socket_init();
+	if (ret != BLUETOOTH_ERROR_NONE) {
+		BT_ERR("_bt_socket_init Failed");
 		return ret;
 	}
 

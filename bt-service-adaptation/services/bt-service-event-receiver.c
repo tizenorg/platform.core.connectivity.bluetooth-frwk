@@ -36,6 +36,7 @@
 _bt_service_event_handler_callback adapter_cb;
 _bt_service_event_handler_callback device_cb;
 _bt_service_event_handler_callback hid_cb;
+_bt_service_event_handler_callback socket_cb;
 
 void _bt_service_register_event_handler_callback(
 		bt_service_module_t module, _bt_service_event_handler_callback cb)
@@ -52,6 +53,10 @@ void _bt_service_register_event_handler_callback(
 	case BT_HID_MODULE:
                 BT_INFO("Register BT_HID_MODULE Callback");
                 hid_cb = cb;
+                break;
+	case BT_SOCKET_MODULE:
+                BT_INFO("Register BT_SOCKET_MODULE Callback");
+                socket_cb = cb;
                 break;
 	default:
 		BT_INFO("Unknown module");
@@ -72,6 +77,10 @@ void _bt_service_unregister_event_handler_callback(bt_service_module_t module)
 	case BT_HID_MODULE:
                 BT_INFO("Un-Register BT_HID_MODULE Callback");
                 hid_cb = NULL;
+                break;
+	case BT_SOCKET_MODULE:
+                BT_INFO("Un-Register BT_SOCKET_MODULE Callback");
+                socket_cb = NULL;
                 break;
 	default:
 		BT_INFO("Unknown module");
