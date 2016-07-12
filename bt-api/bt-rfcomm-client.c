@@ -406,8 +406,6 @@ static void __client_connected_cb(rfcomm_cb_data_t *cb_data, char *dev_address,
 	BT_DBG("-");
 }
 
-#endif
-
 int new_connection(const char *path, int fd, bluetooth_device_address_t *addr)
 {
 	rfcomm_cb_data_t *info;
@@ -552,6 +550,7 @@ done:
 	if (err)
 		g_clear_error(&err);
 }
+#endif
 
 BT_EXPORT_API int bluetooth_rfcomm_connect(
 		const bluetooth_device_address_t *remote_bt_address,
@@ -693,6 +692,7 @@ BT_EXPORT_API int bluetooth_rfcomm_connect(
 
 BT_EXPORT_API int bluetooth_rfcomm_client_is_connected(const bluetooth_device_address_t *device_address, gboolean *connected)
 {
+#ifdef RFCOMM_DIRECT
 	GSList *l;
 	GSList *conn_list = NULL;
 	rfcomm_cb_data_t *client_info;
@@ -723,6 +723,9 @@ BT_EXPORT_API int bluetooth_rfcomm_client_is_connected(const bluetooth_device_ad
 	}
 
 	return BLUETOOTH_ERROR_NONE;
+#else
+	return BLUETOOTH_ERROR_NOT_SUPPORT;
+#endif
 }
 
 BT_EXPORT_API gboolean bluetooth_rfcomm_is_client_connected(void)
@@ -908,4 +911,3 @@ BT_EXPORT_API int bluetooth_rfcomm_write(int fd, const char *buf, int length)
 	return result;
 #endif
 }
-

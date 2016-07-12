@@ -2207,8 +2207,12 @@ void __bt_rfcomm_server_event_filter(GDBusConnection *connection,
 		g_variant_get(parameters, "(i&s&s&s&sn)", &result, &address,
 						&uuid, &name, &path, &socket_fd);
 
+#ifdef RFCOMM_DIRECT
 		if (_check_uuid_path(path, uuid) == FALSE)
 			return;
+#else
+		/* TODO: need to check UUID */
+#endif
 
 		memset(&req_ind, 0x00, sizeof(bluetooth_rfcomm_connection_request_t));
 		_bt_convert_addr_string_to_type(req_ind.device_addr.addr,

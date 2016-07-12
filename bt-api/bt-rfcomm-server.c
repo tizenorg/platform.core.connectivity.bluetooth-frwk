@@ -641,6 +641,7 @@ BT_EXPORT_API gboolean bluetooth_rfcomm_is_server_uuid_available(const char *uui
 
 BT_EXPORT_API int bluetooth_rfcomm_server_is_connected(const bluetooth_device_address_t *device_address, gboolean *connected)
 {
+#ifdef RFCOMM_DIRECT
 	GSList *l;
 	rfcomm_info_t *info;
 	char connected_addr[BT_ADDRESS_STRING_SIZE] = { 0 };
@@ -667,6 +668,9 @@ BT_EXPORT_API int bluetooth_rfcomm_server_is_connected(const bluetooth_device_ad
 	}
 
 	return BLUETOOTH_ERROR_NONE;
+#else
+	return BLUETOOTH_ERROR_NOT_SUPPORT;
+#endif
 }
 
 BT_EXPORT_API int bluetooth_rfcomm_listen_and_accept(int socket_fd, int max_pending_connection)

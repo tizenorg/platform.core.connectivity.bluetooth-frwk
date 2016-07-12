@@ -165,7 +165,11 @@ export CFLAGS="$CFLAGS -fpie"
 export LDFLAGS="$CFLAGS -pie"
 %endif
 
+%if %{bt_hal} == ENABLED
+export CFLAGS="$CFLAGS -URFCOMM_DIRECT"
+%else
 export CFLAGS="$CFLAGS -DRFCOMM_DIRECT"
+%endif
 export LDFLAGS="$CFLAGS -Wl,--rpath=%{_libdir} -Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs"
 
 %if "%{?_with_emulator}" == "1"
