@@ -29,6 +29,7 @@
 #include "bt-hal-log.h"
 #include "bt-hal-msg.h"
 #include "bt-hal-utils.h"
+#include "bt-hal-rfcomm-dbus-handler.h"
 
 static bt_status_t listen(btsock_type_t type, const char *service_name,
 		const uint8_t *uuid, int channel, int *sock_fd, int flags)
@@ -59,9 +60,11 @@ static bt_status_t connect(const bt_bdaddr_t *bd_addr, btsock_type_t type,
 
 	switch (type) {
 	case BTSOCK_RFCOMM:
-		ERR("bt rfcomm socket type not supported");
-		status = BT_STATUS_UNSUPPORTED;
-		goto failed;
+		/* Call rfcomm dbus handler to connect rfcomm client */
+		status = _bt_hal_dbus_handler_rfcomm_connect(
+				(unsigned char *)bd_addr->address,
+				(unsigned char *)uuid, sock_fd);
+		break;
 	case BTSOCK_L2CAP:
 		ERR("bt l2cap socket type not supported");
 		status = BT_STATUS_UNSUPPORTED;

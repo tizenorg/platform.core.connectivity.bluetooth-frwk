@@ -13,6 +13,7 @@ SET(SRCS
 ./src/bt-hal-hidhost.c
 ./src/bt-hal-hid-dbus-handler.c
 ./src/bt-hal-socket.c
+./src/bt-hal-rfcomm-dbus-handler.c
 )
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})

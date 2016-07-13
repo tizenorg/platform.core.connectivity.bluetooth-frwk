@@ -233,5 +233,12 @@ struct hal_ev_hidhost_handshake {
 	uint8_t  status;
 } __attribute__((packed));
 
+/* Bluetooth Socket HAL events */
+struct hal_ev_sock_connect {
+	short   size;
+	uint8_t bdaddr[6];
+	int     channel;
+	int     status;
+} __attribute__((packed));
 #endif //_BT_HAL_MSG_H_
 
