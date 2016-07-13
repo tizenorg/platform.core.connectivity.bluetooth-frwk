@@ -49,6 +49,7 @@ static int adapter_sub_id = -1;
 static http_request_state req_state;
 
 #ifdef	HPS_GATT_DB
+#define	HPS_PTS_TEST
 struct hps_notify_read_info {
 	gchar *char_path;
 	guint  read_status;
@@ -64,6 +65,12 @@ struct hps_char_info {
 
 static GSList *hps_notify_read_list = NULL;
 static GSList *hps_char_list = NULL;
+
+#ifdef HPS_PTS_TEST
+gboolean enable_status_notify;
+gboolean libsoup_conn_status;
+gboolean http_process_status;
+#endif
 #endif
 
 static GDBusConnection *conn;
@@ -92,7 +99,7 @@ static const gchar hps_introspection_xml[] =
 "</node>";
 
 #ifdef	HPS_GATT_DB
-static void _bt_hps_set_char_value(const char *obj_path, const char* value, int value_length);
+static void _bt_hps_set_char_value(const char *obj_path, const char* value, int value_length, int offset);
 
 static void _hps_convert_address_to_hex(bluetooth_device_address_t *addr_hex, const char *addr_str)
 {
@@ -112,6 +119,33 @@ static void _hps_convert_address_to_hex(bluetooth_device_address_t *addr_hex, co
 	}
 }
 
+static char *__hps_convert_uuid_to_uuid128(const char *uuid)
+{
+	int len;
+	char *uuid128;
+
+	len = strlen(uuid);
+
+	switch (len) {
+	case 4: 	/* UUID 16bits */
+		uuid128 = g_strdup_printf("0000%s-0000-1000-8000-00805F9B34FB", uuid);
+		break;
+
+	case 8: 	/* UUID 32bits */
+		uuid128 = g_strdup_printf("%s-0000-1000-8000-00805F9B34FB", uuid);
+		break;
+
+	case 36:	/* UUID 128bits */
+		uuid128 = strdup(uuid);
+		break;
+
+	default:
+		return NULL;
+	}
+
+	return uuid128;
+}
+
 static void _bt_hps_send_status_notification(unsigned short http_status,
 			unsigned char data_status,
 			bluetooth_device_address_t *unicast_address)
@@ -127,7 +161,7 @@ static void _bt_hps_send_status_notification(unsigned short http_status,
 	BT_DBG("Status %d %04x", http_status, http_status);
 
 	/* Store the status value */
-	_bt_hps_set_char_value(http_status_obj_path, status, 3);
+	_bt_hps_set_char_value(http_status_obj_path, status, 3, 0);
 
 	/* Send unicast notification */
 	ret = bluetooth_gatt_server_set_notification(http_status_obj_path, unicast_address);
@@ -283,7 +317,7 @@ static int notify_info_cmp(gconstpointer a1, gconstpointer a2)
 	return g_strcmp0(attrib1->char_path, attrib2->char_path);
 }
 
-static void _bt_hps_set_char_value(const char *obj_path, const char* value, int value_length)
+static void _bt_hps_set_char_value(const char *obj_path, const char* value, int value_length, int offset)
 {
 	GSList *tmp = NULL;
 	if (!value)
@@ -293,10 +327,25 @@ static void _bt_hps_set_char_value(const char *obj_path, const char* value, int 
 		if (tmp->data) {
 			struct hps_char_info *char_info = tmp->data;
 			if (!g_strcmp0(char_info->char_path, obj_path)) {
-				char_info->char_value = g_try_realloc(char_info->char_value, value_length);
+				gchar *str = NULL;
+				if (offset > 0) {
+					str = g_strdup(char_info->char_value);
+					char_info->char_value = g_try_realloc(char_info->char_value, offset + value_length);
+				} else {
+					char_info->char_value = g_try_realloc(char_info->char_value, value_length);
+				}
 				if (char_info->char_value) {
-					memcpy(char_info->char_value, value, value_length);
-					char_info->value_length = value_length;
+					if (str) {
+						memcpy(char_info->char_value, str, strlen(str));
+						g_free(str);
+					}
+					if (offset > 0) {
+						memcpy(&char_info->char_value[offset], value, value_length);
+						char_info->value_length = offset + value_length;
+					} else {
+						memcpy(char_info->char_value, value, value_length);
+						char_info->value_length = value_length;
+					}
 					hps_char_list = g_slist_insert_sorted(hps_char_list,
 									char_info, char_info_cmp);
 				}
@@ -416,7 +465,7 @@ static void delete_notify_read_status(const char *obj_path)
 }
 #endif
 
-int _bt_hps_uri_write_cb(char *uri, int len)
+int _bt_hps_uri_write_cb(char *uri, int len, int offset)
 {
 	if ((len < 1) || (len > MAX_URI_LENGTH)) {
 		BT_ERR("Wrong URI length %d", len);
@@ -428,12 +477,12 @@ int _bt_hps_uri_write_cb(char *uri, int len)
 		g_free(g_uri);
 	g_uri = g_strndup(uri, len);
 #ifdef	HPS_GATT_DB
-	_bt_hps_set_char_value(http_uri_obj_path, g_uri, len);
+	_bt_hps_set_char_value(http_uri_obj_path, g_uri, len, offset);
 #endif
 	return BLUETOOTH_ERROR_NONE;
 }
 
-int _bt_hps_http_header_write_cb(char *header, int len)
+int _bt_hps_http_header_write_cb(char *header, int len, int offset)
 {
 	if ((len < 1) || (len > MAX_HEADER_LENGTH)) {
 		BT_ERR("Wrong Header length %d", len);
@@ -447,13 +496,13 @@ int _bt_hps_http_header_write_cb(char *header, int len)
 		g_free(g_header);
 	g_header = g_strndup(header, len);
 #ifdef	HPS_GATT_DB
-	_bt_hps_set_char_value(http_hdr_obj_path, g_header, len);
+	_bt_hps_set_char_value(http_hdr_obj_path, g_header, len, offset);
 #endif
 
 	return BLUETOOTH_ERROR_NONE;
 }
 
-int _bt_hps_entity_body_write_cb(char *entity, int len)
+int _bt_hps_entity_body_write_cb(char *entity, int len, int offset)
 {
 	if ((len < 1) || (len > MAX_ENTITY_LENGTH)) {
 		BT_ERR("Wrong Entity length %d", len);
@@ -465,13 +514,194 @@ int _bt_hps_entity_body_write_cb(char *entity, int len)
 		g_free(g_entity);
 	g_entity = g_strndup(entity, len);
 #ifdef	HPS_GATT_DB
-	_bt_hps_set_char_value(http_entity_obj_path, g_entity, len);
+	_bt_hps_set_char_value(http_entity_obj_path, g_entity, len, offset);
 #endif
 
 	return BLUETOOTH_ERROR_NONE;
 }
 
 #ifdef	HPS_GATT_DB
+#ifdef HPS_PTS_TEST
+int _bt_hps_local_head_response_cb(gpointer user_data)
+{
+	unsigned short http_status = 0x00;
+
+	const char *device_address = user_data;
+	bluetooth_device_address_t addr_hex = { {0,} };
+	unsigned char data_status = DS_NONE;
+	_hps_convert_address_to_hex(&addr_hex, device_address);
+	req_state = HTTP_REQ_STATE_EXECUTED;
+
+	http_status = 200;
+
+	// Process Header in Response Body
+	if (http_status == 200) {
+
+		const char *content = "Host:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\n";
+		guint hdr_len = strlen(content);
+
+		// Write Data to Header Characteristic
+#ifdef	HPS_GATT_DB
+		_bt_hps_set_char_value(http_hdr_obj_path, content, hdr_len, 0);
+#else
+		bluetooth_gatt_set_characteristic_value(http_hdr_obj_path, content, hdr_len);
+#endif
+		// TODO : Handle Truncated Header
+
+		// Write Data to Status Code Characteristic
+#ifdef	HPS_GATT_DB
+		data_status = (hdr_len > MAX_ENTITY_LENGTH) ? DS_HEADER_TRUNCATED : DS_HEADER_RECEIVED;
+		if (data_status == DS_HEADER_TRUNCATED && SOUP_STATUS_IS_SUCCESSFUL(http_status)) {
+			_bt_hps_set_notify_read_status(http_hdr_obj_path, 0, data_status, http_status);
+		}
+		_bt_hps_send_status_notification(http_status, data_status, &addr_hex);
+#else
+		status[0] = http_status & 0x0F;
+		status[1] = (http_status >> 8) & 0x0F;
+		status[2] = (hdr_len > MAX_HEADER_LENGTH) ? DS_HEADER_TRUNCATED : DS_HEADER_RECEIVED;
+
+		bluetooth_gatt_set_characteristic_value(http_status_obj_path, status, 3);
+#endif
+	} else {
+		BT_ERR("HEAD Response is NULL");
+		_bt_hps_send_status_notification(http_status, data_status, &addr_hex);
+	}
+
+	return BLUETOOTH_ERROR_NONE;
+}
+
+int _bt_hps_local_http_response_cb(gpointer user_data)
+{
+	unsigned short http_status = 0x00;
+	const char *device_address = user_data;
+	bluetooth_device_address_t addr_hex = { {0,} };
+	unsigned char data_status = DS_NONE;
+	_hps_convert_address_to_hex(&addr_hex, device_address);
+
+	hps_soup_msg = NULL;
+
+#if 0
+		if (req_state == HTTP_REQ_STATE_INPROGRESS)
+			return BLUETOOTH_ERROR_IN_PROGRESS;
+		if (req_state == HTTP_REQ_STATE_EXECUTED)
+			req_state = HTTP_REQ_STATE_INPROGRESS;
+#else
+		req_state = HTTP_REQ_STATE_EXECUTED;
+#endif
+
+	http_status = 200;
+
+	// Write Data to Status Code Characteristic
+#ifndef HPS_GATT_DB
+	status[0] = http_status & 0x0F;
+	status[1] = (http_status >> 8) & 0x0F;
+	status[2] = DS_HEADER_RECEIVED;
+	bluetooth_gatt_set_characteristic_value(http_status_obj_path, status, 3);
+#else
+	data_status = DS_HEADER_RECEIVED;
+	_bt_hps_send_status_notification(http_status, data_status, &addr_hex);
+#endif
+
+	return BLUETOOTH_ERROR_NONE;
+}
+
+int _bt_hps_local_get_response_cb(gpointer user_data)
+{
+	unsigned short http_status = 0x00;
+
+	const char *device_address = user_data;
+	bluetooth_device_address_t addr_hex = { {0,} };
+	unsigned char data_status = DS_NONE;
+	_hps_convert_address_to_hex(&addr_hex, device_address);
+
+#if 0
+	if (req_state == HTTP_REQ_STATE_INPROGRESS)
+		return BLUETOOTH_ERROR_IN_PROGRESS;
+	if (req_state == HTTP_REQ_STATE_EXECUTED)
+		req_state = HTTP_REQ_STATE_INPROGRESS;
+#else
+	req_state = HTTP_REQ_STATE_EXECUTED;
+#endif
+
+	http_status = 200;
+
+	// Process Entity Body in Response Message
+	if (http_status == 200) {
+		const char *body = "Host:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHelloWorld!HelloWorld!HelloWorld!HelloWorld!HelloWorld!HelloWorld!HelloWorld!HelloWorld!HelloWorld!HelloWorld!HelloWorld!HelloWorld!HelloWorld!HelloWorld!HelloWorld!\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\n";
+		guint body_len = strlen(body);
+		BT_DBG("BP 1 %d", body_len);
+
+		// Write Data to Entity Body Characteristic
+#ifdef	HPS_GATT_DB
+		_bt_hps_set_char_value(http_entity_obj_path, body, body_len, 0);
+#else
+		bluetooth_gatt_set_characteristic_value(http_entity_obj_path, body, body_len);
+#endif
+		// TODO : Handle Truncated Entiry Body
+
+		// Write Data to Status Code Characteristic
+#ifdef	HPS_GATT_DB
+		data_status = (body_len > MAX_ENTITY_LENGTH) ? DS_BODY_TRUNCATED : DS_BODY_RECEIVED;
+		if (data_status == DS_BODY_TRUNCATED && SOUP_STATUS_IS_SUCCESSFUL(http_status)) {
+			_bt_hps_set_notify_read_status(http_entity_obj_path, 0, data_status, http_status);
+		}
+		_bt_hps_send_status_notification(http_status, data_status, &addr_hex);
+
+#else
+		status[0] = http_status & 0x0F;
+		status[1] = (http_status >> 8) & 0x0F;
+		status[2] = (body_len > MAX_HEADER_LENGTH) ? DS_BODY_TRUNCATED : DS_BODY_TRUNCATED;
+
+		bluetooth_gatt_set_characteristic_value(http_status_obj_path, status, 3);
+#endif
+	} else {
+		BT_ERR("GET Response Body is NULL");
+#ifdef HPS_GATT_DB
+		_bt_hps_send_status_notification(http_status, data_status, &addr_hex);
+#endif
+	}
+
+	// Process Header in Response Body
+#if 0
+	if (http_status == 200) {
+
+		const char *content = "Host:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\nHost:httpbin.org\r\nConnection:Close\r\n";
+		guint hdr_len = strlen(content);
+
+		// Write Data to Header Characteristic
+#ifdef	HPS_GATT_DB
+		_bt_hps_set_char_value(http_hdr_obj_path, content, hdr_len, 0);
+#else
+		bluetooth_gatt_set_characteristic_value(http_hdr_obj_path, content, hdr_len);
+#endif
+		// TODO : Handle Truncated Header
+
+		// Write Data to Status Code Characteristic
+#ifdef	HPS_GATT_DB
+		data_status = (hdr_len > MAX_HEADER_LENGTH) ? DS_HEADER_TRUNCATED : DS_HEADER_RECEIVED;
+		if (data_status == DS_HEADER_TRUNCATED && SOUP_STATUS_IS_SUCCESSFUL(http_status)) {
+			_bt_hps_set_notify_read_status(http_hdr_obj_path, 0, data_status, http_status);
+		}
+		_bt_hps_send_status_notification(http_status, data_status, &addr_hex);
+#else
+		status[0] = http_status & 0x0F;
+		status[1] = (http_status >> 8) & 0x0F;
+		status[2] = (hdr_len > MAX_HEADER_LENGTH) ? DS_HEADER_TRUNCATED : DS_HEADER_RECEIVED;
+
+		bluetooth_gatt_set_characteristic_value(http_status_obj_path, status, 3);
+#endif
+	} else {
+		BT_ERR("GET Response Header is NULL");
+#ifdef HPS_GATT_DB
+		_bt_hps_send_status_notification(http_status, data_status, &addr_hex);
+#endif
+	}
+#endif
+
+	return BLUETOOTH_ERROR_NONE;
+}
+#endif
+
 int _bt_hps_read_cb(const char *obj_path, char **value, int *len)
 {
 	struct hps_char_info *info = NULL;
@@ -482,7 +712,7 @@ int _bt_hps_read_cb(const char *obj_path, char **value, int *len)
 
 	if (!obj_path) {
 		BT_ERR("Wrong Obj path");
-		return FALSE;
+		return data_status;
 	}
 
 	if (!g_strcmp0(http_hdr_obj_path, obj_path))
@@ -507,7 +737,7 @@ int _bt_hps_read_cb(const char *obj_path, char **value, int *len)
 				_bt_hps_set_notify_read_status(obj_path, offset + MAX_ENTITY_LENGTH,
 								data_status, notify_read_info->https_status);
 				*value = g_strdup(&info->char_value[offset]);
-				*len = info->value_length;
+				*len = MAX_ENTITY_LENGTH;
 			} else if ((info->value_length - offset) > 0 &&
 				(info->value_length - offset) <= MAX_ENTITY_LENGTH) {
 				if (is_header)
@@ -516,7 +746,7 @@ int _bt_hps_read_cb(const char *obj_path, char **value, int *len)
 					data_status = DS_BODY_RECEIVED;
 				_bt_hps_set_notify_read_status(obj_path, offset, data_status, notify_read_info->https_status);
 				*value = g_strdup(&info->char_value[offset]);
-				*len = info->value_length;
+				*len = info->value_length - offset;
 			}
 		} else if (notify_read_info && (notify_read_info->read_status == DS_BODY_RECEIVED ||
 						notify_read_info->read_status == DS_HEADER_RECEIVED)) {
@@ -527,7 +757,16 @@ int _bt_hps_read_cb(const char *obj_path, char **value, int *len)
 				delete_notify_read_status(obj_path);
 				*value = g_strdup(&info->char_value[offset]);
 				*len = info->value_length;
+#ifdef HPS_PTS_TEST
+		} else {
+				if (is_header)
+					data_status = DS_HEADER_RECEIVED;
+				else
+					data_status = DS_BODY_RECEIVED;
+				*value = g_strdup(&info->char_value[offset]);
+				*len = info->value_length;
 		}
+#endif
 	}
 
 	return data_status;
@@ -584,7 +823,7 @@ void _bt_hps_head_response_cb(SoupSession *session,
 
 		// Write Data to Header Characteristic
 #ifdef	HPS_GATT_DB
-		_bt_hps_set_char_value(http_hdr_obj_path, content, hdr_len);
+		_bt_hps_set_char_value(http_hdr_obj_path, content, hdr_len, 0);
 #else
 		bluetooth_gatt_set_characteristic_value(http_hdr_obj_path, content, hdr_len);
 #endif
@@ -594,7 +833,7 @@ void _bt_hps_head_response_cb(SoupSession *session,
 #ifdef	HPS_GATT_DB
 		data_status = (hdr_len > MAX_ENTITY_LENGTH) ? DS_HEADER_TRUNCATED : DS_HEADER_RECEIVED;
 		if (data_status == DS_BODY_TRUNCATED && SOUP_STATUS_IS_SUCCESSFUL(http_status)) {
-			_bt_hps_set_notify_read_status(http_hdr_obj_path, data_status, 0, http_status);
+			_bt_hps_set_notify_read_status(http_hdr_obj_path, 0, data_status, http_status);
 		}
 		_bt_hps_send_status_notification(http_status, data_status, &addr_hex);
 #else
@@ -706,7 +945,7 @@ void _bt_hps_get_response_cb(SoupSession *session,
 		}
 		// Write Data to Entity Body Characteristic
 #ifdef	HPS_GATT_DB
-		_bt_hps_set_char_value(http_entity_obj_path, body->data, body->length);
+		_bt_hps_set_char_value(http_entity_obj_path, body->data, body->length, 0);
 #else
 		bluetooth_gatt_set_characteristic_value(http_entity_obj_path, body->data, body->length);
 #endif
@@ -716,7 +955,7 @@ void _bt_hps_get_response_cb(SoupSession *session,
 #ifdef	HPS_GATT_DB
 		data_status = (body->length > MAX_ENTITY_LENGTH) ? DS_BODY_TRUNCATED : DS_BODY_RECEIVED;
 		if (data_status == DS_BODY_TRUNCATED && SOUP_STATUS_IS_SUCCESSFUL(http_status)) {
-			_bt_hps_set_notify_read_status(http_entity_obj_path, data_status, 0, http_status);
+			_bt_hps_set_notify_read_status(http_entity_obj_path, 0, data_status, http_status);
 		}
 		_bt_hps_send_status_notification(http_status, data_status, &addr_hex);
 
@@ -757,7 +996,7 @@ void _bt_hps_get_response_cb(SoupSession *session,
 		hdr_len = soup_message_headers_get_content_length(msg->response_headers);
 		// Write Data to Header Characteristic
 #ifdef	HPS_GATT_DB
-		_bt_hps_set_char_value(http_hdr_obj_path, content, hdr_len);
+		_bt_hps_set_char_value(http_hdr_obj_path, content, hdr_len, 0);
 #else
 		bluetooth_gatt_set_characteristic_value(http_hdr_obj_path, content, hdr_len);
 #endif
@@ -767,7 +1006,7 @@ void _bt_hps_get_response_cb(SoupSession *session,
 #ifdef	HPS_GATT_DB
 		data_status = (hdr_len > MAX_HEADER_LENGTH) ? DS_HEADER_TRUNCATED : DS_HEADER_RECEIVED;
 		if (data_status == DS_HEADER_TRUNCATED && SOUP_STATUS_IS_SUCCESSFUL(http_status)) {
-			_bt_hps_set_notify_read_status(http_hdr_obj_path, data_status, 0, http_status);
+			_bt_hps_set_notify_read_status(http_hdr_obj_path, 0, data_status, http_status);
 		}
 		_bt_hps_send_status_notification(http_status, data_status, &addr_hex);
 #else
@@ -801,29 +1040,34 @@ int _bt_hps_control_point_write_cb(char *value, int len)
 	BT_INFO("Opcode %0x", opcode);
 
 #ifdef	HPS_GATT_DB
-	_bt_hps_set_char_value(http_cp_obj_path, value, len);
+	_bt_hps_set_char_value(http_cp_obj_path, value, len, 0);
 #endif
 
 	switch (opcode) {
 		case HTTP_GET_REQUEST:
 			if (req_state == HTTP_REQ_STATE_EXECUTED) {
 				req_state = HTTP_REQ_STATE_INPROGRESS;
+#ifndef HPS_PTS_TEST
 				hps_soup_msg = soup_message_new("GET", g_uri);
+#endif
 #ifdef	HPS_GATT_DB
+#ifndef HPS_PTS_TEST
 				g_object_ref(hps_soup_msg);
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_get_response_cb, addr);
+#endif
 #else
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_get_response_cb, NULL);
 #endif
 			} else {
 				BT_ERR("HTTP GET request in progress, message dropped");
-				result = BLUETOOTH_ERROR_INTERNAL;
+				result = BLUETOOTH_ERROR_IN_PROGRESS;
 			}
 			break;
 
 		case HTTP_POST_REQUEST:
 			if (req_state == HTTP_REQ_STATE_EXECUTED) {
 				req_state = HTTP_REQ_STATE_INPROGRESS;
+#ifndef HPS_PTS_TEST
 				hps_soup_msg = soup_message_new("POST", g_uri);
 				if (hps_soup_msg == NULL || g_entity == NULL) {
 					BT_ERR("Soup Message NULL");
@@ -833,21 +1077,25 @@ int _bt_hps_control_point_write_cb(char *value, int len)
 				}
 				soup_message_set_request(hps_soup_msg, "text/xml", SOUP_MEMORY_COPY,
 							  g_entity, strlen(g_entity));
+#endif
 #ifdef	HPS_GATT_DB
+#ifndef HPS_PTS_TEST
 				g_object_ref(hps_soup_msg);
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_http_response_cb, addr);
+#endif
 #else
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_http_response_cb, NULL);
 #endif
 			} else {
 				BT_ERR("HTTP POST request in progress, message dropped");
-				result = BLUETOOTH_ERROR_INTERNAL;
+				result = BLUETOOTH_ERROR_IN_PROGRESS;
 			}
 			break;
 
 		case HTTP_HEAD_REQUEST:
 			if (req_state == HTTP_REQ_STATE_EXECUTED) {
 				req_state = HTTP_REQ_STATE_INPROGRESS;
+#ifndef HPS_PTS_TEST
 				hps_soup_msg = soup_message_new("HEAD", g_uri);
 				if (hps_soup_msg == NULL) {
 					BT_ERR("Soup Message NULL");
@@ -855,22 +1103,26 @@ int _bt_hps_control_point_write_cb(char *value, int len)
 					req_state = HTTP_REQ_STATE_EXECUTED;
 					break;
 				}
+#endif
 #ifdef	HPS_GATT_DB
+#ifndef HPS_PTS_TEST
 				g_object_ref(hps_soup_msg);
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_head_response_cb, addr);
+#endif
 #else
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_head_response_cb, NULL);
 #endif
 			} else {
 				BT_ERR("HTTP HEAD request in progress, message dropped");
-				result = BLUETOOTH_ERROR_INTERNAL;
+				result = BLUETOOTH_ERROR_IN_PROGRESS;
 			}
 			break;
 
 		case HTTP_PUT_REQUEST:
 			if (req_state == HTTP_REQ_STATE_EXECUTED) {
-				SoupBuffer *buf;
 				req_state = HTTP_REQ_STATE_INPROGRESS;
+#ifndef HPS_PTS_TEST
+				SoupBuffer *buf;
 				hps_soup_msg = soup_message_new("PUT", g_uri);
 				if (hps_soup_msg == NULL  || g_entity == NULL) {
 					BT_ERR("Soup Message NULL");
@@ -881,22 +1133,26 @@ int _bt_hps_control_point_write_cb(char *value, int len)
 				buf = soup_buffer_new(SOUP_MEMORY_TAKE, g_entity, strlen(g_entity));
 				soup_message_body_append_buffer(hps_soup_msg->request_body, buf);
 				soup_message_body_set_accumulate(hps_soup_msg->request_body, FALSE);
+#endif
 #ifdef	HPS_GATT_DB
+#ifndef HPS_PTS_TEST
 				g_object_ref(hps_soup_msg);
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_http_response_cb, addr);
+#endif
 #else
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_http_response_cb, NULL);
 #endif
 
 			} else {
 				BT_ERR("HTTP PUT request in progress, message dropped");
-				result = BLUETOOTH_ERROR_INTERNAL;
+				result = BLUETOOTH_ERROR_IN_PROGRESS;
 			}
 			break;
 
 		case HTTP_DELETE_REQUEST:
 			if (req_state == HTTP_REQ_STATE_EXECUTED) {
 				req_state = HTTP_REQ_STATE_INPROGRESS;
+#ifndef HPS_PTS_TEST
 				hps_soup_msg = soup_message_new("DELETE", g_uri);
 				if (hps_soup_msg == NULL) {
 					BT_ERR("Soup Message NULL");
@@ -904,21 +1160,25 @@ int _bt_hps_control_point_write_cb(char *value, int len)
 					req_state = HTTP_REQ_STATE_EXECUTED;
 					break;
 				}
+#endif
 #ifdef	HPS_GATT_DB
+#ifndef HPS_PTS_TEST
 				g_object_ref(hps_soup_msg);
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_http_response_cb, addr);
+#endif
 #else
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_http_response_cb, NULL);
 #endif
 			} else {
 				BT_ERR("HTTP DELETE request in progress, message dropped");
-				result = BLUETOOTH_ERROR_INTERNAL;
+				result = BLUETOOTH_ERROR_IN_PROGRESS;
 			}
 			break;
 
 		case HTTPS_GET_REQUEST:
 			if (req_state == HTTP_REQ_STATE_EXECUTED) {
 				req_state = HTTP_REQ_STATE_INPROGRESS;
+#ifndef HPS_PTS_TEST
 				hps_soup_msg = soup_message_new("GET", g_uri);
 				if (hps_soup_msg == NULL) {
 					BT_ERR("Soup Message NULL");
@@ -926,27 +1186,31 @@ int _bt_hps_control_point_write_cb(char *value, int len)
 					req_state = HTTP_REQ_STATE_EXECUTED;
 					break;
 				}
+#endif
 #ifdef	HPS_GATT_DB
+#ifndef HPS_PTS_TEST
 				g_object_ref(hps_soup_msg);
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_get_response_cb, addr);
+#endif
 #else
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_get_response_cb, NULL);
 #endif
 				https_status = soup_message_get_https_status(hps_soup_msg, &cert, &flags);
 #ifdef	HPS_GATT_DB
-				_bt_hps_set_char_value(http_security_obj_path, (const char *)&https_status, 1);
+				_bt_hps_set_char_value(http_security_obj_path, (const char *)&https_status, 1, 0);
 #else
 				bluetooth_gatt_set_characteristic_value(http_security_obj_path, (char *)&https_status, 1);
 #endif
 			} else {
 				BT_ERR("HTTPS GET request in progress, message dropped");
-				result = BLUETOOTH_ERROR_INTERNAL;
+				result = BLUETOOTH_ERROR_IN_PROGRESS;
 			}
 			break;
 
 		case HTTPS_HEAD_REQUEST:
 			if (req_state == HTTP_REQ_STATE_EXECUTED) {
 				req_state = HTTP_REQ_STATE_INPROGRESS;
+#ifndef HPS_PTS_TEST
 				hps_soup_msg = soup_message_new("HEAD", g_uri);
 				if (hps_soup_msg == NULL) {
 					BT_ERR("Soup Message NULL");
@@ -954,27 +1218,31 @@ int _bt_hps_control_point_write_cb(char *value, int len)
 					req_state = HTTP_REQ_STATE_EXECUTED;
 					break;
 				}
+#endif
 #ifdef	HPS_GATT_DB
+#ifndef HPS_PTS_TEST
 				g_object_ref(hps_soup_msg);
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_head_response_cb, addr);
+#endif
 #else
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_head_response_cb, NULL);
 #endif
 				https_status = soup_message_get_https_status(hps_soup_msg, &cert, &flags);
 #ifdef	HPS_GATT_DB
-				_bt_hps_set_char_value(http_security_obj_path, (const char *)&https_status, 1);
+				_bt_hps_set_char_value(http_security_obj_path, (const char *)&https_status, 1, 0);
 #else
 				bluetooth_gatt_set_characteristic_value(http_security_obj_path, (char *)&https_status, 1);
 #endif
 			} else {
 				BT_ERR("HTTPS HEAD request in progress, message dropped");
-				result = BLUETOOTH_ERROR_INTERNAL;
+				result = BLUETOOTH_ERROR_IN_PROGRESS;
 			}
 			break;
 
 		case HTTPS_POST_REQUEST:
 			if (req_state == HTTP_REQ_STATE_EXECUTED) {
 				req_state = HTTP_REQ_STATE_INPROGRESS;
+#ifndef HPS_PTS_TEST
 				hps_soup_msg = soup_message_new("POST", g_uri);
 				if (hps_soup_msg == NULL) {
 					BT_ERR("Soup Message NULL");
@@ -984,27 +1252,31 @@ int _bt_hps_control_point_write_cb(char *value, int len)
 				}
 				soup_message_set_request(hps_soup_msg, "text/xml", SOUP_MEMORY_STATIC,
 							  g_entity, strlen(g_entity));
+#endif
 #ifdef	HPS_GATT_DB
+#ifndef HPS_PTS_TEST
 				g_object_ref(hps_soup_msg);
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_http_response_cb, addr);
+#endif
 #else
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_http_response_cb, NULL);
 
 #endif
 				https_status = soup_message_get_https_status(hps_soup_msg, &cert, &flags);
 #ifdef	HPS_GATT_DB
-				_bt_hps_set_char_value(http_security_obj_path, (const char *)&https_status, 1);
+				_bt_hps_set_char_value(http_security_obj_path, (const char *)&https_status, 1, 0);
 #else
 				bluetooth_gatt_set_characteristic_value(http_security_obj_path, (char *)&https_status, 1);
 #endif
 			} else {
 				BT_ERR("HTTPS POST request in progress, message dropped");
-				result = BLUETOOTH_ERROR_INTERNAL;
+				result = BLUETOOTH_ERROR_IN_PROGRESS;
 			}
 			break;
 
 		case HTTPS_PUT_REQUEST:
 			if (req_state == HTTP_REQ_STATE_EXECUTED) {
+#ifndef HPS_PTS_TEST
 				SoupBuffer *buf;
 				req_state = HTTP_REQ_STATE_INPROGRESS;
 				hps_soup_msg = soup_message_new("PUT", g_uri);
@@ -1017,26 +1289,30 @@ int _bt_hps_control_point_write_cb(char *value, int len)
 				buf = soup_buffer_new(SOUP_MEMORY_TAKE, g_entity, strlen(g_entity));
 				soup_message_body_append_buffer(hps_soup_msg->request_body, buf);
 				soup_message_body_set_accumulate(hps_soup_msg->request_body, FALSE);
+#endif
 #ifdef	HPS_GATT_DB
+#ifndef HPS_PTS_TEST
 				g_object_ref(hps_soup_msg);
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_http_response_cb, addr);
+#endif
 #else
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_http_response_cb, NULL);
 #endif
 				https_status = soup_message_get_https_status(hps_soup_msg, &cert, &flags);
 #ifdef	HPS_GATT_DB
-				_bt_hps_set_char_value(http_security_obj_path, (const char *)&https_status, 1);
+				_bt_hps_set_char_value(http_security_obj_path, (const char *)&https_status, 1, 0);
 #else
 				bluetooth_gatt_set_characteristic_value(http_security_obj_path, (char *)&https_status, 1);
 #endif
 			} else {
 				BT_ERR("HTTPS PUT request in progress, message dropped");
-				result = BLUETOOTH_ERROR_INTERNAL;
+				result = BLUETOOTH_ERROR_IN_PROGRESS;
 			}
 			break;
 
 		case HTTPS_DELETE_REQUEST:
 			if (req_state == HTTP_REQ_STATE_EXECUTED) {
+#ifndef HPS_PTS_TEST
 				req_state = HTTP_REQ_STATE_INPROGRESS;
 				hps_soup_msg = soup_message_new("DELETE", g_uri);
 				if (hps_soup_msg == NULL) {
@@ -1045,22 +1321,25 @@ int _bt_hps_control_point_write_cb(char *value, int len)
 					req_state = HTTP_REQ_STATE_EXECUTED;
 					break;
 				}
+#endif
 #ifdef	HPS_GATT_DB
+#ifndef HPS_PTS_TEST
 				g_object_ref(hps_soup_msg);
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_http_response_cb, addr);
+#endif
 #else
 				soup_session_queue_message(hps_soup_session, hps_soup_msg, _bt_hps_http_response_cb, NULL);
 #endif
 
 				https_status = soup_message_get_https_status(hps_soup_msg, &cert, &flags);
 #ifdef	HPS_GATT_DB
-				_bt_hps_set_char_value(http_security_obj_path, (const char *)&https_status, 1);
+				_bt_hps_set_char_value(http_security_obj_path, (const char *)&https_status, 1, 0);
 #else
 				bluetooth_gatt_set_characteristic_value(http_security_obj_path, (char *)&https_status, 1);
 #endif
 			} else {
 				BT_ERR("HTTPS DELETE request in progress, message dropped");
-				result = BLUETOOTH_ERROR_INTERNAL;
+				result = BLUETOOTH_ERROR_IN_PROGRESS;
 			}
 			break;
 
@@ -1068,6 +1347,7 @@ int _bt_hps_control_point_write_cb(char *value, int len)
 			/* Cancel the outstanding request */
 			if (req_state == HTTP_REQ_STATE_INPROGRESS) {
 				req_state = HTTP_REQ_STATE_IDLE;
+#ifndef HPS_PTS_TEST
 				if (hps_soup_msg == NULL) {
 					BT_ERR("Soup Message NULL");
 					result = BLUETOOTH_ERROR_INTERNAL;
@@ -1075,6 +1355,7 @@ int _bt_hps_control_point_write_cb(char *value, int len)
 					break;
 				}
 				soup_session_cancel_message(hps_soup_session, hps_soup_msg, SOUP_STATUS_CANCELLED);
+#endif
 				hps_soup_msg = NULL;
 			}
 			break;
@@ -1129,29 +1410,84 @@ void _bt_hps_gatt_char_property_changed_event(GVariant *msg,
 
 				len = g_variant_get_size(val);
 
-				BT_DBG("Len = %d", len);
+				BT_DBG("Len = %d, Offset = %d", len, offset);
 
 				value = (char *) g_variant_get_data(val);
 
 				if (len != 0) {
 					if (!g_strcmp0(char_path, http_uri_obj_path)) {
 						/* Retrive URI */
-						result = _bt_hps_uri_write_cb(value, len);
+#ifdef HPS_PTS_TEST
+						BT_DBG("BP URI");
+						req_state = HTTP_REQ_STATE_EXECUTED;
+					//	http_process_status = FALSE
+#endif
+						result = _bt_hps_uri_write_cb(value, len, offset);;
 					} else if (!g_strcmp0(char_path, http_hdr_obj_path)) {
 						/* Retrive HEADER */
-						result = _bt_hps_http_header_write_cb(value, len);
+#ifdef HPS_PTS_TEST
+						BT_DBG("BP HEADER");
+						req_state = HTTP_REQ_STATE_EXECUTED;
+					//	http_process_status = FALSE
+#endif
+						result = _bt_hps_http_header_write_cb(value, len, offset);
 					} else if (!g_strcmp0(char_path, http_entity_obj_path)) {
 						/* Retrive ENTITY BODY */
-						result = _bt_hps_entity_body_write_cb(value, len);
+#ifdef HPS_PTS_TEST
+						BT_DBG("BP ENTITY BODY");
+						req_state = HTTP_REQ_STATE_EXECUTED;
+					//	http_process_status = TRUE;
+#endif
+						result = _bt_hps_entity_body_write_cb(value, len, offset);
 					} else if (!g_strcmp0(char_path, http_cp_obj_path)) {
-						result = _bt_hps_control_point_write_cb(value, len, addr);
+#ifdef HPS_PTS_TEST
+						BT_DBG("BP CP");
+					//		if (http_process_status)
+								result = _bt_hps_control_point_write_cb(value, len, addr);
+					//		else
+					//			result = BLUETOOTH_ERROR_INVALID_PARAM;
+#else
+					result = _bt_hps_control_point_write_cb(value, len, addr);
+#endif
 					} else {
 						BT_ERR("Wrong Object Path %s", char_path);
 						result = BLUETOOTH_ERROR_INTERNAL;
 					}
-				bluetooth_gatt_send_response(req_id, BLUETOOTH_GATT_ATT_REQUEST_TYPE_WRITE, result, 0, NULL, 0);
+#ifdef HPS_PTS_TEST
+					if (!g_strcmp0(char_path, http_cp_obj_path)) {
+						BT_DBG("BP 2");
+						int opcode = *value;
+						bluetooth_gatt_send_response(req_id, BLUETOOTH_GATT_ATT_REQUEST_TYPE_WRITE, result, 0, NULL, 0);
+						if (result == BLUETOOTH_ERROR_NONE) {
+							BT_DBG("BP 2.5");
+							switch(opcode) {
+								case HTTP_GET_REQUEST:
+								case HTTPS_GET_REQUEST:
+									_bt_hps_local_get_response_cb(addr);
+								break;
+								case HTTP_POST_REQUEST:
+								case HTTP_PUT_REQUEST:
+								case HTTPS_POST_REQUEST:
+								case HTTPS_PUT_REQUEST:
+								case HTTPS_DELETE_REQUEST:
+								case HTTP_DELETE_REQUEST:
+									_bt_hps_local_http_response_cb(addr);
+								break;
+								case HTTP_HEAD_REQUEST:
+								case HTTPS_HEAD_REQUEST:
+									_bt_hps_local_head_response_cb(addr);
+								break;
+							}
+						}
+					}
+					else
+						bluetooth_gatt_send_response(req_id, BLUETOOTH_GATT_ATT_REQUEST_TYPE_WRITE, result, 0, NULL, 0);
+#else
+					bluetooth_gatt_send_response(req_id, BLUETOOTH_GATT_ATT_REQUEST_TYPE_WRITE, result, 0, NULL, 0);
+#endif
 				} else {
 					BT_ERR("Array Len 0");
+					bluetooth_gatt_send_response(req_id, BLUETOOTH_GATT_ATT_REQUEST_TYPE_WRITE, result, 0, NULL, 0);
 				}
 			} else {
 				BT_ERR("var==NULL");
@@ -1162,13 +1498,18 @@ void _bt_hps_gatt_char_property_changed_event(GVariant *msg,
 			guint16 offset = 0;
 			char *value = NULL;
 			int len = 0;
+#ifndef HPS_PTS_TEST
 			int data_status = -1;
+#else
+			struct hps_char_info *info = NULL;
+#endif
 			BT_INFO("ReadValue");
 			BT_INFO("Type '%s'\n", g_variant_get_type_string(var));
 
 			g_variant_get(var, "(&s&s&syq)", &char_path, &svc_handle,
 								&addr, &req_id, &offset);
 
+#ifndef HPS_PTS_TEST
 			data_status = _bt_hps_read_cb(char_path, &value, &len);
 			if (data_status >= DS_NONE) {
 				struct hps_notify_read_info *notify_read_info = NULL;
@@ -1183,17 +1524,52 @@ void _bt_hps_gatt_char_property_changed_event(GVariant *msg,
 				} else {
 					if (data_status == DS_BODY_RECEIVED ||
 						data_status == DS_HEADER_RECEIVED) {
-						_bt_hps_set_char_value(char_path, NULL, 0);
+						_bt_hps_set_char_value(char_path, NULL, 0, 0);
 					}
 				}
 				if (value)
 					g_free(value);
+#else
+			info = hps_get_char_value(char_path);
+			if (info) {
+				value = g_strdup(&info->char_value[offset]);
+				len = MAX_ENTITY_LENGTH - offset;
+				bluetooth_gatt_send_response(req_id, BLUETOOTH_GATT_ATT_REQUEST_TYPE_READ,
+								BLUETOOTH_ERROR_NONE, offset, value, len);
+				if (value)
+					g_free(value);
+#endif
 			} else {
 				BT_ERR("ReadValue failed %s", char_path);
+#ifndef HPS_PTS_TEST
+				bluetooth_gatt_send_response(req_id, BLUETOOTH_GATT_ATT_REQUEST_TYPE_READ,
+								BLUETOOTH_ERROR_NONE, offset, NULL, 0);
+#else
 				bluetooth_gatt_send_response(req_id, BLUETOOTH_GATT_ATT_REQUEST_TYPE_READ,
 								BLUETOOTH_ERROR_INTERNAL, offset, NULL, 0);
+#endif
 			}
 		}
+#ifdef HPS_PTS_TEST
+		else if (!g_strcmp0(property, "StartNotify")) {
+			BT_INFO("StartNotify");
+			BT_INFO("Type '%s'\n", g_variant_get_type_string(var));
+
+			if (var) {
+				gboolean att_notify = FALSE;
+				g_variant_get(var, "(&s&sb)", &char_path,
+						&svc_handle, &att_notify);
+
+				BT_DBG("attt_notify = %d", att_notify);
+				if (!g_strcmp0(char_path, http_security_obj_path)) {
+					/* Retrive URI */
+					BT_DBG("BP Security");
+					enable_status_notify = att_notify;
+					result = BLUETOOTH_ERROR_NONE;
+				}
+			}
+		}
+#endif
 	}
 	return;
 }
@@ -1335,12 +1711,12 @@ void _bt_hps_adapter_event_filter(GDBusConnection *connection,
 				BT_ERR("Fail to prepare HTTP Proxy");
 				return;
 			}
-
+#ifndef HPS_PTS_TEST
 			if (_bt_hps_set_advertising_data() != BLUETOOTH_ERROR_NONE) {
 				BT_ERR("Fail to set advertising data");
 				return;
 			}
-
+#endif
 		} else {
 			BT_ERR("Wrong Signal %s", signal_name);
 		}
@@ -1393,7 +1769,7 @@ int _bt_hps_set_advertising_data(void)
 	BT_DBG("");
 
     // Temporary UUID is used. SIG have not yet defined the UUID yet
-	guint8 data[4]	= {0x03, 0x02, 0x00, 0x19};
+	guint8 data[4]	= {0x03, 0x02, 0x23, 0x18};
 	bluetooth_advertising_data_t adv;
 
 	BT_DBG("%x %x %x %x", data[0], data[1], data[2], data[3]);
@@ -1435,7 +1811,7 @@ int _bt_hps_prepare_httpproxy(void)
 		goto fail;
 	}
 
-	service_uuid = g_strdup(HPS_UUID);
+	service_uuid = __hps_convert_uuid_to_uuid128(HPS_UUID);
 	ret = bluetooth_gatt_add_service(service_uuid, &hps_obj_path);
 	if (ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Failed to add service %d", ret);
@@ -1443,9 +1819,8 @@ int _bt_hps_prepare_httpproxy(void)
 	}
 
 	/* Characteristic URI */
-	props = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ |
-			BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE;
-	char_uuid = g_strdup(HTTP_URI_UUID);
+	props = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE;
+	char_uuid = __hps_convert_uuid_to_uuid128(HTTP_URI_UUID);
 	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, 0, props, &http_uri_obj_path);
 	if (ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Failed to add new char %d", ret);
@@ -1462,14 +1837,14 @@ int _bt_hps_prepare_httpproxy(void)
 	/* Store requets information */
 	char_info = g_new0(struct hps_char_info, 1);
 	char_info->char_path = g_strdup(http_uri_obj_path);
-	_bt_hps_set_char_value(http_uri_obj_path, value, MAX_URI_LENGTH);
+	_bt_hps_set_char_value(http_uri_obj_path, value, MAX_URI_LENGTH, 0);
 	hps_char_list = g_slist_append(hps_char_list, char_info);
 #endif
 
 	/* Characteristic HTTP Headers */
 	props = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ |
 			BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE;
-	char_uuid = g_strdup(HTTP_HDR_UUID);
+	char_uuid = __hps_convert_uuid_to_uuid128(HTTP_HDR_UUID);
 	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, 0, props, &http_hdr_obj_path);
 	if (ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Failed to add new char %d", ret);
@@ -1485,14 +1860,14 @@ int _bt_hps_prepare_httpproxy(void)
 	/* Store Characterisitc information */
 	char_info = g_new0(struct hps_char_info, 1);
 	char_info->char_path = g_strdup(http_hdr_obj_path);
-	_bt_hps_set_char_value(http_hdr_obj_path, value, MAX_HEADER_LENGTH);
+	_bt_hps_set_char_value(http_hdr_obj_path, value, MAX_HEADER_LENGTH, 0);
 	hps_char_list = g_slist_append(hps_char_list, char_info);
 #endif
 
 	/* Characteristic HTTP Entity Body */
 	props = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ |
 			BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE;
-	char_uuid = g_strdup(HTTP_ENTITY_UUID);
+	char_uuid = __hps_convert_uuid_to_uuid128(HTTP_ENTITY_UUID);
 	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, 0, props, &http_entity_obj_path);
 	if (ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Failed to add new char %d", ret);
@@ -1508,14 +1883,13 @@ int _bt_hps_prepare_httpproxy(void)
 	/* Store Characterisitc information */
 	char_info = g_new0(struct hps_char_info, 1);
 	char_info->char_path = g_strdup(http_entity_obj_path);
-	_bt_hps_set_char_value(http_entity_obj_path, value, MAX_ENTITY_LENGTH);
+	_bt_hps_set_char_value(http_entity_obj_path, value, MAX_ENTITY_LENGTH, 0);
 	hps_char_list = g_slist_append(hps_char_list, char_info);
 #endif
 
 	/* Characteristic HTTP Control Point */
-	props = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ |
-			BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE;
-	char_uuid = g_strdup(HTTP_CP_UUID);
+	props = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE;
+	char_uuid = __hps_convert_uuid_to_uuid128(HTTP_CP_UUID);
 	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, 0, props, &http_cp_obj_path);
 	if (ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Failed to add new char %d", ret);
@@ -1531,15 +1905,13 @@ int _bt_hps_prepare_httpproxy(void)
 	/* Store Characterisitc information */
 	char_info = g_new0(struct hps_char_info, 1);
 	char_info->char_path = g_strdup(http_cp_obj_path);
-	_bt_hps_set_char_value(http_cp_obj_path, &cp, 1);
+	_bt_hps_set_char_value(http_cp_obj_path, &cp, 1, 0);
 	hps_char_list = g_slist_append(hps_char_list, char_info);
 #endif
 
 	/* Characteristic HTTP Status Code */
-	props = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ |
-			BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE |
-			BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_NOTIFY;
-	char_uuid = g_strdup(HTTP_STATUS_UUID);
+	props =  BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_NOTIFY;
+	char_uuid = __hps_convert_uuid_to_uuid128(HTTP_STATUS_UUID);
 	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, 0, props, &http_status_obj_path);
 	if (ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Failed to add new char %d", ret);
@@ -1552,7 +1924,7 @@ int _bt_hps_prepare_httpproxy(void)
 		goto fail;
 	}
 #endif
-	desc_uuid = g_strdup(HTTP_STATUS_CCC_DESC_UUID);
+	desc_uuid = __hps_convert_uuid_to_uuid128(HTTP_STATUS_CCC_DESC_UUID);
 	ret = bluetooth_gatt_add_descriptor(http_status_obj_path, desc_uuid,
 					(BLUETOOTH_GATT_PERMISSION_READ | BLUETOOTH_GATT_PERMISSION_WRITE),
 					&http_status_desc_obj_path);
@@ -1564,20 +1936,22 @@ int _bt_hps_prepare_httpproxy(void)
 	/* Store Characterisitc information */
 	char_info = g_new0(struct hps_char_info, 1);
 	char_info->char_path = g_strdup(http_status_obj_path);
-	_bt_hps_set_char_value(http_status_obj_path, status, 3);
+	_bt_hps_set_char_value(http_status_obj_path, status, 3, 0);
 	hps_char_list = g_slist_append(hps_char_list, char_info);
 #endif
 
 	/* Characteristic HTTPS Security */
-	props = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ |
-			BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_WRITE;
-	char_uuid = g_strdup(HTTP_SECURITY_UUID);
+	props = BLUETOOTH_GATT_CHARACTERISTIC_PROPERTY_READ;
+	char_uuid = __hps_convert_uuid_to_uuid128(HTTP_SECURITY_UUID);
 	ret = bluetooth_gatt_add_new_characteristic(hps_obj_path, char_uuid, 0, props, &http_security_obj_path);
 	if (ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Failed to add new char %d", ret);
 		goto fail;
 	}
 #ifdef	HPS_GATT_DB
+#ifdef HPS_PTS_TEST
+	cp = 0x01;
+#endif
 	ret = bluetooth_gatt_set_characteristic_value(http_security_obj_path, &cp, 1);
 	if (ret != BLUETOOTH_ERROR_NONE) {
 		BT_ERR("Failed to add new char %d", ret);
@@ -1587,7 +1961,7 @@ int _bt_hps_prepare_httpproxy(void)
 	/* Store Characterisitc information */
 	char_info = g_new0(struct hps_char_info, 1);
 	char_info->char_path = g_strdup(http_security_obj_path);
-	_bt_hps_set_char_value(http_security_obj_path, &cp, 1);
+	_bt_hps_set_char_value(http_security_obj_path, &cp, 1, 0);
 	hps_char_list = g_slist_append(hps_char_list, char_info);
 #endif
 

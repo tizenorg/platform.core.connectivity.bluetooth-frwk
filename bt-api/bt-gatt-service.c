@@ -28,6 +28,10 @@
 
 #define NUMBER_OF_FLAGS	10
 
+#ifdef HPS_FEATURE
+#define HPS_PTS_TEST
+#endif
+
 GDBusConnection *g_conn;
 GDBusNodeInfo *obj_info;
 guint owner_id;
@@ -195,6 +199,26 @@ static gchar *app_path = NULL;
 #define BT_HPS_INTERFACE_NAME "org.projectx.httpproxy_service"
 #define PROPERTIES_CHANGED "PropertiesChanged"
 #define BT_HPS_PROPERTIES_INTERFACE "org.freedesktop.DBus.Properties"
+
+#if 0
+typedef enum {
+	GATT_SERVER_ERROR_APPLICATION,
+	GATT_SERVER_ERROR_CCC_IMPROPER,
+	GATT_SERVER_ERROR_IN_PROGRESS,
+	GATT_SERVER_ERROR_OUT_OF_RANGE,
+} GattServerError;
+
+#define GATT_SERVER_ERROR (gatt_server_error_quark())
+
+static GQuark gatt_server_error_quark(void)
+{
+	static GQuark quark = 0;
+	if (!quark)
+		quark = g_quark_from_static_string("agent");
+
+	return quark;
+}
+#endif
 #endif
 
 static GDBusProxy *manager_gproxy = NULL;
@@ -274,7 +298,23 @@ static int __bt_send_event_to_hps(int event, GVariant *var)
 		parameters = g_variant_new("(a{sv}as)", inner_builder, invalidated_builder);
 		g_variant_builder_unref(invalidated_builder);
 		g_variant_builder_unref(inner_builder);
+#ifdef HPS_PTS_TEST
+	} else if (BLUETOOTH_EVENT_GATT_SERVER_NOTIFICATION_STATE_CHANGED) {
+		GVariantBuilder *inner_builder;
+		GVariantBuilder *invalidated_builder;
+	
+		BT_DBG("BLUETOOTH_EVENT_GATT_SERVER_VALUE_CHANGED");
+		inner_builder = g_variant_builder_new(G_VARIANT_TYPE("a{sv}"));
+	
+		g_variant_builder_add(inner_builder, "{sv}", "StartNotify", var);
+	
+		invalidated_builder = g_variant_builder_new(G_VARIANT_TYPE("as"));
+	
+		parameters = g_variant_new("(a{sv}as)", inner_builder, invalidated_builder);
+		g_variant_builder_unref(invalidated_builder);
+		g_variant_builder_unref(inner_builder);
 	}
+#endif
 
 	msg = g_dbus_message_new_signal(BT_HPS_OBJECT_PATH, BT_HPS_INTERFACE_NAME, PROPERTIES_CHANGED);
 	g_dbus_message_set_body(msg, parameters);
@@ -758,7 +798,11 @@ static void __bt_gatt_char_method_call(GDBusConnection *connection,
 				user_info->cb, user_info->user_data);
 		}
 #ifdef HPS_FEATURE
+#ifdef HPS_PTS_TEST
+		if (len >= 0) {
+#else
 		if (len > 0) {
+#endif
 			gchar *svc_path;
 			svc_path = g_strdup(svc_info->serv_path);
 			param = g_variant_new("(sssyq@ay)",
@@ -778,10 +822,17 @@ static void __bt_gatt_char_method_call(GDBusConnection *connection,
 	} else if (g_strcmp0(method_name, "StartNotify") == 0) {
 		bt_user_info_t *user_info = NULL;
 		bt_gatt_char_notify_change_t notify_change = {0, };
+		struct gatt_service_info *svc_info = NULL;
+#ifdef HPS_FEATURE
+#ifdef HPS_PTS_TEST
+		GVariant *param = NULL;
+		gchar *svc_path;
+		gboolean att_notify = TRUE;
+#endif
+#endif
 		BT_DBG("StartNotify");
 		user_info = _bt_get_user_data(BT_COMMON);
 		if (user_info != NULL) {
-			struct gatt_service_info *svc_info = NULL;
 			svc_info = __bt_gatt_find_gatt_service_from_char(object_path);
 			if (svc_info) {
 				notify_change.service_handle = g_strdup(svc_info->serv_path);
@@ -793,6 +844,24 @@ static void __bt_gatt_char_method_call(GDBusConnection *connection,
 					user_info->cb, user_info->user_data);
 			}
 		}
+#ifdef HPS_FEATURE
+#ifdef HPS_PTS_TEST
+
+		if (!svc_info)
+			svc_info = __bt_gatt_find_gatt_service_from_char(object_path);
+		if (svc_info) {
+			svc_path = g_strdup(svc_info->serv_path);
+			param = g_variant_new("(ssb)",
+					object_path,
+					svc_path,
+					att_notify);
+			__bt_send_event_to_hps(BLUETOOTH_EVENT_GATT_SERVER_NOTIFICATION_STATE_CHANGED, param);
+			if (svc_path)
+				g_free(svc_path);
+		}
+#endif
+#endif
+
 	} else if (g_strcmp0(method_name, "StopNotify") == 0) {
 		bt_user_info_t *user_info = NULL;
 		bt_gatt_char_notify_change_t notify_change = {0, };
@@ -2449,22 +2518,40 @@ BT_EXPORT_API int bluetooth_gatt_send_response(int request_id, guint req_type,
 {
 	struct gatt_req_info *req_info = NULL;
 
+#ifndef HPS_PTS_TEST
 	if (_bt_check_privilege(BT_CHECK_PRIVILEGE, BT_GATT_SEND_RESPONSE)
 			== BLUETOOTH_ERROR_PERMISSION_DEINED) {
 		BT_ERR("Don't have aprivilege to use this API");
 		return BLUETOOTH_ERROR_PERMISSION_DEINED;
 	}
-
+#endif
 	req_info = __bt_gatt_find_request_info(request_id);
 
 	if (req_info) {
 		if (resp_state != BLUETOOTH_ERROR_NONE) {
 
+#ifdef HPS_PTS_TEST
+			if (resp_state == BLUETOOTH_ERROR_IN_PROGRESS)
+				g_dbus_method_invocation_return_error(req_info->context,
+					G_DBUS_ERROR, G_DBUS_ERROR_OBJECT_PATH_IN_USE, "Procedure in Progress");
+			else if (resp_state == BLUETOOTH_ERROR_NOT_SUPPORT)
+				g_dbus_method_invocation_return_error(req_info->context,
+					G_DBUS_ERROR, G_DBUS_ERROR_NOT_SUPPORTED, "Not Supported/Initialized");
+			else if (resp_state == BLUETOOTH_ERROR_CONNECTION_ERROR)
+				g_dbus_method_invocation_return_error(req_info->context,
+					G_DBUS_ERROR, G_DBUS_ERROR_NO_NETWORK, "No Network");
+			else if (resp_state == BLUETOOTH_ERROR_INVALID_PARAM)
+				g_dbus_method_invocation_return_error(req_info->context,
+					G_DBUS_ERROR, G_DBUS_ERROR_INVALID_ARGS, "Invalid Request");
+			else
+				g_dbus_method_invocation_return_error(req_info->context,
+					G_DBUS_ERROR, G_DBUS_ERROR_SERVICE_UNKNOWN, "Application Error");
+#else
 			GQuark quark = g_quark_from_string("gatt-server");
 			GError *err = g_error_new(quark, 0, "Application Error");
 			g_dbus_method_invocation_return_gerror(req_info->context, err);
 			g_error_free(err);
-
+#endif
 			gatt_requests = g_slist_remove(gatt_requests, req_info);
 
 			req_info->context = NULL;
