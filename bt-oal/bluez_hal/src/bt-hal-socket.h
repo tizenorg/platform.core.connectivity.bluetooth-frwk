@@ -1,15 +1,15 @@
 /*
- * BLUETOOTH HAL
+ * Bluetooth-frwk
  *
- * Copyright (c) 2015 -2016 Samsung Electronics Co., Ltd All Rights Reserved.
+ * Copyright (c) 2000 - 2011 Samsung Electronics Co., Ltd. All rights reserved.
  *
- * Contact: Anupam Roy <anupam.r@samsung.com>
+ * Contact:  Atul Kumar Rai <a.rai@samsung.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *              http://www.apache.org/licenses/LICENSE-2.0
+ *		http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,12 +19,15 @@
  *
  */
 
-#ifndef _BT_HAL_H_
-#define _BT_HAL_H_
+#ifndef __BT_HAL_SOCKET_H__
+#define __BT_HAL_SOCKET_H__
 
-#include <hardware/bluetooth.h>
-#include <hardware/bt_hh.h>
-#include <hardware/bt_sock.h>
+#include <stdint.h>
+#include <glib.h>
+#include <unistd.h>
+#include <dlog.h>
+#include <stdio.h>
 
-/*TODO: Profile interfaces headers and exposed methods of Android HAL framework to be included in next patches */
-#endif //_BT_HAL_H
+btsock_interface_t *bt_get_socket_interface(void);
+
+#endif //__BT_HAL_SOCKET_H__
