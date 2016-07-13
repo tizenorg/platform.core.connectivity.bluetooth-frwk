@@ -25,6 +25,8 @@
 #include <glib.h>
 #include <sys/types.h>
 
+#include "bt-hal.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -51,9 +53,12 @@ extern "C" {
                         "the message bus security policy blocked the reply, " \
                         "the reply timeout expired, or the network connection " \
                         "was broken."
+#define BT_HAL_ACCESS_DENIED_MSG "Rejected send message"
 
 #define BT_HAL_DISCOVERY_FINISHED_DELAY 200
 
+#define BT_HAL_UUID_SIZE 16
+#define BT_HAL_UUID_STRING_LEN 37
 #define BT_HAL_ADDRESS_LENGTH_MAX 6
 #define BT_HAL_ADDRESS_STRING_SIZE 18
 #define BT_HAL_LOWER_ADDRESS_LENGTH 9
@@ -364,7 +369,6 @@ typedef struct {
         unsigned char addr[BT_HAL_ADDRESS_LENGTH_MAX];
 } bt_hal_device_address_t;
 
-
 /**
  * structure to hold the device information
  */
@@ -385,30 +389,44 @@ typedef enum {
         BT_HAL_CONNECTED_LINK_BREDR_LE = 0x03,
 } bt_hal_connected_link_t;
 
+typedef struct {
+	char *obj_path;
+	char *uuid;
+	gboolean authentication;
+	gboolean authorization;
+	char *role;
+	char *service;
+} bt_hal_register_profile_info_t;
+
+typedef int (*bt_hal_new_connection_cb) (const char *path, int fd, bt_bdaddr_t *address);
+
 GDBusProxy *_bt_get_adapter_proxy(void);
-
 GDBusProxy *_bt_get_adapter_properties_proxy(void);
-
 GDBusConnection *_bt_get_system_gconn(void);
-
-void _bt_convert_device_path_to_address(const char *device_path,
-                char *device_address);
-
-void _bt_convert_addr_string_to_type(unsigned char *addr, const char *address);
-
-void _bt_convert_addr_type_to_string(char *address, const unsigned char *addr);
-
-void _bt_convert_uuid_string_to_type(unsigned char *uuid, const char *device_uuid);
-
-int _bt_connect_profile(char *address, char *uuid, void *cb, gpointer func_data);
-
-int _bt_disconnect_profile(char *address, char *uuid, void *cb, gpointer func_data);
-
 GDBusProxy *_bt_get_manager_proxy(void);
-
+GDBusProxy *_bt_get_profile_proxy(void);
 char *_bt_get_adapter_path(void);
 
 char *_bt_get_device_object_path(char *address);
+void _bt_convert_device_path_to_address(const char *device_path, char *device_address);
+
+void _bt_convert_addr_string_to_type(unsigned char *addr, const char *address);
+void _bt_convert_addr_type_to_string(char *address, const unsigned char *addr);
+void _bt_convert_uuid_string_to_type(unsigned char *uuid, const char *device_uuid);
+void _bt_convert_uuid_type_to_string(char *str, const unsigned char *uuid);
+
+int _bt_connect_profile(char *address, char *uuid, void *cb, gpointer func_data);
+int _bt_disconnect_profile(char *address, char *uuid, void *cb, gpointer func_data);
+int _bt_register_profile(bt_hal_register_profile_info_t *info, gboolean use_default_rfcomm);
+void _bt_unregister_profile(char *path);
+
+
+int _bt_discover_services(char *address, char *uuid, void *cb, gpointer func_data);
+int _bt_cancel_discovers(char *address);
+int _bt_discover_service_uuids(char *address, char *remote_uuid);
+
+int _bt_register_new_gdbus_object(const char *path, bt_hal_new_connection_cb cb);
+void _bt_unregister_gdbus_object(int object_id);
 
 #ifdef __cplusplus
 }

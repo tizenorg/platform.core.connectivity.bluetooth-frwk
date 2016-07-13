@@ -37,6 +37,7 @@
 #include <dbus/dbus.h>
 #include <sys/prctl.h>
 #include <gio/gio.h>
+#include <gio/gunixfdlist.h>
 
 #include "bt-hal-dbus-common-utils.h"
 
@@ -46,14 +47,36 @@
 #include "bt-hal-utils.h"
 #include "bt-hal-internal.h"
 
+/**
+ * This is RFCOMM default Channel Value
+ */
+#define RFCOMM_DEFAULT_PROFILE_CHANNEL 0
+
 static GDBusConnection *system_conn;
 static GDBusConnection *session_conn;
 static GDBusProxy *manager_proxy;
 static GDBusProxy *adapter_proxy;
+static GDBusProxy *profile_gproxy;
 
 static GDBusProxy *adapter_properties_proxy;
 
 static GDBusConnection *system_gconn = NULL;
+
+static guint bus_id;
+GDBusNodeInfo *new_conn_node;
+static const gchar rfcomm_agent_xml[] =
+"<node name='/'>"
+" <interface name='org.bluez.Profile1'>"
+"     <method name='NewConnection'>"
+"          <arg type='o' name='object' direction='in'/>"
+"          <arg type='h' name='fd' direction='in'/>"
+"          <arg type='a{sv}' name='properties' direction='in'/>"
+"     </method>"
+"     <method name='RequestDisconnection'>"
+"          <arg type='o' name='device' direction='in'/>"
+"     </method>"
+"  </interface>"
+"</node>";
 
 GDBusConnection *_bt_gdbus_init_system_gconn(void)
 {
@@ -260,6 +283,34 @@ GDBusProxy *_bt_get_adapter_properties_proxy(void)
 		__bt_init_adapter_properties_proxy();
 }
 
+GDBusProxy *_bt_get_profile_proxy(void)
+{
+	GDBusConnection *gconn;
+	GError *err = NULL;
+
+	if (profile_gproxy)
+		return profile_gproxy;
+
+	gconn = _bt_get_system_gconn();
+	if (gconn == NULL) {
+		ERR("_bt_get_system_gconn failed");
+		return NULL;
+	}
+
+	profile_gproxy = g_dbus_proxy_new_sync(gconn, G_DBUS_PROXY_FLAGS_NONE,
+			NULL, BT_HAL_BLUEZ_NAME,
+			"/org/bluez",
+			"org.bluez.ProfileManager1",
+			NULL, &err);
+	if (err) {
+		ERR("Unable to create proxy: %s", err->message);
+		g_clear_error(&err);
+		return NULL;
+	}
+
+	return profile_gproxy;
+}
+
 static char *__bt_extract_adapter_path(GVariantIter *iter)
 {
 	char *object_path = NULL;
@@ -402,8 +453,24 @@ void _bt_convert_uuid_string_to_type(unsigned char *uuid,
 	memcpy(&(uuid[8]), &uuid3, 2);
 	memcpy(&(uuid[10]), &uuid4, 4);
 	memcpy(&(uuid[14]), &uuid5, 2);
+}
 
-	return;
+void _bt_convert_uuid_type_to_string(char *str, const unsigned char *uuid)
+{
+	if (!str) {
+		ERR("str == NULL");
+		return;
+	}
+
+	if (!uuid) {
+		ERR("uuid == NULL");
+		return;
+	}
+
+	snprintf(str, BT_HAL_UUID_STRING_LEN,
+			"%2.2X%2.2X%2.2X%2.2X-%2.2X%2.2X-%2.2X%2.2X-%2.2X%2.2X-%2.2X%2.2X%2.2X%2.2X%2.2X%2.2X",
+			uuid[0], uuid[1], uuid[2], uuid[3], uuid[4], uuid[5], uuid[6], uuid[7],
+			uuid[8], uuid[9], uuid[10], uuid[11], uuid[12], uuid[13], uuid[14], uuid[15]);
 }
 
 void _bt_convert_addr_string_to_type(unsigned char *addr,
@@ -609,96 +676,96 @@ char *_bt_get_device_object_path(char *address)
 char *_bt_convert_error_to_string(int error)
 {
 	switch (error) {
-		case BT_HAL_ERROR_CANCEL:
-			return "CANCELLED";
-		case BT_HAL_ERROR_INVALID_PARAM:
-			return "INVALID_PARAMETER";
-		case BT_HAL_ERROR_INVALID_DATA:
-			return "INVALID DATA";
-		case BT_HAL_ERROR_MEMORY_ALLOCATION:
-		case BT_HAL_ERROR_OUT_OF_MEMORY:
-			return "OUT_OF_MEMORY";
-		case BT_HAL_ERROR_TIMEOUT:
-			return "TIMEOUT";
-		case BT_HAL_ERROR_NO_RESOURCES:
-			return "NO_RESOURCES";
-		case BT_HAL_ERROR_INTERNAL:
-			return "INTERNAL";
-		case BT_HAL_ERROR_NOT_SUPPORT:
-			return "NOT_SUPPORT";
-		case BT_HAL_ERROR_DEVICE_NOT_ENABLED:
-			return "NOT_ENABLED";
-		case BT_HAL_ERROR_DEVICE_ALREADY_ENABLED:
-			return "ALREADY_ENABLED";
-		case BT_HAL_ERROR_DEVICE_BUSY:
-			return "DEVICE_BUSY";
-		case BT_HAL_ERROR_ACCESS_DENIED:
-			return "ACCESS_DENIED";
-		case BT_HAL_ERROR_MAX_CLIENT:
-			return "MAX_CLIENT";
-		case BT_HAL_ERROR_NOT_FOUND:
-			return "NOT_FOUND";
-		case BT_HAL_ERROR_SERVICE_SEARCH_ERROR:
-			return "SERVICE_SEARCH_ERROR";
-		case BT_HAL_ERROR_PARING_FAILED:
-			return "PARING_FAILED";
-		case BT_HAL_ERROR_NOT_PAIRED:
-			return "NOT_PAIRED";
-		case BT_HAL_ERROR_SERVICE_NOT_FOUND:
-			return "SERVICE_NOT_FOUND";
-		case BT_HAL_ERROR_NOT_CONNECTED:
-			return "NOT_CONNECTED";
-		case BT_HAL_ERROR_ALREADY_CONNECT:
-			return "ALREADY_CONNECT";
-		case BT_HAL_ERROR_CONNECTION_BUSY:
-			return "CONNECTION_BUSY";
-		case BT_HAL_ERROR_CONNECTION_ERROR:
-			return "CONNECTION_ERROR";
-		case BT_HAL_ERROR_MAX_CONNECTION:
-			return "MAX_CONNECTION";
-		case BT_HAL_ERROR_NOT_IN_OPERATION:
-			return "NOT_IN_OPERATION";
-		case BT_HAL_ERROR_CANCEL_BY_USER:
-			return "CANCEL_BY_USER";
-		case BT_HAL_ERROR_REGISTRATION_FAILED:
-			return "REGISTRATION_FAILED";
-		case BT_HAL_ERROR_IN_PROGRESS:
-			return "IN_PROGRESS";
-		case BT_HAL_ERROR_AUTHENTICATION_FAILED:
-			return "AUTHENTICATION_FAILED";
-		case BT_HAL_ERROR_HOST_DOWN:
-			return "HOST_DOWN";
-		case BT_HAL_ERROR_END_OF_DEVICE_LIST:
-			return "END_OF_DEVICE_LIST";
-		case BT_HAL_ERROR_AGENT_ALREADY_EXIST:
-			return "AGENT_ALREADY_EXIST";
-		case BT_HAL_ERROR_AGENT_DOES_NOT_EXIST:
-			return "AGENT_DOES_NOT_EXIST";
-		case BT_HAL_ERROR_ALREADY_INITIALIZED:
-			return "ALREADY_INITIALIZED";
-		case BT_HAL_ERROR_PERMISSION_DEINED:
-			return "PERMISSION_DEINED";
-		case BT_HAL_ERROR_ALREADY_DEACTIVATED:
-			return "ALREADY_DEACTIVATED";
-		case BT_HAL_ERROR_NOT_INITIALIZED:
-			return "NOT_INITIALIZED";
-		default:
-			return "UNKNOWN";
+	case BT_HAL_ERROR_CANCEL:
+		return "CANCELLED";
+	case BT_HAL_ERROR_INVALID_PARAM:
+		return "INVALID_PARAMETER";
+	case BT_HAL_ERROR_INVALID_DATA:
+		return "INVALID DATA";
+	case BT_HAL_ERROR_MEMORY_ALLOCATION:
+	case BT_HAL_ERROR_OUT_OF_MEMORY:
+		return "OUT_OF_MEMORY";
+	case BT_HAL_ERROR_TIMEOUT:
+		return "TIMEOUT";
+	case BT_HAL_ERROR_NO_RESOURCES:
+		return "NO_RESOURCES";
+	case BT_HAL_ERROR_INTERNAL:
+		return "INTERNAL";
+	case BT_HAL_ERROR_NOT_SUPPORT:
+		return "NOT_SUPPORT";
+	case BT_HAL_ERROR_DEVICE_NOT_ENABLED:
+		return "NOT_ENABLED";
+	case BT_HAL_ERROR_DEVICE_ALREADY_ENABLED:
+		return "ALREADY_ENABLED";
+	case BT_HAL_ERROR_DEVICE_BUSY:
+		return "DEVICE_BUSY";
+	case BT_HAL_ERROR_ACCESS_DENIED:
+		return "ACCESS_DENIED";
+	case BT_HAL_ERROR_MAX_CLIENT:
+		return "MAX_CLIENT";
+	case BT_HAL_ERROR_NOT_FOUND:
+		return "NOT_FOUND";
+	case BT_HAL_ERROR_SERVICE_SEARCH_ERROR:
+		return "SERVICE_SEARCH_ERROR";
+	case BT_HAL_ERROR_PARING_FAILED:
+		return "PARING_FAILED";
+	case BT_HAL_ERROR_NOT_PAIRED:
+		return "NOT_PAIRED";
+	case BT_HAL_ERROR_SERVICE_NOT_FOUND:
+		return "SERVICE_NOT_FOUND";
+	case BT_HAL_ERROR_NOT_CONNECTED:
+		return "NOT_CONNECTED";
+	case BT_HAL_ERROR_ALREADY_CONNECT:
+		return "ALREADY_CONNECT";
+	case BT_HAL_ERROR_CONNECTION_BUSY:
+		return "CONNECTION_BUSY";
+	case BT_HAL_ERROR_CONNECTION_ERROR:
+		return "CONNECTION_ERROR";
+	case BT_HAL_ERROR_MAX_CONNECTION:
+		return "MAX_CONNECTION";
+	case BT_HAL_ERROR_NOT_IN_OPERATION:
+		return "NOT_IN_OPERATION";
+	case BT_HAL_ERROR_CANCEL_BY_USER:
+		return "CANCEL_BY_USER";
+	case BT_HAL_ERROR_REGISTRATION_FAILED:
+		return "REGISTRATION_FAILED";
+	case BT_HAL_ERROR_IN_PROGRESS:
+		return "IN_PROGRESS";
+	case BT_HAL_ERROR_AUTHENTICATION_FAILED:
+		return "AUTHENTICATION_FAILED";
+	case BT_HAL_ERROR_HOST_DOWN:
+		return "HOST_DOWN";
+	case BT_HAL_ERROR_END_OF_DEVICE_LIST:
+		return "END_OF_DEVICE_LIST";
+	case BT_HAL_ERROR_AGENT_ALREADY_EXIST:
+		return "AGENT_ALREADY_EXIST";
+	case BT_HAL_ERROR_AGENT_DOES_NOT_EXIST:
+		return "AGENT_DOES_NOT_EXIST";
+	case BT_HAL_ERROR_ALREADY_INITIALIZED:
+		return "ALREADY_INITIALIZED";
+	case BT_HAL_ERROR_PERMISSION_DEINED:
+		return "PERMISSION_DEINED";
+	case BT_HAL_ERROR_ALREADY_DEACTIVATED:
+		return "ALREADY_DEACTIVATED";
+	case BT_HAL_ERROR_NOT_INITIALIZED:
+		return "NOT_INITIALIZED";
+	default:
+		return "UNKNOWN";
 	}
 }
 
 char * _bt_convert_disc_reason_to_string(int reason)
 {
 	switch(reason) {
-		case 1:
-			return "Link loss";
-		case 2:
-			return "Connection terminated by local host";
-		case 3:
-			return "Remote user terminated connection";
-		case 0:
-		default:
-			return "Unknown";
+	case 1:
+		return "Link loss";
+	case 2:
+		return "Connection terminated by local host";
+	case 3:
+		return "Remote user terminated connection";
+	case 0:
+	default:
+		return "Unknown";
 	}
 }
 
@@ -857,4 +924,458 @@ int _bt_disconnect_profile(char *address, char *uuid,
 			func_data);
 
 	return BT_HAL_ERROR_NONE;
+}
+
+int _bt_register_profile(bt_hal_register_profile_info_t *info, gboolean use_default_rfcomm)
+{
+	GVariantBuilder *option_builder;
+	GVariant *ret;
+	GDBusProxy *proxy;
+	GError *err = NULL;
+	int result = BT_STATUS_SUCCESS;
+
+	proxy = _bt_get_profile_proxy();
+	if (proxy == NULL) {
+		ERR("Getting profile proxy failed");
+		return BT_STATUS_FAIL;
+	}
+
+	option_builder = g_variant_builder_new(G_VARIANT_TYPE("a{sv}"));
+	if (info->authentication)
+		g_variant_builder_add(option_builder, "{sv}",
+				"RequireAuthentication",
+				g_variant_new_boolean(TRUE));
+	if (info->authorization)
+		g_variant_builder_add(option_builder, "{sv}",
+				"RequireAuthorization",
+				g_variant_new_boolean(TRUE));
+	if (info->role)
+		g_variant_builder_add(option_builder, "{sv}",
+				"Role",
+				g_variant_new_string(info->role));
+
+	/*
+	 * Setting RFCOMM channel to default value 0; would allow bluez to assign
+	 * RFCOMM channels based on the availability when two services want to use
+	 * the RFCOMM along with SPP. Hence bluez makes sure that no two services
+	 * use the same SPP RFCOMM channel.
+	 */
+	if (use_default_rfcomm)
+		g_variant_builder_add(option_builder, "{sv}",
+				"Channel",
+				g_variant_new_uint16(RFCOMM_DEFAULT_PROFILE_CHANNEL));
+	if (info->service)
+		g_variant_builder_add(option_builder, "{sv}",
+				"Service",
+				g_variant_new_string(info->service));
+
+	ret = g_dbus_proxy_call_sync(proxy, "RegisterProfile",
+			g_variant_new("(osa{sv})", info->obj_path,
+				info->uuid,
+				option_builder),
+			G_DBUS_CALL_FLAGS_NONE, -1,
+			NULL, &err);
+	if (err) {
+		ERR("RegisterProfile failed: %s", err->message);
+
+		if (g_strrstr(err->message, BT_HAL_ACCESS_DENIED_MSG))
+			result = BT_STATUS_AUTH_REJECTED;
+		else
+			result = BT_STATUS_FAIL;
+
+		g_clear_error(&err);
+	}
+
+	g_variant_builder_unref(option_builder);
+
+	if (ret)
+		g_variant_unref(ret);
+
+	return result;
+}
+
+void _bt_unregister_profile(char *path)
+{
+	GVariant *ret;
+	GDBusProxy *proxy;
+	GError *err = NULL;
+
+	proxy = _bt_get_profile_proxy();
+	if (proxy == NULL) {
+		ERR("Getting profile proxy failed");
+		return;
+	}
+
+	ret = g_dbus_proxy_call_sync(proxy, "UnregisterProfile",
+			g_variant_new("(o)", path),
+			G_DBUS_CALL_FLAGS_NONE, -1,
+			NULL, &err);
+	if (err) {
+		ERR("UnregisterProfile failed : %s", err->message);
+		g_clear_error(&err);
+	}
+
+	if (ret)
+		g_variant_unref(ret);
+
+	return;
+}
+
+static void __new_connection_method(GDBusConnection *connection,
+		const gchar *sender,
+		const gchar *object_path,
+		const gchar *interface_name,
+		const gchar *method_name,
+		GVariant *parameters,
+		GDBusMethodInvocation *invocation,
+		gpointer user_data)
+{
+	DBG("method %s", method_name);
+	if (g_strcmp0(method_name, "NewConnection") == 0) {
+		int index;
+		int fd;
+		GUnixFDList *fd_list;
+		GDBusMessage *msg;
+		GVariantBuilder *properties;
+		char *obj_path;
+		bt_bdaddr_t remote_addr1;
+		char addr[BT_HAL_ADDRESS_STRING_SIZE];
+		bt_hal_new_connection_cb cb = user_data;
+
+		g_variant_get(parameters, "(oha{sv})", &obj_path, &index,
+				&properties);
+
+		msg = g_dbus_method_invocation_get_message(invocation);
+		fd_list = g_dbus_message_get_unix_fd_list(msg);
+		if (fd_list == NULL) {
+			GQuark quark = g_quark_from_string("rfcomm-app");
+			GError *err = g_error_new(quark, 0, "No fd in message");
+			g_dbus_method_invocation_return_gerror(invocation, err);
+			g_error_free(err);
+			return;
+		}
+
+
+		fd = g_unix_fd_list_get(fd_list, index, NULL);
+		if (fd == -1) {
+			ERR("Invalid fd return");
+			GQuark quark = g_quark_from_string("rfcomm-app");
+			GError *err = g_error_new(quark, 0, "Invalid FD return");
+			g_dbus_method_invocation_return_gerror(invocation, err);
+			g_error_free(err);
+			return;
+		}
+		INFO("Object Path %s", obj_path);
+
+		_bt_convert_device_path_to_address(obj_path, addr);
+		_bt_convert_addr_string_to_type(remote_addr1.address, (const char *)addr);
+		INFO("fd: %d, address %s", fd, addr);
+
+		g_dbus_method_invocation_return_value(invocation, NULL);
+
+		if (cb)
+			cb(object_path, fd, &remote_addr1);
+	} else if (g_strcmp0(method_name, "RequestDisconnection") == 0) {
+		g_dbus_method_invocation_return_value(invocation, NULL);
+	}
+}
+
+static GDBusNodeInfo *_bt_get_gdbus_node(const gchar *xml_data)
+{
+	if (bus_id == 0) {
+		char *name = g_strdup_printf("org.bt.frwk%d", getpid());
+
+		bus_id = g_bus_own_name(G_BUS_TYPE_SYSTEM,
+				name,
+				G_BUS_NAME_OWNER_FLAGS_NONE,
+				NULL,
+				NULL,
+				NULL,
+				NULL,
+				NULL);
+		DBG("Got bus id %d", bus_id);
+		g_free(name);
+	}
+
+	return g_dbus_node_info_new_for_xml(xml_data, NULL);
+}
+
+static const GDBusInterfaceVTable method_table = {
+	__new_connection_method,
+	NULL,
+	NULL,
+};
+
+int _bt_register_new_gdbus_object(const char *path, bt_hal_new_connection_cb cb)
+{
+	GDBusConnection *gconn;
+	int id;
+	GError *error = NULL;
+
+	gconn = _bt_get_system_gconn();
+	if (gconn == NULL)
+		return -1;
+
+	if (new_conn_node == NULL)
+		new_conn_node = _bt_get_gdbus_node(rfcomm_agent_xml);
+
+	if (new_conn_node == NULL)
+		return -1;
+
+	id = g_dbus_connection_register_object(gconn, path,
+			new_conn_node->interfaces[0],
+			&method_table,
+			cb, NULL, &error);
+	if (id == 0) {
+		ERR("Failed to register: %s", error->message);
+		g_error_free(error);
+		return -1;
+	}
+
+	DBG("NEW CONNECTION ID %d", id);
+
+	return id;
+}
+
+void _bt_unregister_gdbus_object(int object_id)
+{
+	GDBusConnection *gconn;
+
+	gconn = _bt_get_system_gconn();
+	if (gconn == NULL)
+		return;
+
+	g_dbus_connection_unregister_object(gconn, object_id);
+}
+
+int _bt_discover_services(char *address, char *uuid, void *cb, gpointer func_data)
+{
+	char *object_path;
+	GDBusProxy *proxy;
+	GDBusProxy *adapter_proxy;
+	GError *err = NULL;
+	GDBusConnection *conn;
+
+	conn = _bt_get_system_gconn();
+	if (conn == NULL) {
+		ERR("conn == NULL, return");
+		return  BT_STATUS_FAIL;
+	}
+
+	object_path = _bt_get_device_object_path(address);
+	if (object_path == NULL) {
+		GVariant *ret = NULL;
+
+		INFO("No searched device");
+		adapter_proxy = _bt_get_adapter_proxy();
+		if(adapter_proxy == NULL) {
+			ERR("adapter_proxy == NULL, return");
+			return BT_STATUS_FAIL;
+		}
+
+		ret = g_dbus_proxy_call_sync(adapter_proxy, "CreateDevice",
+				g_variant_new("(s)", address),
+				G_DBUS_CALL_FLAGS_NONE,
+				BT_HAL_MAX_DBUS_TIMEOUT, NULL,
+				&err);
+		if (err != NULL) {
+			ERR("CreateDevice Failed: %s", err->message);
+			g_clear_error(&err);
+		}
+
+		if (ret)
+			g_variant_unref(ret);
+
+		g_object_unref(adapter_proxy);
+		object_path = _bt_get_device_object_path(address);
+		if (object_path == NULL) {
+			ERR("object_path == NULL, return");
+			return BT_STATUS_FAIL;
+		}
+	}
+
+	proxy = g_dbus_proxy_new_sync(conn,
+			G_DBUS_PROXY_FLAGS_NONE, NULL,
+			BT_HAL_BLUEZ_NAME, object_path,
+			BT_HAL_DEVICE_INTERFACE,  NULL, NULL);
+	g_free(object_path);
+	if (proxy == NULL) {
+		ERR("Error while getting proxy");
+		return BT_STATUS_FAIL;
+	}
+
+	g_dbus_proxy_call(proxy, "DiscoverServices",
+			g_variant_new("(s)", uuid),
+			G_DBUS_CALL_FLAGS_NONE,
+			BT_HAL_MAX_DBUS_TIMEOUT, NULL,
+			(GAsyncReadyCallback)cb,
+			func_data);
+	DBG("-");
+	return BT_STATUS_SUCCESS;
+}
+
+int _bt_cancel_discovers(char *address)
+{
+	char *object_path;
+	GDBusProxy *proxy;
+	GDBusProxy *adapter_proxy;
+	GError *err = NULL;
+	GDBusConnection *conn;
+
+	conn = _bt_get_system_gconn();
+	if (conn == NULL)
+		return  BT_STATUS_FAIL;
+
+	object_path = _bt_get_device_object_path(address);
+	if (object_path == NULL) {
+		GVariant *ret = NULL;
+		INFO("No searched device");
+		adapter_proxy = _bt_get_adapter_proxy();
+		if(adapter_proxy == NULL) {
+			ERR("adapter_proxy == NULL, return");
+			return BT_STATUS_FAIL;
+		}
+
+		ret = g_dbus_proxy_call_sync(adapter_proxy, "CreateDevice",
+				g_variant_new("(s)", address),
+				G_DBUS_CALL_FLAGS_NONE,
+				BT_HAL_MAX_DBUS_TIMEOUT, NULL,
+				&err);
+		if (err != NULL) {
+			ERR("CreateDevice Failed: %s", err->message);
+			g_clear_error(&err);
+		}
+
+		if (ret)
+			g_variant_unref(ret);
+
+		g_object_unref(adapter_proxy);
+
+		object_path = _bt_get_device_object_path(address);
+		if (object_path == NULL)
+			return BT_STATUS_FAIL;
+	}
+
+	proxy = g_dbus_proxy_new_sync(conn,
+			G_DBUS_PROXY_FLAGS_NONE, NULL,
+			BT_HAL_BLUEZ_NAME, object_path,
+			BT_HAL_DEVICE_INTERFACE,  NULL, NULL);
+	g_free(object_path);
+	g_dbus_proxy_call_sync(proxy, "CancelDiscovery",
+			NULL,
+			G_DBUS_CALL_FLAGS_NONE,
+			BT_HAL_MAX_DBUS_TIMEOUT, NULL,
+			&err);
+	if (err) {
+		ERR("DBus Error message: [%s]", err->message);
+		g_clear_error(&err);
+		return BT_STATUS_FAIL;
+	}
+
+	if (proxy)
+		g_object_unref(proxy);
+
+	return BT_STATUS_SUCCESS;
+}
+
+int _bt_discover_service_uuids(char *address, char *remote_uuid)
+{
+	char *object_path;
+	GDBusProxy *proxy;
+	GDBusConnection *gconn;
+	GError *err = NULL;
+	char **uuid_value = NULL;
+	gsize size;
+	int i =0;
+	GVariant *value = NULL;
+	GVariant *ret = NULL;
+	int result = BT_STATUS_FAIL;
+
+	DBG("+");
+
+	if(remote_uuid == NULL) {
+		ERR("remote_uuid == NULL, return");
+		return BT_STATUS_FAIL;
+	}
+
+	gconn = _bt_get_system_gconn();
+	if(gconn == NULL) {
+		ERR("gconn == NULL, return");
+		return BT_STATUS_FAIL;
+	}
+
+	object_path = _bt_get_device_object_path(address);
+	if(object_path == NULL) {
+		ERR("object_path == NULL, return");
+		return BT_STATUS_FAIL;
+	}
+
+	proxy = g_dbus_proxy_new_sync(gconn, G_DBUS_PROXY_FLAGS_NONE, NULL,
+			BT_HAL_BLUEZ_NAME, object_path, BT_HAL_PROPERTIES_INTERFACE, NULL,
+			&err);
+	if(proxy == NULL) {
+		ERR("proxy == NULL, return");
+		return BT_STATUS_FAIL;
+	}
+
+	if (err) {
+		ERR("DBus Error: [%s]", err->message);
+		g_clear_error(&err);
+	}
+
+	ret = g_dbus_proxy_call_sync(proxy, "GetAll",
+			g_variant_new("(s)", BT_HAL_DEVICE_INTERFACE),
+			G_DBUS_CALL_FLAGS_NONE,
+			BT_HAL_MAX_DBUS_TIMEOUT, NULL,
+			&err);
+	if (err) {
+		result = BT_STATUS_FAIL;
+		ERR("DBus Error : %s", err->message);
+		g_clear_error(&err);
+		goto done;
+	}
+
+	if (ret == NULL) {
+		ERR("g_dbus_proxy_call_sync function return NULL");
+		result = BT_STATUS_FAIL;
+		goto done;
+	}
+
+	g_variant_get(ret, "(@a{sv})", &value);
+	g_variant_unref(ret);
+	if (value) {
+		GVariant *temp_value = g_variant_lookup_value(value, "UUIDs",
+				G_VARIANT_TYPE_STRING_ARRAY);
+
+		if (temp_value)
+			size = g_variant_get_size(temp_value);
+
+		if (size > 0) {
+			uuid_value = (char **)g_variant_get_strv(temp_value, &size);
+			DBG("Size items %d", size);
+		}
+
+		if (temp_value)
+			g_variant_unref(temp_value);
+
+		for (i = 0; uuid_value[i] != NULL; i++) {
+			DBG("Remote uuids %s, searched uuid: %s",
+					uuid_value[i], remote_uuid);
+			if (strcasecmp(uuid_value[i], remote_uuid) == 0) {
+				result = BT_STATUS_SUCCESS;
+				goto done;
+			}
+		}
+	}
+
+done:
+	if (proxy)
+		g_object_unref(proxy);
+	if (value)
+		g_variant_unref(value);
+	if (uuid_value)
+		g_free(uuid_value);
+
+	DBG("-");
+	return result;
 }
