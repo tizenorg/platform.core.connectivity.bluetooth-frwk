@@ -60,6 +60,10 @@ void _bt_service_cynara_deinit(void);
 
 void _bt_service_method_return(GDBusMethodInvocation *invocation,
 		GArray *out_param, int result);
+
+void _bt_service_method_return_with_unix_fd_list(GDBusMethodInvocation *invocation,
+		GArray *out_param, int result, GUnixFDList *fd_list);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

@@ -137,6 +137,11 @@ void _bt_service_oal_event_receiver(int event_type, gpointer event_data, gsize l
 		if (hid_cb)
 			hid_cb(event_type, event_data);
 		break;
+	case OAL_EVENT_SOCKET_OUTGOING_CONNECTED:
+	case OAL_EVENT_SOCKET_DISCONNECTED:
+		if (socket_cb)
+			socket_cb(event_type, event_data);
+		break;
 	default:
 		BT_ERR("Unhandled Event: %d", event_type);
 		break;

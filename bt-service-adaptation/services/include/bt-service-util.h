@@ -27,7 +27,14 @@ extern "C" {
 #endif /* __cplusplus */
 
 #define BT_NODE_NAME_LEN 50
+#define BT_UUID_LENGTH_MAX 16
 #define BT_UUID_STRING_SIZE 37
+
+
+static const char BT_SERVICE_BASE_UUID[] = {
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00,
+	0x80, 0x00, 0x00, 0x80, 0x5f, 0x9b, 0x34, 0xfb
+};
 
 typedef struct {
 	int req_id;
@@ -56,6 +63,7 @@ request_info_t *_bt_get_request_info(int req_id);
 void _bt_clear_request_list(void);
 
 void _bt_service_convert_uuid_type_to_string(char *str, const unsigned char *uuid);
+void _bt_service_convert_uuid_string_to_type(unsigned char *uuid, const char *str);
 
 #ifdef __cplusplus
 }

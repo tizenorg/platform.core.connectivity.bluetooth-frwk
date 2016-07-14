@@ -19,6 +19,7 @@
 #include <glib.h>
 #include <dlog.h>
 #include <gio/gio.h>
+#include <gio/gunixfdlist.h>
 #include <cynara-client.h>
 #include <cynara-creds-gdbus.h>
 
@@ -33,6 +34,7 @@
 #include "bt-service-dpm.h"
 #endif
 #include "bt-service-hidhost.h"
+#include "bt-service-rfcomm.h"
 
 /* For maintaining Application Sync API call requests */
 GSList *invocation_list = NULL;
@@ -950,6 +952,41 @@ int __bt_bluez_request(int function_name,
 		break;
 	}
 #endif
+	case BT_RFCOMM_CLIENT_CONNECT: {
+		bluetooth_device_address_t address = { {0} };
+		char *input_string;
+		int connect_type;
+
+		__bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+		input_string = (char *)g_variant_get_data(in_param2);
+		__bt_service_get_parameters(in_param3, &connect_type, sizeof(int));
+
+		if (connect_type == BT_RFCOMM_UUID)
+			result = _bt_rfcomm_connect_using_uuid(&address, input_string);
+		else
+			result = _bt_rfcomm_connect_using_channel(&address, input_string);
+
+		if (result != BLUETOOTH_ERROR_NONE) {
+			bluetooth_rfcomm_connection_t conn_info;
+
+			BT_ERR("BT_RFCOMM_CLIENT_CONNECT failed, send error");
+			memset(&conn_info, 0x00, sizeof(bluetooth_rfcomm_connection_t));
+			if (connect_type == BT_RFCOMM_UUID)
+				g_strlcpy(conn_info.uuid, input_string, BLUETOOTH_UUID_STRING_MAX);
+			else
+				g_strlcpy(conn_info.uuid, "not_used", BLUETOOTH_UUID_STRING_MAX);
+
+			conn_info.device_role = RFCOMM_ROLE_CLIENT;
+			conn_info.socket_fd = -1;
+			g_array_append_vals(*out_param1, &conn_info,
+					sizeof(bluetooth_rfcomm_connection_t));
+		} else {
+			sender = (char*)g_dbus_method_invocation_get_sender(context);
+			_bt_save_invocation_context(context, result, sender, function_name, NULL);
+		}
+		break;
+	}
 	default:
 		BT_INFO("UnSupported function [%d]", function_name);
 		result = BLUETOOTH_ERROR_NOT_SUPPORT;
@@ -1487,5 +1524,18 @@ void _bt_service_method_return(GDBusMethodInvocation *invocation,
 
 	g_dbus_method_invocation_return_value(invocation,
 			g_variant_new("(iv)", result, out_var));
+	BT_DBG("-");
+}
+
+void _bt_service_method_return_with_unix_fd_list(GDBusMethodInvocation *invocation,
+		GArray *out_param, int result, GUnixFDList *fd_list)
+{
+	GVariant *out_var;
+	BT_DBG("+");
+	out_var = g_variant_new_from_data((const GVariantType *)"ay",
+			out_param->data, out_param->len, TRUE, NULL, NULL);
+
+	g_dbus_method_invocation_return_value_with_unix_fd_list(invocation,
+			g_variant_new("(iv)", result, out_var), fd_list);
 	BT_DBG("-");
 }

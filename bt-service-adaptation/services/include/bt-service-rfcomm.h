@@ -19,8 +19,8 @@
  *
  */
 
-#ifndef __BT_SERVICE_SOCKET_H__
-#define __BT_SERVICE_SOCKET_H__
+#ifndef __BT_SERVICE_RFCOMM_CLIENT_H__
+#define __BT_SERVICE_RFCOMM_CLIENT_H__
 
 #include <glib.h>
 #include <sys/types.h>
@@ -30,19 +30,10 @@
 extern "C" {
 #endif
 
-#define SOCK_TYPE_RFCOMM 0
-#define SOCK_TYPE_SCO 1
-#define SOCK_TYPE_L2CAP	2
-
-typedef void (*bt_socket_client_conn_cb) (int result, int sock_fd, char *address, char *uuid, int chan);
-
-int _bt_socket_init(void);
-void _bt_socket_deinit(void);
-
-int _bt_socket_client_connect(int sock_type, char *address,
-		char *remote_uuid, int channel, bt_socket_client_conn_cb cb);
+int _bt_rfcomm_connect_using_uuid(bluetooth_device_address_t *device_address, char *remote_uuid);
+int _bt_rfcomm_connect_using_channel(bluetooth_device_address_t *device_address, char *chan_str);
 
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
-#endif /* __BT_SERVICE_SOCKET_H__ */
+#endif /* __BT_SERVICE_RFCOMM_CLIENT_H__ */

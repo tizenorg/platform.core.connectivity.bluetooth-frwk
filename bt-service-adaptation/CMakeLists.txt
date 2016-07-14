@@ -16,6 +16,7 @@ marshal.c
 ./services/bt-service-agent-util.c
 ./services/hid/bt-service-hidhost.c
 ./services/socket/bt-service-socket.c
+./services/rfcomm/bt-service-rfcomm.c
 )
 
 IF("${CMAKE_BUILD_TYPE}" STREQUAL "")
