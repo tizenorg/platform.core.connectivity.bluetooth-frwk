@@ -26,7 +26,6 @@
 #include <dlog.h>
 #include <string.h>
 
-
 #include "bluetooth-api.h"
 #include "bt-internal-types.h"
 #include "bt-request-handler.h"
@@ -65,11 +64,11 @@ static void __bt_rfcomm_reply_pending_request(int result,
 				fd_list = g_unix_fd_list_new();
 				g_unix_fd_list_append(fd_list, ptr->socket_fd, &error);
 				g_assert_no_error (error);
+				close(ptr->socket_fd);
 			}
 
 			_bt_service_method_return_with_unix_fd_list(
 					req_info->context, out_param, result, fd_list);
-
 			g_object_unref(fd_list);
 			break;
 		}
@@ -106,16 +105,6 @@ static void __bt_rfcomm_socket_conn_cb(int result, int sock_fd, char *address, c
 	__bt_rfcomm_reply_pending_request(
 			result, BT_RFCOMM_CLIENT_CONNECT,
 			(void *)&conn_info, sizeof(bluetooth_rfcomm_connection_t));
-
-	/* Send BLUETOOTH_EVENT_RFCOMM_CONNECTED event to application */
-	if (result == BLUETOOTH_ERROR_NONE) {
-		GVariant *param;
-
-		param = g_variant_new("(issn)", BLUETOOTH_ERROR_NONE,
-				address, conn_info.uuid, sock_fd);
-		_bt_send_event(BT_RFCOMM_CLIENT_EVENT,
-				BLUETOOTH_EVENT_RFCOMM_CONNECTED, param);
-	}
 
 	BT_DBG("-");
 }

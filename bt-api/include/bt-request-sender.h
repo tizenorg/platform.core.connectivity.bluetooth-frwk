@@ -58,6 +58,21 @@ int _bt_async_send_request(int service_type, int service_function,
 	} \
 	)
 
+int _bt_async_send_request_with_unix_fd_list(int service_type, int service_function,
+			GArray *in_param1, GArray *in_param2,
+			GArray *in_param3, GArray *in_param4,
+			void *callback, void *user_data,
+			GUnixFDList *fd_list, GAsyncReadyCallback __async_req_cb);
+#define _bt_send_request_async_with_unix_fd_list(a, b, format ...) ( \
+	{ \
+	BT_INFO_C("Async Request => type=%s, fn=%s(0x%x)", #a, #b, b); \
+	_bt_async_send_request_with_unix_fd_list(a, b, format); \
+	} \
+	)
+
+void _bt_get_event_info(int service_function, GArray *output,
+			int *event, int *event_type, void **param_data);
+
 #ifdef __cplusplus
 }
 #endif

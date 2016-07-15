@@ -982,6 +982,7 @@ int __bt_bluez_request(int function_name,
 			g_array_append_vals(*out_param1, &conn_info,
 					sizeof(bluetooth_rfcomm_connection_t));
 		} else {
+			BT_ERR("BT_RFCOMM_CLIENT_CONNECT success, save context");
 			sender = (char*)g_dbus_method_invocation_get_sender(context);
 			_bt_save_invocation_context(context, result, sender, function_name, NULL);
 		}

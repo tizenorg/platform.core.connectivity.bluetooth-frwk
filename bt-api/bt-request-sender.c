@@ -81,7 +81,7 @@ void _bt_gdbus_deinit_proxys(void)
 	}
 }
 
-static void __bt_get_event_info(int service_function, GArray *output,
+void _bt_get_event_info(int service_function, GArray *output,
 			int *event, int *event_type, void **param_data)
 {
 	ret_if(event == NULL);
@@ -277,7 +277,7 @@ static void __send_request_cb(GDBusProxy *proxy,
 
 		ret_if(cb_data == NULL);
 
-		__bt_get_event_info(cb_data->service_function, NULL,
+		_bt_get_event_info(cb_data->service_function, NULL,
 				&bt_event.event, &event_type,
 				&bt_event.param_data);
 	} else {
@@ -302,7 +302,7 @@ static void __send_request_cb(GDBusProxy *proxy,
 
 		ret_if(cb_data == NULL);
 
-		__bt_get_event_info(cb_data->service_function, out_param1,
+		_bt_get_event_info(cb_data->service_function, out_param1,
 				&bt_event.event, &event_type,
 				&bt_event.param_data);
 
@@ -554,3 +554,82 @@ int _bt_async_send_request(int service_type, int service_function,
 	return BLUETOOTH_ERROR_NONE;
 }
 
+int _bt_async_send_request_with_unix_fd_list(int service_type, int service_function,
+			GArray *in_param1, GArray *in_param2,
+			GArray *in_param3, GArray *in_param4,
+			void *callback, void *user_data,
+			GUnixFDList *fd_list, GAsyncReadyCallback __async_req_cb)
+{
+	GArray* in_param5 = NULL;
+	bt_req_info_t *cb_data;
+
+	GDBusProxy *proxy;
+	int timeout;
+	GVariant *param1;
+	GVariant *param2;
+	GVariant *param3;
+	GVariant *param4;
+	GVariant *param5;
+
+	BT_DBG("service_function : %d", service_function);
+
+	cb_data = g_new0(bt_req_info_t, 1);
+	cb_data->service_function = service_function;
+	cb_data->cb = callback;
+	cb_data->user_data = user_data;
+
+	switch (service_type) {
+	case BT_BLUEZ_SERVICE:
+	case BT_OBEX_SERVICE:
+		proxy =  __bt_gdbus_get_service_proxy();
+		if (!proxy) {
+			g_free(cb_data);
+			return BLUETOOTH_ERROR_INTERNAL;
+		}
+
+		/* Do not timeout the request in certain cases. Sometime the
+		 * request may take undeterministic time to reponse.
+		 * (for ex: pairing retry) */
+		if (service_function == BT_BOND_DEVICE ||
+				service_function == BT_BOND_DEVICE_BY_TYPE)
+			timeout = INT_MAX;
+		else
+			timeout = BT_DBUS_TIMEOUT_MAX;
+
+		in_param5 = g_array_new(TRUE, TRUE, sizeof(gchar));
+
+		param1 = g_variant_new_from_data((const GVariantType *)"ay",
+				in_param1->data, in_param1->len,
+				TRUE, NULL, NULL);
+		param2 = g_variant_new_from_data((const GVariantType *)"ay",
+				in_param2->data, in_param2->len,
+				TRUE, NULL, NULL);
+		param3 = g_variant_new_from_data((const GVariantType *)"ay",
+				in_param3->data, in_param3->len,
+				TRUE, NULL, NULL);
+		param4 = g_variant_new_from_data((const GVariantType *)"ay",
+				in_param4->data, in_param4->len,
+				TRUE, NULL, NULL);
+		param5 = g_variant_new_from_data((const GVariantType *)"ay",
+				in_param5->data, in_param5->len,
+				TRUE, NULL, NULL);
+
+		g_dbus_proxy_call_with_unix_fd_list(proxy, "service_request",
+				g_variant_new("(iii@ay@ay@ay@ay@ay)",
+					service_type, service_function,
+					BT_ASYNC_REQ, param1, param2,
+					param3, param4, param5),
+				G_DBUS_CALL_FLAGS_NONE,
+				timeout, fd_list, NULL,
+				__async_req_cb, (gpointer)cb_data);
+		sending_requests = g_slist_append(sending_requests, cb_data);
+
+		g_array_free(in_param5, TRUE);
+		break;
+	default:
+		g_free(cb_data);
+		break;
+	}
+
+	return BLUETOOTH_ERROR_NONE;
+}

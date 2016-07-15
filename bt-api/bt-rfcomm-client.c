@@ -16,9 +16,10 @@
  */
 
 #include <string.h>
+#include <gio/gunixfdlist.h>
+
 #ifdef RFCOMM_DIRECT
 #include <errno.h>
-#include <gio/gunixfdlist.h>
 #endif
 
 #include "bluetooth-api.h"
@@ -33,7 +34,6 @@
 #endif
 
 #ifdef RFCOMM_DIRECT
-
 #define BT_TIMEOUT_MESSAGE "Did not receive a reply. Possible causes include: " \
 			"the remote application did not send a reply, " \
 			"the message bus security policy blocked the reply, " \
@@ -550,6 +550,312 @@ done:
 	if (err)
 		g_clear_error(&err);
 }
+#else
+GSList *rfcomm_clients;
+
+typedef struct {
+	char *uuid;
+	char *remote_addr;
+	int sock_fd;
+	int watch_id;
+} rfcomm_client_conn_info_t;
+
+static gboolean __is_error_by_disconnect(GError *err)
+{
+	return !g_strcmp0(err->message, "Connection reset by peer") ||
+		!g_strcmp0(err->message, "Connection timed out") ||
+		!g_strcmp0(err->message, "Software caused connection abort");
+}
+
+static rfcomm_client_conn_info_t *__find_rfcomm_conn_info_with_fd(int fd)
+{
+	GSList *l;
+
+	BT_DBG("+");
+
+	for (l = rfcomm_clients; l != NULL; l = l->next) {
+		rfcomm_client_conn_info_t *info = l->data;
+
+		if (info && info->sock_fd == fd) {
+			BT_INFO("Match found");
+			return info;
+		}
+	}
+
+	BT_DBG("-");
+	return NULL;
+}
+
+static void __rfcomm_remove_client_conn_info_t(rfcomm_client_conn_info_t *info)
+{
+	ret_if(info == NULL);
+
+	rfcomm_clients = g_slist_remove(rfcomm_clients, info);
+	g_free(info->uuid);
+	g_free(info->remote_addr);
+}
+
+static void __bt_rfcomm_client_disconnected(rfcomm_client_conn_info_t *conn_info)
+{
+
+	bluetooth_rfcomm_disconnection_t disconn_info;
+	bt_event_info_t *event_info = NULL;
+
+	ret_if(conn_info == NULL);
+
+	event_info = _bt_event_get_cb_data(BT_RFCOMM_CLIENT_EVENT);
+	ret_if(event_info == NULL);
+
+	memset(&disconn_info, 0x00, sizeof(bluetooth_rfcomm_disconnection_t));
+	disconn_info.device_role = RFCOMM_ROLE_CLIENT;
+	disconn_info.socket_fd = conn_info->sock_fd;
+	g_strlcpy(disconn_info.uuid, conn_info->uuid, BLUETOOTH_UUID_STRING_MAX);
+	_bt_convert_addr_string_to_type(disconn_info.device_addr.addr,
+			conn_info->remote_addr);
+
+	BT_DBG("Disconnection Result[%d] BT_ADDRESS[%s] UUID[%s] FD[%d]",
+			BLUETOOTH_ERROR_NONE, conn_info->remote_addr,
+			conn_info->uuid, conn_info->sock_fd);
+	_bt_common_event_cb(BLUETOOTH_EVENT_RFCOMM_DISCONNECTED,
+			BLUETOOTH_ERROR_NONE, &disconn_info,
+			event_info->cb, event_info->user_data);
+
+	BT_DBG("-");
+}
+
+static gboolean __client_data_received_cb(GIOChannel *chan, GIOCondition cond, gpointer data)
+{
+	bt_event_info_t *event_info;
+	bluetooth_rfcomm_received_data_t data_r;
+	rfcomm_client_conn_info_t *conn_info;
+
+	int fd;
+	gsize len = 0;
+	char *buffer;
+	GError *err = NULL;
+	GIOStatus status = G_IO_STATUS_NORMAL;
+
+	BT_DBG("+");
+
+	fd = g_io_channel_unix_get_fd(chan);
+	if (cond & (G_IO_NVAL | G_IO_HUP | G_IO_ERR)) {
+		BT_ERR_C("RFComm Client  disconnected: %d", fd);
+		goto error;
+	}
+
+	buffer = g_malloc0(BT_RFCOMM_BUFFER_LEN + 1);
+	status = g_io_channel_read_chars(chan, buffer, BT_RFCOMM_BUFFER_LEN,
+			&len, &err);
+	if (status != G_IO_STATUS_NORMAL) {
+		BT_ERR("IO Channel read is failed with %d", status);
+		g_free(buffer);
+		if (err) {
+			BT_ERR("IO Channel read error [%s]", err->message);
+			if (status == G_IO_STATUS_ERROR &&
+					__is_error_by_disconnect(err)) {
+				BT_ERR("cond : %d", cond);
+				g_error_free(err);
+				goto error;
+			}
+			g_error_free(err);
+		}
+
+		return TRUE;
+	}
+
+	BT_DBG("fd: %d, len: %d, buffer: %s", fd, len, buffer);
+
+	event_info = _bt_event_get_cb_data(BT_RFCOMM_CLIENT_EVENT);
+	if (event_info == NULL) {
+		BT_INFO("event_info == NULL");
+		g_free(buffer);
+		return TRUE;
+	}
+
+	data_r.socket_fd = fd;
+	data_r.buffer_size = len;
+	data_r.buffer = buffer;
+
+	_bt_common_event_cb(BLUETOOTH_EVENT_RFCOMM_DATA_RECEIVED,
+			BLUETOOTH_ERROR_NONE, &data_r,
+			event_info->cb, event_info->user_data);
+
+	g_free(buffer);
+	return TRUE;
+
+error:
+	conn_info = __find_rfcomm_conn_info_with_fd(fd);
+	if (conn_info) {
+		__bt_rfcomm_client_disconnected(conn_info);
+		__rfcomm_remove_client_conn_info_t(conn_info);
+	} else {
+		BT_ERR("RFCOMM client conn_info not found");
+	}
+	return FALSE;
+}
+
+static void __rfcomm_client_connection_create_watch(rfcomm_client_conn_info_t *conn_info)
+{
+	GIOChannel *data_io;
+
+	ret_if(NULL == conn_info);
+
+	BT_DBG("+");
+
+	data_io = g_io_channel_unix_new(conn_info->sock_fd);
+	g_io_channel_set_encoding(data_io, NULL, NULL);
+	g_io_channel_set_flags(data_io, G_IO_FLAG_NONBLOCK, NULL);
+	conn_info->watch_id = g_io_add_watch(data_io,
+			G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_NVAL,
+			__client_data_received_cb, NULL);
+	g_io_channel_unref(data_io);
+
+	BT_DBG("-");
+}
+
+static void __bt_rfcomm_handle_new_client_connection(bluetooth_rfcomm_connection_t *info)
+{
+	rfcomm_client_conn_info_t *conn_info;
+
+	ret_if(NULL == info);
+
+	BT_DBG("+");
+
+	conn_info = g_malloc0(sizeof(rfcomm_client_conn_info_t));
+	conn_info->remote_addr = g_malloc0(BT_ADDRESS_STRING_SIZE);
+	_bt_convert_addr_type_to_string(
+			conn_info->remote_addr, info->device_addr.addr);
+	conn_info->uuid = g_strdup(info->uuid);
+	conn_info->sock_fd = info->socket_fd;
+
+	BT_DBG("Address:%s, UUID:%s Socket: %d",
+			conn_info->remote_addr, conn_info->uuid, conn_info->sock_fd);
+
+	rfcomm_clients = g_slist_append(rfcomm_clients, conn_info);
+	__rfcomm_client_connection_create_watch(conn_info);
+
+	BT_DBG("-");
+}
+
+static void __bt_fill_garray_from_variant(GVariant *var, GArray *param)
+{
+	char *data;
+	int size;
+
+	size = g_variant_get_size(var);
+	if (size > 0) {
+		data = (char *)g_variant_get_data(var);
+		if (data)
+			param = g_array_append_vals(param, data, size);
+
+	}
+}
+
+static void __async_req_cb_with_unix_fd_list(GDBusProxy *proxy, GAsyncResult *res, gpointer user_data)
+{
+	int result = BLUETOOTH_ERROR_NONE;
+	int event_type = BT_ADAPTER_EVENT;
+	bt_req_info_t *cb_data = user_data;
+	bluetooth_event_param_t bt_event;
+
+	GError *error = NULL;
+	GVariant *value;
+	GVariant *param1;
+	GArray *out_param1 = NULL;
+	GUnixFDList *out_fd_list = NULL;
+
+	BT_DBG("+");
+
+	memset(&bt_event, 0x00, sizeof(bluetooth_event_param_t));
+
+	value = g_dbus_proxy_call_with_unix_fd_list_finish(proxy, &out_fd_list, res, &error);
+	if (value == NULL) {
+		if (error) {
+			/* dBUS gives error cause */
+			BT_ERR("D-Bus API failure: message[%s]",
+					error->message);
+			g_clear_error(&error);
+		}
+		result = BLUETOOTH_ERROR_TIMEOUT;
+
+		ret_if(cb_data == NULL);
+
+		_bt_get_event_info(cb_data->service_function, NULL,
+				&bt_event.event, &event_type,
+				&bt_event.param_data);
+		goto failed;
+	}
+
+	g_variant_get(value, "(iv)", &result, &param1);
+	g_variant_unref(value);
+
+	if (param1) {
+		out_param1 = g_array_new(TRUE, TRUE, sizeof(gchar));
+		__bt_fill_garray_from_variant(param1, out_param1);
+		g_variant_unref(param1);
+	}
+
+	if (!cb_data)
+		goto done;
+
+	_bt_get_event_info(cb_data->service_function, out_param1,
+			&bt_event.event, &event_type,
+			&bt_event.param_data);
+
+	if (result == BLUETOOTH_ERROR_NONE && out_param1) {
+		if (BT_RFCOMM_CLIENT_CONNECT == cb_data->service_function) {
+			int *fd_list_array;
+			int len = 0;
+			bluetooth_rfcomm_connection_t *conn_info;
+
+			conn_info = (bluetooth_rfcomm_connection_t *)bt_event.param_data;
+			if (!out_fd_list) {
+				BT_ERR("out_fd_list is NULL");
+				goto failed;
+			}
+
+			fd_list_array = g_unix_fd_list_steal_fds(out_fd_list, &len);
+			BT_INFO("Num fds in fd_list is : %d, fd_list[0]: %d", len, fd_list_array[0]);
+			conn_info->socket_fd = fd_list_array[0];
+
+			BT_DBG("conn_info->socket_fd: %d", conn_info->socket_fd);
+			__bt_rfcomm_handle_new_client_connection(conn_info);
+
+			if (cb_data->cb != NULL) {
+				/* Send client connected event */
+				bt_event.result = result;
+				BT_INFO("event_type[%d], result=[%d]", event_type, result);
+				((bluetooth_cb_func_ptr)cb_data->cb)(
+					bt_event.event, &bt_event, cb_data->user_data);
+			}
+
+			g_free(fd_list_array);
+			g_object_unref(out_fd_list);
+		}
+		goto done;
+	}
+
+failed:
+	if (cb_data->cb == NULL)
+		goto done;
+
+	/* Only if fail case, call the callback function*/
+	bt_event.result = result;
+
+	BT_INFO("event_type[%d], result=[%d]", event_type, result);
+	if (event_type == BT_RFCOMM_CLIENT_EVENT) {
+		((bluetooth_cb_func_ptr)cb_data->cb)(bt_event.event,
+			&bt_event, cb_data->user_data);
+	} else {
+		BT_INFO("Not handled event type : %d", event_type);
+	}
+done:
+	if (out_param1)
+		g_array_free(out_param1, TRUE);
+
+	g_free(cb_data);
+	BT_DBG("-");
+}
 #endif
 
 BT_EXPORT_API int bluetooth_rfcomm_connect(
@@ -659,12 +965,6 @@ BT_EXPORT_API int bluetooth_rfcomm_connect(
 	/* In now, we only support to connecty using UUID */
 	connect_type = BT_RFCOMM_UUID;
 
-	if (_bt_check_privilege(BT_BLUEZ_SERVICE, BT_RFCOMM_CLIENT_CONNECT)
-	     == BLUETOOTH_ERROR_PERMISSION_DEINED) {
-		BT_ERR("Don't have a privilege to use this API");
-		return BLUETOOTH_ERROR_PERMISSION_DEINED;
-	}
-
 	BT_INIT_PARAMS();
 	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
 
@@ -676,11 +976,12 @@ BT_EXPORT_API int bluetooth_rfcomm_connect(
 
 	g_array_append_vals(in_param3, &connect_type, sizeof(int));
 
-	result = _bt_send_request_async(BT_BLUEZ_SERVICE,
+	result = _bt_send_request_async_with_unix_fd_list(BT_BLUEZ_SERVICE,
 				BT_RFCOMM_CLIENT_CONNECT,
 				in_param1, in_param2,
 				in_param3, in_param4,
-				user_info->cb, user_info->user_data);
+				user_info->cb, user_info->user_data,
+				NULL, (GAsyncReadyCallback)__async_req_cb_with_unix_fd_list);
 
 	BT_DBG("result: %x", result);
 
