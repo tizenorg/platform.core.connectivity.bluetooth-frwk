@@ -677,55 +677,10 @@ static gboolean __confirm_request(GapAgentPrivate *agent, GDBusProxy *device,
 	if (!name)
 		name = address;
 
-#ifdef TIZEN_WEARABLE
-	uint32_t device_class = 0x00;
-	uint32_t major_class;
-
-	tmp_value = g_variant_lookup_value(reply, "Class", G_VARIANT_TYPE_UINT32);
-	g_variant_get(tmp_value, "u", &device_class);
-	G_VARIANT_UNREF(tmp_value);
-
-	major_class = (device_class & 0x1f00) >> 8;
-
-	if (major_class == BLUETOOTH_DEVICE_MAJOR_CLASS_AUDIO) {
-		BT_DBG("Audio device. Launch passkey pop-up");
-		_bt_launch_system_popup(BT_AGENT_EVENT_PASSKEY_CONFIRM_REQUEST, name,
-				str_passkey, NULL, _gap_agent_get_path(agent));
-		goto done;
-	}
-
-	if (__is_reset_required(address)) {
-		BT_INFO("Launch system reset pop-up");
-		_bt_launch_system_popup(BT_AGENT_EVENT_SYSTEM_RESET_REQUEST, name,
-				NULL, NULL, _gap_agent_get_path(agent));
-	} else {
-		BT_INFO("Launch passkey pop-up");
-		_bt_launch_system_popup(BT_AGENT_EVENT_PASSKEY_AUTO_ACCEPTED, name,
-				str_passkey, NULL, _gap_agent_get_path(agent));
-
-		gap_agent_reply_confirmation(agent, GAP_AGENT_ACCEPT, NULL);
-	}
-#else
-#ifdef AUTO_ACCEPT
-	BT_DBG("Confirm reply");
-	gap_agent_reply_confirmation(agent, GAP_AGENT_ACCEPT, NULL);
-#else
-	if (syspopup_mode) {
-		BT_DBG("LAUNCH SYSPOPUP");
-		_bt_launch_system_popup(BT_AGENT_EVENT_PASSKEY_CONFIRM_REQUEST, name,
-				str_passkey, NULL,
-				_gap_agent_get_path(agent));
-	} else {
-		int result = BLUETOOTH_ERROR_NONE;
-		GVariant *param;
-
-		BT_DBG("Send BLUETOOTH_EVENT_PASSKEY_CONFIRM_REQUEST");
-		param = g_variant_new("(isss)", result, address, name, str_passkey);
-		_bt_send_event(BT_ADAPTER_EVENT,
-				BLUETOOTH_EVENT_PASSKEY_CONFIRM_REQUEST, param);
-	}
-#endif
-#endif
+	BT_DBG("LAUNCH SYSPOPUP");
+	_bt_launch_system_popup(BT_AGENT_EVENT_PASSKEY_CONFIRM_REQUEST, name,
+			str_passkey, NULL,
+			_gap_agent_get_path(agent));
 
 done:
 	g_variant_unref(reply);
