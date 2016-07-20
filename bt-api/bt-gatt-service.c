@@ -29,7 +29,6 @@
 #define NUMBER_OF_FLAGS	10
 
 GDBusConnection *g_conn;
-GDBusNodeInfo *obj_info;
 guint owner_id;
 guint manager_id;
 static gboolean new_service = FALSE;
@@ -1031,22 +1030,21 @@ static const GDBusInterfaceVTable manager_interface_vtable = {
 };
 
 static GDBusNodeInfo *__bt_gatt_create_method_node_info(
-				const gchar *introspection_data)
+		const gchar *introspection_data)
 {
 	GError *err = NULL;
+	GDBusNodeInfo *obj_info = NULL;
 
 	if (introspection_data == NULL)
 		return NULL;
 
-	if (obj_info == NULL) {
-		BT_DBG("Create new node info");
-		obj_info = g_dbus_node_info_new_for_xml(introspection_data, &err);
+	BT_DBG("Create new node info");
+	obj_info = g_dbus_node_info_new_for_xml(introspection_data, &err);
 
-		if (err) {
-			BT_ERR("Unable to create node: %s", err->message);
-			g_clear_error(&err);
-			return NULL;
-		}
+	if (err) {
+		BT_ERR("Unable to create node: %s", err->message);
+		g_clear_error(&err);
+		return NULL;
 	}
 
 	return obj_info;
@@ -1572,15 +1570,11 @@ BT_EXPORT_API int bluetooth_gatt_init(void)
 	return BLUETOOTH_ERROR_NONE;
 
 failed:
-	if (obj_info)
-		g_dbus_node_info_unref(obj_info);
-
 	if (owner_id)
 		g_bus_unown_name(owner_id);
 
 	g_free(app_path);
 
-	obj_info = NULL;
 	app_path = NULL;
 	owner_id = 0;
 
@@ -1622,12 +1616,6 @@ BT_EXPORT_API int bluetooth_gatt_deinit()
 		g_object_unref(manager_gproxy);
 		manager_gproxy = NULL;
 
-		/* Temperary block under codes to avoid TC blocking issue.
-		    But we should unref node info in later. */
-#if 0
-		g_dbus_node_info_unref(obj_info);
-		obj_info = NULL;
-#endif
 		__bt_gatt_close_gdbus_connection();
 
 		return ret;
