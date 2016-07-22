@@ -998,6 +998,14 @@ int __bt_bluez_request(int function_name,
 		}
 		break;
 	}
+	case BT_RFCOMM_SOCKET_DISCONNECT: {
+		/*
+		 * Bluetooth RFCOMM socket disconnection will be done from bt-api, call to bt-service
+		 * is only used for privilege check, so return BLUETOOTH_ERROR_NONE from here.
+		 */
+		result = BLUETOOTH_ERROR_NONE;
+		break;
+	}
 	default:
 		BT_INFO("UnSupported function [%d]", function_name);
 		result = BLUETOOTH_ERROR_NOT_SUPPORT;

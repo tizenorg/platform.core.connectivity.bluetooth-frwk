@@ -1101,31 +1101,45 @@ BT_EXPORT_API int bluetooth_rfcomm_disconnect(int socket_fd)
 
 	return BLUETOOTH_ERROR_NONE;
 #else
-	int result;
-	int service_function;
+	rfcomm_client_conn_info_t *conn_info;
+
+	BT_INFO_C("<<<<<<<<< RFCOMM Disconnect request from app >>>>>>>>");
 
 	BT_CHECK_ENABLED(return);
+	retv_if(socket_fd < 0, BLUETOOTH_ERROR_INVALID_PARAM);
 
-	BT_INIT_PARAMS();
-	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
-
-	/* Support the OSP */
-	if (socket_fd == -1) {
-		/* Cancel connect */
-		service_function = BT_RFCOMM_CLIENT_CANCEL_CONNECT;
-	} else {
-		g_array_append_vals(in_param1, &socket_fd, sizeof(int));
-		service_function = BT_RFCOMM_SOCKET_DISCONNECT;
+	if (_bt_check_privilege(BT_BLUEZ_SERVICE, BT_RFCOMM_SOCKET_DISCONNECT)
+			== BLUETOOTH_ERROR_PERMISSION_DEINED) {
+		BT_ERR("Don't have a privilege to use this API");
+		return BLUETOOTH_ERROR_PERMISSION_DEINED;
 	}
 
-	result = _bt_send_request(BT_BLUEZ_SERVICE, service_function,
-		in_param1, in_param2, in_param3, in_param4, &out_param);
+	BT_DBG("FD %d", socket_fd);
 
-	BT_DBG("result: %x", result);
+	conn_info = __find_rfcomm_conn_info_with_fd(socket_fd);
+	if (conn_info == NULL) {
+		BT_DBG("Could not find in client, so check in server");
+		/*
+		 * TODO: For now if fd is not found in client list, return NOT CONNECTED.
+		 * Once RFCOMM server APIs are completed, Check for fd in server list and
+		 * perform the disconnection if present.
+		 */
+		//return bluetooth_rfcomm_server_disconnect(socket_fd);
+		return BLUETOOTH_ERROR_NOT_CONNECTED;
+	}
 
-	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
+	if (conn_info->watch_id <= 0) {
+		BT_ERR("Invalid state");
+		return BLUETOOTH_ERROR_NOT_CONNECTED;
+	}
 
-	return result;
+	/*
+	 * Just close socket here and return. Socket close will be detected via I/O watch
+	 * and disconnection event as well as info cleanup will be performed there.
+	 */
+	close(conn_info->sock_fd);
+
+	return BLUETOOTH_ERROR_NONE;
 #endif
 }
 
