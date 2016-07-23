@@ -306,6 +306,27 @@ oal_status_t device_reply_ssp_consent(bt_address_t * addr, int accept)
 	return OAL_STATUS_SUCCESS;
 }
 
+oal_status_t device_reply_auth_request(bt_address_t * addr, oal_service_t service_type, int accept, int always)
+{
+	int res;
+	bdstr_t bdstr;
+
+	CHECK_OAL_INITIALIZED();
+
+	OAL_CHECK_PARAMETER(addr, return);
+
+	API_TRACE("[%s] Accept: %d, always: %d, service_type: %d", bdt_bd2str(addr, &bdstr), accept, always, service_type);
+
+	res = blued_api->authorize_response((bt_bdaddr_t *)addr, service_type, accept, always);
+	if (res != BT_STATUS_SUCCESS) {
+		BT_ERR("authorize_response error: [%s]", status2string(res));
+		BT_ERR("Accept: [%d], always: [%d], service_type: [%d]", accept, always, service_type);
+		return convert_to_oal_status(res);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
 void cb_device_properties(bt_status_t status, bt_bdaddr_t *bd_addr,
 		int num_properties, bt_property_t *properties)
 {

@@ -450,12 +450,12 @@ static void __bt_device_authorization_request_callback(event_dev_authorize_req_t
 {
         oal_service_t service_d = auth_event->service_id;
 	gchar address[BT_ADDRESS_STR_LEN];
+	int res;
 
         _bt_convert_addr_type_to_string(address, auth_event->address.addr);
 
         BT_INFO("service_d: %d", service_d);
 
-	/* TODO: Add Reply to Authorization requests */
 	switch(service_d) {
 	case HID_SERVICE_ID:
 		BT_INFO("Incoming HID Profile conn Req from device addr [%s]", address);
@@ -467,9 +467,18 @@ static void __bt_device_authorization_request_callback(event_dev_authorize_req_t
 		BT_INFO("Incoming AVRCP Profile conn Req from device addr [%s]", address);
 		break;
 	default:
+		/* For now, reject authorization for any service apart from above switch cases */
 		BT_INFO("Incoming Profile conn req with service ID [%d] from device addr [%s]", service_d, address);
-		break;
+		res = device_reply_auth_request((bt_address_t*)&auth_event->address, service_d, FALSE, FALSE);
+		if (res != OAL_STATUS_SUCCESS)
+			BT_ERR("authorize_response: %d", res);
+		return;
 	}
+
+	/* Auto accept authorization request for HID, A2DP and AVRCP profiles */
+	res = device_reply_auth_request((bt_address_t*)&auth_event->address, service_d, TRUE, FALSE);
+	if (res != OAL_STATUS_SUCCESS)
+		BT_ERR("authorize_response: %d", res);
 	BT_INFO("-");
 }
 

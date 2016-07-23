@@ -232,6 +232,22 @@ oal_status_t device_reply_passkey_confirmation(bt_address_t * addr, int accept);
  */
 oal_status_t device_reply_ssp_consent(bt_address_t * addr, int accept);
 
+/**
+ * @brief Accept or reject authorization request for a connection from remote device
+ *
+ * @details authorize = TRUE: all connections from this device will be auto accepted without any auth-event
+ *                 authorize = FALSE: all connections from this device will result in auth request event
+ *
+ * @param[in] always  If TRUE, future connection requests will be automatically accepted.
+ *
+ * @return OAL_STATUS_SUCCESS on success, otherwise a non-zero error value.
+ * @retval #OAL_STATUS_SUCCESS  Successful
+ *
+ * @pre OAL_EVENT_DEVICE_AUTHORIZE_REQUEST should have been recieved by application.
+ *
+ * @see  OAL_EVENT_DEVICE_AUTHORIZE_REQUEST
+ */
+oal_status_t device_reply_auth_request(bt_address_t * addr, oal_service_t service_type, int accept, int always);
 
 #ifdef __cplusplus
 }
