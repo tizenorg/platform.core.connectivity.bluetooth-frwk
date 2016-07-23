@@ -55,6 +55,9 @@ int _bt_hal_device_ssp_reply(const bt_bdaddr_t *bd_addr, bt_ssp_variant_t varian
 
 int _bt_hal_dbus_get_remote_device_services(const bt_bdaddr_t *remote_addr);
 
+int _bt_hal_device_authorize_response(const bt_bdaddr_t *bd_addr, bt_service_id_t service_id,
+                                    uint8_t authorize, uint8_t save_settings);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

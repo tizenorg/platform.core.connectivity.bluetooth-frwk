@@ -108,4 +108,6 @@ gboolean gap_agent_reply_passkey(GapAgentPrivate *agent, const guint accept,
 gboolean gap_agent_reply_confirmation(GapAgentPrivate *agent, const guint accept,
                 GDBusMethodInvocation *context);
 
+gboolean gap_agent_reply_authorize(GapAgentPrivate *agent, const guint accept,
+                GDBusMethodInvocation *context);
 #endif //_BT_HAL_GAP_AGENT_H__

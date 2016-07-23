@@ -377,6 +377,27 @@ fail:
 	return result;
 }
 
+int _bt_hal_device_authorize_response(const bt_bdaddr_t *bd_addr, bt_service_id_t service_id,
+                                    uint8_t authorize, uint8_t save_settings)
+{
+	int reply = GAP_AGENT_ACCEPT;
+	GapAgentPrivate *agent = _bt_hal_get_adapter_agent();
+	DBG("+");
+
+	if (!agent)
+		return BT_STATUS_FAIL;
+
+	if (!authorize)
+		reply = GAP_AGENT_REJECT;
+	else if (authorize && save_settings)
+		reply = GAP_AGENT_ACCEPT_ALWAYS;
+
+	gap_agent_reply_authorize(agent, reply, NULL);
+
+	DBG("-");
+	return BT_STATUS_SUCCESS;
+}
+
 static void __bt_hal_device_service_search_cb(GDBusProxy *proxy, GAsyncResult *res,
                                         gpointer user_data)
 {

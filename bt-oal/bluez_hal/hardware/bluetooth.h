@@ -650,6 +650,10 @@ typedef struct {
       * Success indicates that the VSC command was sent to controller
       */
     int (*read_energy_info)();
+
+     /* Tizen Specific: Send  service level Authorization response */
+     int (*authorize_response)(const bt_bdaddr_t *bd_addr, bt_service_id_t service_id,
+					uint8_t authorize, uint8_t save_settings);
 } bt_interface_t;
 
 /** TODO: Need to add APIs for Service Discovery, Service authorization and

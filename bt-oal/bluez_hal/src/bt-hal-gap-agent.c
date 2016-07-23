@@ -960,3 +960,57 @@ gboolean gap_agent_reply_passkey(GapAgentPrivate *agent, const guint accept,
 	DBG("-");
 	return TRUE;
 }
+
+gboolean gap_agent_reply_authorize(GapAgentPrivate *agent, const guint accept,
+                GDBusMethodInvocation *context)
+{
+	gboolean ret = TRUE;
+	GapAgentPrivate *priv = agent;
+	DBG("+");
+
+	/* Fix : NULL_RETURNS */
+	if (priv == NULL)
+		return  FALSE;
+
+	if (priv->exec_type != GAP_AGENT_EXEC_NO_OPERATION &&
+			priv->reply_context != NULL) {
+		if (accept == GAP_AGENT_ACCEPT) {
+			g_dbus_method_invocation_return_value(priv->reply_context, NULL);
+		} else if (accept == GAP_AGENT_ACCEPT_ALWAYS) {
+			/* TODO: Enable below logic after set authorization API implementation */
+			g_dbus_method_invocation_return_value(priv->reply_context, NULL);
+		} else {
+			switch (accept) {
+				case GAP_AGENT_CANCEL:
+					g_dbus_method_invocation_return_error(priv->reply_context,
+							GAP_AGENT_ERROR, GAP_AGENT_ERROR_CANCEL,
+							"CanceledbyUser");
+					break;
+				case GAP_AGENT_TIMEOUT:
+				case GAP_AGENT_REJECT:
+				default:
+					g_dbus_method_invocation_return_error(priv->reply_context,
+							GAP_AGENT_ERROR, GAP_AGENT_ERROR_REJECT,
+							"Authorization request rejected");
+					break;
+			}
+		}
+
+		if (context)
+			g_dbus_method_invocation_return_value(context, NULL);
+	} else {
+		ERR("No context");
+		if (context)
+			g_dbus_method_invocation_return_error(context,
+					GAP_AGENT_ERROR, GAP_AGENT_ERROR_REJECT,
+					"No context");
+		ret = FALSE;
+	}
+
+	priv->exec_type = GAP_AGENT_EXEC_NO_OPERATION;
+	priv->reply_context = NULL;
+	memset(priv->authorize_addr, 0x00, sizeof(priv->authorize_addr));
+
+	DBG("-");
+	return ret;
+}
