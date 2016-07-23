@@ -64,6 +64,7 @@ extern void cb_device_acl_state_changed(bt_status_t status, bt_bdaddr_t *remote_
 extern void cb_device_pin_request(bt_bdaddr_t *bd_addr, bt_bdname_t *bdname, uint32_t device_class);
 extern void cb_device_ssp_request(bt_bdaddr_t *bd_addr, bt_bdname_t *bdname, uint32_t device_class,
 			bt_ssp_variant_t pairing_variant, uint32_t pass_key);
+extern void cb_device_authorize_request(bt_bdaddr_t *remote_bd_addr, bt_service_id_t service_d);
 
 static bt_callbacks_t callbacks = {
 	sizeof(callbacks),
@@ -80,6 +81,7 @@ static bt_callbacks_t callbacks = {
 	NULL, /* dut_mode_recv_callback */
 	NULL, /* le_test_mode_callback*/
 	NULL, /* energy_info_callback */
+	cb_device_authorize_request,
 };
 
 oal_status_t adapter_mgr_init(const bt_interface_t * stack_if)

@@ -555,3 +555,14 @@ void cb_device_ssp_request(bt_bdaddr_t *bd_addr, bt_bdname_t *bdname, uint32_t d
 	}
 	send_event_bda_trace(event, event_data, size, (bt_address_t*)bd_addr);
 }
+
+void cb_device_authorize_request(bt_bdaddr_t *bd_addr, bt_service_id_t service_d)
+{
+	event_dev_authorize_req_t * auth_req = g_new0(event_dev_authorize_req_t, 1);
+
+	BT_INFO("service_d: %d", service_d);
+	memcpy(auth_req->address.addr, bd_addr->address, 6);
+	auth_req->service_id = service_d;
+
+	send_event_bda_trace(OAL_EVENT_DEVICE_AUTHORIZE_REQUEST, auth_req, sizeof(event_dev_authorize_req_t), (bt_address_t*)bd_addr);
+}
