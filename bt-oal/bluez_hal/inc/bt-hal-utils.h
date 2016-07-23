@@ -31,6 +31,24 @@ static const char BT_BASE_UUID[] = {
 	0x80, 0x00, 0x00, 0x80, 0x5f, 0x9b, 0x34, 0xfb
 };
 
+/** BT Profile Service UUID's */
+#define BT_HAL_HFP_AUDIO_GATEWAY_UUID "0000111f-0000-1000-8000-00805f9b34fb"
+#define BT_HAL_HSP_AUDIO_GATEWAY_UUID "00001112-0000-1000-8000-00805f9b34fb"
+#define BT_HAL_A2DP_UUID "0000110D-0000-1000-8000-00805F9B34FB"
+#define BT_HAL_AVRCP_TARGET_UUID "0000110c-0000-1000-8000-00805f9b34fb"
+#define BT_HAL_AVRCP_REMOTE_UUID "0000110e-0000-1000-8000-00805f9b34fb"
+#define BT_HAL_OPP_UUID "00001105-0000-1000-8000-00805f9b34fb"
+#define BT_HAL_FTP_UUID "00001106-0000-1000-8000-00805f9b34fb"
+#define BT_HAL_SPP_UUID "00001101-0000-1000-8000-00805f9b34fb"
+#define BT_HAL_PBAP_UUID "0000112f-0000-1000-8000-00805f9b34fb"
+#define BT_HAL_MAP_UUID "00001132-0000-1000-8000-00805f9b34fb"
+#define BT_HAL_NAP_UUID "00001116-0000-1000-8000-00805f9b34fb"
+#define BT_HAL_GN_UUID "00001117-0000-1000-8000-00805f9b34fb"
+#define BT_HAL_BNEP_UUID "0000000f-0000-1000-8000-00805f9b34fb"
+#define BT_HAL_HID_UUID "00001124-0000-1000-8000-00805f9b34fb"
+#define BT_HAL_SAP_UUID_OLD "a49eb41e-cb06-495c-9f4f-bb80a90cdf00"
+#define BT_HAL_SAP_UUID_NEW "a49eb41e-cb06-495c-9f4f-aa80a90cdf4a"
+
 const char *bt_uuid_t2str(const uint8_t *uuid, char *buf);
 const char *btuuid2str(const uint8_t *uuid);
 const char *bt_bdaddr_t2str(const bt_bdaddr_t *bd_addr, char *buf);
@@ -52,5 +70,5 @@ int int2str_findstr(const char *str, const struct int2str m[]);
 const char *enum_defines(void *v, int i);
 const char *enum_strings(void *v, int i);
 const char *enum_one_string(void *v, int i);
-
+bt_service_id_t _bt_convert_uuid_string_to_service_id(const char *uuid);
 #endif //_BT_HAL_UTILS_H_

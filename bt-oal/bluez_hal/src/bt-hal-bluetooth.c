@@ -599,6 +599,34 @@ static void __bt_hal_handle_device_acl_state_changed_event(void *buf, uint16_t l
         DBG("-");
 }
 
+static void __bt_hal_handle_authorize_request_event(void *buf, uint16_t len)
+{
+	struct hal_ev_authorize_request *ev = (struct hal_ev_authorize_request *)buf;
+	bt_bdaddr_t bd_addr;
+
+	DBG("+");
+
+	memcpy(bd_addr.address, ev->bdaddr, 6);
+
+	/* BD address*/
+	DBG("[0x%x]", bd_addr.address[0]);
+	DBG("[0x%x]", bd_addr.address[1]);
+	DBG("[0x%x]", bd_addr.address[2]);
+	DBG("[0x%x]", bd_addr.address[3]);
+	DBG("[0x%x]", bd_addr.address[4]);
+	DBG("[0x%x]", bd_addr.address[5]);
+
+	DBG("Service Id: [%u]", ev->service_id);
+
+	if (!bt_hal_cbacks->authorize_request_cb) {
+		ERR("HAL User authorize_request_cb is not set!!");
+		return;
+	}
+
+	bt_hal_cbacks->authorize_request_cb(&bd_addr, ev->service_id);
+	DBG("-");
+}
+
 static void __bt_hal_handle_ssp_request_event(void *buf, uint16_t len)
 {
 	struct hal_ev_ssp_request *ev = (struct hal_ev_ssp_request *)buf;
@@ -701,6 +729,10 @@ static void __bt_hal_handle_stack_messages(int message, void *buf, uint16_t len)
 		case HAL_EV_PIN_REQUEST:
 			DBG("Event: HAL_EV_PIN_REQUEST");
 			__bt_hal_handle_pin_request_event(buf, len);
+			break;
+		case HAL_EV_AUTHORIZE_REQUEST:
+			DBG("Event: HAL_EV_AUTHORIZE_REQUEST");
+			__bt_hal_handle_authorize_request_event(buf, len);
 			break;
 		default:
 			DBG("Event Currently not handled!!");

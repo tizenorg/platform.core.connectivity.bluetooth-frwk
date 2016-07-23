@@ -46,6 +46,7 @@
 #include "bt-hal-log.h"
 #include "bt-hal-msg.h"
 #include "bt-hal-internal.h"
+#include "bt-hal-utils.h"
 #include "bt-hal-event-receiver.h"
 #include "bt-hal-dbus-common-utils.h"
 
@@ -85,9 +86,12 @@ static gboolean __bt_hal_display_request(GapAgentPrivate *agent, GDBusProxy *dev
 static gboolean __bt_hal_passkey_request(GapAgentPrivate *agent, GDBusProxy *device);
 static gboolean __bt_hal_confirm_request(GapAgentPrivate *agent, GDBusProxy *device,
 		guint passkey);
+static gboolean __bt_hal_authorize_request(GapAgentPrivate *agent, GDBusProxy *device,
+                                                        const char *uuid);
 static GVariant *__bt_hal_service_getall(GDBusProxy *device, const char *interface);
 static void __bt_hal_agent_release_memory(void);
 static inline void stack_trim(void);
+static void __bt_hal_send_authorize_request_event(const gchar *address, const char *uuid);
 
 #ifdef TIZEN_SYSPOPUP_SUPPORTED
 static gboolean __bt_hal_device_is_hid_keyboard(unsigned int dev_class);
@@ -120,7 +124,7 @@ void* _bt_hal_create_agent(const char *path, gboolean adapter)
 	func_cb.display_func = __bt_hal_display_request;
 	func_cb.passkey_func = __bt_hal_passkey_request;
 	func_cb.confirm_func = __bt_hal_confirm_request;
-	func_cb.authorize_func = NULL;
+	func_cb.authorize_func = __bt_hal_authorize_request;
 	func_cb.pairing_cancel_func = NULL;
 	func_cb.authorization_cancel_func = NULL;
 
@@ -204,6 +208,25 @@ void _bt_hal_destroy_adapter_agent(void)
 void* _bt_hal_get_adapter_agent(void)
 {
 	return adapter_agent;
+}
+
+static void __bt_hal_send_authorize_request_event(const gchar *address, const char *uuid)
+{
+	struct hal_ev_authorize_request ev;
+	memset(&ev, 0, sizeof(ev));
+
+	DBG("Remote Device address [%s]", address);
+
+	_bt_convert_addr_string_to_type(ev.bdaddr, address);
+	ev.service_id = _bt_convert_uuid_string_to_service_id(uuid);
+
+	handle_stack_msg event_cb = _bt_hal_get_stack_message_handler();
+	if (event_cb) {
+		DBG("Sending AUTHORIZE REQUEST");
+		event_cb(HAL_EV_AUTHORIZE_REQUEST, (void*)&ev, sizeof(ev));
+	}
+
+	DBG("-");
 }
 
 /* Legacy Pairing */
@@ -548,6 +571,84 @@ done:
 	g_variant_unref(reply);
 	g_variant_unref(reply_temp);
 	__bt_hal_agent_release_memory();
+	DBG("-");
+	return TRUE;
+}
+
+static gboolean __bt_hal_authorize_request(GapAgentPrivate *agent, GDBusProxy *device,
+                                                        const char *uuid)
+{
+	const gchar *address;
+	const gchar *name;
+	gboolean trust;
+	gboolean paired;
+	GVariant *reply = NULL;
+	GVariant *reply_temp = NULL;
+	GVariant *tmp_value;
+
+	DBG("Authorize Request from Bluez STack: UUID [%s]", uuid);
+
+	reply_temp = __bt_hal_service_getall(device, BT_HAL_DEVICE_INTERFACE);
+	if (reply_temp == NULL) {
+		/* TODO Reject Authorization request */
+		goto done;
+	}
+
+	g_variant_get(reply_temp,"(@a{sv})", &reply); /* Format of reply a{sv}*/
+
+	tmp_value = g_variant_lookup_value (reply, "Address", G_VARIANT_TYPE_STRING);
+	g_variant_get(tmp_value, "s", &address);
+	G_VARIANT_UNREF(tmp_value);
+	if (!address) {
+		/* TODO Reject Authorization request */
+		goto done;
+	}
+
+	tmp_value = g_variant_lookup_value(reply, "Alias", G_VARIANT_TYPE_STRING);
+	g_variant_get(tmp_value, "s", &name);
+	G_VARIANT_UNREF(tmp_value);
+	if (!name)
+		name = address;
+
+	tmp_value = g_variant_lookup_value(reply, "Trusted", G_VARIANT_TYPE_BOOLEAN);
+	g_variant_get(tmp_value, "b", &trust);
+	G_VARIANT_UNREF(tmp_value);
+
+	tmp_value = g_variant_lookup_value(reply, "Paired", G_VARIANT_TYPE_BOOLEAN);
+	g_variant_get(tmp_value, "b", &paired);
+	G_VARIANT_UNREF(tmp_value);
+	if ((paired == FALSE) && (trust == FALSE)) {
+		ERR("No paired & No trusted device");
+		/* TODO Reject Authorization request */
+		goto done;
+	}
+
+	INFO("Authorization request for device [%s] Service:[%s]\n", address, uuid);
+
+	if (trust) {
+		INFO("Trusted device, so authorize\n");
+		/* TODO Accept Authorization request */
+		goto done;
+	}
+
+	/*
+	 * TODO: Handling for authorization request for different profiles will be
+	 * implemented while profiles support is added. For now send all the request
+	 * to bt-service or, launch bt-syspopup.
+	 */
+#ifdef TIZEN_SYSPOPUP_SUPPORTED
+	DBG("Launch Syspopup: AUTHORIZE_REQUEST");
+	_bt_hal_launch_system_popup(BT_AGENT_EVENT_AUTHORIZE_REQUEST,
+			name, NULL, NULL, _gap_agent_get_path(agent));
+#else
+	__bt_hal_send_authorize_request_event(address, uuid);
+#endif
+
+done:
+	g_variant_unref(reply);
+	g_variant_unref(reply_temp);
+	__bt_hal_agent_release_memory();
+
 	DBG("-");
 	return TRUE;
 }

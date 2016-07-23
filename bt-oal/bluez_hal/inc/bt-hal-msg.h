@@ -156,6 +156,12 @@ struct hal_ev_bond_state_changed {
         uint8_t state;
 } __attribute__((packed));
 
+#define HAL_EV_AUTHORIZE_REQUEST        0x89
+struct hal_ev_authorize_request {
+	uint8_t  bdaddr[6];
+	uint32_t service_id;
+} __attribute__((packed));
+
 #define HAL_ACL_STATE_CONNECTED         0x00
 #define HAL_ACL_STATE_DISCONNECTED      0x01
 

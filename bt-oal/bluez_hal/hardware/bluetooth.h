@@ -354,6 +354,39 @@ typedef enum {
     BT_SSP_VARIANT_PASSKEY_NOTIFICATION
 } bt_ssp_variant_t;
 
+/** Bluetooth Profile Service IDs */
+typedef enum {
+    BT_RES_SERVICE_ID,              /* Reserved */
+    BT_SPP_SERVICE_ID,              /* Serial port profile. */
+    BT_DUN_SERVICE_ID,              /* Dial-up networking profile. */
+    BT_A2DP_SRC_SERVICE_ID,         /* A2DP Source profile. */
+    BT_LAP_SERVICE_ID,              /* LAN access profile. */
+    BT_HSP_SERVICE_ID,              /* Headset profile. */
+    BT_HFP_SERVICE_ID,              /* Hands-free profile. */
+    BT_OPP_SERVICE_ID,              /* Object push  */
+    BT_FTP_SERVICE_ID,              /* File transfer */
+    BT_AVRCP_CT_SERVICE_ID,         /* AVRC Controller Terminal */
+    BT_ICP_SERVICE_ID,              /* Intercom Terminal */
+    BT_SYNC_SERVICE_ID,             /* Synchronization */
+    BT_BPP_SERVICE_ID,              /* Basic printing profile */
+    BT_BIP_SERVICE_ID,              /* Basic Imaging profile */
+    BT_PANU_SERVICE_ID,             /* PAN User */
+    BT_NAP_SERVICE_ID,              /* PAN Network access point */
+    BT_GN_SERVICE_ID,               /* PAN Group Ad-hoc networks */
+    BT_SAP_SERVICE_ID,              /* SIM Access profile */
+    BT_A2DP_SERVICE_ID,             /* A2DP Sink */
+    BT_AVRCP_SERVICE_ID,            /* A/V remote control */
+    BT_HID_SERVICE_ID,              /* HID */
+    BT_VDP_SERVICE_ID,              /* Video distribution */
+    BT_PBAP_SERVICE_ID,             /* PhoneBook Access Server*/
+    BT_HSP_HS_SERVICE_ID,           /* HFP HS role */
+    BT_HFP_HS_SERVICE_ID,           /* HSP HS role */
+    BT_MAP_SERVICE_ID,              /* Message Access Profile */
+    BT_MN_SERVICE_ID,               /* Message Notification Service */
+    BT_HDP_SERVICE_ID,              /* Health Device Profile */
+    BT_PCE_SERVICE_ID               /* PhoneBook Access Client*/
+} bt_service_id_t;
+
 #define BT_MAX_NUM_UUIDS 32
 
 /** Bluetooth Interface callbacks */
@@ -444,6 +477,10 @@ typedef void (*le_test_mode_callback)(bt_status_t status, uint16_t num_packets);
  * Status-Provides the status of the read_energy_info API call */
 typedef void (*energy_info_callback)(bt_activity_energy_info *energy_info);
 
+/* Service level Authorization request callback */
+typedef void (*authorize_request_callback) (bt_bdaddr_t *remote_bd_addr, bt_service_id_t service_d);
+
+
 /** TODO: Add callbacks for Link Up/Down and other generic
   *  notifications/callbacks */
 
@@ -464,6 +501,7 @@ typedef struct {
     dut_mode_recv_callback dut_mode_recv_cb;
     le_test_mode_callback le_test_mode_cb;
     energy_info_callback energy_info_cb;
+    authorize_request_callback authorize_request_cb;
 } bt_callbacks_t;
 
 typedef void (*alarm_cb)(void *data);

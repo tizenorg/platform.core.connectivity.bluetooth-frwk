@@ -363,3 +363,47 @@ const char *btproperty2str(const bt_property_t *property)
 
 	return buf;
 }
+
+bt_service_id_t _bt_convert_uuid_string_to_service_id(const char *uuid)
+{
+        bt_service_id_t service_id = BT_RES_SERVICE_ID;
+
+        DBG("+");
+
+        if (!strcasecmp(uuid, BT_HAL_HFP_AUDIO_GATEWAY_UUID))
+                service_id = BT_HFP_SERVICE_ID;
+        else if (!strcasecmp(uuid, BT_HAL_HSP_AUDIO_GATEWAY_UUID))
+                service_id = BT_HSP_SERVICE_ID;
+        else if (!strcasecmp(uuid, BT_HAL_A2DP_UUID))
+                service_id = BT_A2DP_SERVICE_ID;
+        else if (!strcasecmp(uuid, BT_HAL_AVRCP_TARGET_UUID))
+                service_id = BT_AVRCP_SERVICE_ID;
+        else if (!strcasecmp(uuid, BT_HAL_AVRCP_REMOTE_UUID))
+                service_id = BT_AVRCP_CT_SERVICE_ID;
+        else if (!strcasecmp(uuid, BT_HAL_OPP_UUID))
+                service_id = BT_OPP_SERVICE_ID;
+        else if (!strcasecmp(uuid, BT_HAL_FTP_UUID))
+                service_id = BT_FTP_SERVICE_ID;
+        else if (!strcasecmp(uuid, BT_HAL_SPP_UUID))
+                service_id = BT_SPP_SERVICE_ID;
+        else if (!strcasecmp(uuid, BT_HAL_PBAP_UUID))
+                service_id = BT_PBAP_SERVICE_ID;
+        else if (!strcasecmp(uuid, BT_HAL_MAP_UUID))
+                service_id = BT_MAP_SERVICE_ID;
+        else if (!strcasecmp(uuid, BT_HAL_NAP_UUID))
+                service_id = BT_NAP_SERVICE_ID;
+        else if (!strcasecmp(uuid, BT_HAL_GN_UUID))
+                service_id = BT_GN_SERVICE_ID;
+        else if (!strcasecmp(uuid, BT_HAL_HID_UUID))
+                service_id = BT_HID_SERVICE_ID;
+        else if (!strcasecmp(uuid, BT_HAL_SAP_UUID_OLD))
+                service_id = BT_SAP_SERVICE_ID;
+        else if (!strcasecmp(uuid, BT_HAL_SAP_UUID_NEW))
+                service_id = BT_SAP_SERVICE_ID;
+        else
+                ERR("Unknwon Service uuid, return BT_RES_SERVICE_ID");
+
+        DBG("service_id = [%d]", service_id);
+        DBG("-");
+        return service_id;
+}

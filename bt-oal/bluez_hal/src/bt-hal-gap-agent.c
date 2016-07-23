@@ -661,7 +661,73 @@ static void __bt_gap_agent_method(GDBusConnection *connection,
 		g_object_unref(device);
 		return;
 	} else if (g_strcmp0(method_name, "AuthorizeService") == 0) {
-		/* TODO */
+		GapAgentPrivate *priv = user_data;
+		char *sender = (char *)g_dbus_method_invocation_get_sender(invocation);
+		GDBusProxy *device;
+		GDBusConnection *conn;
+		char *addr;
+		char *path;
+		char *uuid;
+
+		if (sender == NULL)
+			return;
+
+		g_variant_get(parameters, "(&o&s)", &path, &uuid);
+		DBG("Request authorization :sender %s priv->busname %s "
+				"Device Path :%s UUID: %s",
+				sender, priv->busname, path, uuid);
+
+		/* Need to check
+		   if (g_strcmp0(sender, agent->busname) != 0)
+		   return;
+		 */
+
+		if (!priv->cb.authorize_func)
+			return;
+
+		conn = _bt_get_system_gconn();
+		if (conn == NULL)
+			return;
+
+		device = g_dbus_proxy_new_sync(conn,
+				G_DBUS_PROXY_FLAGS_NONE, NULL,
+				BT_HAL_BLUEZ_NAME, path,
+				BT_HAL_PROPERTIES_INTERFACE, NULL, &err);
+
+		if (!device) {
+			ERR("Fail to make device proxy");
+
+			g_dbus_method_invocation_return_error(invocation,
+					GAP_AGENT_ERROR, GAP_AGENT_ERROR_REJECT,
+					"No proxy for device");
+
+			if (err) {
+				ERR("Unable to create proxy: %s", err->message);
+				g_clear_error(&err);
+			}
+
+			return;
+		}
+
+		priv->exec_type = GAP_AGENT_EXEC_AUTHORZATION;
+		priv->reply_context = invocation;
+
+		addr = strstr(path, "dev_");
+		if (addr != NULL) {
+			char *pos = NULL;
+			addr += 4;
+			g_strlcpy(priv->authorize_addr, addr,
+					sizeof(priv->authorize_addr));
+
+			while ((pos = strchr(priv->authorize_addr, '_')) != NULL) {
+				*pos = ':';
+			}
+		}
+
+		priv->cb.authorize_func(priv, device, uuid);
+
+		g_object_unref(device);
+		return;
 	} else if (g_strcmp0(method_name, "RequestAuthorization") == 0) {
 		g_dbus_method_invocation_return_value(invocation, NULL);
 	} else if (g_strcmp0(method_name, "ConfirmModeChange") == 0) {
