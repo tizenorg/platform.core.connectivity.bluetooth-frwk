@@ -586,11 +586,11 @@ static gboolean __bt_hal_authorize_request(GapAgentPrivate *agent, GDBusProxy *d
 	GVariant *reply_temp = NULL;
 	GVariant *tmp_value;
 
-	DBG("Authorize Request from Bluez STack: UUID [%s]", uuid);
+	DBG("Authorize Request from Bluez Stack: UUID [%s]", uuid);
 
 	reply_temp = __bt_hal_service_getall(device, BT_HAL_DEVICE_INTERFACE);
 	if (reply_temp == NULL) {
-		/* TODO Reject Authorization request */
+		gap_agent_reply_authorize(agent, GAP_AGENT_REJECT, NULL);
 		goto done;
 	}
 
@@ -600,7 +600,7 @@ static gboolean __bt_hal_authorize_request(GapAgentPrivate *agent, GDBusProxy *d
 	g_variant_get(tmp_value, "s", &address);
 	G_VARIANT_UNREF(tmp_value);
 	if (!address) {
-		/* TODO Reject Authorization request */
+		gap_agent_reply_authorize(agent, GAP_AGENT_REJECT, NULL);
 		goto done;
 	}
 
@@ -619,7 +619,7 @@ static gboolean __bt_hal_authorize_request(GapAgentPrivate *agent, GDBusProxy *d
 	G_VARIANT_UNREF(tmp_value);
 	if ((paired == FALSE) && (trust == FALSE)) {
 		ERR("No paired & No trusted device");
-		/* TODO Reject Authorization request */
+		gap_agent_reply_authorize(agent, GAP_AGENT_REJECT, NULL);
 		goto done;
 	}
 
@@ -627,7 +627,7 @@ static gboolean __bt_hal_authorize_request(GapAgentPrivate *agent, GDBusProxy *d
 
 	if (trust) {
 		INFO("Trusted device, so authorize\n");
-		/* TODO Accept Authorization request */
+		gap_agent_reply_authorize(agent, GAP_AGENT_ACCEPT, NULL);
 		goto done;
 	}
 
