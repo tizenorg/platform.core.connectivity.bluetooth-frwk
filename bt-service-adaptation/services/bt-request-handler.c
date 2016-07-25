@@ -617,6 +617,16 @@ int __bt_bluez_request(int function_name,
 		result = _bt_passkey_confirmation_reply(confirmation_reply);
 		break;
 	}
+	case BT_SET_AUTHORIZATION: {
+		bluetooth_device_address_t address = { {0} };
+		gboolean authorize;
+		 __bt_service_get_parameters(in_param1,
+				&address, sizeof(bluetooth_device_address_t));
+		 __bt_service_get_parameters(in_param2,
+				&authorize, sizeof(gboolean));
+		result = _bt_set_authorization(&address, authorize);
+		break;
+	}
 	case BT_HID_CONNECT: {
 		bluetooth_device_address_t address = { {0} };
 

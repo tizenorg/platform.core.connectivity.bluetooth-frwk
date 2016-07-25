@@ -327,6 +327,27 @@ oal_status_t device_reply_auth_request(bt_address_t * addr, oal_service_t servic
 	return OAL_STATUS_SUCCESS;
 }
 
+oal_status_t device_set_authorized(bt_address_t * addr, int authorize)
+{
+	int res;
+	bdstr_t bdstr;
+
+	CHECK_OAL_INITIALIZED();
+
+	OAL_CHECK_PARAMETER(addr, return);
+
+	API_TRACE("[%s] %d", bdt_bd2str(addr, &bdstr), authorize);
+
+	res = blued_api->set_authorization((bt_bdaddr_t *)addr, authorize);
+	if (res != BT_STATUS_SUCCESS) {
+		BT_ERR("set_authorization error: [%s]", status2string(res));
+		BT_ERR("%d", authorize);
+		return convert_to_oal_status(res);
+	}
+
+	return OAL_STATUS_SUCCESS;
+}
+
 void cb_device_properties(bt_status_t status, bt_bdaddr_t *bd_addr,
 		int num_properties, bt_property_t *properties)
 {

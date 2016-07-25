@@ -1525,3 +1525,21 @@ int _bt_cancel_search_device(void)
 	return BLUETOOTH_ERROR_NONE;
 	BT_DBG("-");
 }
+
+int _bt_set_authorization(bluetooth_device_address_t *device_address,
+                                      gboolean authorize)
+{
+	int ret = OAL_STATUS_SUCCESS;
+	BT_DBG("+");
+
+	BT_CHECK_PARAMETER(device_address, return);
+	BT_INFO("Device to be Trusted? [%d]", authorize);
+
+	ret = device_set_authorized((bt_address_t*)device_address, authorize);
+	if (ret != OAL_STATUS_SUCCESS) {
+		BT_ERR("device_set_authorized: %d", ret);
+		return BLUETOOTH_ERROR_INTERNAL;
+	}
+
+	return BLUETOOTH_ERROR_NONE;
+}

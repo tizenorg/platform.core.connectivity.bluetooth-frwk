@@ -58,7 +58,8 @@ int _bt_passkey_reply(const char *passkey, gboolean authentication_reply);
 
 int _bt_passkey_confirmation_reply(gboolean confirmation_reply);
 
-
+int _bt_set_authorization(bluetooth_device_address_t *device_address,
+				gboolean authorize);
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
