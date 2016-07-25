@@ -398,6 +398,114 @@ int _bt_hal_device_authorize_response(const bt_bdaddr_t *bd_addr, bt_service_id_
 	return BT_STATUS_SUCCESS;
 }
 
+int _bt_hal_device_set_trust(const bt_bdaddr_t *bd_addr, uint8_t trust)
+{
+	char address[BT_HAL_ADDRESS_STRING_SIZE] = { 0 };
+	gchar *device_path = NULL;
+	GDBusProxy *device_proxy;
+	gboolean previous_value;
+	gboolean authorize;
+	GDBusConnection *conn;
+	GError *error = NULL;
+	GVariant *result = NULL;
+	GVariant *temp = NULL;
+	int ret = BT_STATUS_SUCCESS;
+	DBG("+");
+
+	if (!bd_addr)
+		return BT_STATUS_PARM_INVALID;
+
+	if (trust == 1)
+		authorize = TRUE;
+	else
+		authorize = FALSE;
+
+	conn = _bt_get_system_gconn();
+
+	if (conn == NULL) {
+		ERR("Failed to get DBUS connection");
+		return BT_STATUS_FAIL;
+	}
+
+	_bt_convert_addr_type_to_string(address, bd_addr->address);
+
+	device_path = _bt_get_device_object_path(address);
+
+	if (device_path == NULL) {
+		ERR("No paired device");
+		return BT_STATUS_FAIL;
+	}
+
+	DBG("Device path [%s]", device_path);
+	device_proxy = g_dbus_proxy_new_sync(conn, G_DBUS_PROXY_FLAGS_NONE,
+			NULL, BT_HAL_BLUEZ_NAME,
+			device_path, BT_HAL_PROPERTIES_INTERFACE,  NULL, &error);
+
+	g_free(device_path);
+
+	if (device_proxy == NULL) {
+		if (error) {
+			g_dbus_error_strip_remote_error(error);
+			ERR("Device proxy get failed %s", error->message);
+			g_error_free(error);
+		}
+		ERR("Failed to get Device Proxy");
+		return BT_STATUS_FAIL;
+	}
+
+	result = g_dbus_proxy_call_sync(device_proxy, "Get",
+			g_variant_new("(ss)", BT_HAL_DEVICE_INTERFACE, "Trusted"),
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			&error);
+
+	if (error != NULL) {
+		ERR("Getting property failed: [%s]\n", error->message);
+		g_error_free(error);
+		g_object_unref(device_proxy);
+		return BT_STATUS_FAIL;
+	}
+
+	/* Fetch GVaraint*/
+	g_variant_get(result, "(v)", &temp);
+	previous_value = g_variant_get_boolean(temp);
+	DBG("Previous value [%d]", previous_value);
+
+	/* If the input is same with previous value, return error. */
+	if (previous_value == authorize) {
+		ERR("Same value: %d", previous_value);
+		g_object_unref(device_proxy);
+		g_object_unref(result);
+		g_object_unref(temp);
+		return BT_STATUS_PARM_INVALID;
+	}
+
+	DBG("Set authotrize [%d]", authorize);
+	result = g_dbus_proxy_call_sync(device_proxy, "Set",
+			g_variant_new("(ssv)", BT_HAL_DEVICE_INTERFACE, "Trusted", g_variant_new("b", authorize)),
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			&error);
+
+	if (error) {
+		ERR("SetProperty error: [%s]", error->message);
+		g_error_free(error);
+		ret = BT_STATUS_FAIL;
+	}
+
+	g_object_unref(device_proxy);
+
+	if (result)
+		g_object_unref(result);
+	if (temp)
+		g_object_unref(temp);
+
+	DBG("-");
+	return ret;
+}
+
 static void __bt_hal_device_service_search_cb(GDBusProxy *proxy, GAsyncResult *res,
                                         gpointer user_data)
 {

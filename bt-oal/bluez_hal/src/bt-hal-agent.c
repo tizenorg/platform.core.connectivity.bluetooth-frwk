@@ -629,6 +629,8 @@ static gboolean __bt_hal_authorize_request(GapAgentPrivate *agent, GDBusProxy *d
 		INFO("Trusted device, so authorize\n");
 		gap_agent_reply_authorize(agent, GAP_AGENT_ACCEPT, NULL);
 		goto done;
+	} else {
+		INFO("Device is not Trusted, so prompt user to accept or reject authorization \n");
 	}
 
 	/*

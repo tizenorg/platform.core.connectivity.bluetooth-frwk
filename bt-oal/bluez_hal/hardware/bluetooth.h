@@ -654,6 +654,9 @@ typedef struct {
      /* Tizen Specific: Send  service level Authorization response */
      int (*authorize_response)(const bt_bdaddr_t *bd_addr, bt_service_id_t service_id,
 					uint8_t authorize, uint8_t save_settings);
+
+     /** Set auto authorization for peer device. Should be a paired device */
+     int (*set_authorization)(bt_bdaddr_t *bd_addr, uint8_t auth);
 } bt_interface_t;
 
 /** TODO: Need to add APIs for Service Discovery, Service authorization and

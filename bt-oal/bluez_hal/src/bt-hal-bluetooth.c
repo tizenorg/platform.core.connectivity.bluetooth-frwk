@@ -292,6 +292,12 @@ static int authorize_response(const bt_bdaddr_t *bd_addr, bt_service_id_t servic
 	return _bt_hal_device_authorize_response(bd_addr, service_id, authorize, save_settings);
 }
 
+int set_authorization(bt_bdaddr_t *bd_addr, uint8_t auth)
+{
+	DBG("+");
+	return _bt_hal_device_set_trust(bd_addr, auth);
+}
+
 static const bt_interface_t bluetooth_if = {
 	.size = sizeof(bt_interface_t),
 	.init = init,
@@ -321,7 +327,9 @@ static const bt_interface_t bluetooth_if = {
 	.get_connection_state = get_connection_state,
 	.set_os_callouts = set_os_callouts,
 	.read_energy_info = read_energy_info,
+	/* Tizen Specific API's*/
 	.authorize_response = authorize_response,
+	.set_authorization = set_authorization,
 };
 
 static const bt_interface_t *get_bluetooth_interface(void)
