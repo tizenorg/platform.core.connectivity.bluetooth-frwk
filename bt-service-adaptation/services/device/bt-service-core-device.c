@@ -125,6 +125,7 @@ static void __bt_device_pin_request_callback(remote_device_t* pin_req_event);
 static void __bt_device_ssp_passkey_display_callback(event_dev_passkey_t *dev_info);
 static void __bt_device_ssp_passkey_confirmation_callback(event_dev_passkey_t *dev_info);
 static void __bt_device_ssp_passkey_entry_callback(remote_device_t* dev_info);
+static void __bt_device_authorization_request_callback(event_dev_authorize_req_t* auth_event);
 
 static void __bt_device_services_callback(event_dev_services_t* uuid_list);
 static void __bt_handle_ongoing_device_service_search(bt_remote_dev_info_t *remote_dev_info);
@@ -445,6 +446,33 @@ static void __bt_device_services_callback(event_dev_services_t* uuid_list)
 	BT_DBG("-");
 }
 
+static void __bt_device_authorization_request_callback(event_dev_authorize_req_t* auth_event)
+{
+        oal_service_t service_d = auth_event->service_id;
+	gchar address[BT_ADDRESS_STR_LEN];
+
+        _bt_convert_addr_type_to_string(address, auth_event->address.addr);
+
+        BT_INFO("service_d: %d", service_d);
+
+	/* TODO: Add Reply to Authorization requests */
+	switch(service_d) {
+	case HID_SERVICE_ID:
+		BT_INFO("Incoming HID Profile conn Req from device addr [%s]", address);
+		break;
+	case A2DP_SRC_SERVICE_ID:
+		BT_INFO("Incoming A2DP Profile conn Req from device addr [%s]", address);
+		break;
+	case AVRCP_SERVICE_ID:
+		BT_INFO("Incoming AVRCP Profile conn Req from device addr [%s]", address);
+		break;
+	default:
+		BT_INFO("Incoming Profile conn req with service ID [%d] from device addr [%s]", service_d, address);
+		break;
+	}
+	BT_INFO("-");
+}
+
 static void __bt_handle_ongoing_bond(bt_remote_dev_info_t *remote_dev_info)
 {
 	GVariant *param = NULL;
@@ -726,6 +754,11 @@ static void __bt_device_event_handler(int event_type, gpointer event_data)
 	case OAL_EVENT_DEVICE_SERVICES: {
 		BT_INFO("Remote Device Services Received");
 		__bt_device_services_callback((event_dev_services_t*)event_data);
+		break;
+	}
+	case OAL_EVENT_DEVICE_AUTHORIZE_REQUEST: {
+		BT_INFO("Remote Device Authorization Request");
+		__bt_device_authorization_request_callback((event_dev_authorize_req_t*)event_data);
 		break;
 	}
 	default:
