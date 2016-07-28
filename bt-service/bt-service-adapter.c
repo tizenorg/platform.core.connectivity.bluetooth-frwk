@@ -1203,6 +1203,7 @@ static gboolean __bt_disconnect_all(void)
 	return ret;
 }
 
+#if 0
 static gboolean __bt_set_disabled_timeout_cb(gpointer user_data)
 {
 	BT_DBG("");
@@ -1210,12 +1211,15 @@ static gboolean __bt_set_disabled_timeout_cb(gpointer user_data)
 
 	return FALSE;
 }
+#endif
 
 int __bt_disable_cb(void)
 {
 	FN_START;
 	GDBusProxy *proxy;
+#if 0
 	int ret;
+#endif
 	GVariant *result;
 	GError *error = NULL;
 

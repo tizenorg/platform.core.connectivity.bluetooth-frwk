@@ -198,6 +198,7 @@ static void  __bt_register_popup_event_signal(void)
 	return;
 }
 
+#if 0
 static gboolean __is_reset_required(const gchar *address)
 {
 	GArray *device_list;
@@ -240,6 +241,7 @@ static gboolean __is_reset_required(const gchar *address)
 
 	return is_required;
 }
+#endif
 #endif
 
 int _bt_launch_system_popup(bt_agent_event_type_t event_type,
