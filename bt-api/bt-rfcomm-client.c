@@ -33,6 +33,15 @@
 #include "bt-dpm.h"
 #endif
 
+/* Variable for privilege, only for write API,
+  before we should reduce time to bt-service dbus calling
+  -1 : Don't have a permission to access API
+  0 : Initial value, not yet check
+  1 : Have a permission to access API
+*/
+static int privilege_token;
+
+
 #ifdef RFCOMM_DIRECT
 #define BT_TIMEOUT_MESSAGE "Did not receive a reply. Possible causes include: " \
 			"the remote application did not send a reply, " \
@@ -41,14 +50,6 @@
 			"was broken."
 
 static GSList *rfcomm_clients;
-
-/* Variable for privilege, only for write API,
-  before we should reduce time to bt-service dbus calling
-  -1 : Don't have a permission to access API
-  0 : Initial value, not yet check
-  1 : Have a permission to access API
-*/
-static int privilege_token;
 
 typedef struct {
 	char bt_addr[BT_ADDRESS_STRING_SIZE];
@@ -1025,7 +1026,30 @@ BT_EXPORT_API int bluetooth_rfcomm_client_is_connected(const bluetooth_device_ad
 
 	return BLUETOOTH_ERROR_NONE;
 #else
-	return BLUETOOTH_ERROR_NOT_SUPPORT;
+	GSList *l;
+	char address[BT_ADDRESS_STRING_SIZE] = { 0 };
+
+	BT_CHECK_PARAMETER(device_address, return);
+	BT_CHECK_PARAMETER(connected, return);
+
+	BT_DBG("+");
+
+	*connected = FALSE;
+	_bt_convert_addr_type_to_string(address, (unsigned char *)device_address->addr);
+	BT_INFO("Client address: [%s]", address);
+
+	for (l = rfcomm_clients; l != NULL; l = l->next) {
+		rfcomm_client_conn_info_t *info = l->data;
+
+		if (info && !strncasecmp(info->remote_addr, address, BT_ADDRESS_STRING_SIZE)) {
+			BT_INFO("Match found");
+			*connected = TRUE;
+			return BLUETOOTH_ERROR_NONE;
+		}
+	}
+
+	BT_DBG("-");
+	return BLUETOOTH_ERROR_NONE;
 #endif
 }
 
@@ -1143,15 +1167,44 @@ BT_EXPORT_API int bluetooth_rfcomm_disconnect(int socket_fd)
 #endif
 }
 
+static int __write_all(int fd, const char *buf, int len)
+{
+	int sent = 0;
+
+	BT_DBG("+");
+	while (len > 0) {
+		int written;
+
+		written = write(fd, buf, len);
+		BT_DBG("written: %d", written);
+		if (written < 0) {
+			if (errno == EINTR || errno == EAGAIN)
+				continue;
+			return -1;
+		}
+
+		if (!written)
+			return 0;
+
+		len -= written;
+		buf += written;
+		sent += written;
+	}
+
+	BT_DBG("-");
+	return sent;
+}
+
 BT_EXPORT_API int bluetooth_rfcomm_write(int fd, const char *buf, int length)
 {
 #ifdef RFCOMM_DIRECT
 	int written;
-#else
-	char *buffer;
 #endif
 	int result;
 
+#ifndef RFCOMM_DIRECT
+	BT_CHECK_ENABLED(return);
+#endif
 	BT_CHECK_PARAMETER(buf, return);
 	if (fd < 0) {
 		BT_ERR("Invalid FD");
@@ -1160,9 +1213,6 @@ BT_EXPORT_API int bluetooth_rfcomm_write(int fd, const char *buf, int length)
 
 	BT_DBG("FD : %d", fd);
 
-#ifndef RFCOMM_DIRECT
-	BT_CHECK_ENABLED(return);
-#endif
 	retv_if(length <= 0, BLUETOOTH_ERROR_INVALID_PARAM);
 
 #ifdef TIZEN_DPM_ENABLE
@@ -1173,7 +1223,6 @@ BT_EXPORT_API int bluetooth_rfcomm_write(int fd, const char *buf, int length)
 	}
 #endif
 
-#ifdef RFCOMM_DIRECT
 	switch (privilege_token) {
 	case 0:
 		result = _bt_check_privilege(BT_BLUEZ_SERVICE, BT_RFCOMM_SOCKET_WRITE);
@@ -1198,31 +1247,13 @@ BT_EXPORT_API int bluetooth_rfcomm_write(int fd, const char *buf, int length)
 		return BLUETOOTH_ERROR_INTERNAL;
 	}
 
+#ifdef RFCOMM_DIRECT
 	written = write(fd, buf, length);
 	/*BT_DBG("Length %d, written = %d, balance(%d)",
-			 length, written, length - written); */
+			length, written, length - written); */
 	return written;
 #else
-	BT_INIT_PARAMS();
-	BT_ALLOC_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
-
-	buffer = g_malloc0(length + 1);
-
-	memcpy(buffer, buf, length);
-
-	g_array_append_vals(in_param1, &fd, sizeof(int));
-	g_array_append_vals(in_param2, &length, sizeof(int));
-	g_array_append_vals(in_param3, buffer, length);
-
-	result = _bt_send_request(BT_BLUEZ_SERVICE, BT_RFCOMM_SOCKET_WRITE,
-		in_param1, in_param2, in_param3, in_param4, &out_param);
-
-	BT_DBG("result: %x", result);
-
-	BT_FREE_PARAMS(in_param1, in_param2, in_param3, in_param4, out_param);
-
-	g_free(buffer);
-
+	result = __write_all(fd, buf, length);
 	return result;
 #endif
 }

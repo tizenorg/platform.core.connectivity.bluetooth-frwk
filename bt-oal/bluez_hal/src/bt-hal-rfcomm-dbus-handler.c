@@ -456,12 +456,14 @@ static int __new_connection(const char *path, int fd, bt_bdaddr_t *addr)
 	cond = G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_NVAL;
 	io = g_io_channel_unix_new(conn_info->hal_fd);
 	conn_info->hal_watch = g_io_add_watch(io, cond, app_event_cb, info);
+	g_io_channel_set_flags(io, G_IO_FLAG_NONBLOCK, NULL);
 	g_io_channel_unref(io);
 
 	/* Handle rfcomm events from bluez */
 	cond = G_IO_IN | G_IO_ERR | G_IO_HUP | G_IO_NVAL;
 	io = g_io_channel_unix_new(conn_info->stack_fd);
 	conn_info->bt_watch = g_io_add_watch(io, cond, stack_event_cb, info);
+	g_io_channel_set_flags(io, G_IO_FLAG_NONBLOCK, NULL);
 	g_io_channel_unref(io);
 
 	return 0;

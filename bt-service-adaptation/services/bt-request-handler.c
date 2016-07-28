@@ -1006,6 +1006,14 @@ int __bt_bluez_request(int function_name,
 		result = BLUETOOTH_ERROR_NONE;
 		break;
 	}
+	case BT_RFCOMM_SOCKET_WRITE: {
+		/*
+		 * This call to bt-service is only used for privilege check, so return
+		 * BLUETOOTH_ERROR_NONE from here.
+		 */
+		result = BLUETOOTH_ERROR_NONE;
+		break;
+	}
 	default:
 		BT_INFO("UnSupported function [%d]", function_name);
 		result = BLUETOOTH_ERROR_NOT_SUPPORT;
