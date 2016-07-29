@@ -341,6 +341,7 @@ sed -i 's/%TZ_SYS_DEFAULT_USER/app/' %{buildroot}%{_datadir}/dbus-1/system-servi
 
 %if %{bt_hal} == ENABLED
 %files oal
+%manifest %{name}.manifest
 %{_libdir}/libbt-oal.so*
 %{_libdir}/libbluetooth.default.so*
 %endif
