@@ -395,8 +395,8 @@ int _bt_send_event(int event_type, int event, GVariant *param)
 	case BLUETOOTH_EVENT_IPSP_DISCONNECTED:
 		signal = BT_IPSP_DISCONNECTED;
 		break;
-	case BLUETOOTH_EVENT_IPSP_BT_INTERFACE_INFO:
-		signal = BT_IPSP_BT_INTERFACE_INFO;
+	case BLUETOOTH_EVENT_IPSP_INTERFACE_INFO:
+		signal = BT_IPSP_INTERFACE_INFO;
 		break;
 	case BLUETOOTH_EVENT_GATT_CHAR_VAL_CHANGED:
 		signal = BT_GATT_CHAR_VAL_CHANGED;

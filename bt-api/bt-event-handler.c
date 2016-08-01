@@ -998,19 +998,19 @@ void __bt_device_event_filter(GDBusConnection *connection,
 		_bt_common_event_cb(BLUETOOTH_EVENT_IPSP_DISCONNECTED,
 				result, &dev_address,
 				event_info->cb, event_info->user_data);
-	} else if (strcasecmp(signal_name, BT_IPSP_BT_INTERFACE_INFO) == 0) {
+	} else if (strcasecmp(signal_name, BT_IPSP_INTERFACE_INFO) == 0) {
 		const char *address = NULL;
 		const char *if_name = NULL;
 		bt_ipsp_interface_info_t ipsp_iface_info;
 		memset(&ipsp_iface_info, 0, sizeof(ipsp_iface_info));
 
-		BT_DBG("BT_IPSP_BT_INTERFACE_INFO");
+		BT_DBG("BT_IPSP_INTERFACE_INFO");
 		g_variant_get(parameters, "(i&s&s)", &result, &address, &if_name);
 
 		_bt_convert_addr_string_to_type(ipsp_iface_info.btaddr.addr, address);
 		memcpy(ipsp_iface_info.if_name, if_name, 16);
 
-		_bt_common_event_cb(BLUETOOTH_EVENT_IPSP_BT_INTERFACE_INFO,
+		_bt_common_event_cb(BLUETOOTH_EVENT_IPSP_INTERFACE_INFO,
 				result, &ipsp_iface_info,
 				event_info->cb, event_info->user_data);
 	} else if (strcasecmp(signal_name, BT_LE_DATA_LENGTH_CHANGED) == 0) {
